@@ -2,9 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -17,7 +21,11 @@ func main() {
 		log.Fatal("DATABASE_URL is not set")
 	}
 
-	ctx := context.Background()
+	// Cancel the base context on SIGINT/SIGTERM so both startup and the run
+	// loop observe shutdown signals.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
 		log.Fatalf("create connection pool: %v", err)
@@ -37,9 +45,31 @@ func main() {
 	})
 	mux.Handle("GET /groups/{groupId}/members", membersHandler(queries))
 
-	const addr = ":8080"
-	log.Printf("movie-night backend listening on %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatal(err)
+	srv := &http.Server{
+		Addr:         ":8080",
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// Serve in the background; ListenAndServe blocks until Shutdown is called.
+	go func() {
+		log.Printf("movie-night backend listening on %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	// Wait for a shutdown signal, then drain in-flight requests before the
+	// deferred pool.Close runs.
+	<-ctx.Done()
+	stop() // restore default signal handling so a second Ctrl-C force-quits
+	log.Println("shutdown signal received; draining connections")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("graceful shutdown failed: %v", err)
 	}
 }
