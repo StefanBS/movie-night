@@ -51,12 +51,12 @@ without committing to an auth design prematurely.
 - **Testing:** testcontainers-go — an ephemeral Postgres per test run; self-
   contained and CI-friendly. No DB mocks (they would hide exactly the schema/query
   bugs we want to catch).
-- **Task runner:** `just` (a `justfile`) — a purpose-built command runner, cleaner
-  than Make and self-documenting via `just --list`. It is thin sugar over
+- **Task runner:** `just` (a `justfile`) — a purpose-built command runner with a
+  cleaner syntax, self-documenting via `just --list`. It is thin sugar over
   `go tool`, `docker compose`, and `go test`.
 - **Tool versioning:** `sqlc` and `goose` are pinned as Go tool dependencies in
   `go.mod` (Go 1.24+ `tool` directive), invoked as `go tool sqlc` / `go tool goose`.
-  This makes their versions reproducible without a separate install step or the
+  This keeps their versions reproducible without a separate install step or the
   old `tools.go` hack.
 
 ## Architecture & components
