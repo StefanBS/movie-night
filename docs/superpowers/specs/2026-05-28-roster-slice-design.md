@@ -29,7 +29,7 @@ without committing to an auth design prematurely.
 - Expo: a single screen that fetches and lists the roster.
 - One testcontainers-go integration test (migrate → seed → query → assert order).
 - Dev infrastructure: `compose.yaml` (postgres:17), goose migration setup, sqlc
-  config, and a `Makefile` with the common targets.
+  config, and a `justfile` with the common targets.
 
 **Out (deferred to later slices):**
 - Any writes (no add/edit/remove member).
@@ -51,6 +51,13 @@ without committing to an auth design prematurely.
 - **Testing:** testcontainers-go — an ephemeral Postgres per test run; self-
   contained and CI-friendly. No DB mocks (they would hide exactly the schema/query
   bugs we want to catch).
+- **Task runner:** `just` (a `justfile`) — a purpose-built command runner, cleaner
+  than Make and self-documenting via `just --list`. It is thin sugar over
+  `go tool`, `docker compose`, and `go test`.
+- **Tool versioning:** `sqlc` and `goose` are pinned as Go tool dependencies in
+  `go.mod` (Go 1.24+ `tool` directive), invoked as `go tool sqlc` / `go tool goose`.
+  This makes their versions reproducible without a separate install step or the
+  old `tools.go` hack.
 
 ## Architecture & components
 
@@ -61,7 +68,7 @@ backend/
   main.go                # config + pgxpool + route registration + handler
   compose.yaml           # postgres:17 service + volume
   sqlc.yaml              # schema = migrations/, queries = internal/db/query/
-  Makefile               # db-up, migrate, seed, sqlc, test, run
+  justfile               # db-up, migrate, seed, sqlc, test, run (sugar over `go tool` etc.)
   migrations/
     0001_init.sql        # goose: enums + users, groups, memberships (+ indexes)
   seed.sql               # dev-only: 1 group + ~5 members (NOT a migration)
@@ -117,7 +124,7 @@ A subset of `docs/schema.dbml`, verbatim in shape:
 
 ## Seeding
 
-`seed.sql`, applied via `make seed` after migrations and kept out of the migration
+`seed.sql`, applied via `just seed` after migrations and kept out of the migration
 sequence so it is unmistakably dev-only. One group, ~5 users, and a `core`/`active`
 membership each with `rotation_position` 1..5 and `baseline_picks` 0. Uses fixed
 UUIDs + `ON CONFLICT DO NOTHING` so it is safe to re-run.
@@ -135,7 +142,7 @@ UUIDs + `ON CONFLICT DO NOTHING` so it is safe to re-run.
   insert known fixtures, call `ListGroupMembers`, assert it returns exactly the
   seeded members in `rotation_position` order. Build-tagged so it is separable from
   fast unit tests.
-- **Manual:** `make db-up && make migrate && make seed && make run`, `curl` the
+- **Manual:** `just db-up && just migrate && just seed && just run`, `curl` the
   endpoint, then launch the Expo app and confirm the roster renders.
 
 ## Thread 1 — git hygiene (already done on this branch)
