@@ -1,0 +1,171 @@
+// Movie Night App — database schema (DBML)
+//
+// Declarative schema reflecting the architecture decisions in
+// architecture-decision-records.md. Paste into https://dbdiagram.io to render
+// an ERD, or run through the dbml CLI (`npx @dbml/cli`) to emit Postgres DDL.
+//
+// This file is the "what" (the precise shape). The ADRs are the "why".
+// Migrations remain the "how" and are owned by the project.
+//
+// Target engine: PostgreSQL. Last updated: 2026-05-28.
+
+Project movie_night {
+  database_type: 'PostgreSQL'
+  Note: '''
+    Turn-based movie-night app for a small recurring group.
+    Whose-turn-is-it is computed (least-served ranking), never stored.
+    See ADR-0005 (rotation) and ADR-0006 (membership churn).
+  '''
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+Enum membership_role {
+  core  [note: 'In the rotation; carries a rotation_position and can be owed a turn']
+  guest [note: 'Attends and may pick when invited; never in the rotation']
+}
+
+Enum membership_status {
+  active   [note: 'Counts as an eligible picker']
+  inactive [note: 'Left the rotation; history retained, not a candidate (ADR-0006)']
+}
+
+// ---------------------------------------------------------------------------
+// People & groups
+// ---------------------------------------------------------------------------
+
+Table users {
+  id              uuid         [pk, default: `gen_random_uuid()`]
+  name            varchar      [not null]
+  letterboxd_user varchar      [null, note: 'Optional handle; watchlists seeded via CSV import (ADR-0003)']
+  created_at      timestamptz  [not null, default: `now()`]
+
+  Note: 'Every human — core member or guest. Repeated guests are recurring rows (ADR-0004).'
+}
+
+Table groups {
+  id         uuid         [pk, default: `gen_random_uuid()`]
+  name       varchar      [not null]
+  created_at timestamptz  [not null, default: `now()`]
+
+  Note: 'A movie-night crew.'
+}
+
+Table memberships {
+  id                uuid               [pk, default: `gen_random_uuid()`]
+  group_id          uuid               [not null]
+  user_id           uuid               [not null]
+  role              membership_role    [not null, default: 'core']
+  status            membership_status  [not null, default: 'active']
+  baseline_picks    integer            [not null, default: 0, note: 'Seed for the least-served count; set to avg active credited count at join/reactivation (ADR-0006)']
+  rotation_position integer            [not null, note: 'Seed order and final tiebreak only (ADR-0005)']
+  joined_at         timestamptz        [not null, default: `now()`]
+  left_at           timestamptz        [null, note: 'Set on deactivation; never hard-deleted (ADR-0006)']
+
+  Indexes {
+    (group_id, user_id) [unique, name: 'uq_membership_group_user']
+    (group_id, status, role) [name: 'ix_membership_active_core']
+  }
+
+  Note: 'Links a person to a group with a role and rotation state.'
+}
+
+// ---------------------------------------------------------------------------
+// Movies (TMDB-backed) & nights
+// ---------------------------------------------------------------------------
+
+Table movies {
+  id           uuid         [pk, default: `gen_random_uuid()`]
+  tmdb_id      integer      [not null, unique, note: 'Canonical id from TMDB (ADR-0002)']
+  title        varchar      [not null]
+  release_year integer      [null]
+  cached_at    timestamptz  [not null, default: `now()`, note: 'Metadata cached from TMDB; refresh as needed']
+
+  Note: 'Movie metadata cached from TMDB.'
+}
+
+Table picks {
+  id            uuid         [pk, default: `gen_random_uuid()`]
+  group_id      uuid         [not null]
+  picker_id     uuid         [null, note: 'The person who chose. NULL for a free pick / nobody-owed-present night (ADR-0005)']
+  movie_id      uuid         [not null]
+  is_credited   boolean      [not null, default: true, note: 'TRUE only for normal core picks; guest/free picks are FALSE so they never affect standings (ADR-0006)']
+  scheduled_for date         [not null]
+  created_at    timestamptz  [not null, default: `now()`]
+
+  Indexes {
+    (group_id, scheduled_for) [name: 'ix_pick_group_date']
+    (picker_id, is_credited)  [name: 'ix_pick_picker_credited', note: 'Drives the least-served count']
+  }
+
+  Note: 'One movie night. The current picker is derived from credited picks + attendance, not stored.'
+}
+
+Table attendances {
+  id      uuid [pk, default: `gen_random_uuid()`]
+  pick_id uuid [not null]
+  user_id uuid [not null]
+
+  Indexes {
+    (pick_id, user_id) [unique, name: 'uq_attendance_pick_user']
+  }
+
+  Note: 'Who was present on a given night. Feeds the "present tonight" set for the rotation (ADR-0004/0005).'
+}
+
+// ---------------------------------------------------------------------------
+// Reviews & watchlists
+// ---------------------------------------------------------------------------
+
+Table reviews {
+  id         uuid         [pk, default: `gen_random_uuid()`]
+  pick_id    uuid         [not null]
+  user_id    uuid         [not null]
+  rating     decimal(2,1) [null, note: 'e.g. 0.5–5.0 in Letterboxd style; NULL = noted but unrated']
+  body       text         [null]
+  created_at timestamptz  [not null, default: `now()`]
+
+  Indexes {
+    (pick_id, user_id) [unique, name: 'uq_review_pick_user', note: 'One review per person per night; reviews hang off the night, not just the movie (ADR-0004 data-model)']
+  }
+
+  Note: 'A person rating/notes for a given night, enabling per-picker analytics later.'
+}
+
+Table watchlist_items {
+  id       uuid        [pk, default: `gen_random_uuid()`]
+  user_id  uuid        [not null]
+  movie_id uuid        [not null]
+  added_at timestamptz [not null, default: `now()`]
+
+  Indexes {
+    (user_id, movie_id) [unique, name: 'uq_watchlist_user_movie']
+  }
+
+  Note: 'Per-person saved films; the pool a picker can draw from. Seeded by Letterboxd CSV import (ADR-0003).'
+}
+
+// ---------------------------------------------------------------------------
+// References
+// ---------------------------------------------------------------------------
+// delete rules: memberships/attendances/reviews/watchlist cascade with their
+// parent; picks restrict on movie (keep history) and set null on picker
+// (a departed picker's nights survive as free picks).
+
+Ref: memberships.group_id > groups.id [delete: cascade]
+Ref: memberships.user_id  > users.id  [delete: cascade]
+
+Ref: picks.group_id > groups.id [delete: cascade]
+Ref: picks.picker_id > users.id [delete: set null]
+Ref: picks.movie_id  > movies.id [delete: restrict]
+
+Ref: attendances.pick_id > picks.id [delete: cascade]
+Ref: attendances.user_id > users.id [delete: cascade]
+
+Ref: reviews.pick_id > picks.id [delete: cascade]
+Ref: reviews.user_id > users.id [delete: cascade]
+
+Ref: watchlist_items.user_id  > users.id  [delete: cascade]
+Ref: watchlist_items.movie_id > movies.id [delete: cascade]
