@@ -44,19 +44,27 @@ type rosterStore interface {
 	ListGroupMembers(ctx context.Context, groupID uuid.UUID) ([]db.ListGroupMembersRow, error)
 }
 
+// writeJSONError writes a JSON error body with a matching Content-Type, so every
+// response this service emits — success and error alike — is application/json.
+func writeJSONError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
 // membersHandler serves GET /groups/{groupId}/members.
 func membersHandler(store rosterStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, err := parseGroupID(r.PathValue("groupId"))
 		if err != nil {
-			http.Error(w, `{"error":"invalid group id"}`, http.StatusBadRequest)
+			writeJSONError(w, http.StatusBadRequest, "invalid group id")
 			return
 		}
 
 		rows, err := store.ListGroupMembers(r.Context(), gid)
 		if err != nil {
 			log.Printf("list group members (%s): %v", gid, err)
-			http.Error(w, `{"error":"internal server error"}`, http.StatusInternalServerError)
+			writeJSONError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
 
