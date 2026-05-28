@@ -86,8 +86,10 @@ only when a second endpoint justifies it.
 **Components & responsibilities:**
 - `internal/db` (generated) — the only thing that talks SQL. Input: a `pgxpool`
   and a group id. Output: typed member rows. Independently testable.
-- `main.go` — reads `DATABASE_URL`, opens the pool, registers the route, maps the
-  query result to JSON. No business logic.
+- `main.go` — reads `DATABASE_URL`, opens the pool, registers the route, and wires
+  the handler with the concrete sqlc `*Queries`. The handler's pure pieces — path
+  UUID validation and the row → JSON mapping — are extracted as standalone functions
+  so they can be unit-tested directly, with no test doubles. No business logic.
 - Expo screen — fetches the endpoint, renders a `FlatList`, handles loading/error/
   empty states.
 
@@ -138,10 +140,22 @@ UUIDs + `ON CONFLICT DO NOTHING` so it is safe to re-run.
 
 ## Testing
 
-- **Integration (testcontainers-go):** start `postgres:17`, run goose migrations,
-  insert known fixtures, call `ListGroupMembers`, assert it returns exactly the
-  seeded members in `rotation_position` order. Build-tagged so it is separable from
-  fast unit tests.
+Two automated layers (a test pyramid), plus a manual smoke check. **Unit tests are
+pure — no mocks, fakes, stubs, or other test doubles.** Anything that needs a
+database is covered by the integration test against real Postgres, never by
+simulating the DB.
+
+- **Unit — pure, table-driven, no DB and no doubles.** Test the handler's extracted
+  pure functions directly: (1) path UUID validation — valid / malformed / empty
+  strings → expected ok/err; (2) row → response mapping — given sqlc rows, produce
+  the expected JSON DTOs with correct fields and preserved ordering. Idiomatic Go
+  table-driven style: a slice of named cases run through `t.Run` subtests.
+- **Integration — real Postgres via testcontainers-go.** Start `postgres:17`, run
+  goose migrations, insert known fixtures, then exercise the full path — the handler
+  wired to the real `*Queries`, driven through `httptest` — and assert `200` with
+  the seeded members in `rotation_position` order plus the empty-group case. This is
+  where the query, JSON wiring, and status codes are verified end to end. Build-
+  tagged so it is separable from the fast unit tests.
 - **Manual:** `just db-up && just migrate && just seed && just run`, `curl` the
   endpoint, then launch the Expo app and confirm the roster renders.
 
