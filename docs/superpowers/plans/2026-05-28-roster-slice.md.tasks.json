@@ -1,0 +1,61 @@
+{
+  "planPath": "docs/superpowers/plans/2026-05-28-roster-slice.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Dev infrastructure (Compose, go tool pins, justfile)",
+      "status": "completed",
+      "description": "**Goal:** Stand up reproducible dev env — postgres:17 Compose service, sqlc/goose pinned as `go tool` deps, `.env.example`, and a `justfile`.\n\n```json:metadata\n{\"files\": [\"backend/compose.yaml\", \"backend/.env.example\", \"backend/justfile\", \"backend/go.mod\"], \"verifyCommand\": \"cd backend && just db-up && go tool goose --version && go tool sqlc version && just --list\", \"acceptanceCriteria\": [\"just db-up starts healthy postgres:17\", \"go tool goose/sqlc print versions\", \"just --list shows documented recipes\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Schema migration 0001",
+      "status": "completed",
+      "blockedBy": [1],
+      "description": "**Goal:** goose migration creating enums + users/groups/memberships with indexes and FKs.\n\n```json:metadata\n{\"files\": [\"backend/migrations/0001_init.sql\"], \"verifyCommand\": \"cd backend && just db-up && just migrate\", \"acceptanceCriteria\": [\"just migrate applies cleanly\", \"just migrate-down reverses cleanly\", \"memberships shows both indexes and two FKs\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Dev seed",
+      "status": "completed",
+      "blockedBy": [2],
+      "description": "**Goal:** Re-runnable seed.sql (1 group + 5 active core members), applied via `just seed`.\n\n```json:metadata\n{\"files\": [\"backend/seed.sql\"], \"verifyCommand\": \"cd backend && just seed && just seed && docker compose exec -T db psql -U movie -d movienight -c \\\"SELECT count(*) FROM memberships;\\\"\", \"acceptanceCriteria\": [\"seed inserts 1 group, 5 users, 5 memberships\", \"re-running seed is idempotent\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: sqlc query + codegen",
+      "status": "completed",
+      "blockedBy": [2],
+      "description": "**Goal:** Write ListGroupMembers query and generate internal/db package (uuid → google/uuid.UUID).\n\n```json:metadata\n{\"files\": [\"backend/sqlc.yaml\", \"backend/internal/db/query/roster.sql\", \"backend/internal/db/db.go\", \"backend/internal/db/models.go\", \"backend/internal/db/roster.sql.go\"], \"verifyCommand\": \"cd backend && just sqlc && go build ./...\", \"acceptanceCriteria\": [\"just sqlc generates three files\", \"ListGroupMembers takes uuid.UUID returns ID/Name/Role rows\", \"go build passes\"]}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: Handler pure functions + unit tests (TDD)",
+      "status": "completed",
+      "blockedBy": [4],
+      "description": "**Goal:** Pure parseGroupID + toMemberDTOs with table-driven unit tests, no DB, no doubles. Tests first.\n\n```json:metadata\n{\"files\": [\"backend/roster.go\", \"backend/roster_test.go\"], \"verifyCommand\": \"cd backend && go test ./...\", \"acceptanceCriteria\": [\"parseGroupID ok/err cases\", \"toMemberDTOs preserves order, stringifies fields\", \"toMemberDTOs(nil) returns non-nil empty slice\", \"go test passes\"]}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: Wire pgxpool + handler in main.go",
+      "status": "completed",
+      "blockedBy": [5],
+      "description": "**Goal:** Open pgxpool from DATABASE_URL at startup, register GET /groups/{groupId}/members wired to *db.Queries via a small store interface (no mocks).\n\n```json:metadata\n{\"files\": [\"backend/main.go\", \"backend/roster.go\"], \"verifyCommand\": \"cd backend && go build ./... && go vet ./...\", \"acceptanceCriteria\": [\"main reads DATABASE_URL, aborts on connect failure\", \"400 bad uuid / 500 db error / 200 array\", \"healthz still works\", \"build+vet pass\"]}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: Integration test (testcontainers-go)",
+      "status": "completed",
+      "blockedBy": [6],
+      "description": "**Goal:** Build-tagged integration test: postgres:17 + goose migrate + fixtures (incl. inactive member + empty group), drive handler via httptest with real *db.Queries.\n\n```json:metadata\n{\"files\": [\"backend/roster_integration_test.go\"], \"verifyCommand\": \"cd backend && just test-integration\", \"acceptanceCriteria\": [\"guarded by //go:build integration\", \"asserts rotation order, inactive excluded, 400, empty group 200 []\", \"go test ./... still skips container\"]}\n```"
+    },
+    {
+      "id": 8,
+      "subject": "Task 8: Expo roster screen",
+      "status": "completed",
+      "blockedBy": [6],
+      "description": "**Goal:** Single-screen Expo (TS) app fetching GET /groups/{id}/members, rendering FlatList with loading/error/empty states.\n\n```json:metadata\n{\"files\": [\"mobile/App.tsx\", \"mobile/.env.example\"], \"verifyCommand\": \"cd mobile && npx tsc --noEmit\", \"acceptanceCriteria\": [\"fetches roster on mount from EXPO_PUBLIC_API_URL\", \"renders name+role; loading/error/empty states\", \"tsc --noEmit passes\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-05-28T21:45:00Z"
+}

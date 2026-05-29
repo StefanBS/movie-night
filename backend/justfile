@@ -1,0 +1,60 @@
+set dotenv-load := true
+
+# List all recipes
+default:
+    @just --list
+
+# Start the postgres:18 container (detached)
+db-up:
+    docker compose up -d db
+
+# Stop and remove the postgres container
+db-down:
+    docker compose down
+
+# Destroy the postgres container and its data volume
+db-reset:
+    docker compose down -v
+
+# Apply all goose migrations
+migrate:
+    go tool goose -dir migrations postgres "$DATABASE_URL" up
+
+# Roll back the most recent goose migration
+migrate-down:
+    go tool goose -dir migrations postgres "$DATABASE_URL" down
+
+# Load the dev seed (idempotent; NOT a migration)
+seed:
+    docker compose exec -T db psql -U movie -d movienight < seed.sql
+
+# Regenerate the sqlc db package
+sqlc:
+    go tool sqlc generate
+
+# Verify formatting with gofmt
+fmt-check:
+    test -z "$(gofmt -l .)" || { echo "Not gofmt-clean:"; gofmt -l .; exit 1; }
+
+# Report suspicious constructs
+vet:
+    go vet ./...
+
+# Compile all packages
+build:
+    go build ./...
+
+# Run the fast unit tests
+test:
+    go test ./...
+
+# Run all fast checks: formatting, vet, build, unit tests (what CI runs)
+check: fmt-check vet build test
+
+# Run the testcontainers integration tests
+test-integration:
+    go test -tags=integration ./...
+
+# Run the backend server
+run:
+    go run .

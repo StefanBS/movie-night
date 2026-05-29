@@ -1,0 +1,15 @@
+# Compiled Go binaries
+/backend/backend
+
+# Go test / coverage output
+*.test
+*.out
+coverage.out
+
+# Environment files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# OS / editor cruft
+.DS_Store

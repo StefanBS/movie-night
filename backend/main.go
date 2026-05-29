@@ -1,20 +1,81 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
 func main() {
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		log.Fatal("DATABASE_URL is not set")
+	}
+
+	// Cancel the base context on SIGINT/SIGTERM so both startup and the run
+	// loop observe shutdown signals.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := pgxpool.New(ctx, dbURL)
+	if err != nil {
+		log.Fatalf("create connection pool: %v", err)
+	}
+	defer pool.Close()
+
+	if err := pool.Ping(ctx); err != nil {
+		log.Fatalf("connect to database: %v", err)
+	}
+
+	queries := db.New(pool)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+	mux.Handle("GET /groups/{groupId}/members", membersHandler(queries))
 
-	const addr = ":8080"
-	log.Printf("movie-night backend listening on %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatal(err)
+	// Browsers enforce CORS; native apps and curl do not. Allowed web origins
+	// come from CORS_ALLOWED_ORIGINS (comma-separated) so the policy is the same
+	// mechanism in dev, CI, and prod — only the value differs.
+	allowedOrigins := parseAllowedOrigins(os.Getenv("CORS_ALLOWED_ORIGINS"))
+	log.Printf("CORS allowed origins: %v", allowedOrigins)
+
+	srv := &http.Server{
+		Addr:         ":8080",
+		Handler:      withCORS(allowedOrigins, mux),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// Serve in the background; ListenAndServe blocks until Shutdown is called.
+	go func() {
+		log.Printf("movie-night backend listening on %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	// Wait for a shutdown signal, then drain in-flight requests before the
+	// deferred pool.Close runs.
+	<-ctx.Done()
+	stop() // restore default signal handling so a second Ctrl-C force-quits
+	log.Println("shutdown signal received; draining connections")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("graceful shutdown failed: %v", err)
 	}
 }

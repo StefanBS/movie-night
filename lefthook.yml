@@ -1,0 +1,39 @@
+# https://lefthook.dev
+# Setup once per clone:  lefthook install
+#   pre-commit — fast, runs on every commit (secret scan, format, lint, types)
+#   pre-push   — fast unit tests before code leaves your machine
+# Full suites (incl. backend integration tests) run in CI. Component commands
+# are defined in each justfile (single source of truth).
+pre-commit:
+  parallel: true
+  commands:
+    betterleaks:
+      run: betterleaks git --pre-commit --staged --no-banner
+    backend-fmt:
+      root: backend/
+      glob: "*.go"
+      run: just fmt-check
+    backend-vet:
+      root: backend/
+      glob: "*.go"
+      run: just vet
+    mobile-lint:
+      root: mobile/
+      glob: "*.{js,jsx,ts,tsx}"
+      run: just lint
+    mobile-typecheck:
+      root: mobile/
+      glob: "*.{js,jsx,ts,tsx}"
+      run: just typecheck
+
+pre-push:
+  parallel: true
+  commands:
+    backend-test:
+      root: backend/
+      glob: "*.go"
+      run: just test
+    mobile-test:
+      root: mobile/
+      glob: "*.{js,jsx,ts,tsx}"
+      run: just test
