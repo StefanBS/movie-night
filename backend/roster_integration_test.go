@@ -105,12 +105,12 @@ func TestMembersHandlerIntegration(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.Handle("GET /groups/{groupId}/members", membersHandler(db.New(pool)))
 
-	get := func(t *testing.T, groupID string) (int, []memberDTO) {
+	get := func(t *testing.T, groupID string) (int, []memberResponse) {
 		t.Helper()
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/groups/"+groupID+"/members", nil)
 		mux.ServeHTTP(rec, req)
-		var got []memberDTO
+		var got []memberResponse
 		if rec.Code == http.StatusOK {
 			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 				t.Fatalf("decode body: %v", err)

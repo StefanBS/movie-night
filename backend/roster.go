@@ -11,8 +11,8 @@ import (
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
-// memberDTO is the JSON shape returned by GET /groups/{groupId}/members.
-type memberDTO struct {
+// memberResponse is the JSON shape returned by GET /groups/{groupId}/members.
+type memberResponse struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	Role string `json:"role"`
@@ -23,12 +23,12 @@ func parseGroupID(s string) (uuid.UUID, error) {
 	return uuid.Parse(s)
 }
 
-// toMemberDTOs maps sqlc rows to JSON DTOs, preserving order. It always
+// toMemberResponses maps sqlc rows to JSON responses, preserving order. It always
 // returns a non-nil slice so an empty result encodes as [] rather than null.
-func toMemberDTOs(rows []db.ListGroupMembersRow) []memberDTO {
-	out := make([]memberDTO, 0, len(rows))
+func toMemberResponses(rows []db.ListGroupMembersRow) []memberResponse {
+	out := make([]memberResponse, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, memberDTO{
+		out = append(out, memberResponse{
 			ID:   r.ID.String(),
 			Name: r.Name,
 			Role: string(r.Role),
@@ -37,7 +37,7 @@ func toMemberDTOs(rows []db.ListGroupMembersRow) []memberDTO {
 	return out
 }
 
-// rosterStore is the slice of *db.Queries the handler needs. Declaring it as an
+// rosterStore is the subset of *db.Queries the handler needs. Declaring it as an
 // interface keeps the handler wireable; the integration test passes the real
 // *db.Queries, so no mock implementation is ever written.
 type rosterStore interface {
@@ -69,7 +69,7 @@ func membersHandler(store rosterStore) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(toMemberDTOs(rows)); err != nil {
+		if err := json.NewEncoder(w).Encode(toMemberResponses(rows)); err != nil {
 			log.Printf("encode members response (%s): %v", gid, err)
 		}
 	}
