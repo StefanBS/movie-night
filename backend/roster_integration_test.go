@@ -26,12 +26,12 @@ const (
 	emptyGroup  = "22222222-2222-2222-2222-222222222222"
 )
 
-// startPostgres boots postgres:17, runs goose migrations, returns a connected pool.
+// startPostgres boots postgres:18, runs goose migrations, returns a connected pool.
 func startPostgres(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	ctx := context.Background()
 
-	container, err := postgres.Run(ctx, "postgres:17",
+	container, err := postgres.Run(ctx, "postgres:18",
 		postgres.WithDatabase("movienight"),
 		postgres.WithUsername("movie"),
 		postgres.WithPassword("movie"),

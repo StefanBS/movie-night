@@ -9,7 +9,7 @@ CREATE TYPE membership_status AS ENUM ('active', 'inactive');
 
 -- +goose StatementBegin
 CREATE TABLE users (
-    id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    id              uuid        PRIMARY KEY DEFAULT uuidv7(),
     name            varchar     NOT NULL,
     letterboxd_user varchar,
     created_at      timestamptz NOT NULL DEFAULT now()
@@ -18,7 +18,7 @@ CREATE TABLE users (
 
 -- +goose StatementBegin
 CREATE TABLE groups (
-    id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    id         uuid        PRIMARY KEY DEFAULT uuidv7(),
     name       varchar     NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -26,7 +26,7 @@ CREATE TABLE groups (
 
 -- +goose StatementBegin
 CREATE TABLE memberships (
-    id                uuid              PRIMARY KEY DEFAULT gen_random_uuid(),
+    id                uuid              PRIMARY KEY DEFAULT uuidv7(),
     group_id          uuid              NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     user_id           uuid              NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
     role              membership_role   NOT NULL DEFAULT 'core',
