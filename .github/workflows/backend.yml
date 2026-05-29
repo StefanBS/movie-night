@@ -34,8 +34,17 @@ jobs:
 
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
-      - name: Check (fmt, vet, build, unit tests)
-        run: just check
+      - name: Format check
+        run: just fmt-check
+
+      - name: Vet
+        run: just vet
+
+      - name: Build
+        run: just build
+
+      - name: Unit tests
+        run: just test
 
       - name: Integration tests
         run: just test-integration
