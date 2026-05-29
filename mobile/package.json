@@ -4,19 +4,26 @@
   "main": "index.ts",
   "dependencies": {
     "expo": "^54.0.0",
+    "expo-constants": "~18.0.13",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",
-    "react-native": "0.81.5"
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "~5.6.0"
   },
   "devDependencies": {
     "@types/react": "~19.1.10",
+    "eslint": "^9.39.4",
+    "eslint-config-expo": "~10.0.0",
+    "tsx": "^4.22.3",
     "typescript": "~5.9.2"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "lint": "eslint .",
+    "test": "node --import tsx --test \"lib/**/*.test.ts\""
   },
   "private": true
 }

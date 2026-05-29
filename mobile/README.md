@@ -6,13 +6,13 @@ Native. It currently renders a group's roster fetched from the
 
 ## Stack
 
-- **Expo SDK 56** — React Native tooling and runtime
-- **React Native 0.85** / **React 19**
-- **TypeScript 6**
+- **Expo SDK 54** — React Native tooling and runtime
+- **React Native 0.81** / **React 19**
+- **TypeScript 5.9**
 
 > **Heads up:** Expo APIs are version-specific. Before changing native or Expo
 > code, read the docs for this exact SDK:
-> <https://docs.expo.dev/versions/v56.0.0/> (see [`AGENTS.md`](AGENTS.md)).
+> <https://docs.expo.dev/versions/v54.0.0/> (see [`AGENTS.md`](AGENTS.md)).
 
 ## Prerequisites
 
@@ -40,12 +40,20 @@ loads a `.env` file in this directory:
 EXPO_PUBLIC_API_URL=http://localhost:8080
 ```
 
-- **Simulator / emulator / web:** `localhost` works.
-- **Physical phone (Expo Go):** `localhost` refers to the *phone*, not your
-  computer. Use your dev machine's LAN IP instead, e.g.
-  `EXPO_PUBLIC_API_URL=http://192.168.1.50:8080`.
+You usually don't need to change this. `lib/api.ts` (`resolveApiBaseUrl`)
+chooses the right URL at runtime:
 
-If `EXPO_PUBLIC_API_URL` is unset, the app falls back to `http://localhost:8080`.
+- **Simulator / emulator / web:** uses `localhost` — correct, the backend is on
+  the same machine.
+- **Physical phone (Expo Go):** `localhost` would mean the *phone*, so the app
+  automatically derives your dev machine's LAN address from the host Expo used
+  to serve the bundle. No editing required.
+- **Override (staging / production):** set `EXPO_PUBLIC_API_URL` to an explicit
+  non-localhost URL and it wins. This is how a CI/CD build points at a deployed
+  backend.
+
+For a physical phone to reach the backend, the backend must listen on your LAN
+(i.e. bind `0.0.0.0`, not just `127.0.0.1`) and not be blocked by a firewall.
 
 ## Run
 
@@ -79,22 +87,37 @@ just db-up && just migrate && just seed && just run
 Then start the app. If the request fails you'll see an inline error; an empty
 group shows "No members yet."
 
-## Testing
-
-No test suite is set up for the mobile app yet. TypeScript itself is the first
-line of defense — type-check with:
+## Quality checks
 
 ```bash
-npx tsc --noEmit
+npm test            # unit + integration tests (node:test runner)
+npm run lint        # ESLint (eslint-config-expo)
+npx tsc --noEmit    # type-check
 ```
+
+Tests use Node's built-in test runner via `tsx`, mirroring the Go backend's
+table-driven style:
+
+- **Unit tests** cover pure logic with no mocks — `lib/api.test.ts`
+  (URL resolution) and `lib/members.test.ts` (payload validation).
+- **Integration tests** (`lib/members.integration.test.ts`) exercise
+  `fetchMembers` against a real local HTTP server over a real `fetch`, with no
+  mocking.
+
+There are no component/render tests yet — deferred until there's UI logic worth
+asserting.
 
 ## Project layout
 
 ```
 mobile/
-├── App.tsx          # root component — the roster screen
-├── index.ts         # Expo entrypoint (registerRootComponent)
-├── app.json         # Expo app config
-├── tsconfig.json    # TypeScript config
-└── assets/          # icons and images
+├── App.tsx            # root component — the roster screen
+├── index.ts           # Expo entrypoint (registerRootComponent)
+├── lib/               # framework-free logic + its tests
+│   ├── api.ts         # resolveApiBaseUrl — picks the backend URL
+│   └── members.ts     # fetchMembers + parseMembers (validation)
+├── app.json           # Expo app config
+├── eslint.config.js   # ESLint flat config
+├── tsconfig.json      # TypeScript config
+└── assets/            # icons and images
 ```
