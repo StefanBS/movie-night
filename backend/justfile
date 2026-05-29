@@ -32,9 +32,24 @@ seed:
 sqlc:
     go tool sqlc generate
 
+# Verify formatting with gofmt
+fmt-check:
+    test -z "$(gofmt -l .)" || { echo "Not gofmt-clean:"; gofmt -l .; exit 1; }
+
+# Report suspicious constructs
+vet:
+    go vet ./...
+
+# Compile all packages
+build:
+    go build ./...
+
 # Run the fast unit tests
 test:
     go test ./...
+
+# Run all fast checks: formatting, vet, build, unit tests (what CI runs)
+check: fmt-check vet build test
 
 # Run the testcontainers integration tests
 test-integration:
