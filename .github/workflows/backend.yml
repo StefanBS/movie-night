@@ -34,9 +34,6 @@ jobs:
 
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
-      # Commands live in the justfile (single source of truth); this job only
-      # owns the CI environment. `just` echoes each command it runs, so the
-      # underlying go invocations still appear in the log.
       - name: Check (fmt, vet, build, unit tests)
         run: just check
 
