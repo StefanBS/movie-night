@@ -35,6 +35,10 @@ gitignored — create it in this directory:
 # Connection string used by the server, migrations, and seeding.
 DATABASE_URL=postgres://movie:movie@localhost:5432/movienight?sslmode=disable
 
+# Comma-separated web origins allowed to call the API from a browser (CORS).
+# In prod, set this to your deployed web origin (e.g. https://movie-night.app).
+CORS_ALLOWED_ORIGINS=http://localhost:8081
+
 # Podman users: point docker compose + testcontainers at the rootless socket.
 # Omit these two lines if you use Docker Desktop.
 DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
@@ -42,6 +46,9 @@ TESTCONTAINERS_RYUK_DISABLED=true
 ```
 
 `DATABASE_URL` matches the credentials and port in [`compose.yaml`](compose.yaml).
+Browsers enforce CORS, so the Expo **web** target needs its origin in
+`CORS_ALLOWED_ORIGINS`; the iOS/Android apps and `curl` send no `Origin` and are
+unaffected.
 
 ## Quickstart
 
@@ -76,6 +83,7 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 ```bash
 just test              # fast unit tests (pure functions, no external deps)
 just test-integration  # integration tests against a real Postgres
+just check             # gofmt + vet + build + unit tests (the pre-commit/CI gate)
 ```
 
 `just test-integration` spins up a throwaway PostgreSQL container via
@@ -128,6 +136,8 @@ backend/
 ├── roster.go                    # roster handler + response mapping
 ├── roster_test.go               # unit tests
 ├── roster_integration_test.go   # testcontainers integration test (//go:build integration)
+├── cors.go                      # CORS middleware (parseAllowedOrigins, withCORS)
+├── cors_test.go                 # CORS unit tests (httptest, table-driven)
 ├── migrations/                  # goose SQL migrations
 ├── internal/db/                 # sqlc-generated queries/models (DO NOT EDIT)
 ├── seed.sql                     # idempotent dev fixtures
