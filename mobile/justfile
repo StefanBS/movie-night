@@ -1,0 +1,42 @@
+# List all recipes
+default:
+    @just --list
+
+# Install dependencies
+install:
+    npm install
+
+# Start the Metro dev server
+start:
+    npm start
+
+# Restart Metro with a cleared cache (fixes a phone stuck on a stale bundle)
+start-clean:
+    npx expo start -c
+
+# Launch directly on the Android emulator / device
+android:
+    npm run android
+
+# Launch directly on the iOS simulator (macOS only)
+ios:
+    npm run ios
+
+# Launch in a web browser
+web:
+    npm run web
+
+# Lint with eslint-config-expo
+lint:
+    npm run lint
+
+# Type-check without emitting
+typecheck:
+    npx tsc --noEmit
+
+# Run the unit + integration tests
+test:
+    npm test
+
+# Run everything CI runs: lint, type-check, tests
+check: lint typecheck test

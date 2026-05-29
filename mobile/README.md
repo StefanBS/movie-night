@@ -17,6 +17,9 @@ Native. It currently renders a group's roster fetched from the
 ## Prerequisites
 
 - **Node.js 22+** and **npm** — `node --version`
+- **[just](https://github.com/casey/just)** (optional) — task runner, same as
+  the backend. Every recipe wraps a plain `npm`/`npx` command, so it's not
+  required; `just --list` shows them all.
 - One way to run the app:
   - **Expo Go** on a physical phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) /
     [Android](https://play.google.com/store/apps/details?id=host.exp.exponent)) — easiest, or
@@ -60,7 +63,7 @@ For a physical phone to reach the backend, the backend must listen on your LAN
 Start the Metro bundler:
 
 ```bash
-npm start
+just start        # or: npm start
 ```
 
 Then choose a target from the interactive prompt — press `i` (iOS simulator),
@@ -68,9 +71,7 @@ Then choose a target from the interactive prompt — press `i` (iOS simulator),
 your phone. You can also launch a target directly:
 
 ```bash
-npm run ios      # iOS simulator
-npm run android  # Android emulator
-npm run web      # web browser
+just android      # or: just ios / just web
 ```
 
 ## Connecting to the backend
@@ -87,12 +88,35 @@ just db-up && just migrate && just seed && just run
 Then start the app. If the request fails you'll see an inline error; an empty
 group shows "No members yet."
 
+## Troubleshooting
+
+**"Couldn't load roster: Network request failed" on a physical phone.** Usually
+a *stale bundle*: a long-running Metro server keeps serving old JavaScript after
+you change code or add a dependency, and the older code falls back to
+`localhost` — which, on a phone, is the phone itself. Restart Metro with a
+cleared cache and **re-scan the QR** (don't tap a "recently opened" entry — it
+can reconnect via localhost):
+
+```bash
+just start-clean    # = npx expo start -c
+```
+
+If it still fails, confirm the backend is genuinely reachable *from the phone*:
+
+- Phone and computer are on the **same Wi-Fi** (no guest network / AP isolation).
+- The backend listens on your LAN, not just loopback — `0.0.0.0:8080`, not
+  `127.0.0.1:8080`.
+- From the phone's browser, `http://<dev-machine-lan-ip>:8080` responds.
+- The firewall allows port 8080 on the Wi-Fi interface.
+
 ## Quality checks
 
 ```bash
-npm test            # unit + integration tests (node:test runner)
-npm run lint        # ESLint (eslint-config-expo)
-npx tsc --noEmit    # type-check
+just check          # lint + typecheck + test (everything below)
+
+just lint           # ESLint (eslint-config-expo)
+just typecheck      # tsc --noEmit
+just test           # unit + integration tests (node:test runner)
 ```
 
 Tests use Node's built-in test runner via `tsx`, mirroring the Go backend's
@@ -118,6 +142,7 @@ mobile/
 │   └── members.ts     # fetchMembers + parseMembers (validation)
 ├── app.json           # Expo app config
 ├── eslint.config.js   # ESLint flat config
+├── justfile           # task recipes (just) — parity with the backend
 ├── tsconfig.json      # TypeScript config
 └── assets/            # icons and images
 ```
