@@ -131,6 +131,22 @@ table-driven style:
 There are no component/render tests yet — deferred until there's UI logic worth
 asserting.
 
+## Git hooks
+
+This repo uses [lefthook](https://lefthook.dev) (config at the repo root):
+
+- **pre-commit** — secret scan ([betterleaks](https://github.com/betterleaks/betterleaks))
+  plus, for mobile, `just lint` and `just typecheck` on staged JS/TS files.
+- **pre-push** — `just test` (unit + integration tests) before code leaves your machine.
+
+The full CI suite still runs on every PR. Enable the hooks once per clone:
+
+```bash
+go install github.com/evilmartians/lefthook/v2@latest   # or: brew install lefthook
+sudo dnf install betterleaks   # or: brew install betterleaks (also: docker / releases page)
+lefthook install               # from the repo root
+```
+
 ## Project layout
 
 ```

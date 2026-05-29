@@ -84,6 +84,22 @@ handler end to end. It needs a working container runtime and the `DOCKER_HOST`
 / `TESTCONTAINERS_RYUK_DISABLED` values from `.env` — running it through `just`
 (rather than `go test` directly) ensures those are loaded.
 
+## Git hooks
+
+This repo uses [lefthook](https://lefthook.dev) (config at the repo root):
+
+- **pre-commit** — secret scan ([betterleaks](https://github.com/betterleaks/betterleaks))
+  plus, for the backend, `just fmt-check` and `just vet` on staged Go files.
+- **pre-push** — `just test` (unit tests) before code leaves your machine.
+
+Integration tests and the full matrix run in CI. Enable the hooks once per clone:
+
+```bash
+go install github.com/evilmartians/lefthook/v2@latest   # or: brew install lefthook
+sudo dnf install betterleaks   # or: brew install betterleaks (also: docker / releases page)
+lefthook install               # from the repo root
+```
+
 ## Database workflow
 
 ```bash
