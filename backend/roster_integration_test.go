@@ -74,25 +74,36 @@ func startPostgres(t *testing.T) *pgxpool.Pool {
 func seedFixtures(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	ctx := context.Background()
-	stmts := []string{
-		`INSERT INTO groups (id, name) VALUES
-			('` + seededGroup + `', 'Friday Film Club'),
-			('` + emptyGroup + `', 'Empty Crew')`,
-		`INSERT INTO users (id, name) VALUES
-			('a0000000-0000-0000-0000-000000000001', 'Ada'),
-			('a0000000-0000-0000-0000-000000000002', 'Blake'),
-			('a0000000-0000-0000-0000-000000000003', 'Cleo'),
-			('a0000000-0000-0000-0000-000000000009', 'Zed')`,
-		// rotation_position deliberately out of insert order to prove ORDER BY.
-		// Zed is inactive and must be excluded.
-		`INSERT INTO memberships (group_id, user_id, role, status, rotation_position) VALUES
-			('` + seededGroup + `', 'a0000000-0000-0000-0000-000000000002', 'core', 'active', 2),
-			('` + seededGroup + `', 'a0000000-0000-0000-0000-000000000001', 'core', 'active', 1),
-			('` + seededGroup + `', 'a0000000-0000-0000-0000-000000000003', 'core', 'active', 3),
-			('` + seededGroup + `', 'a0000000-0000-0000-0000-000000000009', 'core', 'inactive', 4)`,
+	stmts := []struct {
+		sql  string
+		args []any
+	}{
+		{
+			sql: `INSERT INTO groups (id, name) VALUES
+				($1, 'Friday Film Club'),
+				($2, 'Empty Crew')`,
+			args: []any{seededGroup, emptyGroup},
+		},
+		{
+			sql: `INSERT INTO users (id, name) VALUES
+				('a0000000-0000-0000-0000-000000000001', 'Ada'),
+				('a0000000-0000-0000-0000-000000000002', 'Blake'),
+				('a0000000-0000-0000-0000-000000000003', 'Cleo'),
+				('a0000000-0000-0000-0000-000000000009', 'Zed')`,
+		},
+		{
+			// rotation_position deliberately out of insert order to prove ORDER BY.
+			// Zed is inactive and must be excluded.
+			sql: `INSERT INTO memberships (group_id, user_id, role, status, rotation_position) VALUES
+				($1, 'a0000000-0000-0000-0000-000000000002', 'core', 'active', 2),
+				($1, 'a0000000-0000-0000-0000-000000000001', 'core', 'active', 1),
+				($1, 'a0000000-0000-0000-0000-000000000003', 'core', 'active', 3),
+				($1, 'a0000000-0000-0000-0000-000000000009', 'core', 'inactive', 4)`,
+			args: []any{seededGroup},
+		},
 	}
 	for _, s := range stmts {
-		if _, err := pool.Exec(ctx, s); err != nil {
+		if _, err := pool.Exec(ctx, s.sql, s.args...); err != nil {
 			t.Fatalf("seed fixture: %v", err)
 		}
 	}
