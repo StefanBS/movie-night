@@ -45,9 +45,15 @@ func main() {
 	})
 	mux.Handle("GET /groups/{groupId}/members", membersHandler(queries))
 
+	// Browsers enforce CORS; native apps and curl do not. Allowed web origins
+	// come from CORS_ALLOWED_ORIGINS (comma-separated) so the policy is the same
+	// mechanism in dev, CI, and prod — only the value differs.
+	allowedOrigins := parseAllowedOrigins(os.Getenv("CORS_ALLOWED_ORIGINS"))
+	log.Printf("CORS allowed origins: %v", allowedOrigins)
+
 	srv := &http.Server{
 		Addr:         ":8080",
-		Handler:      mux,
+		Handler:      withCORS(allowedOrigins, mux),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
