@@ -4,7 +4,7 @@ set dotenv-load := true
 default:
     @just --list
 
-# Start the postgres:17 container (detached)
+# Start the postgres:18 container (detached)
 db-up:
     docker compose up -d db
 
