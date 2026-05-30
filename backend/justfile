@@ -55,6 +55,17 @@ check: fmt-check vet build test
 test-integration:
     go test -tags=integration ./...
 
+# Scan dependencies for known vulnerabilities (reachable-only, near-zero false positives)
+vuln:
+    go tool govulncheck ./...
+
+# Static security analysis (skips sqlc-generated files)
+sast:
+    go tool gosec -exclude-generated ./...
+
+# Run all security scans (what the CI security job runs)
+audit: vuln sast
+
 # Run the backend server
 run:
     go run .
