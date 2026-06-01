@@ -63,8 +63,15 @@ vuln:
 sast:
     go tool gosec -exclude-generated ./...
 
-# Run all security scans (what the CI security job runs)
-audit: vuln sast
+# Run all security scans (what the CI security job runs). Both always run — a
+# govulncheck failure must not mask gosec findings — and audit fails if either does.
+audit:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    rc=0
+    just vuln || rc=1
+    just sast || rc=1
+    exit $rc
 
 # Emit SARIF for code-scanning upload (does NOT gate — `just audit` gates)
 audit-sarif:
