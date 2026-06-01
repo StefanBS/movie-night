@@ -4,6 +4,7 @@ name: security
 # filter — secrets are not component-scoped); the dependency re-audits run on a
 # weekly cron so a CVE disclosed against an unchanged dep still surfaces. The
 # per-component security jobs in backend.yml / mobile.yml are unchanged.
+# Each job emits SARIF and uploads it to the code-scanning Security tab.
 on:
   push:
     branches: [main]
@@ -21,6 +22,9 @@ concurrency:
 jobs:
   secrets:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -34,12 +38,27 @@ jobs:
           chmod +x betterleaks
           sudo mv betterleaks /usr/local/bin/
 
+      - name: Generate SARIF (does not gate)
+        run: betterleaks git --no-banner --report-format sarif --report-path betterleaks.sarif --exit-code 0
+
+      # Fork PRs get a read-only token and can't write security events; skip
+      # upload there (the gate step below still runs).
+      - name: Upload betterleaks SARIF
+        if: github.event.pull_request.head.repo.fork != true
+        uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
+        with:
+          sarif_file: betterleaks.sarif
+          category: betterleaks
+
       - name: Secret scan (full history)
         run: betterleaks git --no-banner
 
   backend-audit:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     defaults:
       run:
         working-directory: backend
@@ -53,12 +72,33 @@ jobs:
 
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
+      - name: Generate SARIF (does not gate)
+        run: just audit-sarif
+
+      # Scheduled-only job; fork guard kept for consistency with the other uploads.
+      - name: Upload govulncheck SARIF
+        if: github.event.pull_request.head.repo.fork != true
+        uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
+        with:
+          sarif_file: backend/govulncheck.sarif
+          category: govulncheck
+
+      - name: Upload gosec SARIF
+        if: github.event.pull_request.head.repo.fork != true
+        uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
+        with:
+          sarif_file: backend/gosec.sarif
+          category: gosec
+
       - name: Dependency + static audit (govulncheck + gosec)
         run: just audit
 
   mobile-audit:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     defaults:
       run:
         working-directory: mobile
@@ -73,6 +113,17 @@ jobs:
           echo "bc98e15319ed0d515e3f9235287ba53cdc5535d576d24fd573978ecfe9ab92dc  osv-scanner" | sha256sum -c -
           chmod +x osv-scanner
           sudo mv osv-scanner /usr/local/bin/
+
+      - name: Generate SARIF (does not gate)
+        run: just audit-sarif
+
+      # Scheduled-only job; fork guard kept for consistency with the other uploads.
+      - name: Upload osv-scanner SARIF
+        if: github.event.pull_request.head.repo.fork != true
+        uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
+        with:
+          sarif_file: mobile/osv-scanner.sarif
+          category: osv-scanner
 
       - name: Dependency audit (osv-scanner)
         run: just audit
