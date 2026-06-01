@@ -4,9 +4,9 @@
     {
       "id": 1,
       "subject": "Task 1: Add .github/dependabot.yml",
-      "status": "pending",
+      "status": "completed",
       "description": "Dependabot v2 config: grouped weekly PRs for gomod /backend, npm /mobile, github-actions /; npm ignores major bumps for the 8 Expo-SDK-54 packages; header comment on the Expo-pin rationale.\n\n```json:metadata\n{\"files\": [\".github/dependabot.yml\"], \"verifyCommand\": \"python3 -c \\\"import yaml; d=yaml.safe_load(open('.github/dependabot.yml')); assert d['version']==2; npm=[u for u in d['updates'] if u['package-ecosystem']=='npm'][0]; assert len(npm['ignore'])==8; print('ok')\\\"\", \"spec\": \"docs/superpowers/specs/2026-06-01-dependabot-design.md\"}\n```"
     }
   ],
-  "lastUpdated": "2026-06-01T16:10:00Z"
+  "lastUpdated": "2026-06-01T16:40:00Z"
 }
