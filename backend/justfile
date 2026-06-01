@@ -66,6 +66,11 @@ sast:
 # Run all security scans (what the CI security job runs)
 audit: vuln sast
 
+# Emit SARIF for code-scanning upload (does NOT gate — `just audit` gates)
+audit-sarif:
+    -go tool govulncheck -format sarif ./... > govulncheck.sarif
+    -go tool gosec -exclude-generated -fmt sarif -out gosec.sarif ./...
+
 # Run the backend server
 run:
     go run .

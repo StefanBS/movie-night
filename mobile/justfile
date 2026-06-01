@@ -44,3 +44,7 @@ check: lint typecheck test
 # Scan npm dependencies for known vulnerabilities (ignores in osv-scanner.toml)
 audit:
     osv-scanner scan source --lockfile=package-lock.json --config=osv-scanner.toml
+
+# Emit SARIF for code-scanning upload (does NOT gate — `just audit` gates)
+audit-sarif:
+    -osv-scanner scan source --lockfile=package-lock.json --config=osv-scanner.toml --format sarif > osv-scanner.sarif
