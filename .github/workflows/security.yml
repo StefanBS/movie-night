@@ -1,0 +1,78 @@
+name: security
+
+# Repo-wide security gate. Secret scanning runs on every push/PR (no path
+# filter — secrets are not component-scoped); the dependency re-audits run on a
+# weekly cron so a CVE disclosed against an unchanged dep still surfaces. The
+# per-component security jobs in backend.yml / mobile.yml are unchanged.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0 # full history — required for a history-wide scan
+
+      - name: Install betterleaks (pinned + checksum-verified)
+        run: |
+          curl -sSL -o betterleaks.tar.gz "https://github.com/betterleaks/betterleaks/releases/download/v1.3.1/betterleaks_1.3.1_linux_x64.tar.gz"
+          echo "7b241c80204538cbb210c94514dc7cdff86430938bd7d5b6e289207959530849  betterleaks.tar.gz" | sha256sum -c -
+          tar -xzf betterleaks.tar.gz betterleaks
+          chmod +x betterleaks
+          sudo mv betterleaks /usr/local/bin/
+
+      - name: Secret scan (full history)
+        run: betterleaks git --no-banner
+
+  backend-audit:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Dependency + static audit (govulncheck + gosec)
+        run: just audit
+
+  mobile-audit:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Install osv-scanner (pinned + checksum-verified)
+        run: |
+          curl -sSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/v2.3.8/osv-scanner_linux_amd64"
+          echo "bc98e15319ed0d515e3f9235287ba53cdc5535d576d24fd573978ecfe9ab92dc  osv-scanner" | sha256sum -c -
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/
+
+      - name: Dependency audit (osv-scanner)
+        run: just audit
