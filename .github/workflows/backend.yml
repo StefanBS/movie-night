@@ -70,6 +70,8 @@ jobs:
       - name: Generate SARIF (does not gate)
         run: just audit-sarif
 
+      # Fork PRs get a read-only token and can't write security events; skip
+      # upload there (the `just audit` gate below still runs on every PR).
       - name: Upload govulncheck SARIF
         if: github.event.pull_request.head.repo.fork != true
         uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
