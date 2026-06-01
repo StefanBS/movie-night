@@ -1,0 +1,26 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-01-code-scanning-sarif.md",
+  "tasks": [
+    {
+      "id": 2,
+      "subject": "Task 1: Add audit-sarif recipes to backend & mobile justfiles",
+      "status": "pending",
+      "description": "Add `audit-sarif` recipes emitting SARIF (govulncheck+gosec backend, osv-scanner mobile), exit 0, existing recipes unchanged; add .gitignore *.sarif.\n\n```json:metadata\n{\"files\": [\"backend/justfile\", \"mobile/justfile\", \".gitignore\"], \"verifyCommand\": \"cd backend && just audit-sarif && python3 -c \\\"import json;json.load(open('govulncheck.sarif'));json.load(open('gosec.sarif'))\\\"\", \"spec\": \"docs/superpowers/specs/2026-06-01-code-scanning-sarif-design.md\"}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 2: Wire SARIF upload into PR/push jobs (backend.yml, mobile.yml)",
+      "status": "pending",
+      "blockedBy": [2],
+      "description": "Add security-events:write; produce SARIF -> upload (categories, pinned codeql SHA 84498526a009a99c875e83ef4821a8ba52de7c22, fork guard) -> gate. sarif_file workspace-root-relative.\n\n```json:metadata\n{\"files\": [\".github/workflows/backend.yml\", \".github/workflows/mobile.yml\"], \"verifyCommand\": \"python3 -c \\\"import yaml;yaml.safe_load(open('.github/workflows/backend.yml'));yaml.safe_load(open('.github/workflows/mobile.yml'))\\\"\", \"spec\": \"docs/superpowers/specs/2026-06-01-code-scanning-sarif-design.md\"}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 3: Wire SARIF into security.yml (secrets + scheduled audits)",
+      "status": "pending",
+      "blockedBy": [2],
+      "description": "All three security.yml jobs: security-events:write; betterleaks SARIF (--exit-code 0) + scheduled just audit-sarif -> upload (pinned SHA, fork guard) -> gate.\n\n```json:metadata\n{\"files\": [\".github/workflows/security.yml\"], \"verifyCommand\": \"python3 -c \\\"import yaml;yaml.safe_load(open('.github/workflows/security.yml'))\\\" && betterleaks git --no-banner --report-format sarif --report-path /tmp/bl.sarif --exit-code 0\", \"spec\": \"docs/superpowers/specs/2026-06-01-code-scanning-sarif-design.md\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-01T14:00:00Z"
+}

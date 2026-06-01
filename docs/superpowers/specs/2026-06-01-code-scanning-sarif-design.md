@@ -65,15 +65,18 @@ audit-sarif:
 ```just
 # Emit SARIF for upload to code scanning (does NOT gate — `just audit` gates)
 audit-sarif:
-    -osv-scanner scan source --lockfile=package-lock.json --config=osv-scanner.toml --format sarif --output osv-scanner.sarif
+    -osv-scanner scan source --lockfile=package-lock.json --config=osv-scanner.toml --format sarif > osv-scanner.sarif
 ```
-- `--output` writes the file; osv-scanner exits non-zero on vulns; the `-` prefix
-  swallows it.
+- osv-scanner has no documented `--output` flag; SARIF goes to stdout (logs go to
+  stderr), so it is redirected to the file. osv-scanner exits non-zero on vulns;
+  the `-` prefix swallows it so the recipe stays green (gating is `just audit`).
 
 betterleaks SARIF is produced inline in the `secrets` job (no justfile; it is a
-repo-wide tool invoked directly, consistent with lefthook):
+repo-wide tool invoked directly, consistent with lefthook). `--exit-code 0`
+forces a green exit so the upload step always runs (gating is the separate
+`betterleaks git --no-banner` step, which keeps its default exit-1-on-leak):
 ```
-betterleaks git --no-banner --report-format sarif --report-path betterleaks.sarif
+betterleaks git --no-banner --report-format sarif --report-path betterleaks.sarif --exit-code 0
 ```
 
 ### Per-job step pattern (identical shape everywhere)
