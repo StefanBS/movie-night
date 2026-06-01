@@ -51,6 +51,9 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     defaults:
       run:
         working-directory: backend
@@ -63,6 +66,23 @@ jobs:
           cache-dependency-path: backend/go.sum
 
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Generate SARIF (does not gate)
+        run: just audit-sarif
+
+      - name: Upload govulncheck SARIF
+        if: github.event.pull_request.head.repo.fork != true
+        uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
+        with:
+          sarif_file: backend/govulncheck.sarif
+          category: govulncheck
+
+      - name: Upload gosec SARIF
+        if: github.event.pull_request.head.repo.fork != true
+        uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
+        with:
+          sarif_file: backend/gosec.sarif
+          category: gosec
 
       - name: Security audit (govulncheck + gosec)
         run: just audit

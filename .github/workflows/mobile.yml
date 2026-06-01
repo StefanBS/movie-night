@@ -49,6 +49,9 @@ jobs:
 
   audit:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     defaults:
       run:
         working-directory: mobile
@@ -63,6 +66,16 @@ jobs:
           echo "bc98e15319ed0d515e3f9235287ba53cdc5535d576d24fd573978ecfe9ab92dc  osv-scanner" | sha256sum -c -
           chmod +x osv-scanner
           sudo mv osv-scanner /usr/local/bin/
+
+      - name: Generate SARIF (does not gate)
+        run: just audit-sarif
+
+      - name: Upload osv-scanner SARIF
+        if: github.event.pull_request.head.repo.fork != true
+        uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
+        with:
+          sarif_file: mobile/osv-scanner.sarif
+          category: osv-scanner
 
       - name: Dependency audit (osv-scanner)
         run: just audit
