@@ -1,0 +1,56 @@
+# Dependabot opens dependency-update PRs that the existing CI gate + code
+# scanning then vet. Updates are grouped into one PR per ecosystem per week.
+#
+# The npm `ignore` block protects the deliberate Expo SDK 54 pin
+# (see mobile/AGENTS.md): it drops MAJOR-version bumps for the SDK-coupled
+# packages only — patch/minor within SDK 54 still flow, and security-advisory
+# updates are unaffected. Do NOT remove it; a major bump of the Expo / React
+# Native family would break the pin.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      backend:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /mobile
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      mobile:
+        patterns:
+          - "*"
+    ignore:
+      - dependency-name: expo
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react-native
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react-dom
+        update-types: ["version-update:semver-major"]
+      - dependency-name: expo-constants
+        update-types: ["version-update:semver-major"]
+      - dependency-name: expo-status-bar
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react-native-safe-area-context
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react-native-web
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns:
+          - "*"
