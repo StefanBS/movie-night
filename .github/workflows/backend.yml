@@ -1,15 +1,12 @@
 name: backend
 
+# No path filter: these jobs are required status checks (branch protection on
+# main), so they must report on every PR. A path-filtered workflow that doesn't
+# trigger leaves its required check pending forever and blocks the merge.
 on:
   push:
     branches: [main]
-    paths:
-      - "backend/**"
-      - ".github/workflows/backend.yml"
   pull_request:
-    paths:
-      - "backend/**"
-      - ".github/workflows/backend.yml"
 
 permissions:
   contents: read
