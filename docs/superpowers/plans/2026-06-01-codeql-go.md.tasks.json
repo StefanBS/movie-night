@@ -1,0 +1,12 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-01-codeql-go.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Add Go to the CodeQL matrix",
+      "status": "pending",
+      "description": "Convert codeql.yml analyze job to a matrix [javascript-typescript build-mode none, go build-mode manual], fail-fast false; conditional setup-go (backend/go.mod) + `working-directory: backend; go build ./...` between init and analyze, both gated to go; languages/build-mode/category from matrix; pins unchanged; header comment updated; gosec kept.\n\n```json:metadata\n{\"files\": [\".github/workflows/codeql.yml\"], \"verifyCommand\": \"python3 -c \\\"import yaml; d=yaml.safe_load(open('.github/workflows/codeql.yml')); j=d['jobs']['analyze']; langs={m['language']:m['build-mode'] for m in j['strategy']['matrix']['include']}; assert langs=={'javascript-typescript':'none','go':'manual'}; assert j['strategy']['fail-fast'] is False; print('matrix ok')\\\"\", \"spec\": \"docs/superpowers/specs/2026-06-01-codeql-go-design.md\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-01T19:00:00Z"
+}
