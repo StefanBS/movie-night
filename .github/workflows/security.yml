@@ -28,7 +28,7 @@ jobs:
 
       - name: Install betterleaks (pinned + checksum-verified)
         run: |
-          curl -sSL -o betterleaks.tar.gz "https://github.com/betterleaks/betterleaks/releases/download/v1.3.1/betterleaks_1.3.1_linux_x64.tar.gz"
+          curl -fsSL -o betterleaks.tar.gz "https://github.com/betterleaks/betterleaks/releases/download/v1.3.1/betterleaks_1.3.1_linux_x64.tar.gz"
           echo "7b241c80204538cbb210c94514dc7cdff86430938bd7d5b6e289207959530849  betterleaks.tar.gz" | sha256sum -c -
           tar -xzf betterleaks.tar.gz betterleaks
           chmod +x betterleaks
@@ -69,7 +69,7 @@ jobs:
 
       - name: Install osv-scanner (pinned + checksum-verified)
         run: |
-          curl -sSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/v2.3.8/osv-scanner_linux_amd64"
+          curl -fsSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/v2.3.8/osv-scanner_linux_amd64"
           echo "bc98e15319ed0d515e3f9235287ba53cdc5535d576d24fd573978ecfe9ab92dc  osv-scanner" | sha256sum -c -
           chmod +x osv-scanner
           sudo mv osv-scanner /usr/local/bin/
