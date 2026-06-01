@@ -24,11 +24,11 @@
 **Acceptance Criteria:**
 - [ ] `version: 2` with three `updates`: gomod `/backend`, npm `/mobile`, github-actions `/`.
 - [ ] Every entry is `schedule.interval: weekly`, `day: monday`, with a `groups` block (`patterns: ["*"]`).
-- [ ] The npm entry has an `ignore` block dropping `version-update:semver-major` for exactly these eight packages: `expo`, `react-native`, `react`, `react-dom`, `expo-constants`, `expo-status-bar`, `react-native-safe-area-context`, `react-native-web`.
+- [ ] The npm entry has an `ignore` block over exactly these eight packages: `expo`, `react`, `react-dom`, `expo-constants`, `expo-status-bar`, `react-native-safe-area-context` ignore `semver-major`; the two `0.x` natives `react-native` and `react-native-web` ignore `semver-major` **and** `semver-minor`.
 - [ ] A header comment documents the Expo-pin rationale.
 
 **Verify:**
-- `python3 -c "import yaml; d=yaml.safe_load(open('.github/dependabot.yml')); assert d['version']==2; ecos=[u['package-ecosystem'] for u in d['updates']]; assert ecos==['gomod','npm','github-actions'], ecos; npm=[u for u in d['updates'] if u['package-ecosystem']=='npm'][0]; assert len(npm['ignore'])==8; assert all(i['update-types']==['version-update:semver-major'] for i in npm['ignore']); assert all('groups' in u for u in d['updates']); print('dependabot config ok')"` → `dependabot config ok`.
+- `python3 -c "import yaml; d=yaml.safe_load(open('.github/dependabot.yml')); assert d['version']==2; ecos=[u['package-ecosystem'] for u in d['updates']]; assert ecos==['gomod','npm','github-actions'], ecos; npm=[u for u in d['updates'] if u['package-ecosystem']=='npm'][0]; assert len(npm['ignore'])==8; byname={i['dependency-name']: i['update-types'] for i in npm['ignore']}; zerox={'react-native','react-native-web'}; assert all(byname[n]==['version-update:semver-major'] for n in byname if n not in zerox); assert all(set(byname[n])=={'version-update:semver-major','version-update:semver-minor'} for n in zerox); assert all('groups' in u for u in d['updates']); print('dependabot config ok')"` → `dependabot config ok`.
 
 **Steps:**
 
@@ -97,7 +97,7 @@ updates:
 
 Run:
 ```bash
-python3 -c "import yaml; d=yaml.safe_load(open('.github/dependabot.yml')); assert d['version']==2; ecos=[u['package-ecosystem'] for u in d['updates']]; assert ecos==['gomod','npm','github-actions'], ecos; npm=[u for u in d['updates'] if u['package-ecosystem']=='npm'][0]; assert len(npm['ignore'])==8; assert all(i['update-types']==['version-update:semver-major'] for i in npm['ignore']); assert all('groups' in u for u in d['updates']); print('dependabot config ok')"
+python3 -c "import yaml; d=yaml.safe_load(open('.github/dependabot.yml')); assert d['version']==2; ecos=[u['package-ecosystem'] for u in d['updates']]; assert ecos==['gomod','npm','github-actions'], ecos; npm=[u for u in d['updates'] if u['package-ecosystem']=='npm'][0]; assert len(npm['ignore'])==8; byname={i['dependency-name']: i['update-types'] for i in npm['ignore']}; zerox={'react-native','react-native-web'}; assert all(byname[n]==['version-update:semver-major'] for n in byname if n not in zerox); assert all(set(byname[n])=={'version-update:semver-major','version-update:semver-minor'} for n in zerox); assert all('groups' in u for u in d['updates']); print('dependabot config ok')"
 ```
 Expected: `dependabot config ok`.
 

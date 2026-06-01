@@ -2,10 +2,11 @@
 # scanning then vet. Updates are grouped into one PR per ecosystem per week.
 #
 # The npm `ignore` block protects the deliberate Expo SDK 54 pin
-# (see mobile/AGENTS.md): it drops MAJOR-version bumps for the SDK-coupled
-# packages only — patch/minor within SDK 54 still flow, and security-advisory
-# updates are unaffected. Do NOT remove it; a major bump of the Expo / React
-# Native family would break the pin.
+# (see mobile/AGENTS.md): it drops the version bumps that would move the
+# SDK-coupled packages off SDK 54 — majors for the normally-versioned packages,
+# and majors+minors for the two 0.x natives (react-native, react-native-web)
+# where a MINOR is the breaking SDK-coupling bump. Patch updates within SDK 54
+# still flow, and security-advisory updates are unaffected. Do NOT remove it.
 version: 2
 updates:
   - package-ecosystem: gomod
@@ -30,8 +31,10 @@ updates:
     ignore:
       - dependency-name: expo
         update-types: ["version-update:semver-major"]
+      # 0.x package: the SDK-coupling bump is a MINOR (0.81 -> 0.82), so ignore
+      # minor too; patch (0.81.x) still flows within SDK 54.
       - dependency-name: react-native
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: react
         update-types: ["version-update:semver-major"]
       - dependency-name: react-dom
@@ -42,8 +45,9 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: react-native-safe-area-context
         update-types: ["version-update:semver-major"]
+      # 0.x package (same reasoning as react-native): ignore minor + major.
       - dependency-name: react-native-web
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
   - package-ecosystem: github-actions
     directory: /

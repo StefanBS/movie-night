@@ -34,12 +34,15 @@ instead of many.
 1. **gomod** — `directory: /backend`. Group all updates (`patterns: ["*"]`).
    Covers module `require` deps and the `tool` deps (gosec, govulncheck, goose,
    sqlc).
-2. **npm** — `directory: /mobile`. Group all updates, plus an `ignore` block that
-   drops `version-update:semver-major` for the eight SDK-coupled packages:
-   `expo`, `react-native`, `react`, `react-dom`, `expo-constants`,
-   `expo-status-bar`, `react-native-safe-area-context`, `react-native-web`.
-   Patch/minor within SDK 54 still flow; a pin-breaking major is never proposed.
-   (Security-advisory updates are unaffected by `ignore`.)
+2. **npm** — `directory: /mobile`. Group all updates, plus an `ignore` block over
+   the eight SDK-coupled packages: `expo`, `react`, `react-dom`,
+   `expo-constants`, `expo-status-bar`, `react-native-safe-area-context` ignore
+   `version-update:semver-major`; the two **`0.x`** natives `react-native`
+   (`0.81.5`) and `react-native-web` (`^0.21.0`) ignore **both**
+   `semver-major` and `semver-minor`, because under `0.x` semver the
+   SDK-coupling bump is a *minor* (`0.81 → 0.82`) — a major-only ignore would
+   not protect the pin for them. Patch updates within SDK 54 still flow for all
+   eight; security-advisory updates are unaffected by `ignore`.
 3. **github-actions** — `directory: /` (Dependabot scans `.github/workflows`).
    Group all updates. Dependabot updates the pinned SHA and the `# vX` version
    comment together, preserving the repo's SHA-pinning convention.
@@ -50,9 +53,9 @@ deleted by a future reader. `open-pull-requests-limit` is left at the default.
 ## Verification
 
 - `.github/dependabot.yml` is valid YAML and structurally matches Dependabot v2
-  (two `updates` ecosystems use `groups`; the npm entry carries the eight-package
-  major-ignore). GitHub fully validates the schema on push and surfaces errors in
-  the Dependabot tab.
+  (all three `updates` use `groups`; the npm entry carries the eight ignore
+  rules, six major-only and the two `0.x` natives major+minor). GitHub fully
+  validates the schema on push and surfaces errors in the Dependabot tab.
 - After merge + enabling alerts/security-updates in Settings, the Dependabot tab
   lists the three ecosystems and the first weekly run opens grouped PRs.
 
