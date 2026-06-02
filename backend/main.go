@@ -44,6 +44,7 @@ func main() {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 	mux.Handle("GET /groups/{groupId}/members", membersHandler(queries))
+	mux.Handle("GET /groups/{groupId}/turn", turnHandler(queries))
 
 	// Browsers enforce CORS; native apps and curl do not. Allowed web origins
 	// come from CORS_ALLOWED_ORIGINS (comma-separated) so the policy is the same
