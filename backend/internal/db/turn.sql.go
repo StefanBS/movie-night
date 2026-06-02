@@ -21,7 +21,7 @@ JOIN users u ON u.id = m.user_id
 LEFT JOIN (
   SELECT picker_id,
          COUNT(*) FILTER (WHERE is_credited)           AS credited_count,
-         MAX(scheduled_for) FILTER (WHERE is_credited)::date AS last_picked_on
+         (MAX(scheduled_for) FILTER (WHERE is_credited))::date AS last_picked_on
   FROM picks
   WHERE picks.group_id = $1
   GROUP BY picker_id
