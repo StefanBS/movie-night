@@ -1,15 +1,17 @@
 name: mobile
 
+# No path filter: these jobs are required status checks (branch protection on
+# main), so they must report on every PR. A path-filtered workflow that doesn't
+# trigger leaves its required check pending forever and blocks the merge.
+#
+# The weekly `schedule` re-runs the dependency audit against unchanged deps so a
+# newly disclosed CVE still surfaces; the `check` job is skipped on that trigger.
 on:
   push:
     branches: [main]
-    paths:
-      - "mobile/**"
-      - ".github/workflows/mobile.yml"
   pull_request:
-    paths:
-      - "mobile/**"
-      - ".github/workflows/mobile.yml"
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
 
 permissions:
   contents: read
@@ -20,6 +22,7 @@ concurrency:
 
 jobs:
   check:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -46,3 +49,38 @@ jobs:
 
       - name: Test
         run: just test
+
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Install osv-scanner (pinned + checksum-verified)
+        run: |
+          curl -fsSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/v2.3.8/osv-scanner_linux_amd64"
+          echo "bc98e15319ed0d515e3f9235287ba53cdc5535d576d24fd573978ecfe9ab92dc  osv-scanner" | sha256sum -c -
+          chmod +x osv-scanner
+          sudo mv osv-scanner /usr/local/bin/
+
+      # One scan run: `just audit-sarif` emits the SARIF AND gates, so this step
+      # fails the job on findings while the upload below still publishes.
+      - name: Dependency audit (osv-scanner)
+        run: just audit-sarif
+
+      # Upload SARIF even when the audit gate fails (if: always()), so findings
+      # reach the Security tab. Fork PRs get a read-only token and can't write
+      # security events; skip the upload there (the gate above still runs).
+      - name: Upload osv-scanner SARIF
+        if: always() && github.event.pull_request.head.repo.fork != true
+        uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
+        with:
+          sarif_file: mobile/osv-scanner.sarif
+          category: osv-scanner

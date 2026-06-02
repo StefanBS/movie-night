@@ -63,14 +63,14 @@ func membersHandler(store rosterStore) http.HandlerFunc {
 
 		rows, err := store.ListGroupMembers(r.Context(), gid)
 		if err != nil {
-			log.Printf("list group members (%s): %v", gid, err)
+			log.Printf("list group members (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
 			writeJSONError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(toMemberResponses(rows)); err != nil {
-			log.Printf("encode members response (%s): %v", gid, err)
+			log.Printf("encode members response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
 		}
 	}
 }

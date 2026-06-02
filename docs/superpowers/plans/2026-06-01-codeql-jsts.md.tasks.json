@@ -1,0 +1,12 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-01-codeql-jsts.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Add .github/workflows/codeql.yml",
+      "status": "completed",
+      "description": "CodeQL analyze workflow for javascript-typescript: push(main)/PR(no path filter)/weekly schedule; analyze job with security-events:write + actions:read; checkout -> init(languages: javascript-typescript) -> analyze(category /language:javascript-typescript); no npm/build; codeql-action pinned to 84498526a009a99c875e83ef4821a8ba52de7c22.\n\n```json:metadata\n{\"files\": [\".github/workflows/codeql.yml\"], \"verifyCommand\": \"python3 -c \\\"import yaml;yaml.safe_load(open('.github/workflows/codeql.yml'))\\\" && grep -c 84498526a009a99c875e83ef4821a8ba52de7c22 .github/workflows/codeql.yml\", \"spec\": \"docs/superpowers/specs/2026-06-01-codeql-jsts-design.md\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-01T18:05:00Z"
+}

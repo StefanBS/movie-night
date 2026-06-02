@@ -1,0 +1,53 @@
+name: security
+
+# Repo-wide secret scanning on every push/PR. Secrets are not component-scoped,
+# so this lives outside backend.yml / mobile.yml. The weekly dependency
+# re-audits run from those component workflows' own `schedule` triggers (a CVE
+# disclosed against an unchanged dep still surfaces there). Emits SARIF and
+# uploads it to the code-scanning Security tab.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0 # full history — required for a history-wide scan
+
+      - name: Install betterleaks (pinned + checksum-verified)
+        run: |
+          curl -fsSL -o betterleaks.tar.gz "https://github.com/betterleaks/betterleaks/releases/download/v1.3.1/betterleaks_1.3.1_linux_x64.tar.gz"
+          echo "7b241c80204538cbb210c94514dc7cdff86430938bd7d5b6e289207959530849  betterleaks.tar.gz" | sha256sum -c -
+          tar -xzf betterleaks.tar.gz betterleaks
+          chmod +x betterleaks
+          sudo mv betterleaks /usr/local/bin/
+
+      # One scan run: emit SARIF AND gate. betterleaks exits non-zero on a leak
+      # (no --exit-code override), so this step fails the job while the upload
+      # below still publishes.
+      - name: Secret scan (full history)
+        run: betterleaks git --no-banner --report-format sarif --report-path betterleaks.sarif
+
+      # Upload SARIF even when the scan gate fails (if: always()), so leaks reach
+      # the Security tab. Fork PRs get a read-only token and can't write security
+      # events; skip the upload there (the gate above still runs).
+      - name: Upload betterleaks SARIF
+        if: always() && github.event.pull_request.head.repo.fork != true
+        uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
+        with:
+          sarif_file: betterleaks.sarif
+          category: betterleaks

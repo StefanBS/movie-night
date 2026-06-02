@@ -1,0 +1,63 @@
+name: codeql
+
+# CodeQL static analysis covering the mobile JS/TS code and the backend Go code
+# (complementary to gosec's Go-idiom rules — both are kept). No path filter so
+# the checks always report (safe to require in branch protection).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: analyze
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: go
+            build-mode: manual
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Go module lives in backend/; install the toolchain for the manual build.
+      - name: Set up Go
+        if: matrix.language == 'go'
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+
+      # Manual build for Go: the module is in backend/, not the repo root, so
+      # autobuild-from-root would fail. CodeQL traces this compile.
+      - if: matrix.language == 'go'
+        name: Build Go (traced by CodeQL)
+        working-directory: backend
+        run: go build ./...
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
+        with:
+          category: "/language:${{ matrix.language }}"

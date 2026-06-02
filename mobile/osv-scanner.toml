@@ -1,0 +1,24 @@
+# osv-scanner ignore list. Entries self-expire: once `ignoreUntil` passes, the
+# vuln re-surfaces and CI fails again, forcing a re-review. osv-scanner also
+# reports an ignore as "unused" once the upstream fix lands, signalling it can be
+# deleted. Re-review both when bumping the Expo SDK (next chance to drop them).
+
+[[IgnoredVulns]]
+id = "GHSA-w5hq-g745-h8pq"
+ignoreUntil = 2026-09-01T00:00:00Z
+# uuid@7.0.3 — pulled transitively by expo > @expo/config-plugins > xcode.
+# Build-time only (iOS prebuild project generation); never in the JS bundle that
+# runs on-device, so the insecure-randomness issue is not reachable in our app.
+# Fix is uuid 7 -> 11 (major API change) which would break xcode@3.0.1; blocked
+# on the deliberate Expo SDK 54 pin (see mobile/AGENTS.md).
+reason = "transitive build-time xcode dep, not runtime-reachable, blocked on Expo SDK 54 pin"
+
+[[IgnoredVulns]]
+id = "GHSA-qx2v-qp2m-jg93"
+ignoreUntil = 2026-09-01T00:00:00Z
+# postcss@8.4.49 — pulled transitively by expo > @expo/metro-config.
+# Bundler-time only (web CSS processing); not reachable in the native runtime,
+# and we never parse untrusted CSS. Safely fixable via an npm override to
+# ^8.5.10, but we ignore rather than manipulate the pinned Expo tree; the fix
+# rides along when Expo updates metro-config.
+reason = "transitive bundler-time dep, not runtime-reachable, rides Expo SDK update"

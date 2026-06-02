@@ -40,3 +40,13 @@ test:
 
 # Run everything CI runs: lint, type-check, tests
 check: lint typecheck test
+
+# Scan npm dependencies for known vulnerabilities (ignores in osv-scanner.toml)
+audit:
+    osv-scanner scan source --lockfile=package-lock.json --config=osv-scanner.toml
+
+# osv-scanner exits non-zero on findings regardless of format; CI uploads the
+# SARIF with `if: always()`, so findings still reach the Security tab on failure.
+# Emit SARIF for the code-scanning upload AND gate it, in a single scan run.
+audit-sarif:
+    osv-scanner scan source --lockfile=package-lock.json --config=osv-scanner.toml --format sarif > osv-scanner.sarif
