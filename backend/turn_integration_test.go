@@ -84,6 +84,12 @@ func TestTurnHandlerIntegration(t *testing.T) {
 		if got[1].ServedCount != 1 || got[2].ServedCount != 1 {
 			t.Errorf("Cleo/Blake servedCount = %d/%d, want 1/1", got[1].ServedCount, got[2].ServedCount)
 		}
+		if got[1].LastPickedOn == nil || *got[1].LastPickedOn != "2026-04-10" {
+			t.Errorf("Cleo lastPickedOn = %v, want 2026-04-10", got[1].LastPickedOn)
+		}
+		if got[2].LastPickedOn == nil || *got[2].LastPickedOn != "2026-05-01" {
+			t.Errorf("Blake lastPickedOn = %v, want 2026-05-01", got[2].LastPickedOn)
+		}
 	})
 
 	t.Run("present subset filters the ranking", func(t *testing.T) {
@@ -102,7 +108,7 @@ func TestTurnHandlerIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("present set matching no active core member returns empty", func(t *testing.T) {
+	t.Run("present set containing only inactive members returns empty", func(t *testing.T) {
 		code, got := get(t, seededGroup, zed)
 		if code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", code)
