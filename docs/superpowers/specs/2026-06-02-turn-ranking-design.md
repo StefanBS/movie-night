@@ -125,6 +125,8 @@ WHERE m.group_id = $1
 ORDER BY served_count ASC, last_picked_on ASC NULLS FIRST, m.rotation_position ASC;
 ```
 
+*Illustrative. The implemented query (`backend/internal/db/query/turn.sql`) parenthesizes the `::int` and `::date` casts over the full expressions and qualifies `picks.group_id` so sqlc infers `int32` / `pgtype.Date` correctly — see the file for the authoritative form.*
+
 - `served_count` = `baseline_picks` (ADR-0006 churn seeding) + the member's credited
   pick count. The `LEFT JOIN` + `COALESCE` makes a never-picked member count `0`.
 - `last_picked_on` is the member's most recent **credited** pick; `NULL` for a member

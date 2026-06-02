@@ -1,8 +1,10 @@
 # Movie Night — Mobile
 
 The Movie Night mobile app, built with [Expo](https://expo.dev) and React
-Native. It currently renders a group's roster fetched from the
-[backend](../backend) API.
+Native. It renders a turn-ranking screen ("Whose turn?") fetched from the
+[backend](../backend) API via `fetchTurn` (`lib/turn.ts`): the least-served
+member is highlighted with a "Tonight's pick" badge and a served-count /
+last-picked subtitle, with the rest of the standings listed below.
 
 ## Stack
 
@@ -76,9 +78,9 @@ just android      # or: just ios / just web
 
 ## Connecting to the backend
 
-The roster screen fetches the seeded group
-`11111111-1111-1111-1111-111111111111` ("Friday Film Club"). To see members,
-make sure the backend is up and seeded first:
+The turn-ranking screen fetches the seeded group
+`11111111-1111-1111-1111-111111111111` ("Friday Film Club"). To see the ranked
+roster, make sure the backend is up and seeded first:
 
 ```bash
 cd ../backend
@@ -90,7 +92,7 @@ group shows "No members yet."
 
 ## Troubleshooting
 
-**"Couldn't load roster: Network request failed" on a physical phone.** Usually
+**"Couldn't load turn ranking: Network request failed" on a physical phone.** Usually
 a *stale bundle*: a long-running Metro server keeps serving old JavaScript after
 you change code or add a dependency, and the older code falls back to
 `localhost` — which, on a phone, is the phone itself. Restart Metro with a
@@ -123,10 +125,11 @@ Tests use Node's built-in test runner via `tsx`, mirroring the Go backend's
 table-driven style:
 
 - **Unit tests** cover pure logic with no mocks — `lib/api.test.ts`
-  (URL resolution) and `lib/members.test.ts` (payload validation).
-- **Integration tests** (`lib/members.integration.test.ts`) exercise
-  `fetchMembers` against a real local HTTP server over a real `fetch`, with no
-  mocking.
+  (URL resolution), `lib/members.test.ts` (roster payload validation), and
+  `lib/turn.test.ts` (turn payload validation).
+- **Integration tests** exercise `fetchMembers` (`lib/members.integration.test.ts`)
+  and `fetchTurn` (`lib/turn.integration.test.ts`) against a real local HTTP
+  server over a real `fetch`, with no mocking.
 
 There are no component/render tests yet — deferred until there's UI logic worth
 asserting.
@@ -151,11 +154,12 @@ lefthook install               # from the repo root
 
 ```
 mobile/
-├── App.tsx            # root component — the roster screen
+├── App.tsx            # root component — the turn-ranking screen ("Whose turn?")
 ├── index.ts           # Expo entrypoint (registerRootComponent)
 ├── lib/               # framework-free logic + its tests
 │   ├── api.ts         # resolveApiBaseUrl — picks the backend URL
-│   └── members.ts     # fetchMembers + parseMembers (validation)
+│   ├── turn.ts        # fetchTurn + parseTurn (validation) — used by the screen
+│   └── members.ts     # fetchMembers + parseMembers (still tested; /members endpoint)
 ├── app.json           # Expo app config
 ├── eslint.config.js   # ESLint flat config
 ├── justfile           # task recipes (just) — parity with the backend
