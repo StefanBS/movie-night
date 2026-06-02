@@ -41,6 +41,16 @@ func TestValidatePickRequest(t *testing.T) {
 		}
 	})
 
+	t.Run("preserves an explicit isCredited true", func(t *testing.T) {
+		got, err := validatePickRequest(pickRequest{PickerID: picker, ScheduledFor: "2026-06-02", IsCredited: boolPtr(true)})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !got.IsCredited {
+			t.Errorf("IsCredited = false, want true")
+		}
+	})
+
 	invalid := []struct {
 		name string
 		req  pickRequest
