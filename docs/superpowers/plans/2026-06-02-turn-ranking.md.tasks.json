@@ -1,0 +1,46 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-02-turn-ranking.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Migration 0002 + RankGroupTurn query + sqlc generate",
+      "status": "completed",
+      "description": "**Goal:** Create the picks table and the least-served ranking query, regenerate sqlc.\n\n**Files:**\n- Create: backend/migrations/0002_picks.sql\n- Create: backend/internal/db/query/turn.sql\n- Modify (generated): backend/internal/db/models.go, backend/internal/db/turn.sql.go\n\n**Verify:** cd backend && just sqlc && just build\n\n```json:metadata\n{\"files\": [\"backend/migrations/0002_picks.sql\", \"backend/internal/db/query/turn.sql\", \"backend/internal/db/turn.sql.go\", \"backend/internal/db/models.go\"], \"verifyCommand\": \"cd backend && just sqlc && just build\", \"acceptanceCriteria\": [\"just sqlc clean\", \"RankGroupTurnRow has ServedCount int32 + LastPickedOn pgtype.Date\", \"just build compiles\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Turn handler with pure-function unit tests",
+      "status": "completed",
+      "blockedBy": [1],
+      "description": "**Goal:** Add turn.go (turnResponse, parsePresent, toTurnResponses, turnStore, turnHandler), wire route in main.go, unit-test pure functions (no mocks).\n\n**Files:**\n- Create: backend/turn.go\n- Create: backend/turn_test.go\n- Modify: backend/main.go\n\n**Verify:** cd backend && just check\n\n```json:metadata\n{\"files\": [\"backend/turn.go\", \"backend/turn_test.go\", \"backend/main.go\"], \"verifyCommand\": \"cd backend && just check\", \"acceptanceCriteria\": [\"parsePresent unit tests pass\", \"toTurnResponses unit tests pass\", \"route registered\", \"just check exit 0\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Turn ranking integration test (testcontainers)",
+      "status": "completed",
+      "blockedBy": [2],
+      "description": "**Goal:** Verify the full ranking path against real Postgres; assert order, present filter, is_credited filter, empty + 400 cases.\n\n**Files:**\n- Create: backend/turn_integration_test.go\n\n**Verify:** cd backend && go test -tags=integration -run 'TestTurnHandlerIntegration' ./... -v\n\n```json:metadata\n{\"files\": [\"backend/turn_integration_test.go\"], \"verifyCommand\": \"cd backend && go test -tags=integration -run 'TestTurnHandlerIntegration' ./... -v\", \"acceptanceCriteria\": [\"default ranking order correct\", \"present subset filters\", \"empty present-set returns []\", \"malformed present returns 400\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Dev seed pick history",
+      "status": "completed",
+      "blockedBy": [1],
+      "description": "**Goal:** Append idempotent pick history to seed.sql for an unambiguous ranking.\n\n**Files:**\n- Modify: backend/seed.sql\n\n**Verify:** cd backend && just db-up && just migrate && just seed && just seed\n\n```json:metadata\n{\"files\": [\"backend/seed.sql\"], \"verifyCommand\": \"cd backend && just db-up && just migrate && just seed && just seed\", \"acceptanceCriteria\": [\"idempotent re-seed\", \"curl /turn returns Ada first\"]}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: Mobile turn data layer (fetch + validation + tests)",
+      "status": "completed",
+      "description": "**Goal:** Add lib/turn.ts (TurnMember, parseTurn, fetchTurn) mirroring members.ts, with unit + real-server integration tests.\n\n**Files:**\n- Create: mobile/lib/turn.ts\n- Create: mobile/lib/turn.test.ts\n- Create: mobile/lib/turn.integration.test.ts\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/lib/turn.ts\", \"mobile/lib/turn.test.ts\", \"mobile/lib/turn.integration.test.ts\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"parseTurn validation tests pass\", \"fetchTurn integration tests pass\", \"just check exit 0\"]}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: Mobile screen — render ranking, highlight picker",
+      "status": "completed",
+      "blockedBy": [5],
+      "description": "**Goal:** Switch App.tsx to fetchTurn; render ranked list with element 0 badged 'Tonight's pick'.\n\n**Files:**\n- Modify: mobile/App.tsx\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/App.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"renders /turn ranking\", \"picker badge + highlight on element 0\", \"just check exit 0\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-02T12:00:00Z"
+}

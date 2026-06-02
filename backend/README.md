@@ -77,6 +77,7 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 |--------|------|-------------|
 | `GET` | `/healthz` | Liveness check — returns `{"status":"ok"}` |
 | `GET` | `/groups/{groupId}/members` | Active members of a group, in rotation order |
+| `GET` | `/groups/{groupId}/turn` | Active core members ranked by ADR-0005's least-served order; element 0 is tonight's picker. Optional `present=<uuid>,<uuid>` query param filters to members present tonight; omitted/empty ranks all active core. Returns `[{"id","name","role","servedCount","lastPickedOn"}]` where `lastPickedOn` is `YYYY-MM-DD` or `null`; `400` on invalid UUIDs; `500` on database error. |
 
 ## Testing
 
