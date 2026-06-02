@@ -73,7 +73,7 @@ export default function App() {
                   <View style={styles.rowMain}>
                     <Text style={styles.name}>{item.name}</Text>
                     {isPicker && (
-                      <Text style={styles.badge}>Tonight&apos;s pick</Text>
+                      <Text style={styles.badge}>{"Tonight's pick"}</Text>
                     )}
                   </View>
                   <Text style={styles.meta}>{`${picks} · last: ${last}`}</Text>
