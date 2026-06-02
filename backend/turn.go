@@ -44,6 +44,9 @@ func parsePresent(raw string) ([]uuid.UUID, error) {
 		}
 		ids = append(ids, id)
 	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
 	return ids, nil
 }
 

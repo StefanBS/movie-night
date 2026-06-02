@@ -27,6 +27,7 @@ func TestParsePresent(t *testing.T) {
 		{name: "trims whitespace around ids", raw: " " + id1.String() + " , " + id2.String() + " ", want: []uuid.UUID{id1, id2}},
 		{name: "skips trailing blank segment", raw: id1.String() + ",", want: []uuid.UUID{id1}},
 		{name: "preserves duplicates", raw: id1.String() + "," + id1.String(), want: []uuid.UUID{id1, id1}},
+		{name: "all-blank segments yields nil", raw: ",,,", want: nil},
 		{name: "malformed value errors", raw: id1.String() + ",not-a-uuid", wantErr: true},
 	}
 	for _, tc := range tests {
