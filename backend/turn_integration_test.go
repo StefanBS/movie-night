@@ -29,6 +29,38 @@ func seedTurnPicks(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
+// seedBaselineGroup seeds a separate group whose ranking is decided by
+// baseline_picks rather than credited picks: Pat has baseline 2 and no picks
+// (served 2); Quinn has baseline 0 and one credited pick (served 1). The correct
+// order is therefore Quinn, Pat — which only holds if the query adds
+// baseline_picks. If that term regressed, Pat (served 0, never picked) would sort
+// first instead. Uses its own group/users so it cannot disturb the other subtests.
+func seedBaselineGroup(t *testing.T, pool *pgxpool.Pool) string {
+	t.Helper()
+	ctx := context.Background()
+	const group = "33333333-3333-3333-3333-333333333333"
+	stmts := []struct {
+		sql  string
+		args []any
+	}{
+		{sql: `INSERT INTO groups (id, name) VALUES ($1, 'Baseline Crew')`, args: []any{group}},
+		{sql: `INSERT INTO users (id, name) VALUES
+			('a0000000-0000-0000-0000-000000000007', 'Pat'),
+			('a0000000-0000-0000-0000-000000000008', 'Quinn')`},
+		{sql: `INSERT INTO memberships (group_id, user_id, role, status, baseline_picks, rotation_position) VALUES
+			($1, 'a0000000-0000-0000-0000-000000000007', 'core', 'active', 2, 1),
+			($1, 'a0000000-0000-0000-0000-000000000008', 'core', 'active', 0, 2)`, args: []any{group}},
+		{sql: `INSERT INTO picks (group_id, picker_id, is_credited, scheduled_for) VALUES
+			($1, 'a0000000-0000-0000-0000-000000000008', true, '2026-03-01')`, args: []any{group}},
+	}
+	for _, s := range stmts {
+		if _, err := pool.Exec(ctx, s.sql, s.args...); err != nil {
+			t.Fatalf("seed baseline group: %v", err)
+		}
+	}
+	return group
+}
+
 func TestTurnHandlerIntegration(t *testing.T) {
 	pool := startPostgres(t)
 	seedFixtures(t, pool)
@@ -122,6 +154,32 @@ func TestTurnHandlerIntegration(t *testing.T) {
 		code, _ := get(t, seededGroup, "not-a-uuid")
 		if code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", code)
+		}
+	})
+
+	t.Run("baseline_picks counts toward the served order", func(t *testing.T) {
+		group := seedBaselineGroup(t, pool)
+		code, got := get(t, group, "")
+		if code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", code)
+		}
+		// Quinn (baseline 0 + 1 credited = 1) must rank ahead of Pat (baseline 2
+		// + 0 credited = 2). If the query dropped the baseline term, Pat would be
+		// served 0 (never picked) and wrongly sort first.
+		wantNames := []string{"Quinn", "Pat"}
+		if len(got) != len(wantNames) {
+			t.Fatalf("got %d members, want %d (%+v)", len(got), len(wantNames), got)
+		}
+		for i, name := range wantNames {
+			if got[i].Name != name {
+				t.Errorf("[%d] name = %q, want %q", i, got[i].Name, name)
+			}
+		}
+		if got[0].ServedCount != 1 {
+			t.Errorf("Quinn servedCount = %d, want 1", got[0].ServedCount)
+		}
+		if got[1].ServedCount != 2 {
+			t.Errorf("Pat servedCount = %d, want 2", got[1].ServedCount)
 		}
 	})
 }
