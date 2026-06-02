@@ -1,10 +1,16 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
@@ -70,5 +76,56 @@ func toPickResponse(p db.Pick) pickResponse {
 		IsCredited:   p.IsCredited,
 		ScheduledFor: p.ScheduledFor.Time.Format("2006-01-02"),
 		CreatedAt:    p.CreatedAt.Time.Format(time.RFC3339),
+	}
+}
+
+// pickStore is the subset of *db.Queries the handler needs; the real *db.Queries
+// satisfies it, so no mock is ever written (same pattern as turnStore).
+type pickStore interface {
+	InsertPick(ctx context.Context, arg db.InsertPickParams) (db.Pick, error)
+}
+
+// createPickHandler serves POST /groups/{groupId}/picks.
+func createPickHandler(store pickStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gid, err := parseGroupID(r.PathValue("groupId"))
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "invalid group id")
+			return
+		}
+
+		var req pickRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		parsed, err := validatePickRequest(req)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		pick, err := store.InsertPick(r.Context(), db.InsertPickParams{
+			GroupID:      gid,
+			PickerID:     pgtype.UUID{Bytes: parsed.PickerID, Valid: true},
+			IsCredited:   parsed.IsCredited,
+			ScheduledFor: parsed.ScheduledFor,
+		})
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+				writeJSONError(w, http.StatusUnprocessableEntity, "picker or group does not exist")
+				return
+			}
+			log.Printf("insert pick (group %s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
+			writeJSONError(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		if err := json.NewEncoder(w).Encode(toPickResponse(pick)); err != nil {
+			log.Printf("encode pick response (group %s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
+		}
 	}
 }
