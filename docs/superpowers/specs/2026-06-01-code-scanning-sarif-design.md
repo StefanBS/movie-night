@@ -1,7 +1,7 @@
 # Code scanning (SARIF → Security tab) — design
 
 **Date:** 2026-06-01
-**Status:** Approved, implementing
+**Status:** Approved; revised 2026-06-02 after in-PR review (see [Revision](#revision-2026-06-02-post-review-same-pr)).
 **Branch:** `feat/ci-security-gate` (same PR #2 that introduced the gate)
 
 ## Problem
@@ -44,102 +44,111 @@ Out (still future/additive):
 
 ## Design
 
-### New `just` recipes (SARIF emitters, exit 0 regardless of findings)
+### New `just` recipes (emit SARIF **and** gate, in a single scan run)
 
-Gating remains the job of the existing text recipes; these only produce files.
+Each `audit-sarif` recipe produces the SARIF file **and** fails on findings, from
+one scan run. (The text `vuln`/`sast`/`audit` recipes are unchanged and remain the
+readable local gate.) CI uploads the SARIF with `if: always()`, so findings still
+reach the Security tab when the recipe fails — no separate non-gating run needed.
 
 `backend/justfile`:
 ```just
-# Emit SARIF for upload to code scanning (does NOT gate — `just audit` gates)
+# Emit SARIF for the code-scanning upload AND gate it, each from a single scan run.
 audit-sarif:
-    -go tool govulncheck -format sarif ./... > govulncheck.sarif
-    -go tool gosec -exclude-generated -fmt sarif -out gosec.sarif ./...
+    #!/usr/bin/env bash
+    set -uo pipefail
+    rc=0
+    gosec -exclude-generated -fmt sarif -out gosec.sarif ./... || rc=1
+    go tool govulncheck -format sarif ./... > govulncheck.sarif || rc=1
+    n=$(jq '[.runs[].results[] | select(.level == "error")] | length' govulncheck.sarif 2>/dev/null || echo 0)
+    if [ "${n:-0}" -gt 0 ]; then rc=1; fi
+    exit $rc
 ```
-- `govulncheck -format sarif` always exits 0 (cannot gate — that is why the text
-  `vuln` recipe still runs to gate).
-- `gosec ... -out gosec.sarif` writes the file then exits non-zero on findings;
-  the leading `-` (just's ignore-error prefix) swallows that so the recipe
-  itself stays green.
+- `gosec ... -out gosec.sarif` writes the file then exits non-zero on findings →
+  gates directly. (gosec is the pinned binary, not `go tool` — see the gate spec.)
+- `govulncheck -format sarif` **always exits 0** even with vulnerabilities (exit-3
+  is text-mode only). So it writes SARIF, then we gate on any reachable
+  (`level == "error"`) result via `jq` — the same thing text mode exits 3 for.
+  `jq` ships on GitHub runners and is a common local tool.
 
 `mobile/justfile`:
 ```just
-# Emit SARIF for upload to code scanning (does NOT gate — `just audit` gates)
+# Emit SARIF for the code-scanning upload AND gate it, in a single scan run.
 audit-sarif:
-    -osv-scanner scan source --lockfile=package-lock.json --config=osv-scanner.toml --format sarif > osv-scanner.sarif
+    osv-scanner scan source --lockfile=package-lock.json --config=osv-scanner.toml --format sarif > osv-scanner.sarif
 ```
-- osv-scanner has no documented `--output` flag; SARIF goes to stdout (logs go to
-  stderr), so it is redirected to the file. osv-scanner exits non-zero on vulns;
-  the `-` prefix swallows it so the recipe stays green (gating is `just audit`).
+- osv-scanner has no documented `--output` flag; SARIF goes to stdout (logs to
+  stderr) and is redirected to the file. It exits non-zero on vulns regardless of
+  format, so the single run both emits SARIF and gates.
 
 betterleaks SARIF is produced inline in the `secrets` job (no justfile; it is a
-repo-wide tool invoked directly, consistent with lefthook). `--exit-code 0`
-forces a green exit so the upload step always runs (gating is the separate
-`betterleaks git --no-banner` step, which keeps its default exit-1-on-leak):
+repo-wide tool invoked directly, consistent with lefthook). A single run emits
+SARIF and gates — betterleaks keeps its default exit-1-on-leak (no `--exit-code 0`
+override):
 ```
-betterleaks git --no-banner --report-format sarif --report-path betterleaks.sarif --exit-code 0
+betterleaks git --no-banner --report-format sarif --report-path betterleaks.sarif
 ```
 
 ### Per-job step pattern (identical shape everywhere)
 
-Order matters so SARIF uploads **even when findings exist**:
+A single scan run produces SARIF and gates; the upload runs unconditionally so
+findings reach the Security tab even when the gate fails:
 
-1. **Produce SARIF** — `just audit-sarif` (or the betterleaks command). Exits 0.
-2. **Upload** — one `github/codeql-action/upload-sarif` step per SARIF file, each
-   with a stable `category` so PR and scheduled runs of the same tool update the
-   same logical analysis instead of duplicating. Categories: `govulncheck`,
-   `gosec`, `osv-scanner`, `betterleaks`. Pinned to
+1. **Scan once** — `just audit-sarif` (or the betterleaks command). Emits SARIF
+   and fails the step on findings.
+2. **Upload** — one `github/codeql-action/upload-sarif` step per SARIF file,
+   guarded `if: always() && <fork guard>` so it runs even after step 1 fails.
+   Each carries a stable `category` so PR and scheduled runs of the same tool
+   update the same logical analysis instead of duplicating. Categories:
+   `govulncheck`, `gosec`, `osv-scanner`, `betterleaks`. Pinned to
    `github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22`
    (`codeql-bundle-v2.25.5`).
-3. **Gate** — the existing text recipe (`just audit`, or `betterleaks git
-   --no-banner` for secrets) runs last and fails the job red on findings.
 
-Trade-off accepted: each tool runs twice (once for SARIF, once to gate). On this
-small codebase the cost is a few seconds, and it keeps the existing gate
-untouched and dependency-free (no SARIF parsing / no `jq`).
+Each tool runs **once**. govulncheck needs `jq` to gate from its SARIF (its SARIF
+mode can't gate by exit code); `jq` ships on GitHub runners and is a common local
+tool — an acceptable dependency for not scanning everything twice.
 
 ### Fork-PR guard
 
 The repo is public, so PRs can come from forks whose `GITHUB_TOKEN` is read-only
 (`security-events: write` denied → upload would error). Every upload step is
-guarded:
+guarded — combined with `always()` so it still runs when the scan step failed:
 ```yaml
-if: github.event.pull_request.head.repo.fork != true
+if: always() && github.event.pull_request.head.repo.fork != true
 ```
-On push/schedule (`github.event.pull_request` is null) this evaluates true →
+On push/schedule (`github.event.pull_request` is null) the fork term is true →
 uploads. On same-repo PRs (fork == false) → uploads. On fork PRs (fork == true)
 → upload skipped; the scan still gates the PR via its exit code.
 
 ### Workflows touched
 
 - `.github/workflows/backend.yml` — `security` job: add job-level
-  `permissions: { contents: read, security-events: write }`; run `just
-  audit-sarif`; upload `govulncheck.sarif` (category `govulncheck`) and
-  `gosec.sarif` (category `gosec`); then `just audit` to gate.
+  `permissions: { contents: read, security-events: write }`; install the pinned
+  `gosec` binary; run `just audit-sarif` (emits SARIF + gates); upload
+  `govulncheck.sarif` (category `govulncheck`) and `gosec.sarif` (category
+  `gosec`) with `if: always() && <fork guard>`.
 - `.github/workflows/mobile.yml` — `audit` job: add the permission; run `just
-  audit-sarif`; upload `osv-scanner.sarif` (category `osv-scanner`); then `just
-  audit` to gate.
-- `.github/workflows/security.yml`:
-  - `secrets` job (push/PR/schedule): add permission; run betterleaks in SARIF
-    mode; upload `betterleaks.sarif` (category `betterleaks`); then `betterleaks
-    git --no-banner` to gate.
-  - `backend-audit` (schedule): add permission; `just audit-sarif` + upload +
-    `just audit` gate.
-  - `mobile-audit` (schedule): add permission; `just audit-sarif` + upload +
-    `just audit` gate.
+  audit-sarif`; upload `osv-scanner.sarif` (category `osv-scanner`) with
+  `if: always() && <fork guard>`.
+- `.github/workflows/security.yml` — `secrets` job (push/PR): add permission; run
+  betterleaks in SARIF mode (emits + gates); upload `betterleaks.sarif`
+  (category `betterleaks`) with `if: always() && <fork guard>`.
 
-The `mobile-audit` job currently has no `npm ci`; osv-scanner only needs the
-committed lockfile, so SARIF mode needs nothing extra. The `backend-audit` job
-already sets up Go, so `audit-sarif` runs as-is.
+The weekly **scheduled** re-audits run from `backend.yml`/`mobile.yml`'s own
+`schedule` triggers (see the secret-scan + scheduled-rescan spec), not from
+dedicated jobs in `security.yml`.
 
 ## Verification
 
 Before claiming done:
-- `just audit-sarif` (backend and mobile) produces valid SARIF files locally and
-  exits 0 even when a finding exists.
+- `just audit-sarif` (backend and mobile) produces valid SARIF files locally;
+  it **exits non-zero when a finding exists** (it both emits and gates) and 0 on
+  a clean tree.
 - Each SARIF validates as JSON and contains a `runs[].tool.driver.name`.
-- The text gate recipes still fail on findings (unchanged behaviour).
+- The text gate recipes (`vuln`/`sast`/`audit`) still fail on findings (unchanged).
 - All workflow YAML parses; `upload-sarif` is pinned to a SHA; every upload step
-  carries the fork guard and the job carries `security-events: write`.
+  carries `if: always() && <fork guard>` and the job carries
+  `security-events: write`.
 - After merge, a scheduled/PR run shows analyses for all four categories in the
   repo's Security → Code scanning tab.
 
@@ -147,3 +156,21 @@ Before claiming done:
 
 Dependabot/Renovate; mobile JS/TS SAST (e.g. an `eslint-plugin-security` pass);
 container/IaC scanning. All additive and non-breaking.
+
+## Revision (2026-06-02, post-review, same PR)
+
+In-PR code review removed the **double scan run** this design originally accepted;
+the body above reflects the final, single-run design. What changed:
+
+- `audit-sarif` now **emits SARIF and gates in one run** (was: a non-gating SARIF
+  run with `-`-swallowed errors, followed by a second `just audit` run to gate).
+  govulncheck's SARIF mode can't gate by exit code, so its run gates via a `jq`
+  check on `level == "error"` results.
+- Uploads moved to `if: always() && <fork guard>` so SARIF still publishes when
+  the single run fails.
+- The betterleaks `--exit-code 0` override was dropped (one run gates + emits).
+
+This halves security-job scan time on every push/PR. The trade-off the original
+accepted (avoid a `jq` dependency) was reversed in favour of not scanning twice.
+See also the scheduled-rescan spec's revision (scheduled audit jobs moved out of
+`security.yml`).

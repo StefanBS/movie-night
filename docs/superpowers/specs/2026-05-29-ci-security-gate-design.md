@@ -1,7 +1,7 @@
 # CI security gate — design
 
 **Date:** 2026-05-29
-**Status:** Approved, implementing
+**Status:** Approved; implemented, then revised 2026-06-02 after in-PR review (see [Revision](#revision-2026-06-02-post-review-same-pr)).
 **Branch:** `feat/ci-security-gate`
 
 ## Problem
@@ -32,9 +32,13 @@ Out (decided against, to avoid noise/maintenance on a walking-skeleton):
 
 - **`just` is the single source of truth.** Every scan is a `just` recipe; CI
   calls the same recipe a developer runs locally. No CI-only security Actions.
-- **Backend tools are vendored via Go's `tool` directive** (as `goose` and
-  `sqlc` already are), so versions are pinned in `go.mod`/`go.sum` — reproducible,
-  no ad-hoc `go install`.
+- **Backend tools are version-pinned, never `go install`-d ad hoc.**
+  `govulncheck` is vendored via Go's `tool` directive (as `goose`/`sqlc` are).
+  `gosec` is a pinned, checksum-verified **release binary** instead: as a `tool`
+  dependency its autofix feature dragged heavy LLM/cloud SDKs (`anthropic-sdk-go`,
+  `openai-go`, `genai`, `cloud.google.com/go/*`) into the app module's go.sum, so
+  it is installed like `betterleaks`/`osv-scanner` (CI installs it; local `just
+  sast` needs it on PATH).
 - **CI-only enforcement.** No new lefthook hooks; commits/pushes stay fast and
   tool-free. Local runs are opt-in.
 - **Scans block the build** (non-zero exit fails CI). Real-but-unactionable
@@ -45,16 +49,32 @@ Out (decided against, to avoid noise/maintenance on a walking-skeleton):
 
 ### Backend — `backend/justfile` + `backend/go.mod`
 
-Add two `tool` dependencies:
+Add one `tool` dependency:
 - `golang.org/x/vuln/cmd/govulncheck`
-- `github.com/securego/gosec/v2/cmd/gosec`
+
+`gosec` is **not** a `tool` dependency — it is a pinned, checksum-verified release
+binary (see Principles), kept out of `go.mod` so its autofix LLM/cloud SDKs don't
+bloat the app module.
 
 New recipes:
 - `vuln` → `go tool govulncheck ./...` — call-graph aware; reports only
   *reachable* vulnerabilities, so near-zero false positives.
-- `sast` → `go tool gosec -exclude-generated ./...` — `-exclude-generated` skips
-  the sqlc-generated `internal/db/*.sql.go` DO-NOT-EDIT files.
-- `audit: vuln sast` — aggregate for one-shot local use.
+- `sast` → `gosec -exclude-generated ./...` — `-exclude-generated` skips the
+  sqlc-generated `internal/db/*.sql.go` DO-NOT-EDIT files.
+- `audit: vuln sast` — human-readable aggregate gate (fails if either scan does).
+
+### Decision: the `//#nosec G706` suppressions in `roster.go` are deliberate
+
+`gosec` flags `roster.go`'s two `log.Printf("...%s...", gid, ...)` calls as G706
+(CWE-117, log injection) because `gid` derives from the request path. It is a
+**false positive**: `gid` is a `uuid.UUID` from `uuid.Parse`, so it can only be
+canonical hex (no newlines/control characters). Both lines carry
+`//#nosec G706 -- gid is a parsed uuid.UUID ...` to suppress it.
+
+**Future readers: G706 is a real gosec check — do not delete these comments.** It
+is implemented as an SSA *analyzer* (`analyzers/loginjection.go`), not an AST rule
+in `rules/rulelist.go`, so grepping the rule list makes it look non-existent. The
+suppression is load-bearing: without it the gate fails on these two lines.
 
 ### Mobile — `mobile/justfile`
 
@@ -79,10 +99,25 @@ Before claiming done:
   (0 on a clean tree, or surface a real finding).
 - Tool invocation syntax confirmed against each tool's current docs — not the
   analysis doc.
-- CI YAML is valid and the new jobs are scoped by the existing path filters.
+- CI YAML is valid and the new `security`/`audit` jobs report on every PR.
 
 ## Future (not now)
 
 If GitHub Security-tab integration is later wanted, it is an additive change:
 have CI also emit SARIF and upload it via `github/codeql-action/upload-sarif`,
-without undoing the recipes.
+without undoing the recipes. *(Done — see the code-scanning SARIF spec.)*
+
+## Revision (2026-06-02, post-review, same PR)
+
+In-PR code review changed two things from the design above; both are reflected in
+the body now:
+
+- **gosec moved from a `tool` dependency to a pinned binary.** Its autofix deps
+  (anthropic/openai/genai/cloud SDKs) were bloating the app module's go.sum by
+  ~64 lines. `just sast` now calls the `gosec` binary; CI installs it
+  checksum-verified, matching betterleaks/osv-scanner.
+- **Documented the G706 false-positive suppression** (see Design) after it was
+  briefly — and wrongly — removed during review on the mistaken belief that G706
+  wasn't a real gosec check.
+
+The original go-tool form is preserved in this branch's git history.

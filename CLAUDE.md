@@ -54,4 +54,5 @@ Committing here triggers lefthook **pre-commit** (betterleaks secret scan + fast
 
 - **Mobile "Couldn't load roster: Network request failed" on a physical phone** is almost always a **stale Metro bundle** (old code that used `localhost`). Fix: `just start-clean` and re-scan the QR (don't tap a "recently opened" entry). The backend must also bind `0.0.0.0:8080`, not loopback.
 - **Install betterleaks from a release binary** (`dnf`/`brew`/releases), **not `go install`** — the `go install` build ships without detection rules and silently finds nothing.
+- **`just sast` / `just audit` need `gosec` on `PATH`** (a pinned release binary, like betterleaks — CI installs it checksum-verified). It's intentionally *not* a go-tool dep: gosec's autofix feature pulls in heavy LLM/cloud SDKs that would bloat `backend/go.mod`. `just check` and the git hooks don't run gosec, so this only affects running the security audit locally.
 - **Mobile is pinned to Expo SDK 54 on purpose** (the Play Store Expo Go supports up to 54). Before changing Expo/native code, read the exact versioned docs per [`mobile/AGENTS.md`](mobile/AGENTS.md): <https://docs.expo.dev/versions/v54.0.0/>.

@@ -3,10 +3,15 @@ name: backend
 # No path filter: these jobs are required status checks (branch protection on
 # main), so they must report on every PR. A path-filtered workflow that doesn't
 # trigger leaves its required check pending forever and blocks the merge.
+#
+# The weekly `schedule` re-runs the security audit against unchanged deps so a
+# newly disclosed CVE still surfaces; the `test` job is skipped on that trigger.
 on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
 
 permissions:
   contents: read
@@ -17,6 +22,7 @@ concurrency:
 
 jobs:
   test:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -64,24 +70,32 @@ jobs:
 
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
-      - name: Generate SARIF (does not gate)
+      - name: Install gosec (pinned + checksum-verified)
+        run: |
+          curl -fsSL -o gosec.tar.gz "https://github.com/securego/gosec/releases/download/v2.26.1/gosec_2.26.1_linux_amd64.tar.gz"
+          echo "665f48c10b10251ab70ef06635c8522900e6d25b0e6902931a697af2f7646360  gosec.tar.gz" | sha256sum -c -
+          tar -xzf gosec.tar.gz gosec
+          chmod +x gosec
+          sudo mv gosec /usr/local/bin/
+
+      # One scan run per tool: `just audit-sarif` emits the SARIF AND gates, so
+      # this step fails the job on findings while the uploads below still publish.
+      - name: Security audit (govulncheck + gosec)
         run: just audit-sarif
 
-      # Fork PRs get a read-only token and can't write security events; skip
-      # upload there (the `just audit` gate below still runs on every PR).
+      # Upload SARIF even when the audit gate fails (if: always()), so findings
+      # reach the Security tab. Fork PRs get a read-only token and can't write
+      # security events; skip the upload there (the gate above still runs).
       - name: Upload govulncheck SARIF
-        if: github.event.pull_request.head.repo.fork != true
+        if: always() && github.event.pull_request.head.repo.fork != true
         uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
         with:
           sarif_file: backend/govulncheck.sarif
           category: govulncheck
 
       - name: Upload gosec SARIF
-        if: github.event.pull_request.head.repo.fork != true
+        if: always() && github.event.pull_request.head.repo.fork != true
         uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
         with:
           sarif_file: backend/gosec.sarif
           category: gosec
-
-      - name: Security audit (govulncheck + gosec)
-        run: just audit

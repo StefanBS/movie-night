@@ -59,24 +59,36 @@ test-integration:
 vuln:
     go tool govulncheck ./...
 
-# Static security analysis (skips sqlc-generated files)
+# Static security analysis (skips sqlc-generated files). gosec is a pinned binary, not a go tool — see CLAUDE.md.
 sast:
-    go tool gosec -exclude-generated ./...
+    gosec -exclude-generated ./...
 
-# Run all security scans (what the CI security job runs). Both always run — a
-# govulncheck failure must not mask gosec findings — and audit fails if either does.
+# Run all security scans, human-readable; fails if either scan does.
 audit:
     #!/usr/bin/env bash
+    # Both always run — a govulncheck failure must not mask gosec findings.
     set -uo pipefail
     rc=0
     just vuln || rc=1
     just sast || rc=1
     exit $rc
 
-# Emit SARIF for code-scanning upload (does NOT gate — `just audit` gates)
+# Emit SARIF for the code-scanning upload AND gate it, each from a single scan run.
 audit-sarif:
-    -go tool govulncheck -format sarif ./... > govulncheck.sarif
-    -go tool gosec -exclude-generated -fmt sarif -out gosec.sarif ./...
+    #!/usr/bin/env bash
+    # CI uploads the SARIF with `if: always()`, so findings still reach the Security
+    # tab when this fails. gosec gates by exit code; govulncheck's SARIF mode always
+    # exits 0, so gate on any reachable (error-level) finding — what text mode exits 3 for.
+    set -uo pipefail
+    rc=0
+    gosec -exclude-generated -fmt sarif -out gosec.sarif ./... || rc=1
+    go tool govulncheck -format sarif ./... > govulncheck.sarif || rc=1
+    n=$(jq '[.runs[].results[] | select(.level == "error")] | length' govulncheck.sarif 2>/dev/null || echo 0)
+    if [ "${n:-0}" -gt 0 ]; then
+        echo "govulncheck: reachable vulnerabilities found (see govulncheck.sarif)" >&2
+        rc=1
+    fi
+    exit $rc
 
 # Run the backend server
 run:

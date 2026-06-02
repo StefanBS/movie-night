@@ -3,10 +3,15 @@ name: mobile
 # No path filter: these jobs are required status checks (branch protection on
 # main), so they must report on every PR. A path-filtered workflow that doesn't
 # trigger leaves its required check pending forever and blocks the merge.
+#
+# The weekly `schedule` re-runs the dependency audit against unchanged deps so a
+# newly disclosed CVE still surfaces; the `check` job is skipped on that trigger.
 on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
 
 permissions:
   contents: read
@@ -17,6 +22,7 @@ concurrency:
 
 jobs:
   check:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -64,17 +70,17 @@ jobs:
           chmod +x osv-scanner
           sudo mv osv-scanner /usr/local/bin/
 
-      - name: Generate SARIF (does not gate)
+      # One scan run: `just audit-sarif` emits the SARIF AND gates, so this step
+      # fails the job on findings while the upload below still publishes.
+      - name: Dependency audit (osv-scanner)
         run: just audit-sarif
 
-      # Fork PRs get a read-only token and can't write security events; skip
-      # upload there (the `just audit` gate below still runs on every PR).
+      # Upload SARIF even when the audit gate fails (if: always()), so findings
+      # reach the Security tab. Fork PRs get a read-only token and can't write
+      # security events; skip the upload there (the gate above still runs).
       - name: Upload osv-scanner SARIF
-        if: github.event.pull_request.head.repo.fork != true
+        if: always() && github.event.pull_request.head.repo.fork != true
         uses: github/codeql-action/upload-sarif@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5
         with:
           sarif_file: mobile/osv-scanner.sarif
           category: osv-scanner
-
-      - name: Dependency audit (osv-scanner)
-        run: just audit
