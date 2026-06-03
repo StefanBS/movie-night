@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parsePick, type Pick } from "./picks";
+import { parsePick, type PickRecord } from "./picks";
 
 test("parses a valid pick", () => {
   const raw = {
@@ -12,7 +12,7 @@ test("parses a valid pick", () => {
     scheduledFor: "2026-06-02",
     createdAt: "2026-06-02T15:04:05Z",
   };
-  const want: Pick = { ...raw };
+  const want: PickRecord = { ...raw };
   assert.deepEqual(parsePick(raw), want);
 });
 

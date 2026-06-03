@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 
-import { recordPick, type Pick } from "./picks";
+import { recordPick, type PickRecord } from "./picks";
 
 type Handler = (req: http.IncomingMessage, res: http.ServerResponse) => void;
 
@@ -31,7 +31,7 @@ test("posts the pick body to the picks path and returns the created pick", async
   let requestedPath = "";
   let method = "";
   let body = "";
-  const created: Pick = {
+  const created: PickRecord = {
     id: "c1",
     groupId: GROUP,
     pickerId: PICKER,

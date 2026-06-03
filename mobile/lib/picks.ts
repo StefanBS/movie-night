@@ -1,4 +1,7 @@
-export type Pick = {
+// PickRecord is the recorded-pick resource the backend returns (201 body).
+// Named PickRecord rather than Pick to avoid shadowing TypeScript's built-in
+// Pick<T, K> utility type for anything importing from this module.
+export type PickRecord = {
   id: string;
   groupId: string;
   pickerId: string;
@@ -8,8 +11,8 @@ export type Pick = {
 };
 
 // parsePick validates an untrusted JSON payload (the 201 body from the backend)
-// and returns a typed Pick, throwing a descriptive error if the shape is wrong.
-export function parsePick(raw: unknown): Pick {
+// and returns a typed PickRecord, throwing a descriptive error if the shape is wrong.
+export function parsePick(raw: unknown): PickRecord {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("expected a pick object");
   }
@@ -43,13 +46,13 @@ export type RecordPickInput = {
 };
 
 // recordPick records a pick via POST /groups/{groupId}/picks and returns the
-// created Pick. The signal lets the caller cancel an in-flight request.
+// created PickRecord. The signal lets the caller cancel an in-flight request.
 export async function recordPick(
   baseUrl: string,
   groupId: string,
   input: RecordPickInput,
   signal?: AbortSignal,
-): Promise<Pick> {
+): Promise<PickRecord> {
   const res = await fetch(`${baseUrl}/groups/${groupId}/picks`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
