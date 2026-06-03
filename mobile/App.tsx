@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -14,6 +15,8 @@ import Constants from "expo-constants";
 import { StatusBar } from "expo-status-bar";
 
 import { resolveApiBaseUrl } from "./lib/api";
+import { todayLocalISO } from "./lib/date";
+import { recordPick } from "./lib/picks";
 import { fetchTurn, type TurnMember } from "./lib/turn";
 
 const API_URL = resolveApiBaseUrl({
@@ -26,13 +29,22 @@ export default function App() {
   const [turn, setTurn] = useState<TurnMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [recordError, setRecordError] = useState<string | null>(null);
+  const [recordingId, setRecordingId] = useState<string | null>(null);
+  // Mirror of recordingId read synchronously by the in-flight guard, so onRecord
+  // can stay out of recordingId's render cycle and keep a stable identity.
+  const recordingRef = useRef<string | null>(null);
+
+  const loadTurn = useCallback(async (signal?: AbortSignal) => {
+    const data = await fetchTurn(API_URL, GROUP_ID, signal);
+    setTurn(data);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     (async () => {
       try {
-        const data = await fetchTurn(API_URL, GROUP_ID, controller.signal);
-        setTurn(data);
+        await loadTurn(controller.signal);
       } catch (e) {
         if (controller.signal.aborted) {
           return;
@@ -45,7 +57,35 @@ export default function App() {
       }
     })();
     return () => controller.abort();
-  }, []);
+  }, [loadTurn]);
+
+  const onRecord = useCallback(
+    async (member: TurnMember) => {
+      if (recordingRef.current !== null) {
+        return;
+      }
+      recordingRef.current = member.id;
+      setRecordingId(member.id);
+      setRecordError(null);
+      try {
+        // No abort signal here on purpose: a pick write should finish even if
+        // the screen unmounts mid-request, and a stray state set after unmount
+        // is benign under React 18.
+        await recordPick(API_URL, GROUP_ID, {
+          pickerId: member.id,
+          scheduledFor: todayLocalISO(),
+          isCredited: true,
+        });
+        await loadTurn();
+      } catch (e) {
+        setRecordError(e instanceof Error ? e.message : "failed to record pick");
+      } finally {
+        recordingRef.current = null;
+        setRecordingId(null);
+      }
+    },
+    [loadTurn],
+  );
 
   return (
     <SafeAreaProvider>
@@ -61,26 +101,44 @@ export default function App() {
         ) : turn.length === 0 ? (
           <Text style={styles.center}>No members yet.</Text>
         ) : (
-          <FlatList
-            data={turn}
-            keyExtractor={(m) => m.id}
-            renderItem={({ item, index }) => {
-              const isPicker = index === 0;
-              const picks = `${item.servedCount} pick${item.servedCount === 1 ? "" : "s"}`;
-              const last = item.lastPickedOn ?? "never";
-              return (
-                <View style={[styles.row, isPicker && styles.pickerRow]}>
-                  <View style={styles.rowMain}>
-                    <Text style={styles.name}>{item.name}</Text>
-                    {isPicker && (
-                      <Text style={styles.badge}>{"Tonight's pick"}</Text>
-                    )}
-                  </View>
-                  <Text style={styles.meta}>{`${picks} · last: ${last}`}</Text>
-                </View>
-              );
-            }}
-          />
+          <>
+            {recordError !== null && (
+              <Text style={[styles.banner, styles.error]}>
+                {`Couldn't record pick: ${recordError}`}
+              </Text>
+            )}
+            <FlatList
+              data={turn}
+              keyExtractor={(m) => m.id}
+              renderItem={({ item, index }) => {
+                const isPicker = index === 0;
+                const picks = `${item.servedCount} pick${item.servedCount === 1 ? "" : "s"}`;
+                const last = item.lastPickedOn ?? "never";
+                const isRecording = recordingId === item.id;
+                return (
+                  <Pressable
+                    onPress={() => onRecord(item)}
+                    disabled={recordingId !== null}
+                    style={({ pressed }) => [
+                      styles.row,
+                      isPicker && styles.pickerRow,
+                      pressed && styles.rowPressed,
+                    ]}
+                  >
+                    <View style={styles.rowMain}>
+                      <Text style={styles.name}>{item.name}</Text>
+                      {isPicker && (
+                        <Text style={styles.badge}>{"Tonight's pick"}</Text>
+                      )}
+                    </View>
+                    <Text style={styles.meta}>
+                      {isRecording ? "Recording…" : `${picks} · last: ${last}`}
+                    </Text>
+                  </Pressable>
+                );
+              }}
+            />
+          </>
         )}
       </SafeAreaView>
     </SafeAreaProvider>
@@ -92,11 +150,13 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: "600", marginBottom: 16 },
   center: { marginTop: 32, textAlign: "center" },
   error: { color: "#b00020" },
+  banner: { paddingVertical: 8, textAlign: "center" },
   row: {
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#ccc",
   },
+  rowPressed: { opacity: 0.6 },
   pickerRow: {
     backgroundColor: "#eef6ff",
     borderRadius: 8,
