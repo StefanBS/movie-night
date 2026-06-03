@@ -63,7 +63,7 @@ func TestCreatePickHandlerIntegration(t *testing.T) {
 		if code != http.StatusCreated {
 			t.Fatalf("status = %d, want 201", code)
 		}
-		if got.PickerID != ada || got.ScheduledFor != "2026-06-02" || !got.IsCredited {
+		if got.PickerID != ada || got.GroupID != seededGroup || got.ScheduledFor != "2026-06-02" || !got.IsCredited {
 			t.Errorf("response = %+v", got)
 		}
 		if got.ID == "" || got.CreatedAt == "" {
@@ -102,6 +102,13 @@ func TestCreatePickHandlerIntegration(t *testing.T) {
 
 	t.Run("malformed JSON yields 400", func(t *testing.T) {
 		code, _ := post(t, seededGroup, `{not json`)
+		if code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", code)
+		}
+	})
+
+	t.Run("malformed groupId yields 400", func(t *testing.T) {
+		code, _ := post(t, "not-a-uuid", `{"pickerId":"`+ada+`","scheduledFor":"2026-06-02"}`)
 		if code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", code)
 		}
