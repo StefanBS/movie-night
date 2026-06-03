@@ -117,7 +117,7 @@ func createPickHandler(store pickStore) http.HandlerFunc {
 				writeJSONError(w, http.StatusUnprocessableEntity, "picker or group does not exist")
 				return
 			}
-			log.Printf("insert pick (group %s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
+			log.Printf("insert pick (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
 			writeJSONError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -125,7 +125,7 @@ func createPickHandler(store pickStore) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		if err := json.NewEncoder(w).Encode(toPickResponse(pick)); err != nil {
-			log.Printf("encode pick response (group %s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
+			log.Printf("encode pick response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
 		}
 	}
 }
