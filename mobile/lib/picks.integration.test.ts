@@ -84,3 +84,47 @@ test("throws on a non-2xx response", async () => {
     await server.close();
   }
 });
+
+test("throws when the 201 payload fails validation", async () => {
+  const server = await startServer((_req, res) => {
+    res.statusCode = 201;
+    res.setHeader("content-type", "application/json");
+    res.end(
+      JSON.stringify({
+        id: "c1",
+        groupId: GROUP,
+        pickerId: PICKER,
+        isCredited: "yes",
+        scheduledFor: "2026-06-02",
+        createdAt: "2026-06-02T15:04:05Z",
+      }),
+    );
+  });
+  try {
+    await assert.rejects(
+      recordPick(server.url, GROUP, { pickerId: PICKER, scheduledFor: "2026-06-02" }),
+      /isCredited/,
+    );
+  } finally {
+    await server.close();
+  }
+});
+
+test("aborts the request when the signal fires", async () => {
+  const server = await startServer((_req, res) => {
+    void res; // never respond, so only an abort can settle the promise
+  });
+  try {
+    const controller = new AbortController();
+    const pending = recordPick(
+      server.url,
+      GROUP,
+      { pickerId: PICKER, scheduledFor: "2026-06-02" },
+      controller.signal,
+    );
+    controller.abort();
+    await assert.rejects(pending, (err: Error) => err.name === "AbortError");
+  } finally {
+    await server.close();
+  }
+});
