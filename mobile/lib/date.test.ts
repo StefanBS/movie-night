@@ -12,3 +12,7 @@ test("formats a date as local YYYY-MM-DD", () => {
 test("zero-pads single-digit month and day", () => {
   assert.equal(todayLocalISO(new Date(2026, 0, 5, 0, 0)), "2026-01-05");
 });
+
+test("handles the year-end boundary", () => {
+  assert.equal(todayLocalISO(new Date(2025, 11, 31, 23, 59)), "2025-12-31");
+});

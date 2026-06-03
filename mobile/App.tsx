@@ -63,6 +63,9 @@ export default function App() {
       setRecordingId(member.id);
       setError(null);
       try {
+        // No abort signal here on purpose: a pick write should finish even if
+        // the screen unmounts mid-request, and a stray state set after unmount
+        // is benign under React 18.
         await recordPick(API_URL, GROUP_ID, {
           pickerId: member.id,
           scheduledFor: todayLocalISO(),
