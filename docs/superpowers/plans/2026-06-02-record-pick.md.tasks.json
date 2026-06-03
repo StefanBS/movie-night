@@ -4,39 +4,39 @@
     {
       "id": 1,
       "subject": "Task 1: InsertPick sqlc query",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Add the insert query and regenerate sqlc so db.Queries gains InsertPick + InsertPickParams.\n\n**Files:**\n- Create: backend/internal/db/query/picks.sql\n- Generated: backend/internal/db/picks.sql.go (do not hand-edit)\n\n```json:metadata\n{\"files\": [\"backend/internal/db/query/picks.sql\", \"backend/internal/db/picks.sql.go\"], \"verifyCommand\": \"cd backend && just sqlc && go build ./...\", \"acceptanceCriteria\": [\"just sqlc regenerates cleanly\", \"InsertPickParams has GroupID/PickerID/IsCredited/ScheduledFor\", \"go build succeeds\"]}\n```"
     },
     {
       "id": 2,
       "subject": "Task 2: Pure pick validation + response mapping",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Add pure, unit-tested validatePickRequest and toPickResponse (and DTO types) in a new picks.go.\n\n**Files:**\n- Create: backend/picks.go\n- Create: backend/picks_test.go\n\n```json:metadata\n{\"files\": [\"backend/picks.go\", \"backend/picks_test.go\"], \"verifyCommand\": \"cd backend && go test -run '^TestValidatePickRequest$|^TestToPickResponse$' ./...\", \"acceptanceCriteria\": [\"validatePickRequest defaults isCredited true and errors on bad UUID/date\", \"toPickResponse formats scheduledFor YYYY-MM-DD and createdAt RFC3339\", \"unit tests pass\"]}\n```"
     },
     {
       "id": 3,
       "subject": "Task 3: POST /groups/{groupId}/picks handler",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [1, 2],
       "description": "**Goal:** Add createPickHandler + pickStore interface, wire the route in main.go. FK violation (23503) -> 422.\n\n**Files:**\n- Modify: backend/picks.go\n- Modify: backend/main.go\n\n```json:metadata\n{\"files\": [\"backend/picks.go\", \"backend/main.go\"], \"verifyCommand\": \"cd backend && just check\", \"acceptanceCriteria\": [\"path UUID 400, body 400, 23503->422, other->500, success 201\", \"route registered in main.go\", \"just check passes\"]}\n```"
     },
     {
       "id": 4,
       "subject": "Task 4: Backend integration test",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [3],
       "description": "**Goal:** testcontainers test: 201 + standings advance; unknown picker 422; malformed pickerId/JSON 400.\n\n**Files:**\n- Create: backend/picks_integration_test.go\n\n```json:metadata\n{\"files\": [\"backend/picks_integration_test.go\"], \"verifyCommand\": \"cd backend && go test -tags=integration -run '^TestCreatePickHandlerIntegration$' ./...\", \"acceptanceCriteria\": [\"201 + standings advance via GET /turn\", \"well-formed unknown picker 422\", \"malformed pickerId and JSON 400\"]}\n```"
     },
     {
       "id": 5,
       "subject": "Task 5: Mobile picks API client",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Add recordPick (POST + 201 validation) and pure parsePick, with unit + real-server integration tests.\n\n**Files:**\n- Create: mobile/lib/picks.ts\n- Create: mobile/lib/picks.test.ts\n- Create: mobile/lib/picks.integration.test.ts\n\n```json:metadata\n{\"files\": [\"mobile/lib/picks.ts\", \"mobile/lib/picks.test.ts\", \"mobile/lib/picks.integration.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/picks.test.ts lib/picks.integration.test.ts\", \"acceptanceCriteria\": [\"parsePick validates 201 payload\", \"recordPick posts body and returns parsed Pick\", \"tests pass\"]}\n```"
     },
     {
       "id": 6,
       "subject": "Task 6: Tappable rows record tonight's pick",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [5],
       "description": "**Goal:** Make turn-screen rows tappable to record a member (local date, credited), then refetch /turn. Add pure todayLocalISO.\n\n**Files:**\n- Create: mobile/lib/date.ts\n- Create: mobile/lib/date.test.ts\n- Modify: mobile/App.tsx\n\n```json:metadata\n{\"files\": [\"mobile/lib/date.ts\", \"mobile/lib/date.test.ts\", \"mobile/App.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"todayLocalISO formats device-local YYYY-MM-DD zero-padded\", \"tap records then refetches with in-flight lock; failure shown in error state\", \"just check passes\"]}\n```"
     }
