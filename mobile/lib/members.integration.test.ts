@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import http from "node:http";
 
 import {
-  addMember,
   deactivateMember,
   fetchMembers,
+  joinMember,
   promoteMember,
   reactivateMember,
   type Member,
@@ -62,10 +62,10 @@ async function capture(
   }
 }
 
-test("addMember posts {name} to the members path and returns the member", async () => {
+test("joinMember posts {name} to the members path and returns the member", async () => {
   const created: Member = { id: "u1", name: "Newbie", role: "core", status: "active" };
   const { method, path, body, result } = await capture(201, created, (url) =>
-    addMember(url, GROUP, "Newbie"),
+    joinMember(url, GROUP, "Newbie"),
   );
   assert.equal(method, "POST");
   assert.equal(path, `/groups/${GROUP}/members`);

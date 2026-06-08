@@ -13,9 +13,9 @@ import Constants from "expo-constants";
 
 import { resolveApiBaseUrl } from "../lib/api";
 import {
-  addMember,
   deactivateMember,
   fetchMembers,
+  joinMember,
   promoteMember,
   reactivateMember,
   type Member,
@@ -87,7 +87,7 @@ export default function ManageScreen() {
     setBusy("add");
     setActionError(null);
     try {
-      await addMember(API_URL, GROUP_ID, trimmed);
+      await joinMember(API_URL, GROUP_ID, trimmed);
       setName("");
       await load();
     } catch (e) {

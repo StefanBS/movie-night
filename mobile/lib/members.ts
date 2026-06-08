@@ -68,8 +68,8 @@ async function postMember(
   return parseMember(await res.json());
 }
 
-// addMember adds a new core member by name (join). Returns the created Member.
-export function addMember(
+// joinMember adds a new core member by name (add). Returns the created Member.
+export function joinMember(
   baseUrl: string,
   groupId: string,
   name: string,
