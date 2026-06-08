@@ -7,17 +7,13 @@ import {
   Text,
   View,
 } from "react-native";
-import {
-  SafeAreaProvider,
-  SafeAreaView,
-} from "react-native-safe-area-context";
 import Constants from "expo-constants";
-import { StatusBar } from "expo-status-bar";
+import { Link } from "expo-router";
 
-import { resolveApiBaseUrl } from "./lib/api";
-import { todayLocalISO } from "./lib/date";
-import { recordPick } from "./lib/picks";
-import { fetchTurn, type TurnMember } from "./lib/turn";
+import { resolveApiBaseUrl } from "../lib/api";
+import { todayLocalISO } from "../lib/date";
+import { recordPick } from "../lib/picks";
+import { fetchTurn, type TurnMember } from "../lib/turn";
 
 const API_URL = resolveApiBaseUrl({
   envUrl: process.env.EXPO_PUBLIC_API_URL,
@@ -25,7 +21,7 @@ const API_URL = resolveApiBaseUrl({
 });
 const GROUP_ID = "11111111-1111-1111-1111-111111111111";
 
-export default function App() {
+export default function TurnScreen() {
   const [turn, setTurn] = useState<TurnMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,66 +84,71 @@ export default function App() {
   );
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="auto" />
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.title}>Whose turn?</Text>
-        {loading ? (
-          <ActivityIndicator style={styles.center} size="large" />
-        ) : error ? (
-          <Text style={[styles.center, styles.error]}>
-            {`Couldn't load turn order: ${error}`}
-          </Text>
-        ) : turn.length === 0 ? (
-          <Text style={styles.center}>No members yet.</Text>
-        ) : (
-          <>
-            {recordError !== null && (
-              <Text style={[styles.banner, styles.error]}>
-                {`Couldn't record pick: ${recordError}`}
-              </Text>
-            )}
-            <FlatList
-              data={turn}
-              keyExtractor={(m) => m.id}
-              renderItem={({ item, index }) => {
-                const isPicker = index === 0;
-                const picks = `${item.servedCount} pick${item.servedCount === 1 ? "" : "s"}`;
-                const last = item.lastPickedOn ?? "never";
-                const isRecording = recordingId === item.id;
-                return (
-                  <Pressable
-                    onPress={() => onRecord(item)}
-                    disabled={recordingId !== null}
-                    style={({ pressed }) => [
-                      styles.row,
-                      isPicker && styles.pickerRow,
-                      pressed && styles.rowPressed,
-                    ]}
-                  >
-                    <View style={styles.rowMain}>
-                      <Text style={styles.name}>{item.name}</Text>
-                      {isPicker && (
-                        <Text style={styles.badge}>{"Tonight's pick"}</Text>
-                      )}
-                    </View>
-                    <Text style={styles.meta}>
-                      {isRecording ? "Recording…" : `${picks} · last: ${last}`}
-                    </Text>
-                  </Pressable>
-                );
-              }}
-            />
-          </>
-        )}
-      </SafeAreaView>
-    </SafeAreaProvider>
+    <View style={styles.container}>
+      <Link href="/manage" style={styles.manageLink}>
+        Manage members →
+      </Link>
+      {loading ? (
+        <ActivityIndicator style={styles.center} size="large" />
+      ) : error ? (
+        <Text style={[styles.center, styles.error]}>
+          {`Couldn't load turn order: ${error}`}
+        </Text>
+      ) : turn.length === 0 ? (
+        <Text style={styles.center}>No members yet.</Text>
+      ) : (
+        <>
+          {recordError !== null && (
+            <Text style={[styles.banner, styles.error]}>
+              {`Couldn't record pick: ${recordError}`}
+            </Text>
+          )}
+          <FlatList
+            data={turn}
+            keyExtractor={(m) => m.id}
+            renderItem={({ item, index }) => {
+              const isPicker = index === 0;
+              const picks = `${item.servedCount} pick${item.servedCount === 1 ? "" : "s"}`;
+              const last = item.lastPickedOn ?? "never";
+              const isRecording = recordingId === item.id;
+              return (
+                <Pressable
+                  onPress={() => onRecord(item)}
+                  disabled={recordingId !== null}
+                  style={({ pressed }) => [
+                    styles.row,
+                    isPicker && styles.pickerRow,
+                    pressed && styles.rowPressed,
+                  ]}
+                >
+                  <View style={styles.rowMain}>
+                    <Text style={styles.name}>{item.name}</Text>
+                    {isPicker && (
+                      <Text style={styles.badge}>{"Tonight's pick"}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.meta}>
+                    {isRecording ? "Recording…" : `${picks} · last: ${last}`}
+                  </Text>
+                </Pressable>
+              );
+            }}
+          />
+        </>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16 },
-  title: { fontSize: 28, fontWeight: "600", marginBottom: 16 },
+  manageLink: {
+    fontSize: 16,
+    color: "#0b66c3",
+    fontWeight: "600",
+    paddingVertical: 12,
+    textAlign: "right",
+  },
   center: { marginTop: 32, textAlign: "center" },
   error: { color: "#b00020" },
   banner: { paddingVertical: 8, textAlign: "center" },
