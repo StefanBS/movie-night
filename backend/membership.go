@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -10,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -126,5 +129,150 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 		}
 
 		encodeMember(w, gid, user.ID, user.Name, string(membership.Role), string(membership.Status), http.StatusCreated)
+	}
+}
+
+// parseGroupAndUser validates the {groupId} and {userId} path segments as UUIDs,
+// writing a 400 and returning ok=false on either malformed value.
+func parseGroupAndUser(w http.ResponseWriter, r *http.Request) (gid, uid uuid.UUID, ok bool) {
+	gid, err := parseGroupID(r.PathValue("groupId"))
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid group id")
+		return uuid.UUID{}, uuid.UUID{}, false
+	}
+	uid, err = uuid.Parse(r.PathValue("userId"))
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid user id")
+		return uuid.UUID{}, uuid.UUID{}, false
+	}
+	return gid, uid, true
+}
+
+// loadMember fetches a member for a transition handler, mapping a missing
+// membership to 404 and any other error to 500. ok=false means a response has
+// already been written and the caller should stop.
+func loadMember(w http.ResponseWriter, r *http.Request, store memberStore, gid, uid uuid.UUID) (db.GetGroupMemberRow, bool) {
+	m, err := store.GetGroupMember(r.Context(), db.GetGroupMemberParams{GroupID: gid, UserID: uid})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			writeJSONError(w, http.StatusNotFound, "member not found")
+			return db.GetGroupMemberRow{}, false
+		}
+		internalError(w, gid, "get group member", err)
+		return db.GetGroupMemberRow{}, false
+	}
+	return m, true
+}
+
+// deactivateMemberHandler serves POST /groups/{groupId}/members/{userId}/deactivate.
+func deactivateMemberHandler(store memberStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gid, uid, ok := parseGroupAndUser(w, r)
+		if !ok {
+			return
+		}
+		m, ok := loadMember(w, r, store, gid, uid)
+		if !ok {
+			return
+		}
+		// Idempotent: already inactive → no-op.
+		if m.Status == db.MembershipStatusInactive {
+			encodeMember(w, gid, m.UserID, m.Name, string(m.Role), string(m.Status), http.StatusOK)
+			return
+		}
+		updated, err := store.DeactivateMembership(r.Context(), db.DeactivateMembershipParams{GroupID: gid, UserID: uid})
+		if err != nil {
+			internalError(w, gid, "deactivate membership", err)
+			return
+		}
+		encodeMember(w, gid, updated.UserID, m.Name, string(updated.Role), string(updated.Status), http.StatusOK)
+	}
+}
+
+// reactivateMemberHandler serves POST /groups/{groupId}/members/{userId}/reactivate.
+func reactivateMemberHandler(store memberStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gid, uid, ok := parseGroupAndUser(w, r)
+		if !ok {
+			return
+		}
+		ctx := r.Context()
+		m, ok := loadMember(w, r, store, gid, uid)
+		if !ok {
+			return
+		}
+		// Idempotent: already active → no-op.
+		if m.Status == db.MembershipStatusActive {
+			encodeMember(w, gid, m.UserID, m.Name, string(m.Role), string(m.Status), http.StatusOK)
+			return
+		}
+		// Seed only when this crosses into the rotation (active core). A
+		// reactivated guest stays out of the rotation, so its baseline is kept.
+		baseline := m.BaselinePicks
+		if m.Role == db.MembershipRoleCore {
+			avg, err := store.AverageServedCount(ctx, gid)
+			if err != nil {
+				internalError(w, gid, "average served", err)
+				return
+			}
+			credited, err := store.MemberCreditedCount(ctx, db.MemberCreditedCountParams{GroupID: gid, UserID: pgtype.UUID{Bytes: uid, Valid: true}})
+			if err != nil {
+				internalError(w, gid, "member credited count", err)
+				return
+			}
+			baseline = seedBaseline(avg, credited)
+		}
+		updated, err := store.ReactivateMembership(ctx, db.ReactivateMembershipParams{GroupID: gid, UserID: uid, BaselinePicks: baseline})
+		if err != nil {
+			internalError(w, gid, "reactivate membership", err)
+			return
+		}
+		encodeMember(w, gid, updated.UserID, m.Name, string(updated.Role), string(updated.Status), http.StatusOK)
+	}
+}
+
+// promoteMemberHandler serves POST /groups/{groupId}/members/{userId}/promote.
+func promoteMemberHandler(store memberStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gid, uid, ok := parseGroupAndUser(w, r)
+		if !ok {
+			return
+		}
+		ctx := r.Context()
+		m, ok := loadMember(w, r, store, gid, uid)
+		if !ok {
+			return
+		}
+		// Idempotent: already active core → no-op.
+		if m.Role == db.MembershipRoleCore && m.Status == db.MembershipStatusActive {
+			encodeMember(w, gid, m.UserID, m.Name, string(m.Role), string(m.Status), http.StatusOK)
+			return
+		}
+		avg, err := store.AverageServedCount(ctx, gid)
+		if err != nil {
+			internalError(w, gid, "average served", err)
+			return
+		}
+		credited, err := store.MemberCreditedCount(ctx, db.MemberCreditedCountParams{GroupID: gid, UserID: pgtype.UUID{Bytes: uid, Valid: true}})
+		if err != nil {
+			internalError(w, gid, "member credited count", err)
+			return
+		}
+		maxPos, err := store.MaxRotationPosition(ctx, gid)
+		if err != nil {
+			internalError(w, gid, "max rotation position", err)
+			return
+		}
+		updated, err := store.PromoteMembership(ctx, db.PromoteMembershipParams{
+			GroupID:          gid,
+			UserID:           uid,
+			BaselinePicks:    seedBaseline(avg, credited),
+			RotationPosition: maxPos + 1,
+		})
+		if err != nil {
+			internalError(w, gid, "promote membership", err)
+			return
+		}
+		encodeMember(w, gid, updated.UserID, m.Name, string(updated.Role), string(updated.Status), http.StatusOK)
 	}
 }
