@@ -89,16 +89,18 @@ func seedFixtures(t *testing.T, pool *pgxpool.Pool) {
 				('a0000000-0000-0000-0000-000000000001', 'Ada'),
 				('a0000000-0000-0000-0000-000000000002', 'Blake'),
 				('a0000000-0000-0000-0000-000000000003', 'Cleo'),
+				('a0000000-0000-0000-0000-000000000006', 'Gwen'),
 				('a0000000-0000-0000-0000-000000000009', 'Zed')`,
 		},
 		{
 			// rotation_position deliberately out of insert order to prove ORDER BY.
-			// Zed is inactive and must be excluded.
+			// Zed is inactive; Gwen is an active guest (not in the rotation).
 			sql: `INSERT INTO memberships (group_id, user_id, role, status, rotation_position) VALUES
 				($1, 'a0000000-0000-0000-0000-000000000002', 'core', 'active', 2),
 				($1, 'a0000000-0000-0000-0000-000000000001', 'core', 'active', 1),
 				($1, 'a0000000-0000-0000-0000-000000000003', 'core', 'active', 3),
-				($1, 'a0000000-0000-0000-0000-000000000009', 'core', 'inactive', 4)`,
+				($1, 'a0000000-0000-0000-0000-000000000009', 'core', 'inactive', 4),
+				($1, 'a0000000-0000-0000-0000-000000000006', 'guest', 'active', 5)`,
 			args: []any{seededGroup},
 		},
 	}
@@ -130,18 +132,25 @@ func TestMembersHandlerIntegration(t *testing.T) {
 		return rec.Code, got
 	}
 
-	t.Run("active members in rotation order, inactive excluded", func(t *testing.T) {
+	t.Run("all members ordered core, guest, then inactive", func(t *testing.T) {
 		code, got := get(t, seededGroup)
 		if code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", code)
 		}
-		wantNames := []string{"Ada", "Blake", "Cleo"}
-		if len(got) != len(wantNames) {
-			t.Fatalf("got %d members, want %d (%+v)", len(got), len(wantNames), got)
+		want := []memberResponse{
+			{Name: "Ada", Role: "core", Status: "active"},
+			{Name: "Blake", Role: "core", Status: "active"},
+			{Name: "Cleo", Role: "core", Status: "active"},
+			{Name: "Gwen", Role: "guest", Status: "active"},
+			{Name: "Zed", Role: "core", Status: "inactive"},
 		}
-		for i, name := range wantNames {
-			if got[i].Name != name {
-				t.Errorf("[%d] name = %q, want %q", i, got[i].Name, name)
+		if len(got) != len(want) {
+			t.Fatalf("got %d members, want %d (%+v)", len(got), len(want), got)
+		}
+		for i, w := range want {
+			if got[i].Name != w.Name || got[i].Role != w.Role || got[i].Status != w.Status {
+				t.Errorf("[%d] = {%s %s %s}, want {%s %s %s}", i,
+					got[i].Name, got[i].Role, got[i].Status, w.Name, w.Role, w.Status)
 			}
 		}
 	})

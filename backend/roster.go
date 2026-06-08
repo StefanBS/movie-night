@@ -11,11 +11,13 @@ import (
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
-// memberResponse is the JSON shape returned by GET /groups/{groupId}/members.
+// memberResponse is the JSON shape returned by GET /groups/{groupId}/members and
+// by the membership-churn write endpoints.
 type memberResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Role string `json:"role"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Role   string `json:"role"`
+	Status string `json:"status"`
 }
 
 // parseGroupID validates a path segment as a UUID.
@@ -29,9 +31,10 @@ func toMemberResponses(rows []db.ListGroupMembersRow) []memberResponse {
 	out := make([]memberResponse, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, memberResponse{
-			ID:   r.ID.String(),
-			Name: r.Name,
-			Role: string(r.Role),
+			ID:     r.ID.String(),
+			Name:   r.Name,
+			Role:   string(r.Role),
+			Status: string(r.Status),
 		})
 	}
 	return out
