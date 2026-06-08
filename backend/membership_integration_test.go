@@ -27,9 +27,9 @@ func TestMembershipChurnIntegration(t *testing.T) {
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
 
 	const (
-		ada  = "a0000000-0000-0000-0000-000000000001"
-		cleo = "a0000000-0000-0000-0000-000000000003"
-		gwen = "a0000000-0000-0000-0000-000000000006"
+		ada     = "a0000000-0000-0000-0000-000000000001"
+		cleo    = "a0000000-0000-0000-0000-000000000003"
+		frankie = "a0000000-0000-0000-0000-000000000006"
 	)
 
 	do := func(t *testing.T, method, path, body string) (int, memberResponse) {
@@ -160,20 +160,20 @@ func TestMembershipChurnIntegration(t *testing.T) {
 	})
 
 	t.Run("promote brings the guest into the rotation at the average, idempotently", func(t *testing.T) {
-		want := roundedTurnAvg(t) // average BEFORE Gwen enters (guest, excluded)
-		code, m := do(t, http.MethodPost, "/groups/"+seededGroup+"/members/"+gwen+"/promote", "")
+		want := roundedTurnAvg(t) // average BEFORE Frankie enters (guest, excluded)
+		code, m := do(t, http.MethodPost, "/groups/"+seededGroup+"/members/"+frankie+"/promote", "")
 		if code != http.StatusOK || m.Role != "core" || m.Status != "active" {
 			t.Fatalf("status=%d member=%+v, want 200/core/active", code, m)
 		}
-		got, ok := servedOf(t, "Gwen")
+		got, ok := servedOf(t, "Frankie")
 		if !ok {
-			t.Fatal("Gwen not in /turn after promote")
+			t.Fatal("Frankie not in /turn after promote")
 		}
 		if got != want {
-			t.Errorf("Gwen servedCount = %d, want %d (the average)", got, want)
+			t.Errorf("Frankie servedCount = %d, want %d (the average)", got, want)
 		}
-		do(t, http.MethodPost, "/groups/"+seededGroup+"/members/"+gwen+"/promote", "")
-		if again, _ := servedOf(t, "Gwen"); again != got {
+		do(t, http.MethodPost, "/groups/"+seededGroup+"/members/"+frankie+"/promote", "")
+		if again, _ := servedOf(t, "Frankie"); again != got {
 			t.Errorf("idempotent promote changed servedCount: %d → %d", got, again)
 		}
 	})

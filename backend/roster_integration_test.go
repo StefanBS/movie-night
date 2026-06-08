@@ -89,12 +89,12 @@ func seedFixtures(t *testing.T, pool *pgxpool.Pool) {
 				('a0000000-0000-0000-0000-000000000001', 'Ada'),
 				('a0000000-0000-0000-0000-000000000002', 'Blake'),
 				('a0000000-0000-0000-0000-000000000003', 'Cleo'),
-				('a0000000-0000-0000-0000-000000000006', 'Gwen'),
+				('a0000000-0000-0000-0000-000000000006', 'Frankie'),
 				('a0000000-0000-0000-0000-000000000009', 'Zed')`,
 		},
 		{
 			// rotation_position deliberately out of insert order to prove ORDER BY.
-			// Zed is inactive; Gwen is an active guest (not in the rotation).
+			// Zed is inactive; Frankie is an active guest (not in the rotation).
 			sql: `INSERT INTO memberships (group_id, user_id, role, status, rotation_position) VALUES
 				($1, 'a0000000-0000-0000-0000-000000000002', 'core', 'active', 2),
 				($1, 'a0000000-0000-0000-0000-000000000001', 'core', 'active', 1),
@@ -141,7 +141,7 @@ func TestMembersHandlerIntegration(t *testing.T) {
 			{Name: "Ada", Role: "core", Status: "active"},
 			{Name: "Blake", Role: "core", Status: "active"},
 			{Name: "Cleo", Role: "core", Status: "active"},
-			{Name: "Gwen", Role: "guest", Status: "active"},
+			{Name: "Frankie", Role: "guest", Status: "active"},
 			{Name: "Zed", Role: "core", Status: "inactive"},
 		}
 		if len(got) != len(want) {

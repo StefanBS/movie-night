@@ -99,6 +99,9 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 			return
 		}
 
+		// Read-then-write without a transaction is deliberate: rotation_position
+		// is only an ORDER BY tiebreak (no uniqueness constraint) and the seed can
+		// drift at most ±1 under simultaneous joins — acceptable for this app.
 		ctx := r.Context()
 		avg, err := store.AverageServedCount(ctx, gid)
 		if err != nil {
