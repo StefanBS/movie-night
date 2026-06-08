@@ -56,13 +56,13 @@
     {
       "id": 9,
       "subject": "Task 9: Migrate navigation to expo-router",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Replace single-App.tsx entry with expo-router; move turn screen to app/index.tsx; Stack layout; placeholder app/manage.tsx + link.\n\n**Files:** mobile/package.json, mobile/app.json, mobile/tsconfig.json, mobile/babel.config.js, mobile/app/_layout.tsx, mobile/app/index.tsx, mobile/app/manage.tsx (delete App.tsx, index.ts)\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/package.json\", \"mobile/app.json\", \"mobile/tsconfig.json\", \"mobile/babel.config.js\", \"mobile/app/_layout.tsx\", \"mobile/app/index.tsx\", \"mobile/app/manage.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"expo-router entry + deps\", \"Stack layout\", \"turn screen moved, behavior intact\"]}\n```"
     },
     {
       "id": 10,
       "subject": "Task 10: Manage-members screen (app/manage.tsx)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [8, 9],
       "description": "**Goal:** Real manage screen: list members with badges, add-member input (join), per-row deactivate/reactivate/promote, each refetching.\n\n**Files:** mobile/app/manage.tsx\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/app/manage.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"list + badges\", \"add member\", \"state-aware row actions\", \"in-flight guard + error line\"]}\n```"
     }

@@ -99,9 +99,22 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 			return
 		}
 
-		// Read-then-write without a transaction is deliberate: rotation_position
-		// is only an ORDER BY tiebreak (no uniqueness constraint) and the seed can
-		// drift at most ±1 under simultaneous joins — acceptable for this app.
+		// Read-then-write without a transaction is deliberate. Two distinct
+		// concerns, both acceptable for this single-group, admin-driven app:
+		//
+		//   Consistency: under simultaneous joins the avg/maxPos reads can go
+		//   stale, but rotation_position is only an ORDER BY tiebreak (no
+		//   uniqueness constraint) so a collision just falls back to name order,
+		//   and the seed drifts at most ±1 — within fairness tolerance. A plain
+		//   transaction would NOT fix this (READ COMMITTED still sees concurrent
+		//   commits between the reads and the write); it needs SERIALIZABLE+retry
+		//   or locking, which isn't warranted at this concurrency.
+		//
+		//   Atomicity: if InsertMembership fails after CreateUser, the user row
+		//   is orphaned. It's inert — nothing reads users except through
+		//   memberships — and a retried join just creates a fresh user. Wrapping
+		//   in a tx would fix this cheaply but is the codebase's first transaction;
+		//   defer it until a second multi-statement write justifies a WithTx helper.
 		ctx := r.Context()
 		avg, err := store.AverageServedCount(ctx, gid)
 		if err != nil {
