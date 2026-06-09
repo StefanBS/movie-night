@@ -4,10 +4,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -162,6 +167,33 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+missing+"/turn", ""); code != http.StatusNotFound {
 			t.Fatalf("turn status = %d, want 404", code)
+		}
+	})
+
+	t.Run("a real recorded pick is not reachable as a night (seam closed)", func(t *testing.T) {
+		// A pick created via the record-pick path has a non-null picker, so it is
+		// NOT a planned night. GetNight is scoped to picker_id IS NULL, so every
+		// night endpoint must 404 on its id — this guards the interim seam against
+		// a future refactor accidentally reopening it.
+		pick, err := q.InsertPick(context.Background(), db.InsertPickParams{
+			GroupID:      uuid.MustParse(seededGroup),
+			PickerID:     pgtype.UUID{Bytes: uuid.MustParse(ada), Valid: true},
+			IsCredited:   true,
+			ScheduledFor: pgtype.Date{Time: time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC), Valid: true},
+		})
+		if err != nil {
+			t.Fatalf("insert recorded pick: %v", err)
+		}
+		pid := pick.ID.String()
+
+		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+pid, ""); code != http.StatusNotFound {
+			t.Errorf("detail status = %d, want 404", code)
+		}
+		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+pid+"/turn", ""); code != http.StatusNotFound {
+			t.Errorf("turn status = %d, want 404", code)
+		}
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+pid+"/attendees", `{"userId":"`+ada+`"}`); code != http.StatusNotFound {
+			t.Errorf("add status = %d, want 404", code)
 		}
 	})
 
