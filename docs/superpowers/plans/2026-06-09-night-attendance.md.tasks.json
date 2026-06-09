@@ -1,0 +1,39 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-09-night-attendance.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Database layer — migration + queries + sqlc",
+      "status": "pending",
+      "description": "**Goal:** Create the attendances table + night/attendee SQL queries, then generate the Go data layer.\n\n**Files:**\n- Create: backend/migrations/0003_attendances.sql\n- Create: backend/internal/db/query/nights.sql\n- Generated: backend/internal/db/nights.sql.go, models.go\n\n**Verify:** cd backend && just sqlc && just build && just test-integration\n\n```json:metadata\n{\"files\": [\"backend/migrations/0003_attendances.sql\", \"backend/internal/db/query/nights.sql\"], \"verifyCommand\": \"cd backend && just sqlc && just build && just test-integration\", \"acceptanceCriteria\": [\"attendances table + unique index\", \"sqlc generates the 5 methods\", \"build + existing integration tests pass\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Backend pure helpers + unit tests",
+      "status": "pending",
+      "blockedBy": [1],
+      "description": "**Goal:** Pure validation + DTO-mapping helpers for nights, unit-tested with no mocks.\n\n**Files:**\n- Create: backend/nights.go (pure helpers only)\n- Create: backend/nights_test.go\n\n**Verify:** cd backend && go test -run '^TestNight|^TestPresentIDs|^TestToNightResponse' ./... && just check\n\n```json:metadata\n{\"files\": [\"backend/nights.go\", \"backend/nights_test.go\"], \"verifyCommand\": \"cd backend && go test -run '^TestNight|^TestPresentIDs|^TestToNightResponse' ./... && just check\", \"acceptanceCriteria\": [\"validation + dedupe\", \"non-nil empty present set\", \"DTO mapping\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Backend handlers + routing + integration tests",
+      "status": "pending",
+      "blockedBy": [2],
+      "description": "**Goal:** Five HTTP handlers + nightStore, wire routes in main.go, testcontainers integration tests.\n\n**Files:**\n- Modify: backend/nights.go (append handlers + nightStore)\n- Create: backend/nights_integration_test.go\n- Modify: backend/main.go (register 5 routes)\n\n**Verify:** cd backend && just check && just test-integration\n\n```json:metadata\n{\"files\": [\"backend/nights.go\", \"backend/nights_integration_test.go\", \"backend/main.go\"], \"verifyCommand\": \"cd backend && just check && just test-integration\", \"acceptanceCriteria\": [\"5 endpoints wired\", \"error codes 400/404/422\", \"guest + absent-core excluded from order\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Mobile nights API client + tests",
+      "status": "pending",
+      "description": "**Goal:** lib/nights.ts (fetch + validation, reusing parseTurn) with unit + real-local-server integration tests.\n\n**Files:**\n- Create: mobile/lib/nights.ts\n- Create: mobile/lib/nights.test.ts\n- Create: mobile/lib/nights.integration.test.ts\n\n**Verify:** cd mobile && node --import tsx --test lib/nights.test.ts lib/nights.integration.test.ts && just check\n\n```json:metadata\n{\"files\": [\"mobile/lib/nights.ts\", \"mobile/lib/nights.test.ts\", \"mobile/lib/nights.integration.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/nights.test.ts lib/nights.integration.test.ts && just check\", \"acceptanceCriteria\": [\"parseNight validation\", \"correct method/path/body\", \"throws on non-2xx\"]}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: Mobile night screen + navigation",
+      "status": "pending",
+      "blockedBy": [4],
+      "description": "**Goal:** expo-router night screen: create night, toggle attendees (reusing fetchMembers), show pick order; register route + link from turn screen.\n\n**Files:**\n- Create: mobile/app/night.tsx\n- Modify: mobile/app/_layout.tsx (register night route)\n- Modify: mobile/app/index.tsx (link to /night)\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/app/night.tsx\", \"mobile/app/_layout.tsx\", \"mobile/app/index.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"attendee toggles\", \"pick order updates\", \"guests separated from order\", \"lint+typecheck+test green\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-09"
+}
