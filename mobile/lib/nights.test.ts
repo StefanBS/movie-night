@@ -1,0 +1,41 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+
+import { parseNight } from "./nights";
+
+const valid = {
+  id: "n1",
+  scheduledFor: "2026-06-12",
+  attendees: [
+    { id: "u1", name: "Ada", role: "core" },
+    { id: "u6", name: "Frankie", role: "guest" },
+  ],
+};
+
+test("parses a valid night with attendees", () => {
+  const n = parseNight(valid);
+  assert.equal(n.id, "n1");
+  assert.equal(n.scheduledFor, "2026-06-12");
+  assert.equal(n.attendees.length, 2);
+  assert.equal(n.attendees[1].role, "guest");
+});
+
+test("parses a night with no attendees", () => {
+  const n = parseNight({ id: "n1", scheduledFor: "2026-06-12", attendees: [] });
+  assert.deepEqual(n.attendees, []);
+});
+
+test("rejects a bad attendee role", () => {
+  assert.throws(
+    () => parseNight({ ...valid, attendees: [{ id: "u1", name: "Ada", role: "admin" }] }),
+    /role/,
+  );
+});
+
+test("rejects non-array attendees", () => {
+  assert.throws(() => parseNight({ id: "n1", scheduledFor: "2026-06-12", attendees: {} }), /attendees/);
+});
+
+test("rejects a non-object", () => {
+  assert.throws(() => parseNight(null), /night object/);
+});
