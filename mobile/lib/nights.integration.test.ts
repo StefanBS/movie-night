@@ -230,3 +230,17 @@ test("getCurrentNight throws on a non-404 error response", async () => {
     await server.close();
   }
 });
+
+test("getCurrentNight aborts the request when the signal fires", async () => {
+  const server = await startServer((_req, res) => {
+    void res; // never respond, so only an abort can settle the promise
+  });
+  try {
+    const controller = new AbortController();
+    const pending = getCurrentNight(server.url, GROUP, controller.signal);
+    controller.abort();
+    await assert.rejects(pending, (err: Error) => err.name === "AbortError");
+  } finally {
+    await server.close();
+  }
+});

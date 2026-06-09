@@ -208,7 +208,8 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		if err := json.Unmarshal(b, &got); err != nil {
 			t.Fatalf("decode current: %v", err)
 		}
-		// The just-created night has the newest created_at, so it's "current".
+		// GetCurrentNight orders by scheduled_for DESC, then created_at DESC. All
+		// test nights share 2026-06-12, so the just-created (newest created_at) wins.
 		if got.ID != n.ID {
 			t.Errorf("current id = %s, want the just-created night %s", got.ID, n.ID)
 		}
