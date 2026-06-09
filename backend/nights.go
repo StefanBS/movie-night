@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
@@ -201,9 +202,13 @@ func requireMember(w http.ResponseWriter, r *http.Request, store nightStore, gid
 }
 
 // createNightHandler serves POST /groups/{groupId}/nights. A night is a picks
-// row with picker_id NULL. We validate every initial attendee is a member
-// BEFORE any write (so bad input fails before we create anything), then insert
-// the night and attendees without a transaction — like joinMemberHandler, a
+// row with picker_id NULL. A group may have at most one open night at a time
+// (a partial unique index on picks(group_id) WHERE picker_id IS NULL enforces
+// it), so create is idempotent: if a night is already open we resume it (200)
+// rather than create a second — the request's scheduledFor/attendees are then
+// ignored. Otherwise we validate every initial attendee is a member BEFORE any
+// write (so bad input fails before we create anything), then insert the night
+// and attendees without a transaction — like joinMemberHandler, a
 // partially-populated planned night is inert (picker NULL → no standings impact)
 // and a retried add is idempotent.
 func createNightHandler(store nightStore) http.HandlerFunc {
@@ -224,6 +229,14 @@ func createNightHandler(store nightStore) http.HandlerFunc {
 			return
 		}
 		ctx := r.Context()
+		// Resume the open night if one exists — at most one per group.
+		if existing, err := store.GetCurrentNight(ctx, gid); err == nil {
+			writeNightDTO(w, r, store, gid, existing.ID, http.StatusOK)
+			return
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			internalError(w, gid, "get current night", err)
+			return
+		}
 		for _, uid := range parsed.Attendees {
 			if !requireMember(w, r, store, gid, uid) {
 				return
@@ -231,6 +244,19 @@ func createNightHandler(store nightStore) http.HandlerFunc {
 		}
 		night, err := store.CreateNight(ctx, db.CreateNightParams{GroupID: gid, ScheduledFor: parsed.ScheduledFor})
 		if err != nil {
+			// A concurrent create won the race to open this group's night (the
+			// partial unique index rejected ours). Resume the winner — same
+			// idempotent outcome as the pre-check above, never a 500.
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				existing, gerr := store.GetCurrentNight(ctx, gid)
+				if gerr != nil {
+					internalError(w, gid, "get current night", gerr)
+					return
+				}
+				writeNightDTO(w, r, store, gid, existing.ID, http.StatusOK)
+				return
+			}
 			internalError(w, gid, "create night", err)
 			return
 		}

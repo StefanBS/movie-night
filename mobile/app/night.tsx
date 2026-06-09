@@ -43,7 +43,8 @@ export default function NightScreen() {
   // present can be recorded. Attendance is presence; the pick order (getNightTurn)
   // filters to active core, so guests/inactive attendees never appear in it. We
   // also resume the group's open night (if any) so leaving and returning doesn't
-  // strand it — there is at most one open night at a time.
+  // strand it — the backend enforces at most one open night per group (a partial
+  // unique index), and create is idempotent, so resuming is always unambiguous.
   useEffect(() => {
     const controller = new AbortController();
     (async () => {

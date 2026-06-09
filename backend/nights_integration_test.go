@@ -51,8 +51,22 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		return rec.Code, rec.Body.Bytes()
 	}
 
+	// clearOpenNight deletes seededGroup's open night (picker_id NULL) so a
+	// subtest starts from a clean slate. A group may have only one open night at
+	// a time (uq_open_night_per_group), so without this the next create would
+	// resume the prior subtest's night instead of making a fresh one. The FK
+	// cascade drops its attendances.
+	clearOpenNight := func(t *testing.T) {
+		t.Helper()
+		if _, err := pool.Exec(context.Background(),
+			"DELETE FROM picks WHERE group_id = $1 AND picker_id IS NULL", seededGroup); err != nil {
+			t.Fatalf("clear open night: %v", err)
+		}
+	}
+
 	createNight := func(t *testing.T, body string) nightResponse {
 		t.Helper()
+		clearOpenNight(t)
 		code, b := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", body)
 		if code != http.StatusCreated {
 			t.Fatalf("create night status = %d, want 201 (body %s)", code, b)
@@ -143,9 +157,35 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	})
 
 	t.Run("create with a non-member initial attendee yields 422", func(t *testing.T) {
+		// Initial-attendee validation only runs when actually creating — so this
+		// must start with no open night, else create would resume and skip it.
+		clearOpenNight(t)
 		code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-06-12","attendees":["`+unknown+`"]}`)
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("status = %d, want 422", code)
+		}
+	})
+
+	t.Run("creating a night when one is open resumes it (idempotent)", func(t *testing.T) {
+		first := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
+		// A second create must NOT open a new night (uq_open_night_per_group). It
+		// returns the already-open night with 200, and the new body is ignored.
+		code, b := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-07-01","attendees":["`+blake+`"]}`)
+		if code != http.StatusOK {
+			t.Fatalf("repeat create status = %d, want 200 (body %s)", code, b)
+		}
+		var got nightResponse
+		if err := json.Unmarshal(b, &got); err != nil {
+			t.Fatalf("decode night: %v", err)
+		}
+		if got.ID != first.ID {
+			t.Errorf("repeat create id = %s, want the open night %s", got.ID, first.ID)
+		}
+		if got.ScheduledFor != "2026-06-12" {
+			t.Errorf("scheduledFor = %s, want 2026-06-12 (resumed, not overwritten)", got.ScheduledFor)
+		}
+		if len(got.Attendees) != 1 || got.Attendees[0].Name != "Ada" {
+			t.Errorf("attendees = %+v, want [Ada] (resumed, body's Blake ignored)", got.Attendees)
 		}
 	})
 
@@ -208,8 +248,8 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		if err := json.Unmarshal(b, &got); err != nil {
 			t.Fatalf("decode current: %v", err)
 		}
-		// GetCurrentNight orders by scheduled_for DESC, then created_at DESC. All
-		// test nights share 2026-06-12, so the just-created (newest created_at) wins.
+		// Only one night is open per group (uq_open_night_per_group), so current
+		// must be exactly the night we just created.
 		if got.ID != n.ID {
 			t.Errorf("current id = %s, want the just-created night %s", got.ID, n.ID)
 		}

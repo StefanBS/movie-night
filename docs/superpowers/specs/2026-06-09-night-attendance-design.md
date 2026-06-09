@@ -58,6 +58,16 @@ CREATE UNIQUE INDEX uq_attendance_pick_user ON attendances (pick_id, user_id);
 `ON DELETE CASCADE` on both FKs and the unique `(pick_id, user_id)` index mirror the
 schema. No other tables change.
 
+A follow-up migration `0004_open_night_unique.sql` enforces the **one-open-night-per-group**
+invariant the resume flow relies on, as a partial unique index on `picks`:
+
+```sql
+CREATE UNIQUE INDEX uq_open_night_per_group ON picks (group_id) WHERE picker_id IS NULL;
+```
+
+It constrains only planned nights (`picker_id NULL`); recorded picks (picker set) are
+untouched, so a group still accrues many of those over time.
+
 ## Backend — endpoints
 
 All under the existing stdlib `net/http` method-pattern mux, registered in
@@ -67,7 +77,7 @@ map to `422` exactly as record-pick does.
 
 | Op | Endpoint | Effect |
 |----|----------|--------|
-| Create night | `POST /groups/{groupId}/nights` | Body `{ scheduledFor, attendees?: [userId…] }`. Validate every initial attendee is a member first, then insert a `picks` row (`picker_id NULL`) + the attendees with **sequential inserts (no transaction)** — mirroring `joinMemberHandler`; a partially-populated planned night is inert (picker NULL → no standings impact) and re-adds are idempotent. → `201` with the night DTO. |
+| Create night | `POST /groups/{groupId}/nights` | Body `{ scheduledFor, attendees?: [userId…] }`. **Idempotent**: if the group already has an open night, resume it (the body is ignored) → `200`; the partial unique index `uq_open_night_per_group` guarantees at most one. Otherwise validate every initial attendee is a member first, then insert a `picks` row (`picker_id NULL`) + the attendees with **sequential inserts (no transaction)** — mirroring `joinMemberHandler`; a partially-populated planned night is inert (picker NULL → no standings impact) and re-adds are idempotent → `201` with the night DTO. A concurrent create that loses the unique-index race also resolves to the open night (`200`), never a `500`. |
 | Add attendee | `POST /groups/{groupId}/nights/{nightId}/attendees` | Body `{ userId }`. Idempotent insert (`ON CONFLICT (pick_id,user_id) DO NOTHING`). → `201` with the night DTO. |
 | Remove attendee | `DELETE /groups/{groupId}/nights/{nightId}/attendees/{userId}` | Delete the attendance row. Removing a non-attendee is a no-op. → `200` with the night DTO. |
 | Night detail | `GET /groups/{groupId}/nights/{nightId}` | The night + its current attendees (for refresh/resume). → `200`. |
