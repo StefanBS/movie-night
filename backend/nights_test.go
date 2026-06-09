@@ -54,6 +54,9 @@ func TestNightCreateRequestValidation(t *testing.T) {
 			if parsed.Attendees == nil {
 				t.Errorf("Attendees must be non-nil even when empty")
 			}
+			if !parsed.ScheduledFor.Valid || parsed.ScheduledFor.Time.Format("2006-01-02") != "2026-06-12" {
+				t.Errorf("ScheduledFor = %+v, want valid 2026-06-12", parsed.ScheduledFor)
+			}
 		})
 	}
 }
@@ -73,21 +76,37 @@ func TestPresentIDsIsNonNilWhenEmpty(t *testing.T) {
 func TestToNightResponse(t *testing.T) {
 	nightID := uuid.MustParse("b0000000-0000-0000-0000-0000000000aa")
 	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
-	pick := db.Pick{ID: nightID}
-	pick.ScheduledFor.Time = mustDate(t, "2026-06-12")
-	pick.ScheduledFor.Valid = true
 
-	rows := []db.ListNightAttendeesRow{
-		{ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
+	mkPick := func() db.Pick {
+		p := db.Pick{ID: nightID}
+		p.ScheduledFor.Time = mustDate(t, "2026-06-12")
+		p.ScheduledFor.Valid = true
+		return p
 	}
-	got := toNightResponse(pick, rows)
-	if got.ID != nightID.String() {
-		t.Errorf("ID = %q", got.ID)
-	}
-	if got.ScheduledFor != "2026-06-12" {
-		t.Errorf("ScheduledFor = %q, want 2026-06-12", got.ScheduledFor)
-	}
-	if len(got.Attendees) != 1 || got.Attendees[0].Name != "Ada" || got.Attendees[0].Role != "core" {
-		t.Errorf("attendees = %+v", got.Attendees)
-	}
+
+	t.Run("maps pick and attendees", func(t *testing.T) {
+		rows := []db.ListNightAttendeesRow{
+			{ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
+		}
+		got := toNightResponse(mkPick(), rows)
+		if got.ID != nightID.String() {
+			t.Errorf("ID = %q", got.ID)
+		}
+		if got.ScheduledFor != "2026-06-12" {
+			t.Errorf("ScheduledFor = %q, want 2026-06-12", got.ScheduledFor)
+		}
+		if len(got.Attendees) != 1 || got.Attendees[0].Name != "Ada" || got.Attendees[0].Role != "core" {
+			t.Errorf("attendees = %+v", got.Attendees)
+		}
+	})
+
+	t.Run("nil rows yields non-nil empty attendees slice", func(t *testing.T) {
+		got := toNightResponse(mkPick(), nil)
+		if got.Attendees == nil {
+			t.Errorf("Attendees must be non-nil even when rows is nil")
+		}
+		if len(got.Attendees) != 0 {
+			t.Errorf("len = %d, want 0", len(got.Attendees))
+		}
+	})
 }
