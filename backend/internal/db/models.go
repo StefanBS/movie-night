@@ -96,6 +96,12 @@ func (ns NullMembershipStatus) Value() (driver.Value, error) {
 	return string(ns.MembershipStatus), nil
 }
 
+type Attendance struct {
+	ID     uuid.UUID `json:"id"`
+	PickID uuid.UUID `json:"pick_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
 type Group struct {
 	ID        uuid.UUID          `json:"id"`
 	Name      string             `json:"name"`
