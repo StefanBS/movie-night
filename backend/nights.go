@@ -177,12 +177,16 @@ func writeNightDTO(w http.ResponseWriter, r *http.Request, store nightStore, gid
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(toNightResponse(night, rows)); err != nil {
-		log.Printf("encode night response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID
+		log.Printf("encode night response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
 	}
 }
 
-// requireMember validates that uid is a member of the group, writing a 422 on a
-// miss and 500 on any other error. ok=false means a response was already written.
+// requireMember validates that uid has a membership in the group (active OR
+// inactive), writing a 422 on a miss and 500 on any other error. Inactive
+// members are intentionally allowed: attendance records presence, and the pick
+// order filters to active core (RankGroupTurn), so an inactive attendee — like a
+// guest — is recorded but never appears in the order. ok=false means a response
+// was already written.
 func requireMember(w http.ResponseWriter, r *http.Request, store nightStore, gid, uid uuid.UUID) bool {
 	if _, err := store.GetGroupMember(r.Context(), db.GetGroupMemberParams{GroupID: gid, UserID: uid}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -330,7 +334,7 @@ func nightTurnHandler(store nightStore) http.HandlerFunc {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(toTurnResponses(ranked)); err != nil {
-			log.Printf("encode turn response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID
+			log.Printf("encode turn response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
 		}
 	}
 }

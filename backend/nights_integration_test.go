@@ -27,11 +27,10 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	const (
 		ada     = "a0000000-0000-0000-0000-000000000001"
 		blake   = "a0000000-0000-0000-0000-000000000002"
-		cleo    = "a0000000-0000-0000-0000-000000000003"
 		frankie = "a0000000-0000-0000-0000-000000000006" // active guest
 		unknown = "a0000000-0000-0000-0000-0000000000ff"
+		zed     = "a0000000-0000-0000-0000-000000000009" // inactive core
 	)
-	_ = cleo // declared for documentation; not used in every subtest
 
 	do := func(t *testing.T, method, path, body string) (int, []byte) {
 		t.Helper()
@@ -134,6 +133,25 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		n := createNight(t, `{"scheduledFor":"2026-06-12"}`)
 		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/attendees", `{"userId":"`+unknown+`"}`); code != http.StatusUnprocessableEntity {
 			t.Fatalf("status = %d, want 422", code)
+		}
+	})
+
+	t.Run("create with a non-member initial attendee yields 422", func(t *testing.T) {
+		code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-06-12","attendees":["`+unknown+`"]}`)
+		if code != http.StatusUnprocessableEntity {
+			t.Fatalf("status = %d, want 422", code)
+		}
+	})
+
+	t.Run("inactive member can attend but is absent from the pick order", func(t *testing.T) {
+		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+zed+`"]}`)
+		if len(n.Attendees) != 2 {
+			t.Fatalf("attendees = %+v, want 2 (Ada + Zed)", n.Attendees)
+		}
+		// Zed is inactive core: recorded as present, but RankGroupTurn filters to
+		// active core, so the order is Ada only.
+		if got := names(turn(t, n.ID)); len(got) != 1 || got[0] != "Ada" {
+			t.Fatalf("order = %v, want [Ada]", got)
 		}
 	})
 
