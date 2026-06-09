@@ -67,7 +67,7 @@ map to `422` exactly as record-pick does.
 
 | Op | Endpoint | Effect |
 |----|----------|--------|
-| Create night | `POST /groups/{groupId}/nights` | Body `{ scheduledFor, attendees?: [userId…] }`. Insert a `picks` row (`picker_id NULL`) + any initial attendees in **one transaction**. → `201` with the night DTO. |
+| Create night | `POST /groups/{groupId}/nights` | Body `{ scheduledFor, attendees?: [userId…] }`. Validate every initial attendee is a member first, then insert a `picks` row (`picker_id NULL`) + the attendees with **sequential inserts (no transaction)** — mirroring `joinMemberHandler`; a partially-populated planned night is inert (picker NULL → no standings impact) and re-adds are idempotent. → `201` with the night DTO. |
 | Add attendee | `POST /groups/{groupId}/nights/{nightId}/attendees` | Body `{ userId }`. Idempotent insert (`ON CONFLICT (pick_id,user_id) DO NOTHING`). → `201` with the night DTO. |
 | Remove attendee | `DELETE /groups/{groupId}/nights/{nightId}/attendees/{userId}` | Delete the attendance row. Removing a non-attendee is a no-op. → `200` with the night DTO. |
 | Night detail | `GET /groups/{groupId}/nights/{nightId}` | The night + its current attendees (for refresh/resume). → `200`. |
@@ -142,10 +142,13 @@ plan-time choice: a dedicated id-only query or reuse `ListNightAttendees`).
 ### Validation & errors
 
 - `scheduledFor` not ISO `YYYY-MM-DD` → `400`; `nightId`/`userId` not a UUID → `400`.
-- Adding an attendee who isn't a **member of the group** → `422` (validated via the
-  existing `GetGroupMember`; this also guarantees a `role` is always available). The
-  same membership check applies to every **initial attendee** in the create-night
-  body. Non-existent user surfaces as the same `422` (FK `23503` is the backstop).
+- Adding an attendee who isn't a **member of the group** (no membership row, active
+  *or* inactive) → `422` (validated via the existing `GetGroupMember`; this also
+  guarantees a `role` is always available). The same membership check applies to
+  every **initial attendee** in the create-night body. Non-existent user surfaces as
+  the same `422` (FK `23503` is the backstop). An **inactive** member *is* a member,
+  so it may be recorded as present — attendance is presence; the pick order still
+  filters to active core, so an inactive attendee (like a guest) never appears in it.
 - `GET`/mutate on a `nightId` that doesn't exist in the group → `404`.
 - Removing a non-attendee → `200` (idempotent no-op).
 - Adding a duplicate attendee → `201` no-op (idempotent).
