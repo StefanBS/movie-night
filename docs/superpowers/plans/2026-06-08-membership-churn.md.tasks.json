@@ -1,0 +1,71 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-08-membership-churn.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Churn sqlc queries + regenerate",
+      "status": "completed",
+      "description": "**Goal:** Add churn SQL in a new members.sql and regenerate the sqlc db package.\n\n**Files:** backend/internal/db/query/members.sql (create), backend/internal/db/members.sql.go (generated)\n\n**Verify:** cd backend && just sqlc && go build ./...\n\n```json:metadata\n{\"files\": [\"backend/internal/db/query/members.sql\", \"backend/internal/db/members.sql.go\"], \"verifyCommand\": \"cd backend && just sqlc && go build ./...\", \"acceptanceCriteria\": [\"just sqlc regenerates cleanly\", \"9 new query methods on db.Queries\", \"go build succeeds\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Extend GET /members to return everyone with status",
+      "status": "completed",
+      "blockedBy": [1],
+      "description": "**Goal:** ListGroupMembers returns all members with status, ordered active-core/active-guest/inactive; add status to DTO; update integration fixture (guest Gwen) + assertions.\n\n**Files:** backend/internal/db/query/roster.sql, backend/roster.go, backend/roster_integration_test.go\n\n**Verify:** cd backend && just check && go test -tags=integration -run '^TestMembersHandlerIntegration$' ./...\n\n```json:metadata\n{\"files\": [\"backend/internal/db/query/roster.sql\", \"backend/roster.go\", \"backend/roster_integration_test.go\"], \"verifyCommand\": \"cd backend && just check && go test -tags=integration -run '^TestMembersHandlerIntegration$' ./...\", \"acceptanceCriteria\": [\"returns all members ordered core/guest/inactive\", \"memberResponse.status added\", \"integration test updated with guest\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Pure seed helper + join-name validation",
+      "status": "completed",
+      "description": "**Goal:** Add pure unit-tested seedBaseline and validateJoinName (+ joinRequest DTO) in membership.go.\n\n**Files:** backend/membership.go, backend/membership_test.go\n\n**Verify:** cd backend && go test -run '^TestSeedBaseline$|^TestValidateJoinName$' ./...\n\n```json:metadata\n{\"files\": [\"backend/membership.go\", \"backend/membership_test.go\"], \"verifyCommand\": \"cd backend && go test -run '^TestSeedBaseline$|^TestValidateJoinName$' ./...\", \"acceptanceCriteria\": [\"seedBaseline rounding + subtraction + non-negative\", \"validateJoinName trims/rejects empty\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Join handler (POST /groups/{groupId}/members)",
+      "status": "completed",
+      "blockedBy": [1, 2, 3],
+      "description": "**Goal:** Add memberStore interface, shared helpers (internalError, encodeMember), joinMemberHandler; register route.\n\n**Files:** backend/membership.go, backend/main.go\n\n**Verify:** cd backend && just check\n\n```json:metadata\n{\"files\": [\"backend/membership.go\", \"backend/main.go\"], \"verifyCommand\": \"cd backend && just check\", \"acceptanceCriteria\": [\"memberStore interface\", \"join handler 201 + seed\", \"route registered\"]}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: Transition handlers (deactivate/reactivate/promote)",
+      "status": "completed",
+      "blockedBy": [4],
+      "description": "**Goal:** Add three idempotent transition handlers (load→404, no-op if already in target state, seed iff entering rotation) + routes.\n\n**Files:** backend/membership.go, backend/main.go\n\n**Verify:** cd backend && just check\n\n```json:metadata\n{\"files\": [\"backend/membership.go\", \"backend/main.go\"], \"verifyCommand\": \"cd backend && just check\", \"acceptanceCriteria\": [\"loadMember 404\", \"three idempotent handlers\", \"seed-on-entry only\", \"routes registered\"]}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: Backend integration test (testcontainers)",
+      "status": "completed",
+      "blockedBy": [2, 5],
+      "description": "**Goal:** Prove join/leave/return/promote standings, history-not-double-counted, idempotency, and 404/400 paths.\n\n**Files:** backend/membership_integration_test.go\n\n**Verify:** cd backend && go test -tags=integration -run '^TestMembershipChurnIntegration$' ./...\n\n```json:metadata\n{\"files\": [\"backend/membership_integration_test.go\"], \"verifyCommand\": \"cd backend && go test -tags=integration -run '^TestMembershipChurnIntegration$' ./...\", \"acceptanceCriteria\": [\"join/leave/return/promote standings\", \"history not double-counted\", \"idempotency\", \"404/400 paths\"]}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: Dev seed gains a guest",
+      "status": "completed",
+      "description": "**Goal:** Add an active guest (Frankie, a0...006) to seed.sql for the promote demo.\n\n**Files:** backend/seed.sql\n\n**Verify:** cd backend && just seed\n\n```json:metadata\n{\"files\": [\"backend/seed.sql\"], \"verifyCommand\": \"cd backend && just seed\", \"acceptanceCriteria\": [\"guest user+membership seeded\", \"idempotent\"]}\n```"
+    },
+    {
+      "id": 8,
+      "subject": "Task 8: Mobile members client write ops + status",
+      "status": "completed",
+      "description": "**Goal:** Add status to Member + addMember/deactivateMember/reactivateMember/promoteMember with unit + integration tests, mirroring lib/picks.ts.\n\n**Files:** mobile/lib/members.ts, mobile/lib/members.test.ts, mobile/lib/members.integration.test.ts\n\n**Verify:** cd mobile && node --import tsx --test lib/members.test.ts lib/members.integration.test.ts && just check\n\n```json:metadata\n{\"files\": [\"mobile/lib/members.ts\", \"mobile/lib/members.test.ts\", \"mobile/lib/members.integration.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/members.test.ts lib/members.integration.test.ts && just check\", \"acceptanceCriteria\": [\"status field + parse\", \"four write ops correct path/body\", \"tests pass\"]}\n```"
+    },
+    {
+      "id": 9,
+      "subject": "Task 9: Migrate navigation to expo-router",
+      "status": "completed",
+      "description": "**Goal:** Replace single-App.tsx entry with expo-router; move turn screen to app/index.tsx; Stack layout; placeholder app/manage.tsx + link.\n\n**Files:** mobile/package.json, mobile/app.json, mobile/tsconfig.json, mobile/babel.config.js, mobile/app/_layout.tsx, mobile/app/index.tsx, mobile/app/manage.tsx (delete App.tsx, index.ts)\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/package.json\", \"mobile/app.json\", \"mobile/tsconfig.json\", \"mobile/babel.config.js\", \"mobile/app/_layout.tsx\", \"mobile/app/index.tsx\", \"mobile/app/manage.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"expo-router entry + deps\", \"Stack layout\", \"turn screen moved, behavior intact\"]}\n```"
+    },
+    {
+      "id": 10,
+      "subject": "Task 10: Manage-members screen (app/manage.tsx)",
+      "status": "completed",
+      "blockedBy": [8, 9],
+      "description": "**Goal:** Real manage screen: list members with badges, add-member input (join), per-row deactivate/reactivate/promote, each refetching.\n\n**Files:** mobile/app/manage.tsx\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/app/manage.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"list + badges\", \"add member\", \"state-aware row actions\", \"in-flight guard + error line\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-08T13:20:00Z"
+}

@@ -8,12 +8,12 @@ import { parseMembers, type Member } from "./members";
 
 test("parses a valid array of members", () => {
   const raw = [
-    { id: "a", name: "Ada", role: "core" },
-    { id: "b", name: "Bo", role: "guest" },
+    { id: "a", name: "Ada", role: "core", status: "active" },
+    { id: "b", name: "Bo", role: "guest", status: "inactive" },
   ];
   const want: Member[] = [
-    { id: "a", name: "Ada", role: "core" },
-    { id: "b", name: "Bo", role: "guest" },
+    { id: "a", name: "Ada", role: "core", status: "active" },
+    { id: "b", name: "Bo", role: "guest", status: "inactive" },
   ];
   assert.deepEqual(parseMembers(raw), want);
 });
@@ -32,18 +32,23 @@ const invalid: { name: string; raw: unknown; wantError: RegExp }[] = [
   },
   {
     name: "rejects a missing id",
-    raw: [{ name: "Ada", role: "core" }],
+    raw: [{ name: "Ada", role: "core", status: "active" }],
     wantError: /member 0.*id/,
   },
   {
     name: "rejects a non-string name",
-    raw: [{ id: "a", name: 42, role: "core" }],
+    raw: [{ id: "a", name: 42, role: "core", status: "active" }],
     wantError: /member 0.*name/,
   },
   {
     name: "rejects an unknown role",
-    raw: [{ id: "a", name: "Ada", role: "admin" }],
+    raw: [{ id: "a", name: "Ada", role: "admin", status: "active" }],
     wantError: /member 0.*role/,
+  },
+  {
+    name: "rejects an unknown status",
+    raw: [{ id: "a", name: "Ada", role: "core", status: "left" }],
+    wantError: /member 0.*status/,
   },
 ];
 

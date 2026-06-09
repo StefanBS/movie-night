@@ -2,12 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 
-import { fetchMembers, type Member } from "./members";
-
-// Integration tests: fetchMembers against a real local HTTP server over a real
-// fetch round-trip. No mocks — a throwaway server stands in for the backend so
-// the test is hermetic and CI-friendly. (A full end-to-end against the real
-// backend is a separate, heavier CI concern.)
+import {
+  deactivateMember,
+  fetchMembers,
+  joinMember,
+  promoteMember,
+  reactivateMember,
+  type Member,
+} from "./members";
 
 type Handler = (req: http.IncomingMessage, res: http.ServerResponse) => void;
 
@@ -30,10 +32,88 @@ async function startServer(
 }
 
 const GROUP = "11111111-1111-1111-1111-111111111111";
+const USER = "a0000000-0000-0000-0000-000000000006";
+
+async function capture(
+  status: number,
+  member: Member,
+  call: (url: string) => Promise<Member>,
+): Promise<{ method: string; path: string; body: string; result: Member }> {
+  let method = "";
+  let path = "";
+  let body = "";
+  const server = await startServer((req, res) => {
+    method = req.method ?? "";
+    path = req.url ?? "";
+    const chunks: Buffer[] = [];
+    req.on("data", (c) => chunks.push(c as Buffer));
+    req.on("end", () => {
+      body = Buffer.concat(chunks).toString();
+      res.statusCode = status;
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify(member));
+    });
+  });
+  try {
+    const result = await call(server.url);
+    return { method, path, body, result };
+  } finally {
+    await server.close();
+  }
+}
+
+test("joinMember posts {name} to the members path and returns the member", async () => {
+  const created: Member = { id: "u1", name: "Newbie", role: "core", status: "active" };
+  const { method, path, body, result } = await capture(201, created, (url) =>
+    joinMember(url, GROUP, "Newbie"),
+  );
+  assert.equal(method, "POST");
+  assert.equal(path, `/groups/${GROUP}/members`);
+  assert.deepEqual(JSON.parse(body), { name: "Newbie" });
+  assert.deepEqual(result, created);
+});
+
+test("deactivateMember posts to the deactivate path with no body", async () => {
+  const m: Member = { id: USER, name: "Frankie", role: "guest", status: "inactive" };
+  const { method, path, body, result } = await capture(200, m, (url) =>
+    deactivateMember(url, GROUP, USER),
+  );
+  assert.equal(method, "POST");
+  assert.equal(path, `/groups/${GROUP}/members/${USER}/deactivate`);
+  assert.equal(body, "");
+  assert.deepEqual(result, m);
+});
+
+test("reactivateMember posts to the reactivate path", async () => {
+  const m: Member = { id: USER, name: "Frankie", role: "core", status: "active" };
+  const { path } = await capture(200, m, (url) => reactivateMember(url, GROUP, USER));
+  assert.equal(path, `/groups/${GROUP}/members/${USER}/reactivate`);
+});
+
+test("promoteMember posts to the promote path", async () => {
+  const m: Member = { id: USER, name: "Frankie", role: "core", status: "active" };
+  const { path } = await capture(200, m, (url) => promoteMember(url, GROUP, USER));
+  assert.equal(path, `/groups/${GROUP}/members/${USER}/promote`);
+});
+
+test("a write op throws on a non-2xx response", async () => {
+  const server = await startServer((_req, res) => {
+    res.statusCode = 404;
+    res.end("nope");
+  });
+  try {
+    await assert.rejects(
+      deactivateMember(server.url, GROUP, USER),
+      /request failed: 404/,
+    );
+  } finally {
+    await server.close();
+  }
+});
 
 test("requests the group members path and returns parsed members", async () => {
   let requestedPath = "";
-  const member: Member = { id: "a", name: "Ada", role: "core" };
+  const member: Member = { id: "a", name: "Ada", role: "core", status: "active" };
   const server = await startServer((req, res) => {
     requestedPath = req.url ?? "";
     res.setHeader("content-type", "application/json");
@@ -48,7 +128,7 @@ test("requests the group members path and returns parsed members", async () => {
   }
 });
 
-test("throws on a non-2xx response", async () => {
+test("fetchMembers throws on a non-2xx response", async () => {
   const server = await startServer((_req, res) => {
     res.statusCode = 500;
     res.end("boom");
@@ -60,10 +140,10 @@ test("throws on a non-2xx response", async () => {
   }
 });
 
-test("throws when the payload fails validation", async () => {
+test("fetchMembers throws when the payload fails validation", async () => {
   const server = await startServer((_req, res) => {
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify([{ id: "a", name: "Ada", role: "admin" }]));
+    res.end(JSON.stringify([{ id: "a", name: "Ada", role: "admin", status: "active" }]));
   });
   try {
     await assert.rejects(fetchMembers(server.url, GROUP), /role/);
@@ -72,7 +152,7 @@ test("throws when the payload fails validation", async () => {
   }
 });
 
-test("aborts the request when the signal fires", async () => {
+test("fetchMembers aborts the request when the signal fires", async () => {
   const server = await startServer((_req, res) => {
     // Never respond, so only an abort can settle the promise.
     void res;
