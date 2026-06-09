@@ -85,9 +85,14 @@ export default function TurnScreen() {
 
   return (
     <View style={styles.container}>
-      <Link href="/manage" style={styles.manageLink}>
-        Manage members →
-      </Link>
+      <View style={styles.links}>
+        <Link href="/night" style={styles.manageLink}>
+          Tonight →
+        </Link>
+        <Link href="/manage" style={styles.manageLink}>
+          Manage members →
+        </Link>
+      </View>
       {loading ? (
         <ActivityIndicator style={styles.center} size="large" />
       ) : error ? (
@@ -142,6 +147,7 @@ export default function TurnScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16 },
+  links: { flexDirection: "row", justifyContent: "flex-end", gap: 20 },
   manageLink: {
     fontSize: 16,
     color: "#0b66c3",
