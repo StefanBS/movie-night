@@ -71,6 +71,7 @@ map to `422` exactly as record-pick does.
 | Add attendee | `POST /groups/{groupId}/nights/{nightId}/attendees` | Body `{ userId }`. Idempotent insert (`ON CONFLICT (pick_id,user_id) DO NOTHING`). → `201` with the night DTO. |
 | Remove attendee | `DELETE /groups/{groupId}/nights/{nightId}/attendees/{userId}` | Delete the attendance row. Removing a non-attendee is a no-op. → `200` with the night DTO. |
 | Night detail | `GET /groups/{groupId}/nights/{nightId}` | The night + its current attendees (for refresh/resume). → `200`. |
+| Current night | `GET /groups/{groupId}/nights/current` | The group's **latest open night** (`picker_id NULL`, newest `scheduled_for`/`created_at`), or `404` if none. Lets the mobile app **resume** an in-progress night instead of creating a new one each visit, so there is at most one open night at a time. → `200`. |
 | Pick order | `GET /groups/{groupId}/nights/{nightId}/turn` | The **ordered core pick order** over this night's attendees. → `200`. |
 
 Mutating endpoints return the **night DTO** so the mobile client always has the
@@ -167,6 +168,8 @@ the screen — same separation as `members.ts`/`picks.ts`):
 - `Night` type `{ id, scheduledFor, attendees: Attendee[] }`, `Attendee` `{ id, name, role }`.
 - `createNight(baseUrl, groupId, scheduledFor, attendees?, signal?) → Night`
 - `getNight(baseUrl, groupId, nightId, signal?) → Night`
+- `getCurrentNight(baseUrl, groupId, signal?) → Night | null` — the open night to
+  resume, or `null` when the backend returns `404`.
 - `addAttendee(baseUrl, groupId, nightId, userId, signal?) → Night`
 - `removeAttendee(baseUrl, groupId, nightId, userId, signal?) → Night`
 - `getNightTurn(baseUrl, groupId, nightId, signal?) → TurnRanking` — reuses the
@@ -178,9 +181,12 @@ linked from a header action on `app/index.tsx`, mirroring the `/manage` link):
 
 - Reuses `fetchMembers` (`lib/members.ts`) to list everyone (core + guests) with
   role/status — the roster-client reuse this app was always heading toward.
-- A date control creates the night (`createNight`); members are checked on/off,
-  each toggle calling `addAttendee`/`removeAttendee` and refreshing from the
-  returned `Night`.
+- On mount it **resumes** the group's open night via `getCurrentNight`; if there is
+  none it offers "Start tonight's night" (`createNight`). So leaving and returning
+  reopens the same night rather than stranding it, and there is at most one open
+  night at a time. Members are checked on/off, each toggle calling
+  `addAttendee`/`removeAttendee` and refreshing from the returned `Night`. A hint
+  line notes that attendance saves automatically.
 - Shows the resulting **pick order** (`getNightTurn`): the ordered core attendees,
   element 0 highlighted as tonight's picker, with guests listed separately as
   "also present." In-flight/disabled handling mirrors the record-pick screen
