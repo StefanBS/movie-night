@@ -56,7 +56,7 @@ func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (Pick,
 const getNight = `-- name: GetNight :one
 SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
 FROM picks
-WHERE id = $1 AND group_id = $2
+WHERE id = $1 AND group_id = $2 AND picker_id IS NULL
 `
 
 type GetNightParams struct {

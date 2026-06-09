@@ -6,7 +6,7 @@ RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at;
 -- name: GetNight :one
 SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
 FROM picks
-WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
+WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id) AND picker_id IS NULL;
 
 -- name: AddAttendee :exec
 INSERT INTO attendances (pick_id, user_id)
