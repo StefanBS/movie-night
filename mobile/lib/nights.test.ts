@@ -39,3 +39,11 @@ test("rejects non-array attendees", () => {
 test("rejects a non-object", () => {
   assert.throws(() => parseNight(null), /night object/);
 });
+
+test("rejects a non-string id", () => {
+  assert.throws(() => parseNight({ id: 42, scheduledFor: "2026-06-12", attendees: [] }), /id/);
+});
+
+test("rejects a non-string scheduledFor", () => {
+  assert.throws(() => parseNight({ id: "n1", scheduledFor: 99, attendees: [] }), /scheduledFor/);
+});

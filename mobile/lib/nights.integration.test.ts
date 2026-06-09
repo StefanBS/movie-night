@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 
-import { createNight, addAttendee, removeAttendee, getNightTurn, type Night } from "./nights";
+import { createNight, addAttendee, removeAttendee, getNightTurn, getNight, type Night } from "./nights";
 
 type Handler = (req: http.IncomingMessage, res: http.ServerResponse) => void;
 
@@ -127,6 +127,53 @@ test("throws on a non-2xx response", async () => {
   });
   try {
     await assert.rejects(createNight(server.url, GROUP, "2026-06-12", []), /request failed: 422/);
+  } finally {
+    await server.close();
+  }
+});
+
+test("aborts the request when the signal fires", async () => {
+  const server = await startServer((_req, res) => {
+    void res; // never respond, so only an abort can settle the promise
+  });
+  try {
+    const controller = new AbortController();
+    const pending = createNight(server.url, GROUP, "2026-06-12", [], controller.signal);
+    controller.abort();
+    await assert.rejects(pending, (err: Error) => err.name === "AbortError");
+  } finally {
+    await server.close();
+  }
+});
+
+test("throws when the 2xx payload fails validation", async () => {
+  const server = await startServer((_req, res) => {
+    res.statusCode = 201;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ id: 42, scheduledFor: "2026-06-12", attendees: [] }));
+  });
+  try {
+    await assert.rejects(createNight(server.url, GROUP, "2026-06-12", []), /id/);
+  } finally {
+    await server.close();
+  }
+});
+
+test("getNight fetches the night by id and parses it", async () => {
+  let path = "";
+  let method = "";
+  const server = await startServer((req, res) => {
+    path = req.url ?? "";
+    method = req.method ?? "";
+    res.statusCode = 200;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify(night));
+  });
+  try {
+    const got = await getNight(server.url, GROUP, NIGHT);
+    assert.equal(method, "GET");
+    assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}`);
+    assert.deepEqual(got, night);
   } finally {
     await server.close();
   }
