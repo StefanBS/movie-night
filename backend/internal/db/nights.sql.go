@@ -53,6 +53,28 @@ func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (Pick,
 	return i, err
 }
 
+const getCurrentNight = `-- name: GetCurrentNight :one
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
+FROM picks
+WHERE group_id = $1 AND picker_id IS NULL
+ORDER BY scheduled_for DESC, created_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetCurrentNight(ctx context.Context, groupID uuid.UUID) (Pick, error) {
+	row := q.db.QueryRow(ctx, getCurrentNight, groupID)
+	var i Pick
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.PickerID,
+		&i.IsCredited,
+		&i.ScheduledFor,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getNight = `-- name: GetNight :one
 SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
 FROM picks

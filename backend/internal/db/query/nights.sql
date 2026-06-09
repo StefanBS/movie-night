@@ -8,6 +8,13 @@ SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
 FROM picks
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id) AND picker_id IS NULL;
 
+-- name: GetCurrentNight :one
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
+FROM picks
+WHERE group_id = sqlc.arg(group_id) AND picker_id IS NULL
+ORDER BY scheduled_for DESC, created_at DESC
+LIMIT 1;
+
 -- name: AddAttendee :exec
 INSERT INTO attendances (pick_id, user_id)
 VALUES (sqlc.arg(pick_id), sqlc.arg(user_id))

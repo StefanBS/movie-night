@@ -114,6 +114,7 @@ func presentIDs(rows []db.ListNightAttendeesRow) []uuid.UUID {
 type nightStore interface {
 	CreateNight(ctx context.Context, arg db.CreateNightParams) (db.Pick, error)
 	GetNight(ctx context.Context, arg db.GetNightParams) (db.Pick, error)
+	GetCurrentNight(ctx context.Context, groupID uuid.UUID) (db.Pick, error)
 	AddAttendee(ctx context.Context, arg db.AddAttendeeParams) error
 	RemoveAttendee(ctx context.Context, arg db.RemoveAttendeeParams) error
 	ListNightAttendees(ctx context.Context, arg db.ListNightAttendeesParams) ([]db.ListNightAttendeesRow, error)
@@ -306,6 +307,31 @@ func nightDetailHandler(store nightStore) http.HandlerFunc {
 			return
 		}
 		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
+	}
+}
+
+// currentNightHandler serves GET /groups/{groupId}/nights/current — the group's
+// latest planned (picker_id NULL) night, or 404 if there is none. This lets the
+// mobile app resume an in-progress night instead of creating a new one on every
+// visit. A finalized pick (picker set) is never returned (slice-2 reconciliation
+// will set the picker, naturally dropping the night out of "current").
+func currentNightHandler(store nightStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gid, err := parseGroupID(r.PathValue("groupId"))
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "invalid group id")
+			return
+		}
+		night, err := store.GetCurrentNight(r.Context(), gid)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				writeJSONError(w, http.StatusNotFound, "no open night")
+				return
+			}
+			internalError(w, gid, "get current night", err)
+			return
+		}
+		writeNightDTO(w, r, store, gid, night.ID, http.StatusOK)
 	}
 }
 

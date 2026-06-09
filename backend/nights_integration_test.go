@@ -24,6 +24,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	mux := http.NewServeMux()
 	q := db.New(pool)
 	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(q))
+	mux.Handle("GET /groups/{groupId}/nights/current", currentNightHandler(q))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}/turn", nightTurnHandler(q))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/attendees", addAttendeeHandler(q))
@@ -194,6 +195,48 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+pid+"/attendees", `{"userId":"`+ada+`"}`); code != http.StatusNotFound {
 			t.Errorf("add status = %d, want 404", code)
+		}
+	})
+
+	t.Run("current night resumes the latest planned night", func(t *testing.T) {
+		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
+		code, b := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
+		if code != http.StatusOK {
+			t.Fatalf("current status = %d, want 200 (body %s)", code, b)
+		}
+		var got nightResponse
+		if err := json.Unmarshal(b, &got); err != nil {
+			t.Fatalf("decode current: %v", err)
+		}
+		// The just-created night has the newest created_at, so it's "current".
+		if got.ID != n.ID {
+			t.Errorf("current id = %s, want the just-created night %s", got.ID, n.ID)
+		}
+		if len(got.Attendees) != 1 || got.Attendees[0].Name != "Ada" {
+			t.Errorf("current attendees = %+v, want [Ada]", got.Attendees)
+		}
+	})
+
+	t.Run("current night is 404 when the group has no planned night", func(t *testing.T) {
+		// emptyGroup has no nights at all.
+		if code, _ := do(t, http.MethodGet, "/groups/"+emptyGroup+"/nights/current", ""); code != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404", code)
+		}
+	})
+
+	t.Run("current night excludes a finalized (recorded) pick", func(t *testing.T) {
+		// A recorded pick (picker set) in an otherwise night-less group must not be
+		// returned as the current planned night.
+		if _, err := q.InsertPick(context.Background(), db.InsertPickParams{
+			GroupID:      uuid.MustParse(emptyGroup),
+			PickerID:     pgtype.UUID{Bytes: uuid.MustParse(ada), Valid: true},
+			IsCredited:   true,
+			ScheduledFor: pgtype.Date{Time: time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC), Valid: true},
+		}); err != nil {
+			t.Fatalf("insert recorded pick: %v", err)
+		}
+		if code, _ := do(t, http.MethodGet, "/groups/"+emptyGroup+"/nights/current", ""); code != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404 (recorded pick must not count as current)", code)
 		}
 	})
 
