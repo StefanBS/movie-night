@@ -2,7 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 
-import { createNight, addAttendee, removeAttendee, getNightTurn, getNight, type Night } from "./nights";
+import {
+  createNight,
+  addAttendee,
+  removeAttendee,
+  getNightTurn,
+  getNight,
+  getCurrentNight,
+  type Night,
+} from "./nights";
 
 type Handler = (req: http.IncomingMessage, res: http.ServerResponse) => void;
 
@@ -174,6 +182,50 @@ test("getNight fetches the night by id and parses it", async () => {
     assert.equal(method, "GET");
     assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}`);
     assert.deepEqual(got, night);
+  } finally {
+    await server.close();
+  }
+});
+
+test("getCurrentNight fetches the open night and parses it", async () => {
+  let path = "";
+  let method = "";
+  const server = await startServer((req, res) => {
+    path = req.url ?? "";
+    method = req.method ?? "";
+    res.statusCode = 200;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify(night));
+  });
+  try {
+    const got = await getCurrentNight(server.url, GROUP);
+    assert.equal(method, "GET");
+    assert.equal(path, `/groups/${GROUP}/nights/current`);
+    assert.deepEqual(got, night);
+  } finally {
+    await server.close();
+  }
+});
+
+test("getCurrentNight returns null when there is no open night (404)", async () => {
+  const server = await startServer((_req, res) => {
+    res.statusCode = 404;
+    res.end("no open night");
+  });
+  try {
+    assert.equal(await getCurrentNight(server.url, GROUP), null);
+  } finally {
+    await server.close();
+  }
+});
+
+test("getCurrentNight throws on a non-404 error response", async () => {
+  const server = await startServer((_req, res) => {
+    res.statusCode = 500;
+    res.end("boom");
+  });
+  try {
+    await assert.rejects(getCurrentNight(server.url, GROUP), /request failed: 500/);
   } finally {
     await server.close();
   }

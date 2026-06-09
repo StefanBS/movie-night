@@ -16,6 +16,7 @@ import { fetchMembers, type Member } from "../lib/members";
 import {
   addAttendee,
   createNight,
+  getCurrentNight,
   getNightTurn,
   removeAttendee,
   type Night,
@@ -40,12 +41,22 @@ export default function NightScreen() {
 
   // Load the full roster (everyone — guests AND inactive members) so anyone
   // present can be recorded. Attendance is presence; the pick order (getNightTurn)
-  // filters to active core, so guests/inactive attendees never appear in it.
+  // filters to active core, so guests/inactive attendees never appear in it. We
+  // also resume the group's open night (if any) so leaving and returning doesn't
+  // strand it — there is at most one open night at a time.
   useEffect(() => {
     const controller = new AbortController();
     (async () => {
       try {
-        setMembers(await fetchMembers(API_URL, GROUP_ID, controller.signal));
+        const [roster, current] = await Promise.all([
+          fetchMembers(API_URL, GROUP_ID, controller.signal),
+          getCurrentNight(API_URL, GROUP_ID, controller.signal),
+        ]);
+        setMembers(roster);
+        if (current !== null) {
+          setNight(current);
+          setOrder(await getNightTurn(API_URL, GROUP_ID, current.id, controller.signal));
+        }
       } catch (e) {
         if (!controller.signal.aborted) {
           setError(e instanceof Error ? e.message : "failed to load members");
@@ -139,6 +150,9 @@ export default function NightScreen() {
       ) : (
         <>
           <Text style={styles.heading}>{`Night of ${night.scheduledFor}`}</Text>
+          <Text style={styles.hint}>
+            {"Tap to add or remove — attendance saves automatically."}
+          </Text>
           {actionError !== null && <Text style={[styles.banner, styles.error]}>{actionError}</Text>}
 
           <Text style={styles.section}>{"Who's here?"}</Text>

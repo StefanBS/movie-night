@@ -82,6 +82,23 @@ export function getNight(
   return fetchNight(`${baseUrl}/groups/${groupId}/nights/${nightId}`, { signal });
 }
 
+// getCurrentNight loads the group's latest open (planned) night so the screen can
+// resume it, or null when there is none (the backend returns 404 in that case).
+export async function getCurrentNight(
+  baseUrl: string,
+  groupId: string,
+  signal?: AbortSignal,
+): Promise<Night | null> {
+  const res = await fetch(`${baseUrl}/groups/${groupId}/nights/current`, { signal });
+  if (res.status === 404) {
+    return null;
+  }
+  if (!res.ok) {
+    throw new Error(`request failed: ${res.status}`);
+  }
+  return parseNight(await res.json());
+}
+
 export function addAttendee(
   baseUrl: string,
   groupId: string,
