@@ -38,7 +38,9 @@ export default function NightScreen() {
   // The member id with an action in flight, or "create" while creating.
   const [busy, setBusy] = useState<string | null>(null);
 
-  // Load the roster (everyone, so guests can be added too).
+  // Load the full roster (everyone — guests AND inactive members) so anyone
+  // present can be recorded. Attendance is presence; the pick order (getNightTurn)
+  // filters to active core, so guests/inactive attendees never appear in it.
   useEffect(() => {
     const controller = new AbortController();
     (async () => {
@@ -73,9 +75,18 @@ export default function NightScreen() {
     setBusy("create");
     setActionError(null);
     try {
+      // No abort signal on write actions: a create/attendance write should finish
+      // even if the screen unmounts mid-request; a stray state set after unmount is
+      // benign under React 18 (mirrors index.tsx's onRecord).
       const created = await createNight(API_URL, GROUP_ID, todayLocalISO());
       setNight(created);
-      await refreshOrder(created.id);
+      // The night was created; a failed order refresh shouldn't report the
+      // create as failed. Surface refresh trouble on its own.
+      try {
+        await refreshOrder(created.id);
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : "failed to load pick order");
+      }
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "failed to create night");
     } finally {
@@ -95,7 +106,11 @@ export default function NightScreen() {
           ? await removeAttendee(API_URL, GROUP_ID, night.id, member.id)
           : await addAttendee(API_URL, GROUP_ID, night.id, member.id);
         setNight(updated);
-        await refreshOrder(updated.id);
+        try {
+          await refreshOrder(updated.id);
+        } catch (e) {
+          setActionError(e instanceof Error ? e.message : "failed to load pick order");
+        }
       } catch (e) {
         setActionError(e instanceof Error ? e.message : "failed to update attendance");
       } finally {
