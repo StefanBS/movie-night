@@ -56,7 +56,7 @@ func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (Pick,
 const getCurrentNight = `-- name: GetCurrentNight :one
 SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
 FROM picks
-WHERE group_id = $1 AND picker_id IS NULL
+WHERE group_id = $1
 ORDER BY scheduled_for DESC, created_at DESC
 LIMIT 1
 `
@@ -78,7 +78,7 @@ func (q *Queries) GetCurrentNight(ctx context.Context, groupID uuid.UUID) (Pick,
 const getNight = `-- name: GetNight :one
 SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
 FROM picks
-WHERE id = $1 AND group_id = $2 AND picker_id IS NULL
+WHERE id = $1 AND group_id = $2
 `
 
 type GetNightParams struct {
@@ -88,6 +88,28 @@ type GetNightParams struct {
 
 func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (Pick, error) {
 	row := q.db.QueryRow(ctx, getNight, arg.NightID, arg.GroupID)
+	var i Pick
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.PickerID,
+		&i.IsCredited,
+		&i.ScheduledFor,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getOpenNight = `-- name: GetOpenNight :one
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
+FROM picks
+WHERE group_id = $1 AND picker_id IS NULL
+ORDER BY scheduled_for DESC, created_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetOpenNight(ctx context.Context, groupID uuid.UUID) (Pick, error) {
+	row := q.db.QueryRow(ctx, getOpenNight, groupID)
 	var i Pick
 	err := row.Scan(
 		&i.ID,
@@ -155,4 +177,37 @@ type RemoveAttendeeParams struct {
 func (q *Queries) RemoveAttendee(ctx context.Context, arg RemoveAttendeeParams) error {
 	_, err := q.db.Exec(ctx, removeAttendee, arg.PickID, arg.UserID)
 	return err
+}
+
+const setNightPicker = `-- name: SetNightPicker :one
+UPDATE picks
+SET picker_id = $1, is_credited = $2
+WHERE id = $3 AND group_id = $4
+RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at
+`
+
+type SetNightPickerParams struct {
+	PickerID   pgtype.UUID `json:"picker_id"`
+	IsCredited bool        `json:"is_credited"`
+	NightID    uuid.UUID   `json:"night_id"`
+	GroupID    uuid.UUID   `json:"group_id"`
+}
+
+func (q *Queries) SetNightPicker(ctx context.Context, arg SetNightPickerParams) (Pick, error) {
+	row := q.db.QueryRow(ctx, setNightPicker,
+		arg.PickerID,
+		arg.IsCredited,
+		arg.NightID,
+		arg.GroupID,
+	)
+	var i Pick
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.PickerID,
+		&i.IsCredited,
+		&i.ScheduledFor,
+		&i.CreatedAt,
+	)
+	return i, err
 }

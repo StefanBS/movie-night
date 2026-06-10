@@ -45,7 +45,6 @@ func main() {
 	})
 	mux.Handle("GET /groups/{groupId}/members", membersHandler(queries))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(queries))
-	mux.Handle("POST /groups/{groupId}/picks", createPickHandler(queries))
 	mux.Handle("POST /groups/{groupId}/members", joinMemberHandler(queries))
 	mux.Handle("POST /groups/{groupId}/members/{userId}/deactivate", deactivateMemberHandler(queries))
 	mux.Handle("POST /groups/{groupId}/members/{userId}/reactivate", reactivateMemberHandler(queries))
@@ -56,6 +55,7 @@ func main() {
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}/turn", nightTurnHandler(queries))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/attendees", addAttendeeHandler(queries))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/attendees/{userId}", removeAttendeeHandler(queries))
+	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(queries))
 
 	// Browsers enforce CORS; native apps and curl do not. Allowed web origins
 	// come from CORS_ALLOWED_ORIGINS (comma-separated) so the policy is the same
