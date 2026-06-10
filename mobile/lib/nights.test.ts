@@ -47,3 +47,30 @@ test("rejects a non-string id", () => {
 test("rejects a non-string scheduledFor", () => {
   assert.throws(() => parseNight({ id: "n1", scheduledFor: 99, attendees: [] }), /scheduledFor/);
 });
+
+test("parseNight reads a set pickerId", () => {
+  const n = parseNight({
+    id: "n1",
+    scheduledFor: "2026-06-12",
+    pickerId: "u1",
+    attendees: [],
+  });
+  assert.equal(n.pickerId, "u1");
+});
+
+test("parseNight accepts a null pickerId", () => {
+  const n = parseNight({
+    id: "n1",
+    scheduledFor: "2026-06-12",
+    pickerId: null,
+    attendees: [],
+  });
+  assert.equal(n.pickerId, null);
+});
+
+test("parseNight rejects a non-string, non-null pickerId", () => {
+  assert.throws(
+    () => parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId: 7, attendees: [] }),
+    /pickerId/,
+  );
+});

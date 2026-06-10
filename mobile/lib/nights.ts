@@ -9,6 +9,7 @@ export type Attendee = {
 export type Night = {
   id: string;
   scheduledFor: string;
+  pickerId: string | null;
   attendees: Attendee[];
 };
 
@@ -35,17 +36,20 @@ export function parseNight(raw: unknown): Night {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("expected a night object");
   }
-  const { id, scheduledFor, attendees } = raw as Record<string, unknown>;
+  const { id, scheduledFor, pickerId, attendees } = raw as Record<string, unknown>;
   if (typeof id !== "string") {
     throw new Error("night: id must be a string");
   }
   if (typeof scheduledFor !== "string") {
     throw new Error("night: scheduledFor must be a string");
   }
+  if (pickerId !== undefined && pickerId !== null && typeof pickerId !== "string") {
+    throw new Error("night: pickerId must be a string or null");
+  }
   if (!Array.isArray(attendees)) {
     throw new Error("night: attendees must be an array");
   }
-  return { id, scheduledFor, attendees: attendees.map(parseAttendee) };
+  return { id, scheduledFor, pickerId: pickerId ?? null, attendees: attendees.map(parseAttendee) };
 }
 
 async function fetchNight(url: string, init?: RequestInit): Promise<Night> {
@@ -139,4 +143,21 @@ export async function getNightTurn(
     throw new Error(`request failed: ${res.status}`);
   }
   return parseTurn(await res.json());
+}
+
+// recordNightPick sets (or corrects) the night's picker. The backend derives
+// is_credited from the picker's role, so the client sends only the id.
+export function recordNightPick(
+  baseUrl: string,
+  groupId: string,
+  nightId: string,
+  pickerId: string,
+  signal?: AbortSignal,
+): Promise<Night> {
+  return fetchNight(`${baseUrl}/groups/${groupId}/nights/${nightId}/pick`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pickerId }),
+    signal,
+  });
 }

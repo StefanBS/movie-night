@@ -9,6 +9,7 @@ import {
   getNightTurn,
   getNight,
   getCurrentNight,
+  recordNightPick,
   type Night,
 } from "./nights";
 
@@ -37,6 +38,7 @@ const ADA = "a0000000-0000-0000-0000-000000000001";
 const night: Night = {
   id: NIGHT,
   scheduledFor: "2026-06-12",
+  pickerId: null,
   attendees: [{ id: ADA, name: "Ada", role: "core" }],
 };
 
@@ -240,6 +242,30 @@ test("getCurrentNight aborts the request when the signal fires", async () => {
     const pending = getCurrentNight(server.url, GROUP, controller.signal);
     controller.abort();
     await assert.rejects(pending, (err: Error) => err.name === "AbortError");
+  } finally {
+    await server.close();
+  }
+});
+
+test("recordNightPick posts the pickerId and parses the night", async () => {
+  let path = "";
+  let method = "";
+  let body = "";
+  const nightWithPicker: Night = { ...night, pickerId: ADA };
+  const server = await startServer(async (req, res) => {
+    path = req.url ?? "";
+    method = req.method ?? "";
+    body = await collect(req);
+    res.statusCode = 200;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify(nightWithPicker));
+  });
+  try {
+    const got = await recordNightPick(server.url, GROUP, NIGHT, ADA);
+    assert.equal(method, "POST");
+    assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/pick`);
+    assert.deepEqual(JSON.parse(body), { pickerId: ADA });
+    assert.deepEqual(got, nightWithPicker);
   } finally {
     await server.close();
   }
