@@ -227,8 +227,9 @@ func requireMember(w http.ResponseWriter, r *http.Request, store nightStore, gid
 	return true
 }
 
-// createNightHandler serves POST /groups/{groupId}/nights. A night is a picks
-// row with picker_id NULL. A group may have at most one open night at a time
+// createNightHandler serves POST /groups/{groupId}/nights. It starts a NEW open
+// night — a picks row with picker_id NULL; a pick is recorded onto it later via
+// .../pick. A group may have at most one open night at a time
 // (a partial unique index on picks(group_id) WHERE picker_id IS NULL enforces
 // it), so create is idempotent: if a night is already open we resume it (200)
 // rather than create a second — the request's scheduledFor/attendees are then

@@ -86,8 +86,9 @@ export function getNight(
   return fetchNight(`${baseUrl}/groups/${groupId}/nights/${nightId}`, { signal });
 }
 
-// getCurrentNight loads the group's latest open (planned) night so the screen can
-// resume it, or null when there is none (the backend returns 404 in that case).
+// getCurrentNight loads the group's latest night (open OR finalized) so the screen
+// can resume and correct it across sessions, or null when there is none (the
+// backend returns 404 in that case).
 export async function getCurrentNight(
   baseUrl: string,
   groupId: string,
