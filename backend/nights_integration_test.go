@@ -9,10 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
-
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -62,6 +58,17 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		if _, err := pool.Exec(context.Background(),
 			"DELETE FROM picks WHERE group_id = $1 AND picker_id IS NULL", seededGroup); err != nil {
 			t.Fatalf("clear open night: %v", err)
+		}
+	}
+
+	// clearAllPicks removes every pick (open and finalized) for a group so a
+	// subtest that asserts "current" or recomputed standings starts from the seed
+	// baseline. The FK cascade drops attendances.
+	clearAllPicks := func(t *testing.T, group string) {
+		t.Helper()
+		if _, err := pool.Exec(context.Background(),
+			"DELETE FROM picks WHERE group_id = $1", group); err != nil {
+			t.Fatalf("clear all picks: %v", err)
 		}
 	}
 
@@ -296,19 +303,61 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("current night excludes a finalized (recorded) pick", func(t *testing.T) {
-		// A recorded pick (picker set) in an otherwise night-less group must not be
-		// returned as the current planned night.
-		if _, err := q.InsertPick(context.Background(), db.InsertPickParams{
-			GroupID:      uuid.MustParse(emptyGroup),
-			PickerID:     pgtype.UUID{Bytes: uuid.MustParse(ada), Valid: true},
-			IsCredited:   true,
-			ScheduledFor: pgtype.Date{Time: time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC), Valid: true},
-		}); err != nil {
-			t.Fatalf("insert recorded pick: %v", err)
+	t.Run("current night resumes a finalized night across sessions", func(t *testing.T) {
+		clearAllPicks(t, seededGroup)
+		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
+		recordPick(t, n.ID, ada) // finalize it
+		code, b := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
+		if code != http.StatusOK {
+			t.Fatalf("current status = %d, want 200 (finalized night must still resume) (body %s)", code, b)
 		}
-		if code, _ := do(t, http.MethodGet, "/groups/"+emptyGroup+"/nights/current", ""); code != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404 (recorded pick must not count as current)", code)
+		var got nightResponse
+		if err := json.Unmarshal(b, &got); err != nil {
+			t.Fatalf("decode current: %v", err)
+		}
+		if got.ID != n.ID {
+			t.Errorf("current id = %s, want the finalized night %s", got.ID, n.ID)
+		}
+		if got.PickerID == nil || *got.PickerID != ada {
+			t.Errorf("current pickerId = %v, want %s", got.PickerID, ada)
+		}
+	})
+
+	t.Run("re-recording a different attendee re-attributes standings (correction)", func(t *testing.T) {
+		clearAllPicks(t, seededGroup)
+		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+blake+`"]}`)
+		recordPick(t, n.ID, ada) // Ada credited → Blake leads
+		if order := names(turn(t, n.ID)); order[0] != "Blake" {
+			t.Fatalf("after recording Ada, order = %v, want Blake first", order)
+		}
+		recordPick(t, n.ID, blake) // correction: now Blake credited → Ada leads
+		if order := names(turn(t, n.ID)); order[0] != "Ada" {
+			t.Fatalf("after correcting to Blake, order = %v, want Ada first", order)
+		}
+	})
+
+	t.Run("starting a new night after finalizing creates a fresh open night", func(t *testing.T) {
+		clearAllPicks(t, seededGroup)
+		first := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
+		recordPick(t, first.ID, ada) // finalize → no open night remains
+		code, b := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-06-19","attendees":["`+blake+`"]}`)
+		if code != http.StatusCreated {
+			t.Fatalf("start-next status = %d, want 201 (body %s)", code, b)
+		}
+		var second nightResponse
+		if err := json.Unmarshal(b, &second); err != nil {
+			t.Fatalf("decode second night: %v", err)
+		}
+		if second.ID == first.ID {
+			t.Fatal("start-next returned the finalized night; want a brand-new open night")
+		}
+		_, cb := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
+		var cur nightResponse
+		if err := json.Unmarshal(cb, &cur); err != nil {
+			t.Fatalf("decode current: %v", err)
+		}
+		if cur.ID != second.ID {
+			t.Errorf("current id = %s, want the new open night %s", cur.ID, second.ID)
 		}
 	})
 

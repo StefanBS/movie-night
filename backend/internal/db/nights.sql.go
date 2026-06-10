@@ -56,7 +56,7 @@ func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (Pick,
 const getCurrentNight = `-- name: GetCurrentNight :one
 SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
 FROM picks
-WHERE group_id = $1 AND picker_id IS NULL
+WHERE group_id = $1
 ORDER BY scheduled_for DESC, created_at DESC
 LIMIT 1
 `
@@ -88,6 +88,28 @@ type GetNightParams struct {
 
 func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (Pick, error) {
 	row := q.db.QueryRow(ctx, getNight, arg.NightID, arg.GroupID)
+	var i Pick
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.PickerID,
+		&i.IsCredited,
+		&i.ScheduledFor,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getOpenNight = `-- name: GetOpenNight :one
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
+FROM picks
+WHERE group_id = $1 AND picker_id IS NULL
+ORDER BY scheduled_for DESC, created_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetOpenNight(ctx context.Context, groupID uuid.UUID) (Pick, error) {
+	row := q.db.QueryRow(ctx, getOpenNight, groupID)
 	var i Pick
 	err := row.Scan(
 		&i.ID,

@@ -129,6 +129,7 @@ type nightStore interface {
 	CreateNight(ctx context.Context, arg db.CreateNightParams) (db.Pick, error)
 	GetNight(ctx context.Context, arg db.GetNightParams) (db.Pick, error)
 	GetCurrentNight(ctx context.Context, groupID uuid.UUID) (db.Pick, error)
+	GetOpenNight(ctx context.Context, groupID uuid.UUID) (db.Pick, error)
 	AddAttendee(ctx context.Context, arg db.AddAttendeeParams) error
 	RemoveAttendee(ctx context.Context, arg db.RemoveAttendeeParams) error
 	ListNightAttendees(ctx context.Context, arg db.ListNightAttendeesParams) ([]db.ListNightAttendeesRow, error)
@@ -255,11 +256,11 @@ func createNightHandler(store nightStore) http.HandlerFunc {
 		}
 		ctx := r.Context()
 		// Resume the open night if one exists — at most one per group.
-		if existing, err := store.GetCurrentNight(ctx, gid); err == nil {
+		if existing, err := store.GetOpenNight(ctx, gid); err == nil {
 			writeNightDTO(w, r, store, gid, existing.ID, http.StatusOK)
 			return
 		} else if !errors.Is(err, pgx.ErrNoRows) {
-			internalError(w, gid, "get current night", err)
+			internalError(w, gid, "get open night", err)
 			return
 		}
 		for _, uid := range parsed.Attendees {
@@ -274,9 +275,9 @@ func createNightHandler(store nightStore) http.HandlerFunc {
 			// idempotent outcome as the pre-check above, never a 500.
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				existing, gerr := store.GetCurrentNight(ctx, gid)
+				existing, gerr := store.GetOpenNight(ctx, gid)
 				if gerr != nil {
-					internalError(w, gid, "get current night", gerr)
+					internalError(w, gid, "get open night", gerr)
 					return
 				}
 				writeNightDTO(w, r, store, gid, existing.ID, http.StatusOK)
@@ -362,10 +363,9 @@ func nightDetailHandler(store nightStore) http.HandlerFunc {
 }
 
 // currentNightHandler serves GET /groups/{groupId}/nights/current — the group's
-// latest planned (picker_id NULL) night, or 404 if there is none. This lets the
-// mobile app resume an in-progress night instead of creating a new one on every
-// visit. A finalized pick (picker set) is never returned (slice-2 reconciliation
-// will set the picker, naturally dropping the night out of "current").
+// latest night, regardless of whether a pick has been recorded, so the app
+// resumes and can correct it across sessions; 404 only when the group has no
+// nights.
 func currentNightHandler(store nightStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, err := parseGroupID(r.PathValue("groupId"))
@@ -376,7 +376,7 @@ func currentNightHandler(store nightStore) http.HandlerFunc {
 		night, err := store.GetCurrentNight(r.Context(), gid)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				writeJSONError(w, http.StatusNotFound, "no open night")
+				writeJSONError(w, http.StatusNotFound, "no current night")
 				return
 			}
 			internalError(w, gid, "get current night", err)

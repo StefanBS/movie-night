@@ -11,6 +11,13 @@ WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
 -- name: GetCurrentNight :one
 SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
 FROM picks
+WHERE group_id = sqlc.arg(group_id)
+ORDER BY scheduled_for DESC, created_at DESC
+LIMIT 1;
+
+-- name: GetOpenNight :one
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
+FROM picks
 WHERE group_id = sqlc.arg(group_id) AND picker_id IS NULL
 ORDER BY scheduled_for DESC, created_at DESC
 LIMIT 1;
