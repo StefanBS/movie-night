@@ -45,7 +45,6 @@ func main() {
 	})
 	mux.Handle("GET /groups/{groupId}/members", membersHandler(queries))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(queries))
-	mux.Handle("POST /groups/{groupId}/picks", createPickHandler(queries))
 	mux.Handle("POST /groups/{groupId}/members", joinMemberHandler(queries))
 	mux.Handle("POST /groups/{groupId}/members/{userId}/deactivate", deactivateMemberHandler(queries))
 	mux.Handle("POST /groups/{groupId}/members/{userId}/reactivate", reactivateMemberHandler(queries))

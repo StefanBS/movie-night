@@ -23,7 +23,8 @@ func TestMembershipChurnIntegration(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/members/{userId}/deactivate", deactivateMemberHandler(q))
 	mux.Handle("POST /groups/{groupId}/members/{userId}/reactivate", reactivateMemberHandler(q))
 	mux.Handle("POST /groups/{groupId}/members/{userId}/promote", promoteMemberHandler(q))
-	mux.Handle("POST /groups/{groupId}/picks", createPickHandler(q))
+	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(q))
+	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(q))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
 
 	const (
@@ -90,11 +91,23 @@ func TestMembershipChurnIntegration(t *testing.T) {
 
 	recordPick := func(t *testing.T, picker, date string) {
 		t.Helper()
-		rec := httptest.NewRecorder()
-		body := `{"pickerId":"` + picker + `","scheduledFor":"` + date + `"}`
-		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/groups/"+seededGroup+"/picks", bytes.NewBufferString(body)))
-		if rec.Code != http.StatusCreated {
-			t.Fatalf("record pick for %s: status = %d, want 201", picker, rec.Code)
+		// Step 1: create (or resume) a night for this date with the picker as attendee.
+		createBody := `{"scheduledFor":"` + date + `","attendees":["` + picker + `"]}`
+		createRec := httptest.NewRecorder()
+		mux.ServeHTTP(createRec, httptest.NewRequest(http.MethodPost, "/groups/"+seededGroup+"/nights", bytes.NewBufferString(createBody)))
+		if createRec.Code != http.StatusCreated && createRec.Code != http.StatusOK {
+			t.Fatalf("create night for %s: status = %d, want 201/200", picker, createRec.Code)
+		}
+		var night nightResponse
+		if err := json.Unmarshal(createRec.Body.Bytes(), &night); err != nil {
+			t.Fatalf("decode night: %v", err)
+		}
+		// Step 2: record the pick — closes the night.
+		pickBody := `{"pickerId":"` + picker + `"}`
+		pickRec := httptest.NewRecorder()
+		mux.ServeHTTP(pickRec, httptest.NewRequest(http.MethodPost, "/groups/"+seededGroup+"/nights/"+night.ID+"/pick", bytes.NewBufferString(pickBody)))
+		if pickRec.Code != http.StatusOK {
+			t.Fatalf("record pick for %s: status = %d, want 200", picker, pickRec.Code)
 		}
 	}
 
