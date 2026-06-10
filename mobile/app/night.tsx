@@ -18,6 +18,7 @@ import {
   createNight,
   getCurrentNight,
   getNightTurn,
+  recordNightPick,
   removeAttendee,
   type Night,
 } from "../lib/nights";
@@ -132,6 +133,52 @@ export default function NightScreen() {
     [night, busy, attendeeIds, refreshOrder],
   );
 
+  const onRecordPick = useCallback(
+    async (memberId: string) => {
+      if (night === null || busy !== null) {
+        return;
+      }
+      setBusy(memberId);
+      setActionError(null);
+      try {
+        const updated = await recordNightPick(API_URL, GROUP_ID, night.id, memberId);
+        setNight(updated);
+        try {
+          await refreshOrder(updated.id);
+        } catch (e) {
+          setActionError(e instanceof Error ? e.message : "failed to load pick order");
+        }
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : "failed to record pick");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [night, busy, refreshOrder],
+  );
+
+  const onStartNew = useCallback(async () => {
+    if (busy !== null) {
+      return;
+    }
+    setBusy("create");
+    setActionError(null);
+    try {
+      const created = await createNight(API_URL, GROUP_ID, todayLocalISO());
+      setNight(created);
+      setOrder([]);
+      try {
+        await refreshOrder(created.id);
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : "failed to load pick order");
+      }
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "failed to start a new night");
+    } finally {
+      setBusy(null);
+    }
+  }, [busy, refreshOrder]);
+
   if (loading) {
     return <ActivityIndicator style={styles.center} size="large" />;
   }
@@ -180,17 +227,53 @@ export default function NightScreen() {
                 {order.length === 0 ? (
                   <Text style={styles.hint}>No core members here yet.</Text>
                 ) : (
-                  order.map((m, i) => (
-                    <View key={m.id} style={[styles.orderRow, i === 0 && styles.pickerRow]}>
-                      <Text style={styles.name}>{`${i + 1}. ${m.name}`}</Text>
-                      {i === 0 && <Text style={styles.badge}>{"Tonight's pick"}</Text>}
-                    </View>
-                  ))
+                  order.map((m, i) => {
+                    const recorded = night?.pickerId === m.id;
+                    return (
+                      <Pressable
+                        key={m.id}
+                        onPress={() => onRecordPick(m.id)}
+                        disabled={busy !== null}
+                        style={({ pressed }) => [
+                          styles.orderRow,
+                          (recorded || (night?.pickerId == null && i === 0)) && styles.pickerRow,
+                          pressed && styles.rowPressed,
+                        ]}
+                      >
+                        <Text style={styles.name}>{`${i + 1}. ${m.name}`}</Text>
+                        {recorded ? (
+                          <Text style={styles.badge}>{"Recorded ✓"}</Text>
+                        ) : night?.pickerId == null && i === 0 ? (
+                          <Text style={styles.badge}>{"Tonight's pick"}</Text>
+                        ) : null}
+                      </Pressable>
+                    );
+                  })
                 )}
                 {guestsPresent.length > 0 && (
-                  <Text style={styles.hint}>
-                    {`Also present: ${guestsPresent.map((g) => g.name).join(", ")}`}
-                  </Text>
+                  <>
+                    <Text style={styles.section}>{"Also present"}</Text>
+                    {guestsPresent.map((g) => {
+                      const recorded = night?.pickerId === g.id;
+                      return (
+                        <Pressable
+                          key={g.id}
+                          onPress={() => onRecordPick(g.id)}
+                          disabled={busy !== null}
+                          style={({ pressed }) => [styles.orderRow, recorded && styles.pickerRow, pressed && styles.rowPressed]}
+                        >
+                          <Text style={styles.name}>{g.name}</Text>
+                          {recorded && <Text style={styles.badge}>{"Recorded ✓"}</Text>}
+                        </Pressable>
+                      );
+                    })}
+                  </>
+                )}
+                {night?.pickerId != null && (
+                  <View style={styles.createRow}>
+                    <Text style={styles.hint}>{"Pick recorded. Tap another name to change it, or start the next night."}</Text>
+                    <Button title="Start a new night" onPress={onStartNew} disabled={busy !== null} />
+                  </View>
                 )}
               </View>
             }
