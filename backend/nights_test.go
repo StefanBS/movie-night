@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -109,4 +110,26 @@ func TestToNightResponse(t *testing.T) {
 			t.Errorf("len = %d, want 0", len(got.Attendees))
 		}
 	})
+
+	t.Run("pickerId is null when unset and the uuid when set", func(t *testing.T) {
+		open := toNightResponse(mkPick(), nil)
+		if open.PickerID != nil {
+			t.Errorf("open night PickerID = %v, want nil", open.PickerID)
+		}
+		p := mkPick()
+		p.PickerID = pgtype.UUID{Bytes: ada, Valid: true}
+		got := toNightResponse(p, nil)
+		if got.PickerID == nil || *got.PickerID != ada.String() {
+			t.Errorf("finalized PickerID = %v, want %s", got.PickerID, ada)
+		}
+	})
+}
+
+func TestCreditedForRole(t *testing.T) {
+	if !creditedForRole(db.MembershipRoleCore) {
+		t.Error("core picker must be credited")
+	}
+	if creditedForRole(db.MembershipRoleGuest) {
+		t.Error("guest picker must not be credited")
+	}
 }

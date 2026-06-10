@@ -29,6 +29,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}/turn", nightTurnHandler(q))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/attendees", addAttendeeHandler(q))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/attendees/{userId}", removeAttendeeHandler(q))
+	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(q))
 
 	const (
 		ada     = "a0000000-0000-0000-0000-000000000001"
@@ -89,6 +90,19 @@ func TestNightAttendanceIntegration(t *testing.T) {
 			t.Fatalf("decode turn: %v", err)
 		}
 		return got
+	}
+
+	recordPick := func(t *testing.T, nightID, pickerID string) nightResponse {
+		t.Helper()
+		code, b := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+nightID+"/pick", `{"pickerId":"`+pickerID+`"}`)
+		if code != http.StatusOK {
+			t.Fatalf("record pick status = %d, want 200 (body %s)", code, b)
+		}
+		var n nightResponse
+		if err := json.Unmarshal(b, &n); err != nil {
+			t.Fatalf("decode night: %v", err)
+		}
+		return n
 	}
 
 	names := func(rows []turnResponse) []string {
@@ -211,30 +225,47 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("a real recorded pick is not reachable as a night (seam closed)", func(t *testing.T) {
-		// A pick created via the record-pick path has a non-null picker, so it is
-		// NOT a planned night. GetNight is scoped to picker_id IS NULL, so every
-		// night endpoint must 404 on its id — this guards the interim seam against
-		// a future refactor accidentally reopening it.
-		pick, err := q.InsertPick(context.Background(), db.InsertPickParams{
-			GroupID:      uuid.MustParse(seededGroup),
-			PickerID:     pgtype.UUID{Bytes: uuid.MustParse(ada), Valid: true},
-			IsCredited:   true,
-			ScheduledFor: pgtype.Date{Time: time.Date(2026, 6, 12, 0, 0, 0, 0, time.UTC), Valid: true},
-		})
-		if err != nil {
-			t.Fatalf("insert recorded pick: %v", err)
+	t.Run("recording a core picker finalizes the night and credits them", func(t *testing.T) {
+		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+blake+`"]}`)
+		got := recordPick(t, n.ID, ada)
+		if got.PickerID == nil || *got.PickerID != ada {
+			t.Fatalf("pickerId = %v, want %s", got.PickerID, ada)
 		}
-		pid := pick.ID.String()
+		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, ""); code != http.StatusOK {
+			t.Errorf("detail of finalized night = %d, want 200", code)
+		}
+		if order := names(turn(t, n.ID)); len(order) != 2 || order[0] != "Blake" {
+			t.Fatalf("post-pick order = %v, want Blake first (Ada credited)", order)
+		}
+	})
 
-		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+pid, ""); code != http.StatusNotFound {
-			t.Errorf("detail status = %d, want 404", code)
+	t.Run("recording a guest picker does not move standings", func(t *testing.T) {
+		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+frankie+`"]}`)
+		before := names(turn(t, n.ID))
+		got := recordPick(t, n.ID, frankie)
+		if got.PickerID == nil || *got.PickerID != frankie {
+			t.Fatalf("pickerId = %v, want %s", got.PickerID, frankie)
 		}
-		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+pid+"/turn", ""); code != http.StatusNotFound {
-			t.Errorf("turn status = %d, want 404", code)
+		if after := names(turn(t, n.ID)); len(after) != len(before) || after[0] != "Ada" {
+			t.Fatalf("guest pick changed the order: before %v after %v", before, after)
 		}
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+pid+"/attendees", `{"userId":"`+ada+`"}`); code != http.StatusNotFound {
-			t.Errorf("add status = %d, want 404", code)
+	})
+
+	t.Run("recording a non-attendee yields 422", func(t *testing.T) {
+		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/pick", `{"pickerId":"`+blake+`"}`); code != http.StatusUnprocessableEntity {
+			t.Fatalf("status = %d, want 422 (Blake is not an attendee)", code)
+		}
+	})
+
+	t.Run("recording on an unknown night yields 404; malformed picker yields 400", func(t *testing.T) {
+		missing := "b0000000-0000-0000-0000-0000000000ee"
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+missing+"/pick", `{"pickerId":"`+ada+`"}`); code != http.StatusNotFound {
+			t.Errorf("unknown-night status = %d, want 404", code)
+		}
+		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/pick", `{"pickerId":"nope"}`); code != http.StatusBadRequest {
+			t.Errorf("malformed-picker status = %d, want 400", code)
 		}
 	})
 

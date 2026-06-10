@@ -6,7 +6,7 @@ RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at;
 -- name: GetNight :one
 SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
 FROM picks
-WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id) AND picker_id IS NULL;
+WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
 
 -- name: GetCurrentNight :one
 SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
@@ -33,3 +33,9 @@ WHERE a.pick_id = sqlc.arg(night_id)
 ORDER BY
   CASE WHEN m.role = 'core' THEN 0 ELSE 1 END,
   u.name;
+
+-- name: SetNightPicker :one
+UPDATE picks
+SET picker_id = sqlc.arg(picker_id), is_credited = sqlc.arg(is_credited)
+WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
+RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at;

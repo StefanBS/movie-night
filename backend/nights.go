@@ -74,10 +74,22 @@ type attendee struct {
 }
 
 // nightResponse is the JSON shape for a night and its current attendees.
+// PickerID is nil (renders as null) until a pick is recorded.
 type nightResponse struct {
 	ID           string     `json:"id"`
 	ScheduledFor string     `json:"scheduledFor"`
+	PickerID     *string    `json:"pickerId"`
 	Attendees    []attendee `json:"attendees"`
+}
+
+// pickerIDPtr renders a nullable picker as *string: nil (JSON null) when the
+// night is still open, the canonical UUID string once a pick is recorded.
+func pickerIDPtr(u pgtype.UUID) *string {
+	if !u.Valid {
+		return nil
+	}
+	s := uuid.UUID(u.Bytes).String()
+	return &s
 }
 
 // toNightResponse maps a night row + attendee rows to the night DTO. Attendees
@@ -94,6 +106,7 @@ func toNightResponse(p db.Pick, rows []db.ListNightAttendeesRow) nightResponse {
 	return nightResponse{
 		ID:           p.ID.String(),
 		ScheduledFor: p.ScheduledFor.Time.Format("2006-01-02"),
+		PickerID:     pickerIDPtr(p.PickerID),
 		Attendees:    attendees,
 	}
 }
@@ -121,11 +134,23 @@ type nightStore interface {
 	ListNightAttendees(ctx context.Context, arg db.ListNightAttendeesParams) ([]db.ListNightAttendeesRow, error)
 	GetGroupMember(ctx context.Context, arg db.GetGroupMemberParams) (db.GetGroupMemberRow, error)
 	RankGroupTurn(ctx context.Context, arg db.RankGroupTurnParams) ([]db.RankGroupTurnRow, error)
+	SetNightPicker(ctx context.Context, arg db.SetNightPickerParams) (db.Pick, error)
 }
 
 // attendeeRequest is the JSON body of POST .../nights/{nightId}/attendees.
 type attendeeRequest struct {
 	UserID string `json:"userId"`
+}
+
+// recordPickRequest is the JSON body of POST .../nights/{nightId}/pick.
+type recordPickRequest struct {
+	PickerID string `json:"pickerId"`
+}
+
+// creditedForRole derives is_credited from the picker's role: a core pick moves
+// the rotation (credited); a guest pick never does. Pure.
+func creditedForRole(role db.MembershipRole) bool {
+	return role == db.MembershipRoleCore
 }
 
 // parseGroupAndNight validates the {groupId} and {nightId} path segments as
@@ -388,5 +413,59 @@ func nightTurnHandler(store nightStore) http.HandlerFunc {
 		if err := json.NewEncoder(w).Encode(toTurnResponses(ranked)); err != nil {
 			log.Printf("encode turn response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
 		}
+	}
+}
+
+// recordNightPickHandler serves POST /groups/{groupId}/nights/{nightId}/pick.
+// It sets (or changes — the correction path) the night's picker. The picker MUST
+// be an attendee; is_credited is derived from their role, so a guest pick never
+// moves standings. RankGroupTurn recomputes served-counts from the picks table on
+// read, so re-recording simply re-attributes — there is no stored counter to fix.
+func recordNightPickHandler(store nightStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gid, nightID, ok := parseGroupAndNight(w, r)
+		if !ok {
+			return
+		}
+		var req recordPickRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		pickerID, err := uuid.Parse(req.PickerID)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "invalid picker id")
+			return
+		}
+		if !ensureNight(w, r, store, gid, nightID) {
+			return
+		}
+		rows, err := store.ListNightAttendees(r.Context(), db.ListNightAttendeesParams{GroupID: gid, NightID: nightID})
+		if err != nil {
+			internalError(w, gid, "list night attendees", err)
+			return
+		}
+		var role db.MembershipRole
+		found := false
+		for _, row := range rows {
+			if row.ID == pickerID {
+				role, found = row.Role, true
+				break
+			}
+		}
+		if !found {
+			writeJSONError(w, http.StatusUnprocessableEntity, "picker is not an attendee of this night")
+			return
+		}
+		if _, err := store.SetNightPicker(r.Context(), db.SetNightPickerParams{
+			NightID:    nightID,
+			GroupID:    gid,
+			PickerID:   pgtype.UUID{Bytes: pickerID, Valid: true},
+			IsCredited: creditedForRole(role),
+		}); err != nil {
+			internalError(w, gid, "set night picker", err)
+			return
+		}
+		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
 	}
 }
