@@ -2,11 +2,24 @@
 # scanning then vet. Updates are grouped into one PR per ecosystem per week.
 #
 # The npm `ignore` block protects the deliberate Expo SDK 54 pin
-# (see mobile/AGENTS.md): it drops the version bumps that would move the
-# SDK-coupled packages off SDK 54 — majors for the normally-versioned packages,
-# and majors+minors for the two 0.x natives (react-native, react-native-web)
-# where a MINOR is the breaking SDK-coupling bump. Patch updates within SDK 54
-# still flow, and security-advisory updates are unaffected. Do NOT remove it.
+# (see mobile/AGENTS.md). The list is DERIVED, not guessed: it is the set of
+# packages in Expo's per-SDK manifest, `node_modules/expo/bundledNativeModules.json`
+# (re-audit with `npx expo install --check`), plus the umbrella `expo` package and
+# the lockstep-versioned `babel-preset-expo` (Expo-published but not native modules,
+# so absent from that manifest). The two SDK-coupling patterns the manifest reveals:
+#
+#   1. Expo-published packages (expo, expo-*, babel-preset-expo, eslint-config-expo)
+#      carry the SDK in their MAJOR — the SDK 54 -> 56 jump was expo-router 6 -> 56,
+#      expo-linking 8 -> 56, expo 54 -> 56. Within SDK 54 they stay on their own
+#      major, so we ignore MAJOR only.
+#   2. React / RN-ecosystem packages (react, react-dom, react-native, and the
+#      react-native-* natives) do NOT renumber to the SDK; each SDK blesses a
+#      specific minor/exact version (safe-area-context 5.6 -> 5.8, screens
+#      4.16 -> 4.25, react pinned exact 19.1.0), so the SDK-coupling bump is a
+#      MINOR (or patch). We ignore MAJOR + MINOR; only patches flow.
+#
+# Patch updates within SDK 54 still flow, and security-advisory updates are
+# unaffected. Re-derive (don't hand-edit) when bumping the SDK. Do NOT remove it.
 version: 2
 updates:
   - package-ecosystem: gomod
@@ -29,23 +42,32 @@ updates:
         patterns:
           - "*"
     ignore:
+      # --- Bucket 1: Expo-published, SDK carried in the MAJOR -> ignore major only ---
       - dependency-name: expo
-        update-types: ["version-update:semver-major"]
-      # 0.x package: the SDK-coupling bump is a MINOR (0.81 -> 0.82), so ignore
-      # minor too; patch (0.81.x) still flows within SDK 54.
-      - dependency-name: react-native
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      - dependency-name: react
-        update-types: ["version-update:semver-major"]
-      - dependency-name: react-dom
         update-types: ["version-update:semver-major"]
       - dependency-name: expo-constants
         update-types: ["version-update:semver-major"]
+      - dependency-name: expo-linking
+        update-types: ["version-update:semver-major"]
+      - dependency-name: expo-router
+        update-types: ["version-update:semver-major"]
       - dependency-name: expo-status-bar
         update-types: ["version-update:semver-major"]
-      - dependency-name: react-native-safe-area-context
+      - dependency-name: babel-preset-expo
         update-types: ["version-update:semver-major"]
-      # 0.x package (same reasoning as react-native): ignore minor + major.
+      - dependency-name: eslint-config-expo
+        update-types: ["version-update:semver-major"]
+      # --- Bucket 2: react / RN-ecosystem, SDK carried in the MINOR -> ignore major + minor ---
+      - dependency-name: react
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: react-dom
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: react-native
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: react-native-safe-area-context
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: react-native-screens
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: react-native-web
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
 
