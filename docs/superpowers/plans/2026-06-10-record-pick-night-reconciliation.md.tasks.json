@@ -1,0 +1,46 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-10-record-pick-night-reconciliation.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Backend — pick endpoint + relax GetNight",
+      "status": "pending",
+      "description": "**Goal:** Add POST /groups/{groupId}/nights/{nightId}/pick that sets the picker (is_credited derived from role) and returns the night DTO now carrying pickerId; relax GetNight so a finalized night is reloadable.\n\n**Files:** backend/internal/db/query/nights.sql, backend/internal/db/nights.sql.go (regen), backend/nights.go, backend/main.go, backend/nights_test.go, backend/nights_integration_test.go\n\n**Verify:** cd backend && just check && go test -tags=integration -run '^TestNightAttendanceIntegration$' ./...\n\n```json:metadata\n{\"files\": [\"backend/internal/db/query/nights.sql\", \"backend/internal/db/nights.sql.go\", \"backend/nights.go\", \"backend/main.go\", \"backend/nights_test.go\", \"backend/nights_integration_test.go\"], \"verifyCommand\": \"cd backend && just check && go test -tags=integration -run '^TestNightAttendanceIntegration$' ./...\", \"acceptanceCriteria\": [\"core picker 200 + credited\", \"guest picker uncredited\", \"non-attendee 422, malformed 400, unknown night 404\", \"pickerId null/uuid in DTO\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Backend — cross-session resume + correction",
+      "status": "pending",
+      "blockedBy": [1],
+      "description": "**Goal:** Make a finalized night the resumable 'current' one (relax GetCurrentNight), preserve create idempotency via a new GetOpenNight, and prove re-pick/correction + start-next-night.\n\n**Files:** backend/internal/db/query/nights.sql, backend/internal/db/nights.sql.go (regen), backend/nights.go, backend/nights_integration_test.go\n\n**Verify:** cd backend && just check && go test -tags=integration -run '^TestNightAttendanceIntegration$' ./...\n\n```json:metadata\n{\"files\": [\"backend/internal/db/query/nights.sql\", \"backend/internal/db/nights.sql.go\", \"backend/nights.go\", \"backend/nights_integration_test.go\"], \"verifyCommand\": \"cd backend && just check && go test -tags=integration -run '^TestNightAttendanceIntegration$' ./...\", \"acceptanceCriteria\": [\"current returns finalized night; 404 only when empty\", \"re-pick re-attributes standings\", \"start-next creates new open night\", \"idempotency preserved\", \"InsertPick gone from tests\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Backend — retire standalone POST /picks",
+      "status": "pending",
+      "blockedBy": [2],
+      "description": "**Goal:** Remove the redundant insert-with-picker path so there is a single create path.\n\n**Files:** delete backend/picks.go, picks_test.go, picks_integration_test.go, internal/db/query/picks.sql, internal/db/picks.sql.go; modify backend/main.go.\n\n**Verify:** cd backend && grep -rn 'InsertPick' . ; just check && go test -tags=integration ./...\n\n```json:metadata\n{\"files\": [\"backend/picks.go\", \"backend/picks_test.go\", \"backend/picks_integration_test.go\", \"backend/internal/db/query/picks.sql\", \"backend/internal/db/picks.sql.go\", \"backend/main.go\"], \"verifyCommand\": \"cd backend && grep -rn 'InsertPick' . ; just check && go test -tags=integration ./...\", \"acceptanceCriteria\": [\"POST /picks route removed\", \"InsertPick absent\", \"check + integration pass\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Mobile — lib/nights pickerId + recordNightPick",
+      "status": "pending",
+      "description": "**Goal:** Extend the framework-free night client with pickerId and the record call, fully tested. Additive — lib/picks stays until Task 6.\n\n**Files:** mobile/lib/nights.ts, mobile/lib/nights.test.ts, mobile/lib/nights.integration.test.ts\n\n**Verify:** cd mobile && node --import tsx --test lib/nights.test.ts lib/nights.integration.test.ts && just check\n\n```json:metadata\n{\"files\": [\"mobile/lib/nights.ts\", \"mobile/lib/nights.test.ts\", \"mobile/lib/nights.integration.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/nights.test.ts lib/nights.integration.test.ts && just check\", \"acceptanceCriteria\": [\"pickerId string|null parsed/validated\", \"recordNightPick path/method/body + throw\", \"just check passes\"]}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: Mobile — record/correct pick on night screen",
+      "status": "pending",
+      "blockedBy": [4],
+      "description": "**Goal:** Let the night screen record a pick by tapping an attendee, badge the recorded picker, allow correcting, and offer 'Start a new night' once finalized.\n\n**Files:** mobile/app/night.tsx\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/app/night.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"tap core/guest records\", \"recorded badge + correction refreshes order\", \"Start a new night when finalized\", \"just check passes\"]}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: Mobile — retire lib/picks; read-only turn screen",
+      "status": "pending",
+      "blockedBy": [5],
+      "description": "**Goal:** Remove the standalone record-pick client and turn app/index.tsx into read-only all-time standings.\n\n**Files:** modify mobile/app/index.tsx; delete mobile/lib/picks.ts, picks.test.ts, picks.integration.test.ts\n\n**Verify:** cd mobile && grep -rn 'lib/picks\\|recordPick' app lib ; just check\n\n```json:metadata\n{\"files\": [\"mobile/app/index.tsx\", \"mobile/lib/picks.ts\", \"mobile/lib/picks.test.ts\", \"mobile/lib/picks.integration.test.ts\"], \"verifyCommand\": \"cd mobile && grep -rn 'lib/picks\\\\|recordPick' app lib ; just check\", \"acceptanceCriteria\": [\"no recordPick in index.tsx; rows read-only; links kept\", \"lib/picks.* deleted; no picks refs\", \"just check passes\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-10"
+}
