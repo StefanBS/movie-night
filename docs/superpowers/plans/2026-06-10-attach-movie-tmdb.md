@@ -85,21 +85,23 @@ WHERE id = sqlc.arg(id);
 UPDATE picks
 SET movie_id = sqlc.arg(movie_id)
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
-RETURNING id, group_id, picker_id, is_credited, movie_id, scheduled_for, created_at;
+RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id;
 ```
+
+> **Column order matters:** list `movie_id` **last** (after `created_at`), matching the physical table order that `ALTER TABLE … ADD COLUMN` produces. sqlc only reuses the shared `db.Pick` struct when a RETURNING/SELECT list matches the physical column order exactly; any other order makes it mint a divergent `*Row` type that breaks the `nightStore` interface. This applies here and to the five night queries below.
 
 - [ ] **Step 3: Add `movie_id` to the five night queries**
 
-In `backend/internal/db/query/nights.sql`, add `movie_id` to each SELECT/RETURNING column list so the rows keep matching the full `picks` table (otherwise sqlc mints a divergent row type instead of `db.Pick`). The lists appear in `CreateNight`, `GetNight`, `GetCurrentNight`, `GetOpenNight`, `SetNightPicker`. Each currently ends `…, is_credited, scheduled_for, created_at`; change every one to `…, is_credited, movie_id, scheduled_for, created_at`. For example `GetNight` becomes:
+In `backend/internal/db/query/nights.sql`, append `movie_id` to each SELECT/RETURNING column list so the rows keep matching the full `picks` table in **physical column order** (otherwise sqlc mints a divergent row type instead of `db.Pick` — see the column-order note above). The lists appear in `CreateNight`, `GetNight`, `GetCurrentNight`, `GetOpenNight`, `SetNightPicker`. Each currently ends `…, is_credited, scheduled_for, created_at`; change every one to `…, is_credited, scheduled_for, created_at, movie_id`. For example `GetNight` becomes:
 
 ```sql
 -- name: GetNight :one
-SELECT id, group_id, picker_id, is_credited, movie_id, scheduled_for, created_at
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 FROM picks
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
 ```
 
-Apply the identical `, movie_id` insertion (before `scheduled_for`) to the `RETURNING`/`SELECT` lists of `CreateNight`, `GetCurrentNight`, `GetOpenNight`, and `SetNightPicker`.
+Apply the identical trailing `, movie_id` (after `created_at`) to the `RETURNING`/`SELECT` lists of `CreateNight`, `GetCurrentNight`, `GetOpenNight`, and `SetNightPicker`.
 
 - [ ] **Step 4: Regenerate sqlc and build**
 

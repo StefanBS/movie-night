@@ -80,17 +80,19 @@ WHERE id = sqlc.arg(id);
 UPDATE picks
 SET movie_id = sqlc.arg(movie_id)
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
-RETURNING id, group_id, picker_id, is_credited, movie_id, scheduled_for, created_at;
+RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id;
 ```
 
 `UpsertMovie` is idempotent cache-by-`tmdb_id`: re-attaching the same film refreshes its
 title/year and reuses the one `movies` row. `GetMovie` (by internal id) renders the DTO.
 
-**Touch the five existing night queries** (`nights.sql`): add `movie_id` to each
-SELECT/RETURNING column list (`CreateNight`, `GetNight`, `GetCurrentNight`, `GetOpenNight`,
-`SetNightPicker`). The list must keep matching the full `picks` table so sqlc continues to
-map these to `db.Pick` (now gaining `MovieID pgtype.UUID`) rather than minting a divergent
-row type that would ripple through `nights.go`. Then `just sqlc`.
+**Touch the five existing night queries** (`nights.sql`): append `movie_id` (as the **last**
+column, after `created_at`) to each SELECT/RETURNING column list (`CreateNight`, `GetNight`,
+`GetCurrentNight`, `GetOpenNight`, `SetNightPicker`). The list must match the full `picks`
+table in **physical column order** — sqlc only reuses `db.Pick` (now gaining
+`MovieID pgtype.UUID`) when the order matches; any other order mints a divergent row type
+that would ripple through `nights.go`. Since `ALTER TABLE … ADD COLUMN` appends `movie_id`
+physically last, it must be listed last. Then `just sqlc`.
 
 ## Backend — TMDB client (`tmdb.go`)
 
