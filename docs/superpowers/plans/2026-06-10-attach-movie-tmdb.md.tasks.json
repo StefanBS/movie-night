@@ -4,7 +4,7 @@
     {
       "id": 0,
       "subject": "Task 1: Schema + queries (movies, picks.movie_id, sqlc)",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** movies cache table + nullable picks.movie_id + UpsertMovie/GetMovie/SetNightMovie queries; thread movie_id through the 5 night queries; regen sqlc.\n\n**Files:** Create backend/migrations/0005_movies.sql, backend/internal/db/query/movies.sql; Modify backend/internal/db/query/nights.sql; Regenerate backend/internal/db/.\n\n```json:metadata\n{\"files\": [\"backend/migrations/0005_movies.sql\", \"backend/internal/db/query/movies.sql\", \"backend/internal/db/query/nights.sql\", \"backend/internal/db/\"], \"verifyCommand\": \"cd backend && just sqlc && just build && just test\", \"acceptanceCriteria\": [\"movies table with unique tmdb_id; nullable picks.movie_id FK ON DELETE RESTRICT\", \"sqlc generates db.Movie, Pick.MovieID, UpsertMovie/GetMovie/SetNightMovie\", \"five night queries return movie_id so they keep mapping to db.Pick\"]}\n```"
     },
     {
@@ -55,5 +55,5 @@
       "description": "**Goal:** ADR-0007 (proxy + server source-of-truth); schema.dbml picks.movie_id nullable; ADR index entry + Last updated.\n\n**Files:** Create docs/adr/0007-tmdb-proxy-source-of-truth.md; Modify docs/adr/README.md, docs/schema.dbml.\n\n```json:metadata\n{\"files\": [\"docs/adr/0007-tmdb-proxy-source-of-truth.md\", \"docs/adr/README.md\", \"docs/schema.dbml\"], \"verifyCommand\": \"\", \"acceptanceCriteria\": [\"ADR-0007 captures backend-proxy + attach re-fetch + movies cache keyed by tmdb_id\", \"schema.dbml picks.movie_id nullable with plan-first note\", \"ADR index lists ADR-0007 Accepted\"]}\n```"
     }
   ],
-  "lastUpdated": "2026-06-10T00:00:00Z"
+  "lastUpdated": "2026-06-10T15:00:00Z"
 }

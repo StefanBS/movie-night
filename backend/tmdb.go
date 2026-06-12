@@ -29,7 +29,7 @@ type movieResult struct {
 type tmdbClient struct {
 	baseURL string
 	token   string // v4 Read Access Token, sent as a Bearer header
-	http    *http.Client
+	client  *http.Client
 }
 
 // newTMDBClient builds a client for the real API, or returns nil when token is
@@ -41,7 +41,7 @@ func newTMDBClient(token string) *tmdbClient {
 	return &tmdbClient{
 		baseURL: "https://api.themoviedb.org/3",
 		token:   token,
-		http:    &http.Client{Timeout: 10 * time.Second},
+		client:  &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -58,7 +58,7 @@ func (c *tmdbClient) get(ctx context.Context, path string, q url.Values) (int, [
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
-	res, err := c.http.Do(req)
+	res, err := c.client.Do(req)
 	if err != nil {
 		return 0, nil, err
 	}
