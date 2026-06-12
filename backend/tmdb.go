@@ -1,0 +1,145 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"time"
+)
+
+// errMovieNotFound is returned by FetchMovie when TMDB has no movie with the
+// given id (an upstream 404), so the attach handler can map it to a 404.
+var errMovieNotFound = errors.New("tmdb: movie not found")
+
+// movieResult is the trimmed TMDB movie shape this app cares about: title + year.
+type movieResult struct {
+	TMDBID      int
+	Title       string
+	ReleaseYear *int
+}
+
+// tmdbClient calls the TMDB REST API. baseURL is injectable so tests point it at
+// a local httptest fake upstream (real HTTP, fake TMDB). A nil *tmdbClient means
+// TMDB is unconfigured; handlers check for it and return 503.
+type tmdbClient struct {
+	baseURL string
+	token   string // v4 Read Access Token, sent as a Bearer header
+	http    *http.Client
+}
+
+// newTMDBClient builds a client for the real API, or returns nil when token is
+// empty (TMDB disabled — search/attach then return 503).
+func newTMDBClient(token string) *tmdbClient {
+	if token == "" {
+		return nil
+	}
+	return &tmdbClient{
+		baseURL: "https://api.themoviedb.org/3",
+		token:   token,
+		http:    &http.Client{Timeout: 10 * time.Second},
+	}
+}
+
+// get issues an authenticated GET to path (+optional query) and returns the
+// status code and body (capped at 1 MiB).
+func (c *tmdbClient) get(ctx context.Context, path string, q url.Values) (int, []byte, error) {
+	u := c.baseURL + path
+	if len(q) > 0 {
+		u += "?" + q.Encode()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return 0, nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json")
+	res, err := c.http.Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer res.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	if err != nil {
+		return 0, nil, err
+	}
+	return res.StatusCode, body, nil
+}
+
+// SearchMovies returns TMDB search hits for a free-text query.
+func (c *tmdbClient) SearchMovies(ctx context.Context, query string) ([]movieResult, error) {
+	q := url.Values{}
+	q.Set("query", query)
+	q.Set("include_adult", "false")
+	code, body, err := c.get(ctx, "/search/movie", q)
+	if err != nil {
+		return nil, err
+	}
+	if code != http.StatusOK {
+		return nil, fmt.Errorf("tmdb search: status %d", code)
+	}
+	return parseTMDBSearch(body)
+}
+
+// FetchMovie returns one movie's canonical metadata, or errMovieNotFound on 404.
+func (c *tmdbClient) FetchMovie(ctx context.Context, tmdbID int) (movieResult, error) {
+	code, body, err := c.get(ctx, "/movie/"+strconv.Itoa(tmdbID), nil)
+	if err != nil {
+		return movieResult{}, err
+	}
+	if code == http.StatusNotFound {
+		return movieResult{}, errMovieNotFound
+	}
+	if code != http.StatusOK {
+		return movieResult{}, fmt.Errorf("tmdb movie: status %d", code)
+	}
+	return parseTMDBMovie(body)
+}
+
+// tmdbMovieJSON is the subset of a TMDB movie object we decode.
+type tmdbMovieJSON struct {
+	ID          int    `json:"id"`
+	Title       string `json:"title"`
+	ReleaseDate string `json:"release_date"`
+}
+
+// parseTMDBSearch decodes a /search/movie body into movieResults. Pure.
+func parseTMDBSearch(body []byte) ([]movieResult, error) {
+	var payload struct {
+		Results []tmdbMovieJSON `json:"results"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("decode tmdb search: %w", err)
+	}
+	out := make([]movieResult, 0, len(payload.Results))
+	for _, m := range payload.Results {
+		out = append(out, movieResult{TMDBID: m.ID, Title: m.Title, ReleaseYear: releaseYear(m.ReleaseDate)})
+	}
+	return out, nil
+}
+
+// parseTMDBMovie decodes a /movie/{id} body into one movieResult. Pure.
+func parseTMDBMovie(body []byte) (movieResult, error) {
+	var m tmdbMovieJSON
+	if err := json.Unmarshal(body, &m); err != nil {
+		return movieResult{}, fmt.Errorf("decode tmdb movie: %w", err)
+	}
+	return movieResult{TMDBID: m.ID, Title: m.Title, ReleaseYear: releaseYear(m.ReleaseDate)}, nil
+}
+
+// releaseYear extracts the leading year from a TMDB release_date ("YYYY-MM-DD").
+// Returns nil for a blank or malformed date. Pure.
+func releaseYear(s string) *int {
+	if len(s) < 4 {
+		return nil
+	}
+	y, err := strconv.Atoi(s[:4])
+	if err != nil {
+		return nil
+	}
+	return &y
+}
