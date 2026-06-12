@@ -44,16 +44,16 @@
     {
       "id": 6,
       "subject": "Task 7: Mobile night screen — Tonight's movie section",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [5],
       "description": "**Goal:** Search-and-attach UI block on night screen: search by title, tap result to attach, show Title (Year) with Change movie affordance; attaching takes the busy lock, searching runs while idle.\n\n**Files:** Modify mobile/app/night.tsx.\n\n```json:metadata\n{\"files\": [\"mobile/app/night.tsx\"], \"verifyCommand\": \"cd mobile && just typecheck && just lint\", \"acceptanceCriteria\": [\"no-movie night shows search box + results to attach\", \"attached movie shows Title (Year) (or title when year null) + Change movie reopening search\", \"attach takes busy lock + errors to banner; search runs while idle without the lock\"]}\n```"
     },
     {
       "id": 7,
       "subject": "Task 8: Docs — ADR-0007, schema.dbml, ADR index",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** ADR-0007 (proxy + server source-of-truth); schema.dbml picks.movie_id nullable; ADR index entry + Last updated.\n\n**Files:** Create docs/adr/0007-tmdb-proxy-source-of-truth.md; Modify docs/adr/README.md, docs/schema.dbml.\n\n```json:metadata\n{\"files\": [\"docs/adr/0007-tmdb-proxy-source-of-truth.md\", \"docs/adr/README.md\", \"docs/schema.dbml\"], \"verifyCommand\": \"\", \"acceptanceCriteria\": [\"ADR-0007 captures backend-proxy + attach re-fetch + movies cache keyed by tmdb_id\", \"schema.dbml picks.movie_id nullable with plan-first note\", \"ADR index lists ADR-0007 Accepted\"]}\n```"
     }
   ],
-  "lastUpdated": "2026-06-10T15:00:00Z"
+  "lastUpdated": "2026-06-12T22:35:00Z"
 }
