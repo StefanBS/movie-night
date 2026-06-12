@@ -558,13 +558,13 @@ func searchMoviesHandler(client *tmdbClient) http.HandlerFunc {
 		}
 		results, err := client.SearchMovies(r.Context(), q)
 		if err != nil {
-			log.Printf("tmdb search %q: %v", q, err)
+			log.Printf("tmdb search %q: %v", q, err) //#nosec G706 -- q is a user query string logged with %q, not used as a format string
 			writeJSONError(w, http.StatusBadGateway, "movie search failed")
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(toMovieResults(results)); err != nil {
-			log.Printf("encode movie results: %v", err)
+			log.Printf("encode movie results: %v", err) //#nosec G706 -- only an error value, no user input
 		}
 	}
 }
@@ -601,7 +601,7 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 				writeJSONError(w, http.StatusNotFound, "no such movie")
 				return
 			}
-			log.Printf("tmdb fetch movie %d: %v", req.TMDBID, err)
+			log.Printf("tmdb fetch movie %d: %v", req.TMDBID, err) //#nosec G706 -- req.TMDBID is an int
 			writeJSONError(w, http.StatusBadGateway, "movie lookup failed")
 			return
 		}

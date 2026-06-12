@@ -10,14 +10,14 @@
     {
       "id": 1,
       "subject": "Task 2: TMDB client + pure parse helpers",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [0],
       "description": "**Goal:** tmdbClient (injectable baseURL, Bearer auth, timeout) with SearchMovies/FetchMovie over pure helpers (parseTMDBSearch, parseTMDBMovie, releaseYear); FetchMovie maps upstream 404 to errMovieNotFound; newTMDBClient(\"\") returns nil.\n\n**Files:** Create backend/tmdb.go, backend/tmdb_test.go.\n\n```json:metadata\n{\"files\": [\"backend/tmdb.go\", \"backend/tmdb_test.go\"], \"verifyCommand\": \"cd backend && go test -run 'TestReleaseYear|TestParseTMDB' ./...\", \"acceptanceCriteria\": [\"parseTMDBSearch/parseTMDBMovie/releaseYear pure + unit-tested incl blank/malformed dates\", \"FetchMovie maps upstream 404 to errMovieNotFound\", \"newTMDBClient(empty) returns nil\"]}\n```"
     },
     {
       "id": 2,
       "subject": "Task 3: Night DTO carries the attached movie",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [0],
       "description": "**Goal:** nightResponse gains Movie *movieDTO (null when unset); writeNightDTO loads it via one GetMovie when Pick.MovieID valid; toNightResponse gains a *db.Movie param; nightStore gains GetMovie.\n\n**Files:** Modify backend/nights.go, backend/nights_test.go.\n\n```json:metadata\n{\"files\": [\"backend/nights.go\", \"backend/nights_test.go\"], \"verifyCommand\": \"cd backend && go test -run 'TestToNightResponse' ./... && just build\", \"acceptanceCriteria\": [\"nightResponse.Movie renders null when unset\", \"writeNightDTO GetMovie lookup only when Pick.MovieID valid\", \"toNightResponse maps *db.Movie incl null release_year; existing tests pass\"]}\n```"
     },
