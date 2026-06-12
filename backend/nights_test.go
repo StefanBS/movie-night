@@ -152,3 +152,14 @@ func TestCreditedForRole(t *testing.T) {
 		t.Error("guest picker must not be credited")
 	}
 }
+
+func TestValidateMovieRequest(t *testing.T) {
+	if err := validateMovieRequest(movieRequest{TMDBID: 438631}); err != nil {
+		t.Errorf("valid tmdbId rejected: %v", err)
+	}
+	for _, bad := range []int{0, -1} {
+		if err := validateMovieRequest(movieRequest{TMDBID: bad}); err == nil {
+			t.Errorf("tmdbId %d accepted, want error", bad)
+		}
+	}
+}
