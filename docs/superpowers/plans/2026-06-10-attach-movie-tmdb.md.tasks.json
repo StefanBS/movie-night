@@ -1,0 +1,59 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-10-attach-movie-tmdb.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 1: Schema + queries (movies, picks.movie_id, sqlc)",
+      "status": "pending",
+      "description": "**Goal:** movies cache table + nullable picks.movie_id + UpsertMovie/GetMovie/SetNightMovie queries; thread movie_id through the 5 night queries; regen sqlc.\n\n**Files:** Create backend/migrations/0005_movies.sql, backend/internal/db/query/movies.sql; Modify backend/internal/db/query/nights.sql; Regenerate backend/internal/db/.\n\n```json:metadata\n{\"files\": [\"backend/migrations/0005_movies.sql\", \"backend/internal/db/query/movies.sql\", \"backend/internal/db/query/nights.sql\", \"backend/internal/db/\"], \"verifyCommand\": \"cd backend && just sqlc && just build && just test\", \"acceptanceCriteria\": [\"movies table with unique tmdb_id; nullable picks.movie_id FK ON DELETE RESTRICT\", \"sqlc generates db.Movie, Pick.MovieID, UpsertMovie/GetMovie/SetNightMovie\", \"five night queries return movie_id so they keep mapping to db.Pick\"]}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Task 2: TMDB client + pure parse helpers",
+      "status": "pending",
+      "blockedBy": [0],
+      "description": "**Goal:** tmdbClient (injectable baseURL, Bearer auth, timeout) with SearchMovies/FetchMovie over pure helpers (parseTMDBSearch, parseTMDBMovie, releaseYear); FetchMovie maps upstream 404 to errMovieNotFound; newTMDBClient(\"\") returns nil.\n\n**Files:** Create backend/tmdb.go, backend/tmdb_test.go.\n\n```json:metadata\n{\"files\": [\"backend/tmdb.go\", \"backend/tmdb_test.go\"], \"verifyCommand\": \"cd backend && go test -run 'TestReleaseYear|TestParseTMDB' ./...\", \"acceptanceCriteria\": [\"parseTMDBSearch/parseTMDBMovie/releaseYear pure + unit-tested incl blank/malformed dates\", \"FetchMovie maps upstream 404 to errMovieNotFound\", \"newTMDBClient(empty) returns nil\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 3: Night DTO carries the attached movie",
+      "status": "pending",
+      "blockedBy": [0],
+      "description": "**Goal:** nightResponse gains Movie *movieDTO (null when unset); writeNightDTO loads it via one GetMovie when Pick.MovieID valid; toNightResponse gains a *db.Movie param; nightStore gains GetMovie.\n\n**Files:** Modify backend/nights.go, backend/nights_test.go.\n\n```json:metadata\n{\"files\": [\"backend/nights.go\", \"backend/nights_test.go\"], \"verifyCommand\": \"cd backend && go test -run 'TestToNightResponse' ./... && just build\", \"acceptanceCriteria\": [\"nightResponse.Movie renders null when unset\", \"writeNightDTO GetMovie lookup only when Pick.MovieID valid\", \"toNightResponse maps *db.Movie incl null release_year; existing tests pass\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 4: Search + attach handlers and wiring",
+      "status": "pending",
+      "blockedBy": [1, 2],
+      "description": "**Goal:** GET /movies/search (proxy) + POST /groups/{gid}/nights/{nightId}/movie (FetchMovie->UpsertMovie->SetNightMovie); validateMovieRequest; main.go reads TMDB_READ_TOKEN + registers routes; .env.example; nightStore gains UpsertMovie+SetNightMovie.\n\n**Files:** Modify backend/nights.go, backend/main.go, backend/.env.example, backend/nights_test.go.\n\n```json:metadata\n{\"files\": [\"backend/nights.go\", \"backend/main.go\", \"backend/.env.example\", \"backend/nights_test.go\"], \"verifyCommand\": \"cd backend && go test -run 'TestValidateMovieRequest' ./... && just check\", \"acceptanceCriteria\": [\"search: 400 empty q, 503 unconfigured, 502 upstream, else mapped array\", \"attach: 400 bad tmdbId, 404 unknown night, 503 unconfigured, 404 unknown movie, 502 upstream, else 200 night DTO\", \"validateMovieRequest unit-tested\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 5: Backend integration tests (fake TMDB)",
+      "status": "pending",
+      "blockedBy": [3],
+      "description": "**Goal:** testcontainers + local httptest fake TMDB upstream; cover search, attach, re-attach, upsert idempotency, unknown tmdbId 404, unconfigured 503, malformed 400, unknown night 404.\n\n**Files:** Create backend/movies_integration_test.go.\n\n```json:metadata\n{\"files\": [\"backend/movies_integration_test.go\"], \"verifyCommand\": \"cd backend && go test -tags=integration -run 'TestMovieAttachIntegration' ./...\", \"acceptanceCriteria\": [\"search returns mapped results; attach populates DTO movie + creates movies row\", \"re-attach updates DTO; same tmdbId across two nights = one movies row\", \"unknown tmdbId 404; unconfigured 503; malformed 400; unknown night 404\"]}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 6: Mobile movie client + night.movie field",
+      "status": "pending",
+      "description": "**Goal:** lib/movies.ts (Movie, parseMovie, searchMovies); lib/nights.ts Night.movie + parseNight validation + attachMovie (kept in nights.ts to avoid import cycle); unit + integration tests; update existing night fixtures with movie:null.\n\n**Files:** Create mobile/lib/movies.ts, movies.test.ts, movies.integration.test.ts; Modify mobile/lib/nights.ts, nights.test.ts, nights.integration.test.ts.\n\n```json:metadata\n{\"files\": [\"mobile/lib/movies.ts\", \"mobile/lib/movies.test.ts\", \"mobile/lib/movies.integration.test.ts\", \"mobile/lib/nights.ts\", \"mobile/lib/nights.test.ts\", \"mobile/lib/nights.integration.test.ts\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"parseMovie accepts valid (incl null/missing releaseYear), rejects bad shapes\", \"searchMovies hits /movies/search?q=, parses array, throws non-2xx\", \"attachMovie POSTs {tmdbId} to .../movie, parses Night\", \"parseNight reads movie object/null/absent, rejects bad shape\"]}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 7: Mobile night screen — Tonight's movie section",
+      "status": "pending",
+      "blockedBy": [5],
+      "description": "**Goal:** Search-and-attach UI block on night screen: search by title, tap result to attach, show Title (Year) with Change movie affordance; attaching takes the busy lock, searching runs while idle.\n\n**Files:** Modify mobile/app/night.tsx.\n\n```json:metadata\n{\"files\": [\"mobile/app/night.tsx\"], \"verifyCommand\": \"cd mobile && just typecheck && just lint\", \"acceptanceCriteria\": [\"no-movie night shows search box + results to attach\", \"attached movie shows Title (Year) (or title when year null) + Change movie reopening search\", \"attach takes busy lock + errors to banner; search runs while idle without the lock\"]}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 8: Docs — ADR-0007, schema.dbml, ADR index",
+      "status": "pending",
+      "description": "**Goal:** ADR-0007 (proxy + server source-of-truth); schema.dbml picks.movie_id nullable; ADR index entry + Last updated.\n\n**Files:** Create docs/adr/0007-tmdb-proxy-source-of-truth.md; Modify docs/adr/README.md, docs/schema.dbml.\n\n```json:metadata\n{\"files\": [\"docs/adr/0007-tmdb-proxy-source-of-truth.md\", \"docs/adr/README.md\", \"docs/schema.dbml\"], \"verifyCommand\": \"\", \"acceptanceCriteria\": [\"ADR-0007 captures backend-proxy + attach re-fetch + movies cache keyed by tmdb_id\", \"schema.dbml picks.movie_id nullable with plan-first note\", \"ADR index lists ADR-0007 Accepted\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-10T00:00:00Z"
+}
