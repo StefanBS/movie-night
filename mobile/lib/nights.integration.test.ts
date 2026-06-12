@@ -10,6 +10,7 @@ import {
   getNight,
   getCurrentNight,
   recordNightPick,
+  attachMovie,
   type Night,
 } from "./nights";
 
@@ -39,6 +40,7 @@ const night: Night = {
   id: NIGHT,
   scheduledFor: "2026-06-12",
   pickerId: null,
+  movie: null,
   attendees: [{ id: ADA, name: "Ada", role: "core" }],
 };
 
@@ -266,6 +268,30 @@ test("recordNightPick posts the pickerId and parses the night", async () => {
     assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/pick`);
     assert.deepEqual(JSON.parse(body), { pickerId: ADA });
     assert.deepEqual(got, nightWithPicker);
+  } finally {
+    await server.close();
+  }
+});
+
+test("attachMovie posts the tmdbId and parses the night with its movie", async () => {
+  const withMovie: Night = { ...night, movie: { tmdbId: 438631, title: "Dune", releaseYear: 2021 } };
+  let path = "";
+  let method = "";
+  let body = "";
+  const server = await startServer(async (req, res) => {
+    path = req.url ?? "";
+    method = req.method ?? "";
+    body = await collect(req);
+    res.statusCode = 200;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify(withMovie));
+  });
+  try {
+    const got = await attachMovie(server.url, GROUP, NIGHT, 438631);
+    assert.equal(method, "POST");
+    assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/movie`);
+    assert.deepEqual(JSON.parse(body), { tmdbId: 438631 });
+    assert.deepEqual(got.movie, { tmdbId: 438631, title: "Dune", releaseYear: 2021 });
   } finally {
     await server.close();
   }
