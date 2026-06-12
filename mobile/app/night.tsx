@@ -217,6 +217,7 @@ export default function NightScreen() {
         const updated = await attachMovie(API_URL, GROUP_ID, night.id, tmdbId);
         setNight(updated);
         setResults([]);
+        setSearchError(null);
         setMovieQuery("");
         setChangingMovie(false);
       } catch (e) {

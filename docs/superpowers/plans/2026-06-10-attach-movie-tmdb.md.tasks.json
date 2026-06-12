@@ -24,21 +24,21 @@
     {
       "id": 3,
       "subject": "Task 4: Search + attach handlers and wiring",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [1, 2],
       "description": "**Goal:** GET /movies/search (proxy) + POST /groups/{gid}/nights/{nightId}/movie (FetchMovie->UpsertMovie->SetNightMovie); validateMovieRequest; main.go reads TMDB_READ_TOKEN + registers routes; .env.example; nightStore gains UpsertMovie+SetNightMovie.\n\n**Files:** Modify backend/nights.go, backend/main.go, backend/.env.example, backend/nights_test.go.\n\n```json:metadata\n{\"files\": [\"backend/nights.go\", \"backend/main.go\", \"backend/.env.example\", \"backend/nights_test.go\"], \"verifyCommand\": \"cd backend && go test -run 'TestValidateMovieRequest' ./... && just check\", \"acceptanceCriteria\": [\"search: 400 empty q, 503 unconfigured, 502 upstream, else mapped array\", \"attach: 400 bad tmdbId, 404 unknown night, 503 unconfigured, 404 unknown movie, 502 upstream, else 200 night DTO\", \"validateMovieRequest unit-tested\"]}\n```"
     },
     {
       "id": 4,
       "subject": "Task 5: Backend integration tests (fake TMDB)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [3],
       "description": "**Goal:** testcontainers + local httptest fake TMDB upstream; cover search, attach, re-attach, upsert idempotency, unknown tmdbId 404, unconfigured 503, malformed 400, unknown night 404.\n\n**Files:** Create backend/movies_integration_test.go.\n\n```json:metadata\n{\"files\": [\"backend/movies_integration_test.go\"], \"verifyCommand\": \"cd backend && go test -tags=integration -run 'TestMovieAttachIntegration' ./...\", \"acceptanceCriteria\": [\"search returns mapped results; attach populates DTO movie + creates movies row\", \"re-attach updates DTO; same tmdbId across two nights = one movies row\", \"unknown tmdbId 404; unconfigured 503; malformed 400; unknown night 404\"]}\n```"
     },
     {
       "id": 5,
       "subject": "Task 6: Mobile movie client + night.movie field",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** lib/movies.ts (Movie, parseMovie, searchMovies); lib/nights.ts Night.movie + parseNight validation + attachMovie (kept in nights.ts to avoid import cycle); unit + integration tests; update existing night fixtures with movie:null.\n\n**Files:** Create mobile/lib/movies.ts, movies.test.ts, movies.integration.test.ts; Modify mobile/lib/nights.ts, nights.test.ts, nights.integration.test.ts.\n\n```json:metadata\n{\"files\": [\"mobile/lib/movies.ts\", \"mobile/lib/movies.test.ts\", \"mobile/lib/movies.integration.test.ts\", \"mobile/lib/nights.ts\", \"mobile/lib/nights.test.ts\", \"mobile/lib/nights.integration.test.ts\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"parseMovie accepts valid (incl null/missing releaseYear), rejects bad shapes\", \"searchMovies hits /movies/search?q=, parses array, throws non-2xx\", \"attachMovie POSTs {tmdbId} to .../movie, parses Night\", \"parseNight reads movie object/null/absent, rejects bad shape\"]}\n```"
     },
     {
