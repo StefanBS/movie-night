@@ -120,6 +120,14 @@ type Membership struct {
 	LeftAt           pgtype.Timestamptz `json:"left_at"`
 }
 
+type Movie struct {
+	ID          uuid.UUID          `json:"id"`
+	TmdbID      int32              `json:"tmdb_id"`
+	Title       string             `json:"title"`
+	ReleaseYear pgtype.Int4        `json:"release_year"`
+	CachedAt    pgtype.Timestamptz `json:"cached_at"`
+}
+
 type Pick struct {
 	ID           uuid.UUID          `json:"id"`
 	GroupID      uuid.UUID          `json:"group_id"`
@@ -127,6 +135,7 @@ type Pick struct {
 	IsCredited   bool               `json:"is_credited"`
 	ScheduledFor pgtype.Date        `json:"scheduled_for"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	MovieID      pgtype.UUID        `json:"movie_id"`
 }
 
 type User struct {

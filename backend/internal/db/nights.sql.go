@@ -31,7 +31,7 @@ func (q *Queries) AddAttendee(ctx context.Context, arg AddAttendeeParams) error 
 const createNight = `-- name: CreateNight :one
 INSERT INTO picks (group_id, scheduled_for)
 VALUES ($1, $2)
-RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at
+RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 `
 
 type CreateNightParams struct {
@@ -49,12 +49,13 @@ func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (Pick,
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
+		&i.MovieID,
 	)
 	return i, err
 }
 
 const getCurrentNight = `-- name: GetCurrentNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 FROM picks
 WHERE group_id = $1
 ORDER BY scheduled_for DESC, created_at DESC
@@ -71,12 +72,13 @@ func (q *Queries) GetCurrentNight(ctx context.Context, groupID uuid.UUID) (Pick,
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
+		&i.MovieID,
 	)
 	return i, err
 }
 
 const getNight = `-- name: GetNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 FROM picks
 WHERE id = $1 AND group_id = $2
 `
@@ -96,12 +98,13 @@ func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (Pick, error
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
+		&i.MovieID,
 	)
 	return i, err
 }
 
 const getOpenNight = `-- name: GetOpenNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 FROM picks
 WHERE group_id = $1 AND picker_id IS NULL
 ORDER BY scheduled_for DESC, created_at DESC
@@ -118,6 +121,7 @@ func (q *Queries) GetOpenNight(ctx context.Context, groupID uuid.UUID) (Pick, er
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
+		&i.MovieID,
 	)
 	return i, err
 }
@@ -183,7 +187,7 @@ const setNightPicker = `-- name: SetNightPicker :one
 UPDATE picks
 SET picker_id = $1, is_credited = $2
 WHERE id = $3 AND group_id = $4
-RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at
+RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 `
 
 type SetNightPickerParams struct {
@@ -208,6 +212,7 @@ func (q *Queries) SetNightPicker(ctx context.Context, arg SetNightPickerParams) 
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
+		&i.MovieID,
 	)
 	return i, err
 }
