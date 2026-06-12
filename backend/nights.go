@@ -73,12 +73,21 @@ type attendee struct {
 	Role string `json:"role"`
 }
 
+// movieDTO is the JSON shape for an attached movie (and a search result).
+// ReleaseYear is null when TMDB has no release date.
+type movieDTO struct {
+	TMDBID      int    `json:"tmdbId"`
+	Title       string `json:"title"`
+	ReleaseYear *int   `json:"releaseYear"`
+}
+
 // nightResponse is the JSON shape for a night and its current attendees.
 // PickerID is nil (renders as null) until a pick is recorded.
 type nightResponse struct {
 	ID           string     `json:"id"`
 	ScheduledFor string     `json:"scheduledFor"`
 	PickerID     *string    `json:"pickerId"`
+	Movie        *movieDTO  `json:"movie"`
 	Attendees    []attendee `json:"attendees"`
 }
 
@@ -92,9 +101,26 @@ func pickerIDPtr(u pgtype.UUID) *string {
 	return &s
 }
 
+// releaseYearPtr renders a nullable release year as *int (nil → JSON null).
+func releaseYearPtr(v pgtype.Int4) *int {
+	if !v.Valid {
+		return nil
+	}
+	y := int(v.Int32)
+	return &y
+}
+
+// movieDTOPtr maps a cached movie row to the DTO; nil renders "movie" as null.
+func movieDTOPtr(m *db.Movie) *movieDTO {
+	if m == nil {
+		return nil
+	}
+	return &movieDTO{TMDBID: int(m.TmdbID), Title: m.Title, ReleaseYear: releaseYearPtr(m.ReleaseYear)}
+}
+
 // toNightResponse maps a night row + attendee rows to the night DTO. Attendees
 // is always non-nil so an empty list encodes as [] rather than null.
-func toNightResponse(p db.Pick, rows []db.ListNightAttendeesRow) nightResponse {
+func toNightResponse(p db.Pick, rows []db.ListNightAttendeesRow, movie *db.Movie) nightResponse {
 	attendees := make([]attendee, 0, len(rows))
 	for _, r := range rows {
 		attendees = append(attendees, attendee{
@@ -107,6 +133,7 @@ func toNightResponse(p db.Pick, rows []db.ListNightAttendeesRow) nightResponse {
 		ID:           p.ID.String(),
 		ScheduledFor: p.ScheduledFor.Time.Format("2006-01-02"),
 		PickerID:     pickerIDPtr(p.PickerID),
+		Movie:        movieDTOPtr(movie),
 		Attendees:    attendees,
 	}
 }
@@ -136,6 +163,7 @@ type nightStore interface {
 	GetGroupMember(ctx context.Context, arg db.GetGroupMemberParams) (db.GetGroupMemberRow, error)
 	RankGroupTurn(ctx context.Context, arg db.RankGroupTurnParams) ([]db.RankGroupTurnRow, error)
 	SetNightPicker(ctx context.Context, arg db.SetNightPickerParams) (db.Pick, error)
+	GetMovie(ctx context.Context, id uuid.UUID) (db.Movie, error)
 }
 
 // attendeeRequest is the JSON body of POST .../nights/{nightId}/attendees.
@@ -197,6 +225,15 @@ func writeNightDTO(w http.ResponseWriter, r *http.Request, store nightStore, gid
 		internalError(w, gid, "get night", err)
 		return
 	}
+	var movie *db.Movie
+	if night.MovieID.Valid {
+		m, err := store.GetMovie(r.Context(), uuid.UUID(night.MovieID.Bytes))
+		if err != nil {
+			internalError(w, gid, "get movie", err)
+			return
+		}
+		movie = &m
+	}
 	rows, err := store.ListNightAttendees(r.Context(), db.ListNightAttendeesParams{GroupID: gid, NightID: nightID})
 	if err != nil {
 		internalError(w, gid, "list night attendees", err)
@@ -204,7 +241,7 @@ func writeNightDTO(w http.ResponseWriter, r *http.Request, store nightStore, gid
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(toNightResponse(night, rows)); err != nil {
+	if err := json.NewEncoder(w).Encode(toNightResponse(night, rows, movie)); err != nil {
 		log.Printf("encode night response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
 	}
 }
