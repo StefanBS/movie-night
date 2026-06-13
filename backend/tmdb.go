@@ -17,10 +17,13 @@ import (
 var errMovieNotFound = errors.New("tmdb: movie not found")
 
 // movieResult is the trimmed TMDB movie shape this app cares about: title + year.
+// TMDBID/ReleaseYear are int32 to match the movies table columns (Postgres
+// integer), so they cross the DB boundary without a narrowing conversion; an
+// out-of-range value from TMDB is rejected at decode/parse time instead.
 type movieResult struct {
-	TMDBID      int
+	TMDBID      int32
 	Title       string
-	ReleaseYear *int
+	ReleaseYear *int32
 }
 
 // tmdbClient calls the TMDB REST API. baseURL is injectable so tests point it at
@@ -52,7 +55,7 @@ func (c *tmdbClient) get(ctx context.Context, path string, q url.Values) (int, [
 	if len(q) > 0 {
 		u += "?" + q.Encode()
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil) //#nosec G107 -- host is the constant baseURL; user input only enters via url.Values-encoded query params, never the scheme/host/path
 	if err != nil {
 		return 0, nil, err
 	}
@@ -100,9 +103,10 @@ func (c *tmdbClient) FetchMovie(ctx context.Context, tmdbID int) (movieResult, e
 	return parseTMDBMovie(body)
 }
 
-// tmdbMovieJSON is the subset of a TMDB movie object we decode.
+// tmdbMovieJSON is the subset of a TMDB movie object we decode. ID is int32 so
+// encoding/json rejects an out-of-range id at decode time (matching the DB type).
 type tmdbMovieJSON struct {
-	ID          int    `json:"id"`
+	ID          int32  `json:"id"`
 	Title       string `json:"title"`
 	ReleaseDate string `json:"release_date"`
 }
@@ -132,14 +136,16 @@ func parseTMDBMovie(body []byte) (movieResult, error) {
 }
 
 // releaseYear extracts the leading year from a TMDB release_date ("YYYY-MM-DD").
-// Returns nil for a blank or malformed date. Pure.
-func releaseYear(s string) *int {
+// Returns nil for a blank or malformed date. ParseInt with bitSize 32 bounds the
+// result to int32, so the conversion is safe by construction. Pure.
+func releaseYear(s string) *int32 {
 	if len(s) < 4 {
 		return nil
 	}
-	y, err := strconv.Atoi(s[:4])
+	y, err := strconv.ParseInt(s[:4], 10, 32)
 	if err != nil {
 		return nil
 	}
-	return &y
+	y32 := int32(y)
+	return &y32
 }

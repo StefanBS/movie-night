@@ -2,13 +2,13 @@ package main
 
 import "testing"
 
-func intp(n int) *int { return &n }
+func intp(n int32) *int32 { return &n }
 
 func TestReleaseYear(t *testing.T) {
 	tests := []struct {
 		name string
 		in   string
-		want *int
+		want *int32
 	}{
 		{name: "valid date returns 2021", in: "2021-10-22", want: intp(2021)},
 		{name: "valid date returns 1984", in: "1984-12-14", want: intp(1984)},

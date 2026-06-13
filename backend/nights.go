@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -76,11 +75,12 @@ type attendee struct {
 }
 
 // movieDTO is the JSON shape for an attached movie (and a search result).
-// ReleaseYear is null when TMDB has no release date.
+// ReleaseYear is null when TMDB has no release date. int32 matches the movies
+// table and TMDB's domain (ids/years fit in 32 bits); JSON renders it as a number.
 type movieDTO struct {
-	TMDBID      int    `json:"tmdbId"`
+	TMDBID      int32  `json:"tmdbId"`
 	Title       string `json:"title"`
-	ReleaseYear *int   `json:"releaseYear"`
+	ReleaseYear *int32 `json:"releaseYear"`
 }
 
 // nightResponse is the JSON shape for a night and its current attendees.
@@ -103,12 +103,12 @@ func pickerIDPtr(u pgtype.UUID) *string {
 	return &s
 }
 
-// releaseYearPtr renders a nullable release year as *int (nil → JSON null).
-func releaseYearPtr(v pgtype.Int4) *int {
+// releaseYearPtr renders a nullable release year as *int32 (nil → JSON null).
+func releaseYearPtr(v pgtype.Int4) *int32 {
 	if !v.Valid {
 		return nil
 	}
-	y := int(v.Int32)
+	y := v.Int32
 	return &y
 }
 
@@ -117,7 +117,7 @@ func movieDTOPtr(m *db.Movie) *movieDTO {
 	if m == nil {
 		return nil
 	}
-	return &movieDTO{TMDBID: int(m.TmdbID), Title: m.Title, ReleaseYear: releaseYearPtr(m.ReleaseYear)}
+	return &movieDTO{TMDBID: m.TmdbID, Title: m.Title, ReleaseYear: releaseYearPtr(m.ReleaseYear)}
 }
 
 // toNightResponse maps a night row + attendee rows to the night DTO. Attendees
@@ -194,27 +194,12 @@ func validateMovieRequest(req movieRequest) error {
 	return nil
 }
 
-// safeInt32 narrows an int to int32, reporting ok=false when the value would
-// overflow. The bounds check makes the conversion safe (and is what satisfies the
-// integer-overflow checks in gosec/CodeQL). Pure.
-func safeInt32(v int) (int32, bool) {
-	if v < math.MinInt32 || v > math.MaxInt32 {
-		return 0, false
-	}
-	return int32(v), true
-}
-
-// int4Ptr maps an optional release year to pgtype.Int4 for UpsertMovie. An
-// out-of-range year is treated as "no year" (null), same as nil.
-func int4Ptr(v *int) pgtype.Int4 {
+// int4Ptr maps an optional release year to pgtype.Int4 for UpsertMovie.
+func int4Ptr(v *int32) pgtype.Int4 {
 	if v == nil {
 		return pgtype.Int4{}
 	}
-	n, ok := safeInt32(*v)
-	if !ok {
-		return pgtype.Int4{}
-	}
-	return pgtype.Int4{Int32: n, Valid: true}
+	return pgtype.Int4{Int32: *v, Valid: true}
 }
 
 // toMovieResults maps TMDB search hits to the JSON DTO (always non-nil → []).
@@ -621,13 +606,8 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			writeJSONError(w, http.StatusBadGateway, "movie lookup failed")
 			return
 		}
-		tmdbID, ok := safeInt32(movie.TMDBID)
-		if !ok {
-			internalError(w, gid, "tmdb id out of range", fmt.Errorf("tmdb id %d exceeds int32", movie.TMDBID))
-			return
-		}
 		cached, err := store.UpsertMovie(r.Context(), db.UpsertMovieParams{
-			TmdbID:      tmdbID,
+			TmdbID:      movie.TMDBID,
 			Title:       movie.Title,
 			ReleaseYear: int4Ptr(movie.ReleaseYear),
 		})

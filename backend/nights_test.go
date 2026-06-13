@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math"
 	"testing"
 	"time"
 
@@ -151,33 +150,6 @@ func TestCreditedForRole(t *testing.T) {
 	}
 	if creditedForRole(db.MembershipRoleGuest) {
 		t.Error("guest picker must not be credited")
-	}
-}
-
-func TestSafeInt32(t *testing.T) {
-	tests := []struct {
-		name string
-		in   int
-		want int32
-		ok   bool
-	}{
-		{name: "zero", in: 0, want: 0, ok: true},
-		{name: "typical tmdb id", in: 438631, want: 438631, ok: true},
-		{name: "max int32", in: math.MaxInt32, want: math.MaxInt32, ok: true},
-		{name: "min int32", in: math.MinInt32, want: math.MinInt32, ok: true},
-		{name: "overflow above", in: math.MaxInt32 + 1, ok: false},
-		{name: "overflow below", in: math.MinInt32 - 1, ok: false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, ok := safeInt32(tt.in)
-			if ok != tt.ok {
-				t.Fatalf("ok = %v, want %v", ok, tt.ok)
-			}
-			if ok && got != tt.want {
-				t.Errorf("got %d, want %d", got, tt.want)
-			}
-		})
 	}
 }
 
