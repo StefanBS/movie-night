@@ -16,10 +16,10 @@
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
-    "@types/node": "^25",
+    "@types/node": "^22",
     "@types/react": "~19.2.14",
     "babel-preset-expo": "~56.0.0",
-    "eslint": "^10.5.0",
+    "eslint": "^9.39.4",
     "eslint-config-expo": "~56.0.4",
     "tsx": "^4.22.4",
     "typescript": "~6.0.3"
