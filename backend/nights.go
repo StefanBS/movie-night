@@ -118,6 +118,7 @@ func movieDTOPtr(m *db.Movie) *movieDTO {
 	if m == nil {
 		return nil
 	}
+	// PosterPath is pgtype.Text; an invalid/NULL column has .String == "" → posterURL yields nil.
 	return &movieDTO{TMDBID: m.TmdbID, Title: m.Title, ReleaseYear: releaseYearPtr(m.ReleaseYear), PosterURL: posterURL(m.PosterPath.String)}
 }
 

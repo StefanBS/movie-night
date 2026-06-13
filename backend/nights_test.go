@@ -160,6 +160,9 @@ func TestToMovieResults(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("len = %d, want 2", len(got))
 	}
+	if got[0].TMDBID != 438631 || got[0].Title != "Dune" || got[0].ReleaseYear == nil || *got[0].ReleaseYear != 2021 {
+		t.Errorf("[0] = %+v, want fields preserved", got[0])
+	}
 	if got[0].PosterURL == nil || *got[0].PosterURL != "https://image.tmdb.org/t/p/w342/dune.jpg" {
 		t.Errorf("[0] poster = %v, want built url", got[0].PosterURL)
 	}
