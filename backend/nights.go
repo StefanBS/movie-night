@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -193,12 +194,27 @@ func validateMovieRequest(req movieRequest) error {
 	return nil
 }
 
-// int4Ptr maps an optional release year to pgtype.Int4 for UpsertMovie.
+// safeInt32 narrows an int to int32, reporting ok=false when the value would
+// overflow. The bounds check makes the conversion safe (and is what satisfies the
+// integer-overflow checks in gosec/CodeQL). Pure.
+func safeInt32(v int) (int32, bool) {
+	if v < math.MinInt32 || v > math.MaxInt32 {
+		return 0, false
+	}
+	return int32(v), true
+}
+
+// int4Ptr maps an optional release year to pgtype.Int4 for UpsertMovie. An
+// out-of-range year is treated as "no year" (null), same as nil.
 func int4Ptr(v *int) pgtype.Int4 {
 	if v == nil {
 		return pgtype.Int4{}
 	}
-	return pgtype.Int4{Int32: int32(*v), Valid: true}
+	n, ok := safeInt32(*v)
+	if !ok {
+		return pgtype.Int4{}
+	}
+	return pgtype.Int4{Int32: n, Valid: true}
 }
 
 // toMovieResults maps TMDB search hits to the JSON DTO (always non-nil → []).
@@ -605,8 +621,13 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			writeJSONError(w, http.StatusBadGateway, "movie lookup failed")
 			return
 		}
+		tmdbID, ok := safeInt32(movie.TMDBID)
+		if !ok {
+			internalError(w, gid, "tmdb id out of range", fmt.Errorf("tmdb id %d exceeds int32", movie.TMDBID))
+			return
+		}
 		cached, err := store.UpsertMovie(r.Context(), db.UpsertMovieParams{
-			TmdbID:      int32(movie.TMDBID),
+			TmdbID:      tmdbID,
 			Title:       movie.Title,
 			ReleaseYear: int4Ptr(movie.ReleaseYear),
 		})
