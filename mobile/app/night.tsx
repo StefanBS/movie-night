@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Button,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -32,6 +33,15 @@ const API_URL = resolveApiBaseUrl({
   hostUri: Constants.expoConfig?.hostUri,
 });
 const GROUP_ID = "11111111-1111-1111-1111-111111111111";
+
+// Poster renders a fixed-size TMDB thumbnail, or a plain neutral box when the
+// movie has no poster (posterUrl null) — never a broken-image icon.
+function Poster({ uri }: { uri: string | null }) {
+  if (uri === null) {
+    return <View style={[styles.poster, styles.posterPlaceholder]} />;
+  }
+  return <Image source={{ uri }} style={styles.poster} resizeMode="cover" />;
+}
 
 export default function NightScreen() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -256,7 +266,10 @@ export default function NightScreen() {
           <Text style={styles.section}>{"Tonight's movie"}</Text>
           {night.movie !== null && !changingMovie ? (
             <View style={styles.movieRow}>
-              <Text style={styles.name}>{movieLabel(night.movie)}</Text>
+              <View style={styles.movieInfo}>
+                <Poster uri={night.movie.posterUrl} />
+                <Text style={styles.name}>{movieLabel(night.movie)}</Text>
+              </View>
               <Button title="Change movie" onPress={() => setChangingMovie(true)} disabled={busy !== null} />
             </View>
           ) : (
@@ -279,9 +292,10 @@ export default function NightScreen() {
                   key={m.tmdbId}
                   onPress={() => onAttach(m.tmdbId)}
                   disabled={busy !== null}
-                  style={({ pressed }) => [styles.orderRow, pressed && styles.rowPressed]}
+                  style={({ pressed }) => [styles.resultRow, pressed && styles.rowPressed]}
                 >
-                  <Text style={styles.name}>{movieLabel(m)}</Text>
+                  <Poster uri={m.posterUrl} />
+                  <Text style={[styles.name, styles.resultLabel]}>{movieLabel(m)}</Text>
                   {busy === "movie" ? <Text style={styles.tag}>…</Text> : null}
                 </Pressable>
               ))}
@@ -405,6 +419,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 8,
   },
+  poster: { width: 46, height: 69, borderRadius: 4, backgroundColor: "#eee" },
+  posterPlaceholder: { borderWidth: StyleSheet.hairlineWidth, borderColor: "#ccc" },
+  movieInfo: { flexDirection: "row", alignItems: "center", gap: 12, flexShrink: 1 },
+  resultRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },
+  resultLabel: { flex: 1 },
   searchRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 },
   input: {
     flex: 1,
