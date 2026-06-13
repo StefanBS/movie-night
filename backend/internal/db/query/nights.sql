@@ -1,22 +1,22 @@
 -- name: CreateNight :one
 INSERT INTO picks (group_id, scheduled_for)
 VALUES (sqlc.arg(group_id), sqlc.arg(scheduled_for))
-RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at;
+RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id;
 
 -- name: GetNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 FROM picks
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
 
 -- name: GetCurrentNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 FROM picks
 WHERE group_id = sqlc.arg(group_id)
 ORDER BY scheduled_for DESC, created_at DESC
 LIMIT 1;
 
 -- name: GetOpenNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 FROM picks
 WHERE group_id = sqlc.arg(group_id) AND picker_id IS NULL
 ORDER BY scheduled_for DESC, created_at DESC
@@ -45,4 +45,4 @@ ORDER BY
 UPDATE picks
 SET picker_id = sqlc.arg(picker_id), is_credited = sqlc.arg(is_credited)
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
-RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at;
+RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id;

@@ -1,3 +1,4 @@
+import { parseMovie, type Movie } from "./movies";
 import { parseTurn, type TurnMember } from "./turn";
 
 export type Attendee = {
@@ -10,6 +11,7 @@ export type Night = {
   id: string;
   scheduledFor: string;
   pickerId: string | null;
+  movie: Movie | null;
   attendees: Attendee[];
 };
 
@@ -36,7 +38,7 @@ export function parseNight(raw: unknown): Night {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("expected a night object");
   }
-  const { id, scheduledFor, pickerId, attendees } = raw as Record<string, unknown>;
+  const { id, scheduledFor, pickerId, movie, attendees } = raw as Record<string, unknown>;
   if (typeof id !== "string") {
     throw new Error("night: id must be a string");
   }
@@ -49,7 +51,14 @@ export function parseNight(raw: unknown): Night {
   if (!Array.isArray(attendees)) {
     throw new Error("night: attendees must be an array");
   }
-  return { id, scheduledFor, pickerId: pickerId ?? null, attendees: attendees.map(parseAttendee) };
+  const parsedMovie = movie === undefined || movie === null ? null : parseMovie(movie);
+  return {
+    id,
+    scheduledFor,
+    pickerId: pickerId ?? null,
+    movie: parsedMovie,
+    attendees: attendees.map(parseAttendee),
+  };
 }
 
 async function fetchNight(url: string, init?: RequestInit): Promise<Night> {
@@ -159,6 +168,23 @@ export function recordNightPick(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ pickerId }),
+    signal,
+  });
+}
+
+// attachMovie sets (or changes) the night's movie. The client sends only the
+// tmdbId; the backend re-fetches canonical metadata from TMDB.
+export function attachMovie(
+  baseUrl: string,
+  groupId: string,
+  nightId: string,
+  tmdbId: number,
+  signal?: AbortSignal,
+): Promise<Night> {
+  return fetchNight(`${baseUrl}/groups/${groupId}/nights/${nightId}/movie`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tmdbId }),
     signal,
   });
 }

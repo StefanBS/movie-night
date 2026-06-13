@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -73,12 +74,22 @@ type attendee struct {
 	Role string `json:"role"`
 }
 
+// movieDTO is the JSON shape for an attached movie (and a search result).
+// ReleaseYear is null when TMDB has no release date. int32 matches the movies
+// table and TMDB's domain (ids/years fit in 32 bits); JSON renders it as a number.
+type movieDTO struct {
+	TMDBID      int32  `json:"tmdbId"`
+	Title       string `json:"title"`
+	ReleaseYear *int32 `json:"releaseYear"`
+}
+
 // nightResponse is the JSON shape for a night and its current attendees.
 // PickerID is nil (renders as null) until a pick is recorded.
 type nightResponse struct {
 	ID           string     `json:"id"`
 	ScheduledFor string     `json:"scheduledFor"`
 	PickerID     *string    `json:"pickerId"`
+	Movie        *movieDTO  `json:"movie"`
 	Attendees    []attendee `json:"attendees"`
 }
 
@@ -92,9 +103,26 @@ func pickerIDPtr(u pgtype.UUID) *string {
 	return &s
 }
 
+// releaseYearPtr renders a nullable release year as *int32 (nil → JSON null).
+func releaseYearPtr(v pgtype.Int4) *int32 {
+	if !v.Valid {
+		return nil
+	}
+	y := v.Int32
+	return &y
+}
+
+// movieDTOPtr maps a cached movie row to the DTO; nil renders "movie" as null.
+func movieDTOPtr(m *db.Movie) *movieDTO {
+	if m == nil {
+		return nil
+	}
+	return &movieDTO{TMDBID: m.TmdbID, Title: m.Title, ReleaseYear: releaseYearPtr(m.ReleaseYear)}
+}
+
 // toNightResponse maps a night row + attendee rows to the night DTO. Attendees
 // is always non-nil so an empty list encodes as [] rather than null.
-func toNightResponse(p db.Pick, rows []db.ListNightAttendeesRow) nightResponse {
+func toNightResponse(p db.Pick, rows []db.ListNightAttendeesRow, movie *db.Movie) nightResponse {
 	attendees := make([]attendee, 0, len(rows))
 	for _, r := range rows {
 		attendees = append(attendees, attendee{
@@ -107,6 +135,7 @@ func toNightResponse(p db.Pick, rows []db.ListNightAttendeesRow) nightResponse {
 		ID:           p.ID.String(),
 		ScheduledFor: p.ScheduledFor.Time.Format("2006-01-02"),
 		PickerID:     pickerIDPtr(p.PickerID),
+		Movie:        movieDTOPtr(movie),
 		Attendees:    attendees,
 	}
 }
@@ -136,6 +165,9 @@ type nightStore interface {
 	GetGroupMember(ctx context.Context, arg db.GetGroupMemberParams) (db.GetGroupMemberRow, error)
 	RankGroupTurn(ctx context.Context, arg db.RankGroupTurnParams) ([]db.RankGroupTurnRow, error)
 	SetNightPicker(ctx context.Context, arg db.SetNightPickerParams) (db.Pick, error)
+	GetMovie(ctx context.Context, id uuid.UUID) (db.Movie, error)
+	UpsertMovie(ctx context.Context, arg db.UpsertMovieParams) (db.Movie, error)
+	SetNightMovie(ctx context.Context, arg db.SetNightMovieParams) (db.Pick, error)
 }
 
 // attendeeRequest is the JSON body of POST .../nights/{nightId}/attendees.
@@ -146,6 +178,37 @@ type attendeeRequest struct {
 // recordPickRequest is the JSON body of POST .../nights/{nightId}/pick.
 type recordPickRequest struct {
 	PickerID string `json:"pickerId"`
+}
+
+// movieRequest is the JSON body of POST .../nights/{nightId}/movie. Only the
+// tmdbId is sent; the backend re-fetches canonical title/year from TMDB.
+type movieRequest struct {
+	TMDBID int `json:"tmdbId"`
+}
+
+// validateMovieRequest checks the attach body. Pure.
+func validateMovieRequest(req movieRequest) error {
+	if req.TMDBID <= 0 {
+		return fmt.Errorf("invalid tmdbId")
+	}
+	return nil
+}
+
+// int4Ptr maps an optional release year to pgtype.Int4 for UpsertMovie.
+func int4Ptr(v *int32) pgtype.Int4 {
+	if v == nil {
+		return pgtype.Int4{}
+	}
+	return pgtype.Int4{Int32: *v, Valid: true}
+}
+
+// toMovieResults maps TMDB search hits to the JSON DTO (always non-nil → []).
+func toMovieResults(results []movieResult) []movieDTO {
+	out := make([]movieDTO, 0, len(results))
+	for _, m := range results {
+		out = append(out, movieDTO{TMDBID: m.TMDBID, Title: m.Title, ReleaseYear: m.ReleaseYear})
+	}
+	return out
 }
 
 // creditedForRole derives is_credited from the picker's role: a core pick moves
@@ -197,6 +260,15 @@ func writeNightDTO(w http.ResponseWriter, r *http.Request, store nightStore, gid
 		internalError(w, gid, "get night", err)
 		return
 	}
+	var movie *db.Movie
+	if night.MovieID.Valid {
+		m, err := store.GetMovie(r.Context(), uuid.UUID(night.MovieID.Bytes))
+		if err != nil {
+			internalError(w, gid, "get movie", err)
+			return
+		}
+		movie = &m
+	}
 	rows, err := store.ListNightAttendees(r.Context(), db.ListNightAttendeesParams{GroupID: gid, NightID: nightID})
 	if err != nil {
 		internalError(w, gid, "list night attendees", err)
@@ -204,7 +276,7 @@ func writeNightDTO(w http.ResponseWriter, r *http.Request, store nightStore, gid
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(toNightResponse(night, rows)); err != nil {
+	if err := json.NewEncoder(w).Encode(toNightResponse(night, rows, movie)); err != nil {
 		log.Printf("encode night response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
 	}
 }
@@ -465,6 +537,90 @@ func recordNightPickHandler(store nightStore) http.HandlerFunc {
 			IsCredited: creditedForRole(role),
 		}); err != nil {
 			internalError(w, gid, "set night picker", err)
+			return
+		}
+		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
+	}
+}
+
+// searchMoviesHandler serves GET /movies/search?q=… — a thin TMDB proxy so the
+// API token stays server-side. 400 empty query, 503 when TMDB is unconfigured,
+// 502 on an upstream failure.
+func searchMoviesHandler(client *tmdbClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := strings.TrimSpace(r.URL.Query().Get("q"))
+		if q == "" {
+			writeJSONError(w, http.StatusBadRequest, "missing query")
+			return
+		}
+		if client == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "movie search is not configured")
+			return
+		}
+		results, err := client.SearchMovies(r.Context(), q)
+		if err != nil {
+			log.Printf("tmdb search %q: %v", q, err) //#nosec G706 -- q is a user query string logged with %q, not used as a format string
+			writeJSONError(w, http.StatusBadGateway, "movie search failed")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(toMovieResults(results)); err != nil {
+			log.Printf("encode movie results: %v", err) //#nosec G706 -- only an error value, no user input
+		}
+	}
+}
+
+// recordNightMovieHandler serves POST /groups/{groupId}/nights/{nightId}/movie.
+// The body carries only {tmdbId}; the backend re-fetches canonical title/year from
+// TMDB (source of truth), caches the movie, and sets it on the night. Repeatable:
+// attaching a different movie is the correction path.
+func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gid, nightID, ok := parseGroupAndNight(w, r)
+		if !ok {
+			return
+		}
+		var req movieRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		if err := validateMovieRequest(req); err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if !ensureNight(w, r, store, gid, nightID) {
+			return
+		}
+		if client == nil {
+			writeJSONError(w, http.StatusServiceUnavailable, "movie attach is not configured")
+			return
+		}
+		movie, err := client.FetchMovie(r.Context(), req.TMDBID)
+		if err != nil {
+			if errors.Is(err, errMovieNotFound) {
+				writeJSONError(w, http.StatusNotFound, "no such movie")
+				return
+			}
+			log.Printf("tmdb fetch movie %d: %v", req.TMDBID, err) //#nosec G706 -- req.TMDBID is an int
+			writeJSONError(w, http.StatusBadGateway, "movie lookup failed")
+			return
+		}
+		cached, err := store.UpsertMovie(r.Context(), db.UpsertMovieParams{
+			TmdbID:      movie.TMDBID,
+			Title:       movie.Title,
+			ReleaseYear: int4Ptr(movie.ReleaseYear),
+		})
+		if err != nil {
+			internalError(w, gid, "upsert movie", err)
+			return
+		}
+		if _, err := store.SetNightMovie(r.Context(), db.SetNightMovieParams{
+			MovieID: pgtype.UUID{Bytes: cached.ID, Valid: true},
+			NightID: nightID,
+			GroupID: gid,
+		}); err != nil {
+			internalError(w, gid, "set night movie", err)
 			return
 		}
 		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)

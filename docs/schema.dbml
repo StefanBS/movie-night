@@ -90,7 +90,7 @@ Table picks {
   id            uuid         [pk, default: `gen_random_uuid()`]
   group_id      uuid         [not null]
   picker_id     uuid         [null, note: 'The person who chose. NULL for a free pick / nobody-owed-present night (ADR-0005)']
-  movie_id      uuid         [not null]
+  movie_id      uuid         [null, note: 'Attached after planning; NULL on a planned night with no movie yet (set via POST .../nights/{id}/movie)']
   is_credited   boolean      [not null, default: true, note: 'TRUE only for normal core picks; guest/free picks are FALSE so they never affect standings (ADR-0006)']
   scheduled_for date         [not null]
   created_at    timestamptz  [not null, default: `now()`]

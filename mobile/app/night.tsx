@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import Constants from "expo-constants";
@@ -15,6 +16,7 @@ import { todayLocalISO } from "../lib/date";
 import { fetchMembers, type Member } from "../lib/members";
 import {
   addAttendee,
+  attachMovie,
   createNight,
   getCurrentNight,
   getNightTurn,
@@ -22,6 +24,7 @@ import {
   removeAttendee,
   type Night,
 } from "../lib/nights";
+import { movieLabel, searchMovies, type Movie } from "../lib/movies";
 import { type TurnMember } from "../lib/turn";
 
 const API_URL = resolveApiBaseUrl({
@@ -39,6 +42,14 @@ export default function NightScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   // The member id with an action in flight, or "create" while creating.
   const [busy, setBusy] = useState<string | null>(null);
+
+  const [movieQuery, setMovieQuery] = useState("");
+  const [results, setResults] = useState<Movie[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  // Show the search UI when no movie is attached yet, or when the user taps
+  // "Change movie" on a night that already has one.
+  const [changingMovie, setChangingMovie] = useState(false);
 
   // Load the full roster (everyone — guests AND inactive members) so anyone
   // present can be recorded. Attendance is presence; the pick order (getNightTurn)
@@ -179,6 +190,45 @@ export default function NightScreen() {
     }
   }, [busy, refreshOrder]);
 
+  const onSearch = useCallback(async () => {
+    const q = movieQuery.trim();
+    if (q === "") {
+      return;
+    }
+    setSearching(true);
+    setSearchError(null);
+    try {
+      setResults(await searchMovies(API_URL, q));
+    } catch (e) {
+      setSearchError(e instanceof Error ? e.message : "search failed");
+    } finally {
+      setSearching(false);
+    }
+  }, [movieQuery]);
+
+  const onAttach = useCallback(
+    async (tmdbId: number) => {
+      if (night === null || busy !== null) {
+        return;
+      }
+      setBusy("movie");
+      setActionError(null);
+      try {
+        const updated = await attachMovie(API_URL, GROUP_ID, night.id, tmdbId);
+        setNight(updated);
+        setResults([]);
+        setSearchError(null);
+        setMovieQuery("");
+        setChangingMovie(false);
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : "failed to attach movie");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [night, busy],
+  );
+
   if (loading) {
     return <ActivityIndicator style={styles.center} size="large" />;
   }
@@ -202,6 +252,41 @@ export default function NightScreen() {
             {"Tap to add or remove — attendance saves automatically."}
           </Text>
           {actionError !== null && <Text style={[styles.banner, styles.error]}>{actionError}</Text>}
+
+          <Text style={styles.section}>{"Tonight's movie"}</Text>
+          {night.movie !== null && !changingMovie ? (
+            <View style={styles.movieRow}>
+              <Text style={styles.name}>{movieLabel(night.movie)}</Text>
+              <Button title="Change movie" onPress={() => setChangingMovie(true)} disabled={busy !== null} />
+            </View>
+          ) : (
+            <View>
+              <View style={styles.searchRow}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Search a film title…"
+                  value={movieQuery}
+                  onChangeText={setMovieQuery}
+                  onSubmitEditing={onSearch}
+                  returnKeyType="search"
+                  autoCorrect={false}
+                />
+                <Button title="Search" onPress={onSearch} disabled={searching || movieQuery.trim() === ""} />
+              </View>
+              {searchError !== null && <Text style={[styles.hint, styles.error]}>{searchError}</Text>}
+              {results.map((m) => (
+                <Pressable
+                  key={m.tmdbId}
+                  onPress={() => onAttach(m.tmdbId)}
+                  disabled={busy !== null}
+                  style={({ pressed }) => [styles.orderRow, pressed && styles.rowPressed]}
+                >
+                  <Text style={styles.name}>{movieLabel(m)}</Text>
+                  {busy === "movie" ? <Text style={styles.tag}>…</Text> : null}
+                </Pressable>
+              ))}
+            </View>
+          )}
 
           <Text style={styles.section}>{"Who's here?"}</Text>
           <FlatList
@@ -314,4 +399,20 @@ const styles = StyleSheet.create({
   },
   pickerRow: { backgroundColor: "#eef6ff", borderRadius: 8, paddingHorizontal: 8 },
   badge: { fontSize: 12, fontWeight: "600", color: "#0b66c3", textTransform: "uppercase" },
+  movieRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 },
+  input: {
+    flex: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 16,
+  },
 });

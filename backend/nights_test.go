@@ -89,7 +89,7 @@ func TestToNightResponse(t *testing.T) {
 		rows := []db.ListNightAttendeesRow{
 			{ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
 		}
-		got := toNightResponse(mkPick(), rows)
+		got := toNightResponse(mkPick(), rows, nil)
 		if got.ID != nightID.String() {
 			t.Errorf("ID = %q", got.ID)
 		}
@@ -102,7 +102,7 @@ func TestToNightResponse(t *testing.T) {
 	})
 
 	t.Run("nil rows yields non-nil empty attendees slice", func(t *testing.T) {
-		got := toNightResponse(mkPick(), nil)
+		got := toNightResponse(mkPick(), nil, nil)
 		if got.Attendees == nil {
 			t.Errorf("Attendees must be non-nil even when rows is nil")
 		}
@@ -112,15 +112,34 @@ func TestToNightResponse(t *testing.T) {
 	})
 
 	t.Run("pickerId is null when unset and the uuid when set", func(t *testing.T) {
-		open := toNightResponse(mkPick(), nil)
+		open := toNightResponse(mkPick(), nil, nil)
 		if open.PickerID != nil {
 			t.Errorf("open night PickerID = %v, want nil", open.PickerID)
 		}
 		p := mkPick()
 		p.PickerID = pgtype.UUID{Bytes: ada, Valid: true}
-		got := toNightResponse(p, nil)
+		got := toNightResponse(p, nil, nil)
 		if got.PickerID == nil || *got.PickerID != ada.String() {
 			t.Errorf("finalized PickerID = %v, want %s", got.PickerID, ada)
+		}
+	})
+
+	t.Run("movie is null when unset and populated when set", func(t *testing.T) {
+		none := toNightResponse(mkPick(), nil, nil)
+		if none.Movie != nil {
+			t.Errorf("Movie = %v, want nil", none.Movie)
+		}
+		m := db.Movie{TmdbID: 438631, Title: "Dune"}
+		m.ReleaseYear = pgtype.Int4{Int32: 2021, Valid: true}
+		got := toNightResponse(mkPick(), nil, &m)
+		if got.Movie == nil || got.Movie.TMDBID != 438631 || got.Movie.Title != "Dune" ||
+			got.Movie.ReleaseYear == nil || *got.Movie.ReleaseYear != 2021 {
+			t.Errorf("Movie = %+v", got.Movie)
+		}
+		noYear := db.Movie{TmdbID: 841, Title: "Dune"} // ReleaseYear zero value → Valid false
+		got2 := toNightResponse(mkPick(), nil, &noYear)
+		if got2.Movie == nil || got2.Movie.ReleaseYear != nil {
+			t.Errorf("Movie release year = %+v, want nil", got2.Movie)
 		}
 	})
 }
@@ -131,5 +150,16 @@ func TestCreditedForRole(t *testing.T) {
 	}
 	if creditedForRole(db.MembershipRoleGuest) {
 		t.Error("guest picker must not be credited")
+	}
+}
+
+func TestValidateMovieRequest(t *testing.T) {
+	if err := validateMovieRequest(movieRequest{TMDBID: 438631}); err != nil {
+		t.Errorf("valid tmdbId rejected: %v", err)
+	}
+	for _, bad := range []int{0, -1} {
+		if err := validateMovieRequest(movieRequest{TMDBID: bad}); err == nil {
+			t.Errorf("tmdbId %d accepted, want error", bad)
+		}
 	}
 }

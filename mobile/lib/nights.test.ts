@@ -6,6 +6,7 @@ import { parseNight } from "./nights";
 const valid = {
   id: "n1",
   scheduledFor: "2026-06-12",
+  movie: null,
   attendees: [
     { id: "u1", name: "Ada", role: "core" },
     { id: "u6", name: "Frankie", role: "guest" },
@@ -73,4 +74,21 @@ test("parseNight rejects a non-string, non-null pickerId", () => {
     () => parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId: 7, attendees: [] }),
     /pickerId/,
   );
+});
+
+test("parseNight reads an attached movie", () => {
+  const n = parseNight({
+    ...valid,
+    movie: { tmdbId: 438631, title: "Dune", releaseYear: 2021 },
+  });
+  assert.deepEqual(n.movie, { tmdbId: 438631, title: "Dune", releaseYear: 2021 });
+});
+
+test("parseNight accepts a null or absent movie", () => {
+  assert.equal(parseNight({ ...valid, movie: null }).movie, null);
+  assert.equal(parseNight(valid).movie, null);
+});
+
+test("parseNight rejects a bad movie shape", () => {
+  assert.throws(() => parseNight({ ...valid, movie: { tmdbId: "x", title: "Dune" } }), /tmdbId/);
 });

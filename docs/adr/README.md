@@ -7,7 +7,7 @@ decision, consequences). Records are append-only: when a decision changes, add a
 new record that supersedes the old one rather than editing history.
 
 **Status legend:** Proposed · Accepted · Superseded · Deprecated
-**Last updated:** 2026-05-28
+**Last updated:** 2026-06-10
 
 ## Index
 
@@ -17,6 +17,7 @@ new record that supersedes the old one rather than editing history.
 - [ADR-0004](0004-people-and-membership-roles.md) — Model members and guests as one people table with membership roles · *Accepted*
 - [ADR-0005](0005-least-served-turn-ranking.md) — Determine whose turn it is with a "least-served" ranking · *Accepted*
 - [ADR-0006](0006-membership-churn-handling.md) — Handle core-membership churn by deactivating, seeding, and crediting · *Accepted*
+- [ADR-0007](0007-tmdb-proxy-source-of-truth.md) — Proxy TMDB through the backend; the server is the source of truth on attach · *Accepted*
 
 Open and deferred decisions are tracked in [backlog.md](backlog.md).
 

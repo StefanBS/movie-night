@@ -38,6 +38,13 @@ func main() {
 
 	queries := db.New(pool)
 
+	tmdb := newTMDBClient(os.Getenv("TMDB_READ_TOKEN"))
+	if tmdb == nil {
+		log.Print("TMDB not configured (TMDB_READ_TOKEN unset); /movies/search and attach return 503")
+	} else {
+		log.Print("TMDB configured")
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -56,6 +63,8 @@ func main() {
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/attendees", addAttendeeHandler(queries))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/attendees/{userId}", removeAttendeeHandler(queries))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(queries))
+	mux.Handle("GET /movies/search", searchMoviesHandler(tmdb))
+	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(queries, tmdb))
 
 	// Browsers enforce CORS; native apps and curl do not. Allowed web origins
 	// come from CORS_ALLOWED_ORIGINS (comma-separated) so the policy is the same
