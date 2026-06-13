@@ -1,7 +1,10 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    // TS 6 (Expo SDK 56) no longer auto-includes @types/node; the lib/*.test.ts
+    // files use node: built-ins (node:test, Buffer, ...), so request it explicitly.
+    "types": ["node"]
   },
   "include": [
     "**/*.ts",

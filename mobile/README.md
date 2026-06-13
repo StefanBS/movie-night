@@ -8,13 +8,13 @@ last-picked subtitle, with the rest of the standings listed below.
 
 ## Stack
 
-- **Expo SDK 54** — React Native tooling and runtime
-- **React Native 0.81** / **React 19**
-- **TypeScript 5.9**
+- **Expo SDK 56** — React Native tooling and runtime
+- **React Native 0.85** / **React 19.2**
+- **TypeScript 6.0**
 
 > **Heads up:** Expo APIs are version-specific. Before changing native or Expo
 > code, read the docs for this exact SDK:
-> <https://docs.expo.dev/versions/v54.0.0/> (see [`AGENTS.md`](AGENTS.md)).
+> <https://docs.expo.dev/versions/v56.0.0/> (see [`AGENTS.md`](AGENTS.md)).
 
 ## Prerequisites
 
@@ -23,8 +23,13 @@ last-picked subtitle, with the rest of the standings listed below.
   the backend. Every recipe wraps a plain `npm`/`npx` command, so it's not
   required; `just --list` shows them all.
 - One way to run the app:
-  - **Expo Go** on a physical phone ([iOS](https://apps.apple.com/app/expo-go/id982107779) /
-    [Android](https://play.google.com/store/apps/details?id=host.exp.exponent)) — easiest, or
+  - **Expo Go** on a physical phone — easiest. This app targets **Expo SDK 56**,
+    so you need an Expo Go build that supports SDK 56; if the
+    [App Store](https://apps.apple.com/app/expo-go/id982107779) /
+    [Play Store](https://play.google.com/store/apps/details?id=host.exp.exponent)
+    build lags the latest SDK, install the SDK 56 build from
+    [`expo.dev/go`](https://expo.dev/go?sdkVersion=56) (Android = sideloaded APK)
+    or via [Expo Orbit](https://docs.expo.dev/build/orbit/), or
   - **iOS Simulator** (Xcode, macOS only), or
   - **Android Emulator** (Android Studio), or
   - a **web browser**

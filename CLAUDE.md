@@ -26,7 +26,7 @@ go test -run '^TestName$' ./...                      # a single unit test
 go test -tags=integration -run '^TestName$' ./...    # a single integration test
 ```
 
-**Mobile** (Expo SDK 54, Node 22):
+**Mobile** (Expo SDK 56, Node 22):
 ```bash
 just start                 # Metro bundler; press i/a/w or scan the QR
 just start-clean           # = expo start -c — restart with cleared cache (see gotcha below)
@@ -55,4 +55,5 @@ Committing here triggers lefthook **pre-commit** (betterleaks secret scan + fast
 - **Mobile "Couldn't load roster: Network request failed" on a physical phone** is almost always a **stale Metro bundle** (old code that used `localhost`). Fix: `just start-clean` and re-scan the QR (don't tap a "recently opened" entry). The backend must also bind `0.0.0.0:8080`, not loopback.
 - **Install betterleaks from a release binary** (`dnf`/`brew`/releases), **not `go install`** — the `go install` build ships without detection rules and silently finds nothing.
 - **`just sast` / `just audit` need `gosec` on `PATH`** (a pinned release binary, like betterleaks — CI installs it checksum-verified). It's intentionally *not* a go-tool dep: gosec's autofix feature pulls in heavy LLM/cloud SDKs that would bloat `backend/go.mod`. `just check` and the git hooks don't run gosec, so this only affects running the security audit locally.
-- **Mobile is pinned to Expo SDK 54 on purpose** (the Play Store Expo Go supports up to 54). Before changing Expo/native code, read the exact versioned docs per [`mobile/AGENTS.md`](mobile/AGENTS.md): <https://docs.expo.dev/versions/v54.0.0/>.
+- **Mobile targets Expo SDK 56.** The SDK is no longer version-pinned (the dependabot SDK-coupling ignore block was removed — dependabot now tracks latest), so an SDK bump can arrive via a routine update PR; treat it as a deliberate change (it also needs a matching Expo Go build on the test device). Expo Go for SDK 56 may need **sideloading** — the App Store / Play Store build can lag the latest SDK; install the matching build via [`expo.dev/go`](https://expo.dev/go) or Expo Orbit (Android = APK). Before changing Expo/native code, read the exact versioned docs per [`mobile/AGENTS.md`](mobile/AGENTS.md): <https://docs.expo.dev/versions/v56.0.0/>.
+- **Mobile typecheck needs `"types": ["node"]` in `mobile/tsconfig.json`** — Expo SDK 56's TypeScript 6 no longer auto-includes `@types/node`, and the `lib/*.test.ts` files use `node:` built-ins (`node:test`, `Buffer`, …). Without it, `just typecheck` fails with TS2591 "Cannot find name 'node:test'". `@types/node` is pinned to the Node 22 runtime major.
