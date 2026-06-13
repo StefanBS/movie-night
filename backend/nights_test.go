@@ -131,17 +131,41 @@ func TestToNightResponse(t *testing.T) {
 		}
 		m := db.Movie{TmdbID: 438631, Title: "Dune"}
 		m.ReleaseYear = pgtype.Int4{Int32: 2021, Valid: true}
+		m.PosterPath = pgtype.Text{String: "/dune.jpg", Valid: true}
 		got := toNightResponse(mkPick(), nil, &m)
 		if got.Movie == nil || got.Movie.TMDBID != 438631 || got.Movie.Title != "Dune" ||
 			got.Movie.ReleaseYear == nil || *got.Movie.ReleaseYear != 2021 {
 			t.Errorf("Movie = %+v", got.Movie)
+		}
+		if got.Movie.PosterURL == nil || *got.Movie.PosterURL != "https://image.tmdb.org/t/p/w342/dune.jpg" {
+			t.Errorf("Movie poster = %v, want built w342 url", got.Movie.PosterURL)
 		}
 		noYear := db.Movie{TmdbID: 841, Title: "Dune"} // ReleaseYear zero value → Valid false
 		got2 := toNightResponse(mkPick(), nil, &noYear)
 		if got2.Movie == nil || got2.Movie.ReleaseYear != nil {
 			t.Errorf("Movie release year = %+v, want nil", got2.Movie)
 		}
+		if got2.Movie.PosterURL != nil {
+			t.Errorf("Movie poster = %v, want nil (no poster_path)", got2.Movie.PosterURL)
+		}
 	})
+}
+
+func TestToMovieResults(t *testing.T) {
+	in := []movieResult{
+		{TMDBID: 438631, Title: "Dune", ReleaseYear: intp(2021), PosterPath: "/dune.jpg"},
+		{TMDBID: 99, Title: "No Poster", ReleaseYear: nil, PosterPath: ""},
+	}
+	got := toMovieResults(in)
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2", len(got))
+	}
+	if got[0].PosterURL == nil || *got[0].PosterURL != "https://image.tmdb.org/t/p/w342/dune.jpg" {
+		t.Errorf("[0] poster = %v, want built url", got[0].PosterURL)
+	}
+	if got[1].PosterURL != nil {
+		t.Errorf("[1] poster = %v, want nil", got[1].PosterURL)
+	}
 }
 
 func TestCreditedForRole(t *testing.T) {
