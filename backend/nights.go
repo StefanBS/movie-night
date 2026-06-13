@@ -113,13 +113,20 @@ func releaseYearPtr(v pgtype.Int4) *int32 {
 	return &y
 }
 
+// posterURLPtr builds the poster URL for a cached movie row, nil when NULL.
+func posterURLPtr(p pgtype.Text) *string {
+	if !p.Valid {
+		return nil
+	}
+	return posterURL(p.String)
+}
+
 // movieDTOPtr maps a cached movie row to the DTO; nil renders "movie" as null.
 func movieDTOPtr(m *db.Movie) *movieDTO {
 	if m == nil {
 		return nil
 	}
-	// PosterPath is pgtype.Text; an invalid/NULL column has .String == "" → posterURL yields nil.
-	return &movieDTO{TMDBID: m.TmdbID, Title: m.Title, ReleaseYear: releaseYearPtr(m.ReleaseYear), PosterURL: posterURL(m.PosterPath.String)}
+	return &movieDTO{TMDBID: m.TmdbID, Title: m.Title, ReleaseYear: releaseYearPtr(m.ReleaseYear), PosterURL: posterURLPtr(m.PosterPath)}
 }
 
 // toNightResponse maps a night row + attendee rows to the night DTO. Attendees
