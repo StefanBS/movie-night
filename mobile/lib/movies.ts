@@ -4,6 +4,12 @@ export type Movie = {
   releaseYear: number | null;
 };
 
+// movieLabel renders a movie as "Title (Year)", or just the title when the
+// release year is unknown.
+export function movieLabel(m: Movie): string {
+  return m.releaseYear !== null ? `${m.title} (${m.releaseYear})` : m.title;
+}
+
 // parseMovie validates an untrusted movie object (a search result or a night's
 // attached movie) and returns a typed Movie, throwing on a bad shape.
 export function parseMovie(raw: unknown): Movie {

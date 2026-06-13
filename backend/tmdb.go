@@ -117,6 +117,11 @@ type tmdbMovieJSON struct {
 	ReleaseDate string `json:"release_date"`
 }
 
+// toResult maps the decoded TMDB JSON to the trimmed movieResult this app stores.
+func (m tmdbMovieJSON) toResult() movieResult {
+	return movieResult{TMDBID: m.ID, Title: m.Title, ReleaseYear: releaseYear(m.ReleaseDate)}
+}
+
 // parseTMDBSearch decodes a /search/movie body into movieResults. Pure.
 func parseTMDBSearch(body []byte) ([]movieResult, error) {
 	var payload struct {
@@ -127,7 +132,7 @@ func parseTMDBSearch(body []byte) ([]movieResult, error) {
 	}
 	out := make([]movieResult, 0, len(payload.Results))
 	for _, m := range payload.Results {
-		out = append(out, movieResult{TMDBID: m.ID, Title: m.Title, ReleaseYear: releaseYear(m.ReleaseDate)})
+		out = append(out, m.toResult())
 	}
 	return out, nil
 }
@@ -138,7 +143,7 @@ func parseTMDBMovie(body []byte) (movieResult, error) {
 	if err := json.Unmarshal(body, &m); err != nil {
 		return movieResult{}, fmt.Errorf("decode tmdb movie: %w", err)
 	}
-	return movieResult{TMDBID: m.ID, Title: m.Title, ReleaseYear: releaseYear(m.ReleaseDate)}, nil
+	return m.toResult(), nil
 }
 
 // releaseYear extracts the leading year from a TMDB release_date ("YYYY-MM-DD").

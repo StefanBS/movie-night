@@ -24,7 +24,7 @@ import {
   removeAttendee,
   type Night,
 } from "../lib/nights";
-import { searchMovies, type Movie } from "../lib/movies";
+import { movieLabel, searchMovies, type Movie } from "../lib/movies";
 import { type TurnMember } from "../lib/turn";
 
 const API_URL = resolveApiBaseUrl({
@@ -256,11 +256,7 @@ export default function NightScreen() {
           <Text style={styles.section}>{"Tonight's movie"}</Text>
           {night.movie !== null && !changingMovie ? (
             <View style={styles.movieRow}>
-              <Text style={styles.name}>
-                {night.movie.releaseYear !== null
-                  ? `${night.movie.title} (${night.movie.releaseYear})`
-                  : night.movie.title}
-              </Text>
+              <Text style={styles.name}>{movieLabel(night.movie)}</Text>
               <Button title="Change movie" onPress={() => setChangingMovie(true)} disabled={busy !== null} />
             </View>
           ) : (
@@ -285,9 +281,7 @@ export default function NightScreen() {
                   disabled={busy !== null}
                   style={({ pressed }) => [styles.orderRow, pressed && styles.rowPressed]}
                 >
-                  <Text style={styles.name}>
-                    {m.releaseYear !== null ? `${m.title} (${m.releaseYear})` : m.title}
-                  </Text>
+                  <Text style={styles.name}>{movieLabel(m)}</Text>
                   {busy === "movie" ? <Text style={styles.tag}>…</Text> : null}
                 </Pressable>
               ))}
