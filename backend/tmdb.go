@@ -50,18 +50,24 @@ func newTMDBClient(token string) *tmdbClient {
 
 // get issues an authenticated GET to path (+optional query) and returns the
 // status code and body (capped at 1 MiB).
+//
+// gosec flags the request below as G704 (SSRF): its taint analysis sees the
+// search query reach the URL. This is a false positive — the scheme/host/path
+// come entirely from the constant baseURL plus fixed per-endpoint paths; user
+// input only ever enters as url.Values-encoded query parameters, so the request
+// destination cannot be redirected. CodeQL's dataflow analysis agrees (no alert).
 func (c *tmdbClient) get(ctx context.Context, path string, q url.Values) (int, []byte, error) {
 	u := c.baseURL + path
 	if len(q) > 0 {
 		u += "?" + q.Encode()
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil) //#nosec G107 -- host is the constant baseURL; user input only enters via url.Values-encoded query params, never the scheme/host/path
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil) //#nosec G704 -- destination is the constant baseURL; user input is confined to url-encoded query params
 	if err != nil {
 		return 0, nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
-	res, err := c.client.Do(req)
+	res, err := c.client.Do(req) //#nosec G704 -- see above: request destination is not user-controlled
 	if err != nil {
 		return 0, nil, err
 	}
