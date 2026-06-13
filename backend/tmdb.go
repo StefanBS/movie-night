@@ -24,6 +24,9 @@ type movieResult struct {
 	TMDBID      int32
 	Title       string
 	ReleaseYear *int32
+	// PosterPath is the raw TMDB poster_path ("" = no poster); the full image
+	// URL is built via posterURL at DTO time, not here.
+	PosterPath string
 }
 
 // tmdbClient calls the TMDB REST API. baseURL is injectable so tests point it at
@@ -115,11 +118,12 @@ type tmdbMovieJSON struct {
 	ID          int32  `json:"id"`
 	Title       string `json:"title"`
 	ReleaseDate string `json:"release_date"`
+	PosterPath  string `json:"poster_path"`
 }
 
 // toResult maps the decoded TMDB JSON to the trimmed movieResult this app stores.
 func (m tmdbMovieJSON) toResult() movieResult {
-	return movieResult{TMDBID: m.ID, Title: m.Title, ReleaseYear: releaseYear(m.ReleaseDate)}
+	return movieResult{TMDBID: m.ID, Title: m.Title, ReleaseYear: releaseYear(m.ReleaseDate), PosterPath: m.PosterPath}
 }
 
 // parseTMDBSearch decodes a /search/movie body into movieResults. Pure.
@@ -144,6 +148,21 @@ func parseTMDBMovie(body []byte) (movieResult, error) {
 		return movieResult{}, fmt.Errorf("decode tmdb movie: %w", err)
 	}
 	return m.toResult(), nil
+}
+
+// tmdbImageBase is the TMDB image CDN base + the fixed thumbnail size. The base
+// and size buckets are an effectively-static constant (see ADR-0007); we do not
+// fetch /configuration. Changing the size later is a one-line edit here.
+const tmdbImageBase = "https://image.tmdb.org/t/p/w342"
+
+// posterURL builds a full TMDB poster URL from a raw poster_path, or nil when the
+// movie has no poster (empty path). Pure.
+func posterURL(path string) *string {
+	if path == "" {
+		return nil
+	}
+	u := tmdbImageBase + path
+	return &u
 }
 
 // releaseYear extracts the leading year from a TMDB release_date ("YYYY-MM-DD").
