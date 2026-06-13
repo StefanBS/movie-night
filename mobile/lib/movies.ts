@@ -34,7 +34,7 @@ export function parseMovie(raw: unknown): Movie {
     tmdbId,
     title,
     releaseYear: releaseYear ?? null,
-    posterUrl: (posterUrl as string | null | undefined) ?? null,
+    posterUrl: posterUrl ?? null,
   };
 }
 
