@@ -79,9 +79,8 @@ type turnStore interface {
 // turnHandler serves GET /groups/{groupId}/turn.
 func turnHandler(store turnStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, err := parseGroupID(r.PathValue("groupId"))
-		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, "invalid group id")
+		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		if !ok {
 			return
 		}
 		present, err := parsePresent(r.URL.Query().Get("present"))

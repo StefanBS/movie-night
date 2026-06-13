@@ -20,11 +20,6 @@ type memberResponse struct {
 	Status string `json:"status"`
 }
 
-// parseGroupID validates a path segment as a UUID.
-func parseGroupID(s string) (uuid.UUID, error) {
-	return uuid.Parse(s)
-}
-
 // toMemberResponses maps sqlc rows to JSON responses, preserving order. It always
 // returns a non-nil slice so an empty result encodes as [] rather than null.
 func toMemberResponses(rows []db.ListGroupMembersRow) []memberResponse {
@@ -47,20 +42,11 @@ type rosterStore interface {
 	ListGroupMembers(ctx context.Context, groupID uuid.UUID) ([]db.ListGroupMembersRow, error)
 }
 
-// writeJSONError writes a JSON error body with a matching Content-Type, so every
-// response this service emits — success and error alike — is application/json.
-func writeJSONError(w http.ResponseWriter, status int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
-}
-
 // membersHandler serves GET /groups/{groupId}/members.
 func membersHandler(store rosterStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, err := parseGroupID(r.PathValue("groupId"))
-		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, "invalid group id")
+		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		if !ok {
 			return
 		}
 
