@@ -21,17 +21,22 @@ func fakeTMDB(t *testing.T) *httptest.Server {
 	mux.HandleFunc("/search/movie", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"results":[
-			{"id":438631,"title":"Dune","release_date":"2021-10-22"},
-			{"id":841,"title":"Dune","release_date":"1984-12-14"}
+			{"id":438631,"title":"Dune","release_date":"2021-10-22","poster_path":"/dune.jpg"},
+			{"id":841,"title":"Dune","release_date":"1984-12-14","poster_path":"/dune84.jpg"}
 		]}`))
 	})
 	mux.HandleFunc("/movie/438631", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":438631,"title":"Dune","release_date":"2021-10-22"}`))
+		_, _ = w.Write([]byte(`{"id":438631,"title":"Dune","release_date":"2021-10-22","poster_path":"/dune.jpg"}`))
 	})
 	mux.HandleFunc("/movie/841", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":841,"title":"Dune","release_date":"1984-12-14"}`))
+		_, _ = w.Write([]byte(`{"id":841,"title":"Dune","release_date":"1984-12-14","poster_path":"/dune84.jpg"}`))
+	})
+	// A movie TMDB knows but with no poster (poster_path null).
+	mux.HandleFunc("/movie/555", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":555,"title":"No Poster","release_date":"2000-01-01","poster_path":null}`))
 	})
 	// Any other /movie/{id} → 404 (unknown movie).
 	mux.HandleFunc("/movie/", func(w http.ResponseWriter, _ *http.Request) {
@@ -112,6 +117,9 @@ func TestMovieAttachIntegration(t *testing.T) {
 			got[0].ReleaseYear == nil || *got[0].ReleaseYear != 2021 {
 			t.Fatalf("results = %+v", got)
 		}
+		if got[0].PosterURL == nil || *got[0].PosterURL != "https://image.tmdb.org/t/p/w342/dune.jpg" {
+			t.Fatalf("search poster = %v, want built w342 url", got[0].PosterURL)
+		}
 	})
 
 	t.Run("attach sets the movie on the night and caches it", func(t *testing.T) {
@@ -124,6 +132,17 @@ func TestMovieAttachIntegration(t *testing.T) {
 			n.Movie.ReleaseYear == nil || *n.Movie.ReleaseYear != 2021 {
 			t.Fatalf("night movie = %+v", n.Movie)
 		}
+		if n.Movie.PosterURL == nil || *n.Movie.PosterURL != "https://image.tmdb.org/t/p/w342/dune.jpg" {
+			t.Fatalf("night poster = %v, want built w342 url", n.Movie.PosterURL)
+		}
+		var poster *string
+		if err := pool.QueryRow(context.Background(),
+			"SELECT poster_path FROM movies WHERE tmdb_id=438631").Scan(&poster); err != nil {
+			t.Fatalf("read poster_path: %v", err)
+		}
+		if poster == nil || *poster != "/dune.jpg" {
+			t.Fatalf("stored poster_path = %v, want /dune.jpg", poster)
+		}
 		var count int
 		if err := pool.QueryRow(context.Background(),
 			"SELECT count(*) FROM movies WHERE tmdb_id=438631").Scan(&count); err != nil {
@@ -131,6 +150,17 @@ func TestMovieAttachIntegration(t *testing.T) {
 		}
 		if count != 1 {
 			t.Fatalf("movies rows for tmdb 438631 = %d, want 1", count)
+		}
+	})
+
+	t.Run("attach a movie with no poster yields null posterUrl", func(t *testing.T) {
+		night := mkNight(t, seededGroup)
+		code, n := attach(t, seededGroup, night, `{"tmdbId":555}`)
+		if code != http.StatusOK {
+			t.Fatalf("attach status = %d, want 200", code)
+		}
+		if n.Movie == nil || n.Movie.PosterURL != nil {
+			t.Fatalf("night poster = %+v, want nil", n.Movie)
 		}
 	})
 

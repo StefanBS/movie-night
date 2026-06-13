@@ -78,9 +78,10 @@ type attendee struct {
 // ReleaseYear is null when TMDB has no release date. int32 matches the movies
 // table and TMDB's domain (ids/years fit in 32 bits); JSON renders it as a number.
 type movieDTO struct {
-	TMDBID      int32  `json:"tmdbId"`
-	Title       string `json:"title"`
-	ReleaseYear *int32 `json:"releaseYear"`
+	TMDBID      int32   `json:"tmdbId"`
+	Title       string  `json:"title"`
+	ReleaseYear *int32  `json:"releaseYear"`
+	PosterURL   *string `json:"posterUrl"`
 }
 
 // nightResponse is the JSON shape for a night and its current attendees.
@@ -112,12 +113,20 @@ func releaseYearPtr(v pgtype.Int4) *int32 {
 	return &y
 }
 
+// posterURLPtr builds the poster URL for a cached movie row, nil when NULL.
+func posterURLPtr(p pgtype.Text) *string {
+	if !p.Valid {
+		return nil
+	}
+	return posterURL(p.String)
+}
+
 // movieDTOPtr maps a cached movie row to the DTO; nil renders "movie" as null.
 func movieDTOPtr(m *db.Movie) *movieDTO {
 	if m == nil {
 		return nil
 	}
-	return &movieDTO{TMDBID: m.TmdbID, Title: m.Title, ReleaseYear: releaseYearPtr(m.ReleaseYear)}
+	return &movieDTO{TMDBID: m.TmdbID, Title: m.Title, ReleaseYear: releaseYearPtr(m.ReleaseYear), PosterURL: posterURLPtr(m.PosterPath)}
 }
 
 // toNightResponse maps a night row + attendee rows to the night DTO. Attendees
@@ -202,11 +211,19 @@ func int4Ptr(v *int32) pgtype.Int4 {
 	return pgtype.Int4{Int32: *v, Valid: true}
 }
 
+// pgText maps a raw string to pgtype.Text for UpsertMovie; "" stores as NULL.
+func pgText(s string) pgtype.Text {
+	if s == "" {
+		return pgtype.Text{}
+	}
+	return pgtype.Text{String: s, Valid: true}
+}
+
 // toMovieResults maps TMDB search hits to the JSON DTO (always non-nil → []).
 func toMovieResults(results []movieResult) []movieDTO {
 	out := make([]movieDTO, 0, len(results))
 	for _, m := range results {
-		out = append(out, movieDTO{TMDBID: m.TMDBID, Title: m.Title, ReleaseYear: m.ReleaseYear})
+		out = append(out, movieDTO{TMDBID: m.TMDBID, Title: m.Title, ReleaseYear: m.ReleaseYear, PosterURL: posterURL(m.PosterPath)})
 	}
 	return out
 }
@@ -610,6 +627,7 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			TmdbID:      movie.TMDBID,
 			Title:       movie.Title,
 			ReleaseYear: int4Ptr(movie.ReleaseYear),
+			PosterPath:  pgText(movie.PosterPath),
 		})
 		if err != nil {
 			internalError(w, gid, "upsert movie", err)

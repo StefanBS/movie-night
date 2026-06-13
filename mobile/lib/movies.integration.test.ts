@@ -83,7 +83,7 @@ test("attachMovie posts the tmdbId and returns the night with its movie", async 
     id: NIGHT,
     scheduledFor: "2026-06-12",
     pickerId: null,
-    movie: { tmdbId: 438631, title: "Dune", releaseYear: 2021 },
+    movie: { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg" },
     attendees: [],
   };
   let path = "";
@@ -102,7 +102,7 @@ test("attachMovie posts the tmdbId and returns the night with its movie", async 
     assert.equal(method, "POST");
     assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/movie`);
     assert.deepEqual(JSON.parse(body), { tmdbId: 438631 });
-    assert.deepEqual(got.movie, { tmdbId: 438631, title: "Dune", releaseYear: 2021 });
+    assert.deepEqual(got.movie, { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg" });
   } finally {
     await server.close();
   }

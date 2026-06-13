@@ -21,13 +21,22 @@ async function startServer(handler: Handler): Promise<{ url: string; close: () =
 }
 
 test("parseMovie accepts a valid movie", () => {
-  const m = parseMovie({ tmdbId: 438631, title: "Dune", releaseYear: 2021 });
-  assert.deepEqual(m, { tmdbId: 438631, title: "Dune", releaseYear: 2021 });
+  const m = parseMovie({ tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg" });
+  assert.deepEqual(m, { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg" });
 });
 
 test("parseMovie treats null and missing releaseYear as null", () => {
   assert.equal(parseMovie({ tmdbId: 1, title: "X", releaseYear: null }).releaseYear, null);
   assert.equal(parseMovie({ tmdbId: 1, title: "X" }).releaseYear, null);
+});
+
+test("parseMovie treats null and missing posterUrl as null", () => {
+  assert.equal(parseMovie({ tmdbId: 1, title: "X", posterUrl: null }).posterUrl, null);
+  assert.equal(parseMovie({ tmdbId: 1, title: "X" }).posterUrl, null);
+});
+
+test("parseMovie rejects a non-string posterUrl", () => {
+  assert.throws(() => parseMovie({ tmdbId: 1, title: "X", posterUrl: 5 }), /posterUrl/);
 });
 
 test("parseMovie rejects bad shapes", () => {

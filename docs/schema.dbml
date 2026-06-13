@@ -81,6 +81,7 @@ Table movies {
   tmdb_id      integer      [not null, unique, note: 'Canonical id from TMDB (ADR-0002)']
   title        varchar      [not null]
   release_year integer      [null]
+  poster_path  varchar      [null, note: 'Raw TMDB poster path; full image URL built at render time']
   cached_at    timestamptz  [not null, default: `now()`, note: 'Metadata cached from TMDB; refresh as needed']
 
   Note: 'Movie metadata cached from TMDB.'

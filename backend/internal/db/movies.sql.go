@@ -13,7 +13,7 @@ import (
 )
 
 const getMovie = `-- name: GetMovie :one
-SELECT id, tmdb_id, title, release_year, cached_at
+SELECT id, tmdb_id, title, release_year, cached_at, poster_path
 FROM movies
 WHERE id = $1
 `
@@ -27,6 +27,7 @@ func (q *Queries) GetMovie(ctx context.Context, id uuid.UUID) (Movie, error) {
 		&i.Title,
 		&i.ReleaseYear,
 		&i.CachedAt,
+		&i.PosterPath,
 	)
 	return i, err
 }
@@ -60,21 +61,28 @@ func (q *Queries) SetNightMovie(ctx context.Context, arg SetNightMovieParams) (P
 }
 
 const upsertMovie = `-- name: UpsertMovie :one
-INSERT INTO movies (tmdb_id, title, release_year)
-VALUES ($1, $2, $3)
+INSERT INTO movies (tmdb_id, title, release_year, poster_path)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT (tmdb_id) DO UPDATE
-    SET title = excluded.title, release_year = excluded.release_year, cached_at = now()
-RETURNING id, tmdb_id, title, release_year, cached_at
+    SET title = excluded.title, release_year = excluded.release_year,
+        poster_path = excluded.poster_path, cached_at = now()
+RETURNING id, tmdb_id, title, release_year, cached_at, poster_path
 `
 
 type UpsertMovieParams struct {
 	TmdbID      int32       `json:"tmdb_id"`
 	Title       string      `json:"title"`
 	ReleaseYear pgtype.Int4 `json:"release_year"`
+	PosterPath  pgtype.Text `json:"poster_path"`
 }
 
 func (q *Queries) UpsertMovie(ctx context.Context, arg UpsertMovieParams) (Movie, error) {
-	row := q.db.QueryRow(ctx, upsertMovie, arg.TmdbID, arg.Title, arg.ReleaseYear)
+	row := q.db.QueryRow(ctx, upsertMovie,
+		arg.TmdbID,
+		arg.Title,
+		arg.ReleaseYear,
+		arg.PosterPath,
+	)
 	var i Movie
 	err := row.Scan(
 		&i.ID,
@@ -82,6 +90,7 @@ func (q *Queries) UpsertMovie(ctx context.Context, arg UpsertMovieParams) (Movie
 		&i.Title,
 		&i.ReleaseYear,
 		&i.CachedAt,
+		&i.PosterPath,
 	)
 	return i, err
 }
