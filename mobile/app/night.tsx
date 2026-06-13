@@ -256,57 +256,65 @@ export default function NightScreen() {
           <Button title="Start tonight's night" onPress={onCreate} disabled={busy !== null} />
         </View>
       ) : (
-        <>
-          <Text style={styles.heading}>{`Night of ${night.scheduledFor}`}</Text>
-          <Text style={styles.hint}>
-            {"Tap to add or remove — attendance saves automatically."}
-          </Text>
-          {actionError !== null && <Text style={[styles.banner, styles.error]}>{actionError}</Text>}
+        // The whole screen is one FlatList so it scrolls as a unit: the
+        // heading + movie search live in ListHeaderComponent, the members are
+        // the data rows, and the pick order is the footer. Passing the header
+        // as a JSX element (not a function component) keeps the search
+        // TextInput from remounting — and losing focus — on every keystroke.
+        <FlatList
+          data={members}
+          keyExtractor={(m) => m.id}
+          ListHeaderComponent={
+            <>
+              <Text style={styles.heading}>{`Night of ${night.scheduledFor}`}</Text>
+              <Text style={styles.hint}>
+                {"Tap to add or remove — attendance saves automatically."}
+              </Text>
+              {actionError !== null && <Text style={[styles.banner, styles.error]}>{actionError}</Text>}
 
-          <Text style={styles.section}>{"Tonight's movie"}</Text>
-          {night.movie !== null && !changingMovie ? (
-            <View style={styles.movieRow}>
-              <View style={styles.movieInfo}>
-                <Poster uri={night.movie.posterUrl} />
-                <Text style={styles.name}>{movieLabel(night.movie)}</Text>
-              </View>
-              <Button title="Change movie" onPress={() => setChangingMovie(true)} disabled={busy !== null} />
-            </View>
-          ) : (
-            <View>
-              <View style={styles.searchRow}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Search a film title…"
-                  value={movieQuery}
-                  onChangeText={setMovieQuery}
-                  onSubmitEditing={onSearch}
-                  returnKeyType="search"
-                  autoCorrect={false}
-                />
-                <Button title="Search" onPress={onSearch} disabled={searching || movieQuery.trim() === ""} />
-              </View>
-              {searchError !== null && <Text style={[styles.hint, styles.error]}>{searchError}</Text>}
-              {results.map((m) => (
-                <Pressable
-                  key={m.tmdbId}
-                  onPress={() => onAttach(m.tmdbId)}
-                  disabled={busy !== null}
-                  style={({ pressed }) => [styles.resultRow, pressed && styles.rowPressed]}
-                >
-                  <Poster uri={m.posterUrl} />
-                  <Text style={[styles.name, styles.resultLabel]}>{movieLabel(m)}</Text>
-                  {busy === "movie" ? <Text style={styles.tag}>…</Text> : null}
-                </Pressable>
-              ))}
-            </View>
-          )}
+              <Text style={styles.section}>{"Tonight's movie"}</Text>
+              {night.movie !== null && !changingMovie ? (
+                <View style={styles.movieRow}>
+                  <View style={styles.movieInfo}>
+                    <Poster uri={night.movie.posterUrl} />
+                    <Text style={styles.name}>{movieLabel(night.movie)}</Text>
+                  </View>
+                  <Button title="Change movie" onPress={() => setChangingMovie(true)} disabled={busy !== null} />
+                </View>
+              ) : (
+                <View>
+                  <View style={styles.searchRow}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Search a film title…"
+                      value={movieQuery}
+                      onChangeText={setMovieQuery}
+                      onSubmitEditing={onSearch}
+                      returnKeyType="search"
+                      autoCorrect={false}
+                    />
+                    <Button title="Search" onPress={onSearch} disabled={searching || movieQuery.trim() === ""} />
+                  </View>
+                  {searchError !== null && <Text style={[styles.hint, styles.error]}>{searchError}</Text>}
+                  {results.map((m) => (
+                    <Pressable
+                      key={m.tmdbId}
+                      onPress={() => onAttach(m.tmdbId)}
+                      disabled={busy !== null}
+                      style={({ pressed }) => [styles.resultRow, pressed && styles.rowPressed]}
+                    >
+                      <Poster uri={m.posterUrl} />
+                      <Text style={[styles.name, styles.resultLabel]}>{movieLabel(m)}</Text>
+                      {busy === "movie" ? <Text style={styles.tag}>…</Text> : null}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
 
-          <Text style={styles.section}>{"Who's here?"}</Text>
-          <FlatList
-            data={members}
-            keyExtractor={(m) => m.id}
-            renderItem={({ item }) => {
+              <Text style={styles.section}>{"Who's here?"}</Text>
+            </>
+          }
+          renderItem={({ item }) => {
               const present = attendeeIds.has(item.id);
               const isBusy = busy === item.id;
               return (
@@ -377,7 +385,6 @@ export default function NightScreen() {
               </View>
             }
           />
-        </>
       )}
     </View>
   );
