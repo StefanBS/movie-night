@@ -21,6 +21,15 @@ updates:
       mobile:
         patterns:
           - "*"
+    # Hold majors that are coupled to Expo SDK 56 / the Node 22 runtime:
+    #   - eslint 10 breaks eslint-config-expo@56's bundled eslint-plugin-react
+    #   - @types/node must track the Node 22 runtime major (see CLAUDE.md)
+    # Bump these deliberately alongside an SDK / runtime change, not via a routine PR.
+    ignore:
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
