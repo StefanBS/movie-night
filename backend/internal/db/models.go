@@ -126,6 +126,7 @@ type Movie struct {
 	Title       string             `json:"title"`
 	ReleaseYear pgtype.Int4        `json:"release_year"`
 	CachedAt    pgtype.Timestamptz `json:"cached_at"`
+	PosterPath  pgtype.Text        `json:"poster_path"`
 }
 
 type Pick struct {
