@@ -17,6 +17,13 @@
 #      specific minor/exact version (safe-area-context 5.6 -> 5.8, screens
 #      4.16 -> 4.25, react pinned exact 19.1.0), so the SDK-coupling bump is a
 #      MINOR (or patch). We ignore MAJOR + MINOR; only patches flow.
+#   3. Toolchain packages (eslint, typescript) are NOT in the manifest but are
+#      transitively pinned to the SDK 54 toolchain by a peer constraint: the
+#      eslint-config-expo 10 plugins still call eslint's removed context.getFilename
+#      (so eslint must stay <10), and Expo's @expo/require-utils peers
+#      typescript "^5" (so typescript must stay <6). Each broke a real grouped
+#      PR (#15). The coupling is on the MAJOR, so we ignore MAJOR only; minor +
+#      patch within 9.x / 5.x flow.
 #
 # Patch updates within SDK 54 still flow, and security-advisory updates are
 # unaffected. Re-derive (don't hand-edit) when bumping the SDK. Do NOT remove it.
@@ -70,6 +77,11 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: react-native-web
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # --- Bucket 3: SDK-coupled toolchain (peer-pinned), ignore major only ---
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
