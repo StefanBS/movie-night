@@ -2,6 +2,7 @@ export type Movie = {
   tmdbId: number;
   title: string;
   releaseYear: number | null;
+  posterUrl: string | null;
 };
 
 // movieLabel renders a movie as "Title (Year)", or just the title when the
@@ -16,7 +17,7 @@ export function parseMovie(raw: unknown): Movie {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("expected a movie object");
   }
-  const { tmdbId, title, releaseYear } = raw as Record<string, unknown>;
+  const { tmdbId, title, releaseYear, posterUrl } = raw as Record<string, unknown>;
   if (typeof tmdbId !== "number") {
     throw new Error("movie: tmdbId must be a number");
   }
@@ -26,7 +27,15 @@ export function parseMovie(raw: unknown): Movie {
   if (releaseYear !== undefined && releaseYear !== null && typeof releaseYear !== "number") {
     throw new Error("movie: releaseYear must be a number or null");
   }
-  return { tmdbId, title, releaseYear: releaseYear ?? null };
+  if (posterUrl !== undefined && posterUrl !== null && typeof posterUrl !== "string") {
+    throw new Error("movie: posterUrl must be a string or null");
+  }
+  return {
+    tmdbId,
+    title,
+    releaseYear: releaseYear ?? null,
+    posterUrl: (posterUrl as string | null | undefined) ?? null,
+  };
 }
 
 // searchMovies proxies TMDB search through the backend and returns typed results.

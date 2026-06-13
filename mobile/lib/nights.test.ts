@@ -79,9 +79,9 @@ test("parseNight rejects a non-string, non-null pickerId", () => {
 test("parseNight reads an attached movie", () => {
   const n = parseNight({
     ...valid,
-    movie: { tmdbId: 438631, title: "Dune", releaseYear: 2021 },
+    movie: { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg" },
   });
-  assert.deepEqual(n.movie, { tmdbId: 438631, title: "Dune", releaseYear: 2021 });
+  assert.deepEqual(n.movie, { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg" });
 });
 
 test("parseNight accepts a null or absent movie", () => {
