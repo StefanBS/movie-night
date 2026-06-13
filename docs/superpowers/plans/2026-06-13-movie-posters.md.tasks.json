@@ -4,42 +4,42 @@
     {
       "id": 8,
       "subject": "Task 1: Schema migration + movies queries + sqlc",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Add the nullable poster_path column to movies, thread it through UpsertMovie/GetMovie, and regenerate sqlc so db.Movie and UpsertMovieParams carry it.\n\n**Files:** Create backend/migrations/0006_movie_poster.sql; Modify backend/internal/db/query/movies.sql, docs/schema.dbml; Regenerate backend/internal/db/models.go, movies.sql.go.\n\n**Verify:** cd backend && just sqlc && just check\n\n```json:metadata\n{\"files\": [\"backend/migrations/0006_movie_poster.sql\", \"backend/internal/db/query/movies.sql\", \"backend/internal/db/models.go\", \"backend/internal/db/movies.sql.go\", \"docs/schema.dbml\"], \"verifyCommand\": \"cd backend && just sqlc && just check\", \"acceptanceCriteria\": [\"migration applies and reverts cleanly\", \"db.Movie and UpsertMovieParams gain PosterPath pgtype.Text\", \"just check passes\", \"schema.dbml documents poster_path nullable\"], \"modelTier\": \"standard\"}\n```"
     },
     {
       "id": 9,
       "subject": "Task 2: TMDB client carries poster_path + posterURL helper",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Decode poster_path from TMDB into movieResult, and add the pure posterURL helper that builds the fixed-size (w342) image URL.\n\n**Files:** Modify backend/tmdb.go; Test backend/tmdb_test.go.\n\n**Verify:** cd backend && go test -run 'TestPosterURL|TestParseTMDBSearch|TestParseTMDBMovie' ./...\n\n```json:metadata\n{\"files\": [\"backend/tmdb.go\", \"backend/tmdb_test.go\"], \"verifyCommand\": \"cd backend && go test -run 'TestPosterURL|TestParseTMDBSearch|TestParseTMDBMovie' ./...\", \"acceptanceCriteria\": [\"movieResult/tmdbMovieJSON carry poster_path and parsers map it\", \"posterURL builds w342 url; empty -> nil\", \"unit tests pass\"], \"modelTier\": \"standard\"}\n```"
     },
     {
       "id": 10,
       "subject": "Task 3: DTO + handler wiring (posterUrl in search and night)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [8, 9],
       "description": "**Goal:** Add posterUrl to movieDTO, populate it in the search mapper and the night mapper, and store the poster path on attach. Unit-test both mapping paths.\n\n**Files:** Modify backend/nights.go; Test backend/nights_test.go.\n\n**Verify:** cd backend && just test\n\n```json:metadata\n{\"files\": [\"backend/nights.go\", \"backend/nights_test.go\"], \"verifyCommand\": \"cd backend && just test\", \"acceptanceCriteria\": [\"movieDTO has PosterURL *string json posterUrl\", \"toMovieResults and movieDTOPtr emit posterUrl (null when absent)\", \"handler stores PosterPath via UpsertMovie\", \"unit tests pass\"], \"modelTier\": \"standard\"}\n```"
     },
     {
       "id": 11,
       "subject": "Task 4: Backend integration tests for posters",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [10],
       "description": "**Goal:** Prove end-to-end (real Postgres + fake TMDB upstream) that search returns built posterUrl, attach persists the raw poster_path and the night DTO carries posterUrl, and a no-poster movie yields null.\n\n**Files:** Modify backend/movies_integration_test.go.\n\n**Verify:** cd backend && just test-integration\n\n```json:metadata\n{\"files\": [\"backend/movies_integration_test.go\"], \"verifyCommand\": \"cd backend && just test-integration\", \"acceptanceCriteria\": [\"fake upstream returns poster_path incl a null-poster movie\", \"search posterUrl is built w342 url\", \"attach DTO posterUrl + stored poster_path verified\", \"no-poster movie yields nil posterUrl\"], \"modelTier\": \"standard\"}\n```"
     },
     {
       "id": 12,
       "subject": "Task 5: Mobile lib — Movie.posterUrl + parseMovie + tests",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Add posterUrl to the Movie type and validate it in parseMovie; update all lib tests (unit + integration fixtures) so the type, runtime parsing, and just check stay consistent.\n\n**Files:** Modify mobile/lib/movies.ts; Test mobile/lib/movies.test.ts, mobile/lib/movies.integration.test.ts, mobile/lib/nights.test.ts.\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/lib/movies.ts\", \"mobile/lib/movies.test.ts\", \"mobile/lib/movies.integration.test.ts\", \"mobile/lib/nights.test.ts\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"Movie has posterUrl string|null; parseMovie maps string/null/missing and rejects non-string\", \"all Movie/Night fixtures include posterUrl (typecheck green)\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
     },
     {
       "id": 13,
       "subject": "Task 6: Mobile UI — poster thumbnails on the night screen",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [12],
       "description": "**Goal:** Render a small poster thumbnail (built-in RN Image) in both the search-result rows and the attached-movie row, with a plain placeholder box when posterUrl is null.\n\n**Files:** Modify mobile/app/night.tsx.\n\n**Verify:** cd mobile && just check; then just start and exercise search/attach.\n\n```json:metadata\n{\"files\": [\"mobile/app/night.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"Poster component: Image for url, plain box for null, fixed ~46x69\", \"appears same size in search rows and attached-movie row\", \"just check passes\", \"manual: thumbnails in search + attached; placeholder for no-poster\"], \"modelTier\": \"standard\"}\n```"
     }
   ],
-  "lastUpdated": "2026-06-13T14:10:00Z"
+  "lastUpdated": "2026-06-13T15:00:00Z"
 }
