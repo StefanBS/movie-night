@@ -13,17 +13,23 @@ import (
 // "how does this service parse paths and emit errors" is findable without
 // opening a feature handler.
 
-// pathUUID parses the named path segment as a UUID. On a malformed value it
-// writes a 400 with errMsg and returns ok=false (the handler should then return).
-// This is the single primitive every route uses to validate an id in the path;
-// routes with two ids (group + user/night) call it once per segment.
-func pathUUID(w http.ResponseWriter, r *http.Request, segment, errMsg string) (uuid.UUID, bool) {
-	id, err := uuid.Parse(r.PathValue(segment))
+// parseUUID validates an already-extracted string as a UUID. On a malformed
+// value it writes a 400 with errMsg and returns ok=false (the handler should
+// then return). This is the single primitive that maps a bad id to a 400; both
+// pathUUID (path segments) and handlers parsing a JSON body field build on it.
+func parseUUID(w http.ResponseWriter, raw, errMsg string) (uuid.UUID, bool) {
+	id, err := uuid.Parse(raw)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, errMsg)
 		return uuid.UUID{}, false
 	}
 	return id, true
+}
+
+// pathUUID parses the named path segment as a UUID, delegating the parse-and-400
+// to parseUUID. Routes with two ids (group + user/night) call it once per segment.
+func pathUUID(w http.ResponseWriter, r *http.Request, segment, errMsg string) (uuid.UUID, bool) {
+	return parseUUID(w, r.PathValue(segment), errMsg)
 }
 
 // writeJSONError writes a JSON error body with a matching Content-Type, so every

@@ -310,9 +310,8 @@ func addAttendeeHandler(store nightStore) http.HandlerFunc {
 			writeJSONError(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
-		uid, err := uuid.Parse(req.UserID)
-		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, "invalid user id")
+		uid, ok := parseUUID(w, req.UserID, "invalid user id")
+		if !ok {
 			return
 		}
 		if !ensureNight(w, r, store, gid, nightID) {
@@ -448,9 +447,8 @@ func recordNightPickHandler(store nightStore) http.HandlerFunc {
 			writeJSONError(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
-		pickerID, err := uuid.Parse(req.PickerID)
-		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, "invalid picker id")
+		pickerID, ok := parseUUID(w, req.PickerID, "invalid picker id")
+		if !ok {
 			return
 		}
 		if !ensureNight(w, r, store, gid, nightID) {
