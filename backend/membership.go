@@ -58,13 +58,6 @@ type memberStore interface {
 	MaxRotationPosition(ctx context.Context, groupID uuid.UUID) (int32, error)
 }
 
-// internalError logs a failed store call and writes a 500. gid is a parsed
-// uuid.UUID (canonical hex), not free-form input.
-func internalError(w http.ResponseWriter, gid uuid.UUID, what string, err error) {
-	log.Printf("%s (%s): %v", what, gid, err) //#nosec G706 -- gid is a parsed uuid.UUID
-	writeJSONError(w, http.StatusInternalServerError, "internal server error")
-}
-
 // encodeMember writes a member DTO as JSON with the given status code.
 func encodeMember(w http.ResponseWriter, gid, userID uuid.UUID, name, role, status string, code int) {
 	w.Header().Set("Content-Type", "application/json")
@@ -83,9 +76,8 @@ func encodeMember(w http.ResponseWriter, gid, userID uuid.UUID, name, role, stat
 // the rotation as an active core member, seeded to the current average.
 func joinMemberHandler(store memberStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, err := parseGroupID(r.PathValue("groupId"))
-		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, "invalid group id")
+		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		if !ok {
 			return
 		}
 		var req joinRequest
@@ -148,22 +140,6 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 	}
 }
 
-// parseGroupAndUser validates the {groupId} and {userId} path segments as UUIDs,
-// writing a 400 and returning ok=false on either malformed value.
-func parseGroupAndUser(w http.ResponseWriter, r *http.Request) (gid, uid uuid.UUID, ok bool) {
-	gid, err := parseGroupID(r.PathValue("groupId"))
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "invalid group id")
-		return uuid.UUID{}, uuid.UUID{}, false
-	}
-	uid, err = uuid.Parse(r.PathValue("userId"))
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "invalid user id")
-		return uuid.UUID{}, uuid.UUID{}, false
-	}
-	return gid, uid, true
-}
-
 // loadMember fetches a member for a transition handler, mapping a missing
 // membership to 404 and any other error to 500. ok=false means a response has
 // already been written and the caller should stop.
@@ -183,7 +159,11 @@ func loadMember(w http.ResponseWriter, r *http.Request, store memberStore, gid, 
 // deactivateMemberHandler serves POST /groups/{groupId}/members/{userId}/deactivate.
 func deactivateMemberHandler(store memberStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, uid, ok := parseGroupAndUser(w, r)
+		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		if !ok {
+			return
+		}
+		uid, ok := pathUUID(w, r, "userId", "invalid user id")
 		if !ok {
 			return
 		}
@@ -208,7 +188,11 @@ func deactivateMemberHandler(store memberStore) http.HandlerFunc {
 // reactivateMemberHandler serves POST /groups/{groupId}/members/{userId}/reactivate.
 func reactivateMemberHandler(store memberStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, uid, ok := parseGroupAndUser(w, r)
+		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		if !ok {
+			return
+		}
+		uid, ok := pathUUID(w, r, "userId", "invalid user id")
 		if !ok {
 			return
 		}
@@ -250,7 +234,11 @@ func reactivateMemberHandler(store memberStore) http.HandlerFunc {
 // promoteMemberHandler serves POST /groups/{groupId}/members/{userId}/promote.
 func promoteMemberHandler(store memberStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, uid, ok := parseGroupAndUser(w, r)
+		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		if !ok {
+			return
+		}
+		uid, ok := pathUUID(w, r, "userId", "invalid user id")
 		if !ok {
 			return
 		}
