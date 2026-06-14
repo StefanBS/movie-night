@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseMembers, type Member } from "./members";
+import { memberActions, parseMembers, type Member, type MemberAction } from "./members";
 
 // parseMembers validates an untrusted JSON payload from the backend and
 // returns typed Members, or throws a descriptive error. Pure, table-driven.
@@ -55,5 +55,30 @@ const invalid: { name: string; raw: unknown; wantError: RegExp }[] = [
 for (const c of invalid) {
   test(c.name, () => {
     assert.throws(() => parseMembers(c.raw), c.wantError);
+  });
+}
+
+// memberActions maps a member's state to the churn transitions it can undergo.
+const actionCases: { name: string; member: Member; want: MemberAction[] }[] = [
+  {
+    name: "inactive member can only reactivate",
+    member: { id: "a", name: "Ada", role: "core", status: "inactive" },
+    want: ["reactivate"],
+  },
+  {
+    name: "active guest can promote or deactivate",
+    member: { id: "b", name: "Bo", role: "guest", status: "active" },
+    want: ["promote", "deactivate"],
+  },
+  {
+    name: "active core member can only deactivate",
+    member: { id: "c", name: "Cy", role: "core", status: "active" },
+    want: ["deactivate"],
+  },
+];
+
+for (const c of actionCases) {
+  test(c.name, () => {
+    assert.deepEqual(memberActions(c.member), c.want);
   });
 }

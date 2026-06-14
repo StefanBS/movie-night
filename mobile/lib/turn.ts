@@ -1,3 +1,5 @@
+import { requestJson } from "./http";
+
 export type TurnMember = {
   id: string;
   name: string;
@@ -43,14 +45,10 @@ export function parseTurn(raw: unknown): TurnMember[] {
 
 // fetchTurn loads a group's turn ranking from the backend. The optional signal
 // lets the caller cancel an in-flight request (e.g. on unmount).
-export async function fetchTurn(
+export function fetchTurn(
   baseUrl: string,
   groupId: string,
   signal?: AbortSignal,
 ): Promise<TurnMember[]> {
-  const res = await fetch(`${baseUrl}/groups/${groupId}/turn`, { signal });
-  if (!res.ok) {
-    throw new Error(`request failed: ${res.status}`);
-  }
-  return parseTurn(await res.json());
+  return requestJson(`${baseUrl}/groups/${groupId}/turn`, parseTurn, { signal });
 }

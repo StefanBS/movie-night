@@ -1,6 +1,10 @@
 const DEFAULT_API_URL = "http://localhost:8080";
 const BACKEND_PORT = 8080;
 
+// GROUP_ID is the seeded "Friday Film Club" group shared across the backend
+// seed, this app, and the backend integration test (the shared contract).
+export const GROUP_ID = "11111111-1111-1111-1111-111111111111";
+
 function isLoopbackHost(host: string): boolean {
   return host === "localhost" || host === "127.0.0.1";
 }

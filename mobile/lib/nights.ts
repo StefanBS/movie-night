@@ -1,3 +1,4 @@
+import { requestJson, requestJsonOrNull } from "./http";
 import { parseMovie, type Movie } from "./movies";
 import { parseTurn, type TurnMember } from "./turn";
 
@@ -61,12 +62,8 @@ export function parseNight(raw: unknown): Night {
   };
 }
 
-async function fetchNight(url: string, init?: RequestInit): Promise<Night> {
-  const res = await fetch(url, init);
-  if (!res.ok) {
-    throw new Error(`request failed: ${res.status}`);
-  }
-  return parseNight(await res.json());
+function fetchNight(url: string, init?: RequestInit): Promise<Night> {
+  return requestJson(url, parseNight, init);
 }
 
 // createNight plans a night for scheduledFor (ISO YYYY-MM-DD) with an optional
@@ -98,19 +95,12 @@ export function getNight(
 // getCurrentNight loads the group's latest night (open OR finalized) so the screen
 // can resume and correct it across sessions, or null when there is none (the
 // backend returns 404 in that case).
-export async function getCurrentNight(
+export function getCurrentNight(
   baseUrl: string,
   groupId: string,
   signal?: AbortSignal,
 ): Promise<Night | null> {
-  const res = await fetch(`${baseUrl}/groups/${groupId}/nights/current`, { signal });
-  if (res.status === 404) {
-    return null;
-  }
-  if (!res.ok) {
-    throw new Error(`request failed: ${res.status}`);
-  }
-  return parseNight(await res.json());
+  return requestJsonOrNull(`${baseUrl}/groups/${groupId}/nights/current`, parseNight, { signal });
 }
 
 export function addAttendee(
@@ -142,17 +132,13 @@ export function removeAttendee(
 }
 
 // getNightTurn loads the core pick order for a night (element 0 is the picker).
-export async function getNightTurn(
+export function getNightTurn(
   baseUrl: string,
   groupId: string,
   nightId: string,
   signal?: AbortSignal,
 ): Promise<TurnMember[]> {
-  const res = await fetch(`${baseUrl}/groups/${groupId}/nights/${nightId}/turn`, { signal });
-  if (!res.ok) {
-    throw new Error(`request failed: ${res.status}`);
-  }
-  return parseTurn(await res.json());
+  return requestJson(`${baseUrl}/groups/${groupId}/nights/${nightId}/turn`, parseTurn, { signal });
 }
 
 // recordNightPick sets (or corrects) the night's picker. The backend derives
