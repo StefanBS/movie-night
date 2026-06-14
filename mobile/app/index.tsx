@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -9,35 +9,30 @@ import {
 import Constants from "expo-constants";
 import { Link } from "expo-router";
 
-import { resolveApiBaseUrl } from "../lib/api";
+import { GROUP_ID, resolveApiBaseUrl } from "../lib/api";
+import { errorMessage } from "../lib/errors";
 import { fetchTurn, type TurnMember } from "../lib/turn";
 
 const API_URL = resolveApiBaseUrl({
   envUrl: process.env.EXPO_PUBLIC_API_URL,
   hostUri: Constants.expoConfig?.hostUri,
 });
-const GROUP_ID = "11111111-1111-1111-1111-111111111111";
 
 export default function TurnScreen() {
   const [turn, setTurn] = useState<TurnMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadTurn = useCallback(async (signal?: AbortSignal) => {
-    const data = await fetchTurn(API_URL, GROUP_ID, signal);
-    setTurn(data);
-  }, []);
-
   useEffect(() => {
     const controller = new AbortController();
     (async () => {
       try {
-        await loadTurn(controller.signal);
+        setTurn(await fetchTurn(API_URL, GROUP_ID, controller.signal));
       } catch (e) {
         if (controller.signal.aborted) {
           return;
         }
-        setError(e instanceof Error ? e.message : "failed to load turn order");
+        setError(errorMessage(e, "failed to load turn order"));
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
@@ -45,7 +40,7 @@ export default function TurnScreen() {
       }
     })();
     return () => controller.abort();
-  }, [loadTurn]);
+  }, []);
 
   return (
     <View style={styles.container}>

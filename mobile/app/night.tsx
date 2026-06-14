@@ -12,8 +12,9 @@ import {
 } from "react-native";
 import Constants from "expo-constants";
 
-import { resolveApiBaseUrl } from "../lib/api";
+import { GROUP_ID, resolveApiBaseUrl } from "../lib/api";
 import { todayLocalISO } from "../lib/date";
+import { errorMessage } from "../lib/errors";
 import { fetchMembers, type Member } from "../lib/members";
 import {
   addAttendee,
@@ -32,7 +33,6 @@ const API_URL = resolveApiBaseUrl({
   envUrl: process.env.EXPO_PUBLIC_API_URL,
   hostUri: Constants.expoConfig?.hostUri,
 });
-const GROUP_ID = "11111111-1111-1111-1111-111111111111";
 
 // Poster renders a fixed-size TMDB thumbnail, or a plain neutral box when the
 // movie has no poster (posterUrl null) — never a broken-image icon.
@@ -41,6 +41,42 @@ function Poster({ uri }: { uri: string | null }) {
     return <View style={[styles.poster, styles.posterPlaceholder]} />;
   }
   return <Image source={{ uri }} style={styles.poster} resizeMode="cover" />;
+}
+
+// PickRow is one tappable name in the night's pick lists (the core pick order
+// or the guests present). It highlights the recorded picker, or — before a pick
+// is recorded — the implied next pick; tapping it records that member.
+function PickRow({
+  label,
+  recorded,
+  impliedPick,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  recorded: boolean;
+  impliedPick: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.orderRow,
+        (recorded || impliedPick) && styles.pickerRow,
+        pressed && styles.rowPressed,
+      ]}
+    >
+      <Text style={styles.name}>{label}</Text>
+      {recorded ? (
+        <Text style={styles.badge}>{"Recorded ✓"}</Text>
+      ) : impliedPick ? (
+        <Text style={styles.badge}>{"Tonight's pick"}</Text>
+      ) : null}
+    </Pressable>
+  );
 }
 
 export default function NightScreen() {
@@ -82,7 +118,7 @@ export default function NightScreen() {
         }
       } catch (e) {
         if (!controller.signal.aborted) {
-          setError(e instanceof Error ? e.message : "failed to load members");
+          setError(errorMessage(e, "failed to load members"));
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -102,103 +138,90 @@ export default function NightScreen() {
     setOrder(await getNightTurn(API_URL, GROUP_ID, nightId));
   }, []);
 
-  const onCreate = useCallback(async () => {
-    if (busy !== null) {
-      return;
-    }
-    setBusy("create");
-    setActionError(null);
-    try {
-      // No abort signal on write actions: a create/attendance write should finish
-      // even if the screen unmounts mid-request; a stray state set after unmount is
-      // benign under React 18 (mirrors index.tsx's onRecord).
-      const created = await createNight(API_URL, GROUP_ID, todayLocalISO());
-      setNight(created);
-      // The night was created; a failed order refresh shouldn't report the
-      // create as failed. Surface refresh trouble on its own.
-      try {
-        await refreshOrder(created.id);
-      } catch (e) {
-        setActionError(e instanceof Error ? e.message : "failed to load pick order");
-      }
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "failed to create night");
-    } finally {
-      setBusy(null);
-    }
-  }, [busy, refreshOrder]);
-
-  const onToggle = useCallback(
-    async (member: Member) => {
-      if (night === null || busy !== null) {
+  // runNightWrite is the shared envelope for the screen's write actions: guard
+  // against a concurrent action, mark `busyKey` in flight, run the write, adopt
+  // the returned night, then refresh the pick order — reporting a refresh
+  // failure on its own so a successful write is never shown as failed. When
+  // `clearOrder` is set (starting a night) the previous order is dropped before
+  // the refresh so it doesn't linger on screen.
+  //
+  // No abort signal on write actions: a write should finish even if the screen
+  // unmounts mid-request; a stray state set after unmount is benign under React 18.
+  const runNightWrite = useCallback(
+    async (
+      busyKey: string,
+      write: () => Promise<Night>,
+      fallback: string,
+      clearOrder = false,
+    ) => {
+      if (busy !== null) {
         return;
       }
-      setBusy(member.id);
+      setBusy(busyKey);
       setActionError(null);
       try {
-        const updated = attendeeIds.has(member.id)
-          ? await removeAttendee(API_URL, GROUP_ID, night.id, member.id)
-          : await addAttendee(API_URL, GROUP_ID, night.id, member.id);
+        const updated = await write();
         setNight(updated);
+        if (clearOrder) {
+          setOrder([]);
+        }
         try {
           await refreshOrder(updated.id);
         } catch (e) {
-          setActionError(e instanceof Error ? e.message : "failed to load pick order");
+          setActionError(errorMessage(e, "failed to load pick order"));
         }
       } catch (e) {
-        setActionError(e instanceof Error ? e.message : "failed to update attendance");
+        setActionError(errorMessage(e, fallback));
       } finally {
         setBusy(null);
       }
     },
-    [night, busy, attendeeIds, refreshOrder],
+    [busy, refreshOrder],
+  );
+
+  // onCreate starts tonight's night — used both for the first night and to
+  // start the next one (clearOrder drops the finished night's order).
+  const onCreate = useCallback(
+    () =>
+      runNightWrite(
+        "create",
+        () => createNight(API_URL, GROUP_ID, todayLocalISO()),
+        "failed to create night",
+        true,
+      ),
+    [runNightWrite],
+  );
+
+  const onToggle = useCallback(
+    (member: Member) => {
+      if (night === null) {
+        return;
+      }
+      return runNightWrite(
+        member.id,
+        () =>
+          attendeeIds.has(member.id)
+            ? removeAttendee(API_URL, GROUP_ID, night.id, member.id)
+            : addAttendee(API_URL, GROUP_ID, night.id, member.id),
+        "failed to update attendance",
+      );
+    },
+    [night, attendeeIds, runNightWrite],
   );
 
   const onRecordPick = useCallback(
-    async (memberId: string) => {
-      if (night === null || busy !== null) {
+    (memberId: string) => {
+      if (night === null) {
         return;
       }
-      setBusy(memberId);
-      setActionError(null);
-      try {
-        const updated = await recordNightPick(API_URL, GROUP_ID, night.id, memberId);
-        setNight(updated);
-        try {
-          await refreshOrder(updated.id);
-        } catch (e) {
-          setActionError(e instanceof Error ? e.message : "failed to load pick order");
-        }
-      } catch (e) {
-        setActionError(e instanceof Error ? e.message : "failed to record pick");
-      } finally {
-        setBusy(null);
-      }
+      return runNightWrite(
+        memberId,
+        () => recordNightPick(API_URL, GROUP_ID, night.id, memberId),
+        "failed to record pick",
+      );
     },
-    [night, busy, refreshOrder],
+    [night, runNightWrite],
   );
-
-  const onStartNew = useCallback(async () => {
-    if (busy !== null) {
-      return;
-    }
-    setBusy("create");
-    setActionError(null);
-    try {
-      const created = await createNight(API_URL, GROUP_ID, todayLocalISO());
-      setNight(created);
-      setOrder([]);
-      try {
-        await refreshOrder(created.id);
-      } catch (e) {
-        setActionError(e instanceof Error ? e.message : "failed to load pick order");
-      }
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "failed to start a new night");
-    } finally {
-      setBusy(null);
-    }
-  }, [busy, refreshOrder]);
 
   const onSearch = useCallback(async () => {
     const q = movieQuery.trim();
@@ -210,7 +233,7 @@ export default function NightScreen() {
     try {
       setResults(await searchMovies(API_URL, q));
     } catch (e) {
-      setSearchError(e instanceof Error ? e.message : "search failed");
+      setSearchError(errorMessage(e, "search failed"));
     } finally {
       setSearching(false);
     }
@@ -231,7 +254,7 @@ export default function NightScreen() {
         setMovieQuery("");
         setChangingMovie(false);
       } catch (e) {
-        setActionError(e instanceof Error ? e.message : "failed to attach movie");
+        setActionError(errorMessage(e, "failed to attach movie"));
       } finally {
         setBusy(null);
       }
@@ -334,52 +357,36 @@ export default function NightScreen() {
                 {order.length === 0 ? (
                   <Text style={styles.hint}>No core members here yet.</Text>
                 ) : (
-                  order.map((m, i) => {
-                    const recorded = night?.pickerId === m.id;
-                    return (
-                      <Pressable
-                        key={m.id}
-                        onPress={() => onRecordPick(m.id)}
-                        disabled={busy !== null}
-                        style={({ pressed }) => [
-                          styles.orderRow,
-                          (recorded || (night?.pickerId == null && i === 0)) && styles.pickerRow,
-                          pressed && styles.rowPressed,
-                        ]}
-                      >
-                        <Text style={styles.name}>{`${i + 1}. ${m.name}`}</Text>
-                        {recorded ? (
-                          <Text style={styles.badge}>{"Recorded ✓"}</Text>
-                        ) : night?.pickerId == null && i === 0 ? (
-                          <Text style={styles.badge}>{"Tonight's pick"}</Text>
-                        ) : null}
-                      </Pressable>
-                    );
-                  })
+                  order.map((m, i) => (
+                    <PickRow
+                      key={m.id}
+                      label={`${i + 1}. ${m.name}`}
+                      recorded={night?.pickerId === m.id}
+                      impliedPick={night?.pickerId == null && i === 0}
+                      disabled={busy !== null}
+                      onPress={() => onRecordPick(m.id)}
+                    />
+                  ))
                 )}
                 {guestsPresent.length > 0 && (
                   <>
                     <Text style={styles.section}>{"Also present"}</Text>
-                    {guestsPresent.map((g) => {
-                      const recorded = night?.pickerId === g.id;
-                      return (
-                        <Pressable
-                          key={g.id}
-                          onPress={() => onRecordPick(g.id)}
-                          disabled={busy !== null}
-                          style={({ pressed }) => [styles.orderRow, recorded && styles.pickerRow, pressed && styles.rowPressed]}
-                        >
-                          <Text style={styles.name}>{g.name}</Text>
-                          {recorded && <Text style={styles.badge}>{"Recorded ✓"}</Text>}
-                        </Pressable>
-                      );
-                    })}
+                    {guestsPresent.map((g) => (
+                      <PickRow
+                        key={g.id}
+                        label={g.name}
+                        recorded={night?.pickerId === g.id}
+                        impliedPick={false}
+                        disabled={busy !== null}
+                        onPress={() => onRecordPick(g.id)}
+                      />
+                    ))}
                   </>
                 )}
                 {night?.pickerId != null && (
                   <View style={styles.createRow}>
                     <Text style={styles.hint}>{"Pick recorded. Tap another name to change it, or start the next night."}</Text>
-                    <Button title="Start a new night" onPress={onStartNew} disabled={busy !== null} />
+                    <Button title="Start a new night" onPress={onCreate} disabled={busy !== null} />
                   </View>
                 )}
               </View>

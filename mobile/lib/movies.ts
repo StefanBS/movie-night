@@ -1,3 +1,5 @@
+import { requestJson } from "./http";
+
 export type Movie = {
   tmdbId: number;
   title: string;
@@ -38,19 +40,24 @@ export function parseMovie(raw: unknown): Movie {
   };
 }
 
+// parseMovies validates an untrusted search-results payload (an array) and
+// returns typed Movies, throwing on a bad shape.
+export function parseMovies(raw: unknown): Movie[] {
+  if (!Array.isArray(raw)) {
+    throw new Error("movies: expected an array");
+  }
+  return raw.map(parseMovie);
+}
+
 // searchMovies proxies TMDB search through the backend and returns typed results.
-export async function searchMovies(
+export function searchMovies(
   baseUrl: string,
   query: string,
   signal?: AbortSignal,
 ): Promise<Movie[]> {
-  const res = await fetch(`${baseUrl}/movies/search?q=${encodeURIComponent(query)}`, { signal });
-  if (!res.ok) {
-    throw new Error(`request failed: ${res.status}`);
-  }
-  const data = await res.json();
-  if (!Array.isArray(data)) {
-    throw new Error("movies: expected an array");
-  }
-  return data.map(parseMovie);
+  return requestJson(
+    `${baseUrl}/movies/search?q=${encodeURIComponent(query)}`,
+    parseMovies,
+    { signal },
+  );
 }

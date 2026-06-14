@@ -1,3 +1,5 @@
+import { requestJson } from "./http";
+
 export type Member = {
   id: string;
   name: string;
@@ -37,35 +39,27 @@ export function parseMembers(raw: unknown): Member[] {
 
 // fetchMembers loads a group's full roster (active + inactive, core + guest)
 // from the backend. The signal lets the caller cancel an in-flight request.
-export async function fetchMembers(
+export function fetchMembers(
   baseUrl: string,
   groupId: string,
   signal?: AbortSignal,
 ): Promise<Member[]> {
-  const res = await fetch(`${baseUrl}/groups/${groupId}/members`, { signal });
-  if (!res.ok) {
-    throw new Error(`request failed: ${res.status}`);
-  }
-  return parseMembers(await res.json());
+  return requestJson(`${baseUrl}/groups/${groupId}/members`, parseMembers, { signal });
 }
 
 // postMember POSTs to a membership endpoint and returns the resulting member.
 // An undefined body sends no payload (the transition endpoints take none).
-async function postMember(
+function postMember(
   url: string,
   body?: unknown,
   signal?: AbortSignal,
 ): Promise<Member> {
-  const res = await fetch(url, {
+  return requestJson(url, (raw) => parseMember(raw), {
     method: "POST",
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal,
   });
-  if (!res.ok) {
-    throw new Error(`request failed: ${res.status}`);
-  }
-  return parseMember(await res.json());
 }
 
 // joinMember adds a new core member by name (add). Returns the created Member.
@@ -78,44 +72,35 @@ export function joinMember(
   return postMember(`${baseUrl}/groups/${groupId}/members`, { name }, signal);
 }
 
-// deactivateMember removes a member from the rotation (leave).
-export function deactivateMember(
+// A churn transition a member can undergo: leave (deactivate), return
+// (reactivate), or a guest joining the core rotation (promote). The value
+// doubles as the backend endpoint verb.
+export type MemberAction = "deactivate" | "reactivate" | "promote";
+
+// transitionMember applies a churn transition by POSTing to its (body-less)
+// endpoint and returns the resulting member.
+export function transitionMember(
   baseUrl: string,
   groupId: string,
   userId: string,
+  action: MemberAction,
   signal?: AbortSignal,
 ): Promise<Member> {
   return postMember(
-    `${baseUrl}/groups/${groupId}/members/${userId}/deactivate`,
+    `${baseUrl}/groups/${groupId}/members/${userId}/${action}`,
     undefined,
     signal,
   );
 }
 
-// reactivateMember returns a deactivated member to the rotation (return).
-export function reactivateMember(
-  baseUrl: string,
-  groupId: string,
-  userId: string,
-  signal?: AbortSignal,
-): Promise<Member> {
-  return postMember(
-    `${baseUrl}/groups/${groupId}/members/${userId}/reactivate`,
-    undefined,
-    signal,
-  );
-}
-
-// promoteMember promotes a guest into the core rotation (promote).
-export function promoteMember(
-  baseUrl: string,
-  groupId: string,
-  userId: string,
-  signal?: AbortSignal,
-): Promise<Member> {
-  return postMember(
-    `${baseUrl}/groups/${groupId}/members/${userId}/promote`,
-    undefined,
-    signal,
-  );
+// memberActions returns the churn transitions valid for a member's current
+// state. The rules live here (pure, testable) rather than in the screen.
+export function memberActions(m: Member): MemberAction[] {
+  if (m.status === "inactive") {
+    return ["reactivate"];
+  }
+  if (m.role === "guest") {
+    return ["promote", "deactivate"];
+  }
+  return ["deactivate"];
 }

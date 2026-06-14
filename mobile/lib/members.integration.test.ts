@@ -3,11 +3,9 @@ import assert from "node:assert/strict";
 import http from "node:http";
 
 import {
-  deactivateMember,
   fetchMembers,
   joinMember,
-  promoteMember,
-  reactivateMember,
+  transitionMember,
   type Member,
 } from "./members";
 
@@ -73,10 +71,10 @@ test("joinMember posts {name} to the members path and returns the member", async
   assert.deepEqual(result, created);
 });
 
-test("deactivateMember posts to the deactivate path with no body", async () => {
+test("transitionMember posts to the deactivate path with no body", async () => {
   const m: Member = { id: USER, name: "Frankie", role: "guest", status: "inactive" };
   const { method, path, body, result } = await capture(200, m, (url) =>
-    deactivateMember(url, GROUP, USER),
+    transitionMember(url, GROUP, USER, "deactivate"),
   );
   assert.equal(method, "POST");
   assert.equal(path, `/groups/${GROUP}/members/${USER}/deactivate`);
@@ -84,15 +82,15 @@ test("deactivateMember posts to the deactivate path with no body", async () => {
   assert.deepEqual(result, m);
 });
 
-test("reactivateMember posts to the reactivate path", async () => {
+test("transitionMember posts to the reactivate path", async () => {
   const m: Member = { id: USER, name: "Frankie", role: "core", status: "active" };
-  const { path } = await capture(200, m, (url) => reactivateMember(url, GROUP, USER));
+  const { path } = await capture(200, m, (url) => transitionMember(url, GROUP, USER, "reactivate"));
   assert.equal(path, `/groups/${GROUP}/members/${USER}/reactivate`);
 });
 
-test("promoteMember posts to the promote path", async () => {
+test("transitionMember posts to the promote path", async () => {
   const m: Member = { id: USER, name: "Frankie", role: "core", status: "active" };
-  const { path } = await capture(200, m, (url) => promoteMember(url, GROUP, USER));
+  const { path } = await capture(200, m, (url) => transitionMember(url, GROUP, USER, "promote"));
   assert.equal(path, `/groups/${GROUP}/members/${USER}/promote`);
 });
 
@@ -103,7 +101,7 @@ test("a write op throws on a non-2xx response", async () => {
   });
   try {
     await assert.rejects(
-      deactivateMember(server.url, GROUP, USER),
+      transitionMember(server.url, GROUP, USER, "deactivate"),
       /request failed: 404/,
     );
   } finally {
