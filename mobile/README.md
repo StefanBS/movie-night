@@ -55,9 +55,6 @@ EXPO_PUBLIC_API_URL=http://localhost:8080
 - **Staging / production** — an explicit non-localhost `EXPO_PUBLIC_API_URL`
   overrides both.
 
-A physical phone reaches the backend only when the backend binds the LAN
-(`0.0.0.0`, not `127.0.0.1`) and the firewall allows the port.
-
 ## Run
 
 ```bash
