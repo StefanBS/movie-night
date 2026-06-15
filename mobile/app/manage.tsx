@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Button,
   FlatList,
   Pressable,
   StyleSheet,
@@ -21,6 +20,16 @@ import {
   type Member,
   type MemberAction,
 } from "../lib/members";
+import { AppButton } from "../components/AppButton";
+import {
+  borderWidth,
+  colors,
+  fontFamily,
+  pressedOpacity,
+  radius,
+  space,
+  textPresets,
+} from "../theme";
 
 const API_URL = resolveApiBaseUrl({
   envUrl: process.env.EXPO_PUBLIC_API_URL,
@@ -106,7 +115,13 @@ export default function ManageScreen() {
   );
 
   if (loading) {
-    return <ActivityIndicator style={styles.center} size="large" />;
+    return (
+      <ActivityIndicator
+        style={styles.center}
+        size="large"
+        color={colors.accent.base}
+      />
+    );
   }
   if (error !== null) {
     return (
@@ -122,6 +137,7 @@ export default function ManageScreen() {
         <TextInput
           style={styles.input}
           placeholder="New member name"
+          placeholderTextColor={colors.text.tertiary}
           value={name}
           onChangeText={setName}
           editable={busy === null}
@@ -129,7 +145,11 @@ export default function ManageScreen() {
           returnKeyType="done"
           onSubmitEditing={onAdd}
         />
-        <Button title="Add" onPress={onAdd} disabled={busy !== null || name.trim() === ""} />
+        <AppButton
+          title="Add"
+          onPress={onAdd}
+          disabled={busy !== null || name.trim() === ""}
+        />
       </View>
       {actionError !== null && (
         <Text style={[styles.banner, styles.error]}>{actionError}</Text>
@@ -173,46 +193,51 @@ export default function ManageScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16 },
-  center: { marginTop: 32, textAlign: "center" },
-  error: { color: "#b00020" },
-  banner: { paddingVertical: 8, textAlign: "center" },
+  container: {
+    flex: 1,
+    backgroundColor: colors.surface.page, // the dim room
+    paddingHorizontal: space[4],
+  },
+  center: { marginTop: space[8], textAlign: "center" },
+  error: { ...textPresets.body, color: colors.text.danger },
+  banner: { paddingVertical: space[2], textAlign: "center" },
   addRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingVertical: 12,
+    gap: space[2],
+    paddingVertical: space[3],
   },
   input: {
     flex: 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#999",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 16,
+    ...textPresets.body,
+    color: colors.text.primary,
+    backgroundColor: colors.surface.card,
+    borderWidth: borderWidth.hairline,
+    borderColor: colors.border.strong,
+    borderRadius: radius.md,
+    paddingHorizontal: space[3],
+    paddingVertical: space[2],
   },
   row: {
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ccc",
+    paddingVertical: space[3],
+    borderBottomWidth: borderWidth.hairline,
+    borderBottomColor: colors.border.hairline,
   },
   rowMain: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  name: { fontSize: 18 },
-  inactiveName: { color: "#999" },
-  tag: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#666",
-    textTransform: "uppercase",
+  name: { ...textPresets.rowName, color: colors.text.primary },
+  inactiveName: { color: colors.text.tertiary },
+  tag: { ...textPresets.tag, color: colors.text.secondary },
+  actions: { flexDirection: "row", gap: space[4], marginTop: space[2] },
+  action: { paddingVertical: space[1] },
+  actionText: {
+    ...textPresets.meta,
+    fontFamily: fontFamily.sansSemibold,
+    color: colors.accent.cool, // moonlight secondary action
   },
-  actions: { flexDirection: "row", gap: 16, marginTop: 8 },
-  action: { paddingVertical: 4 },
-  actionText: { fontSize: 14, fontWeight: "600", color: "#0b66c3" },
-  rowPressed: { opacity: 0.6 },
-  meta: { fontSize: 14, color: "#666", marginTop: 8 },
+  rowPressed: { opacity: pressedOpacity },
+  meta: { ...textPresets.meta, color: colors.text.secondary, marginTop: space[2] },
 });

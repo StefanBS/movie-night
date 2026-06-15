@@ -12,6 +12,14 @@ import { Link } from "expo-router";
 import { GROUP_ID, resolveApiBaseUrl } from "../lib/api";
 import { errorMessage } from "../lib/errors";
 import { fetchTurn, type TurnMember } from "../lib/turn";
+import {
+  colors,
+  space,
+  radius,
+  borderWidth,
+  shadow,
+  textPresets,
+} from "../theme";
 
 const API_URL = resolveApiBaseUrl({
   envUrl: process.env.EXPO_PUBLIC_API_URL,
@@ -53,17 +61,22 @@ export default function TurnScreen() {
         </Link>
       </View>
       {loading ? (
-        <ActivityIndicator style={styles.center} size="large" />
+        <ActivityIndicator
+          style={styles.center}
+          size="large"
+          color={colors.accent.base}
+        />
       ) : error ? (
         <Text style={[styles.center, styles.error]}>
           {`Couldn't load turn order: ${error}`}
         </Text>
       ) : turn.length === 0 ? (
-        <Text style={styles.center}>No members yet.</Text>
+        <Text style={[styles.center, styles.empty]}>No members yet.</Text>
       ) : (
         <FlatList
           data={turn}
           keyExtractor={(m) => m.id}
+          contentContainerStyle={styles.list}
           renderItem={({ item, index }) => {
             const isPicker = index === 0;
             const picks = `${item.servedCount} pick${item.servedCount === 1 ? "" : "s"}`;
@@ -85,38 +98,41 @@ export default function TurnScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16 },
-  links: { flexDirection: "row", justifyContent: "flex-end", gap: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: colors.surface.page, // the dim room
+    paddingHorizontal: space[4],
+  },
+  links: { flexDirection: "row", justifyContent: "flex-end", gap: space[5] },
   manageLink: {
-    fontSize: 16,
-    color: "#0b66c3",
-    fontWeight: "600",
-    paddingVertical: 12,
+    ...textPresets.body,
+    color: colors.accent.cool, // moonlight links
+    paddingVertical: space[3],
     textAlign: "right",
   },
-  center: { marginTop: 32, textAlign: "center" },
-  error: { color: "#b00020" },
+  center: { marginTop: space[8], textAlign: "center" },
+  empty: { ...textPresets.body, color: colors.text.secondary },
+  error: { ...textPresets.body, color: colors.text.danger },
+  list: { paddingBottom: space[6] },
   row: {
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ccc",
+    paddingVertical: space[3],
+    borderBottomWidth: borderWidth.hairline,
+    borderBottomColor: colors.border.hairline,
   },
   pickerRow: {
-    backgroundColor: "#eef6ff",
-    borderRadius: 8,
-    paddingHorizontal: 8,
+    backgroundColor: colors.surface.spotlight, // ember wash — "next up"
+    borderRadius: radius.md,
+    borderWidth: borderWidth.hairline,
+    borderColor: colors.accent.base, // ember ring
+    paddingHorizontal: space[3],
+    ...shadow.spotlight, // the bonfire halo
   },
   rowMain: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  name: { fontSize: 18 },
-  badge: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#0b66c3",
-    textTransform: "uppercase",
-  },
-  meta: { fontSize: 14, color: "#666", marginTop: 4 },
+  name: { ...textPresets.rowName, color: colors.text.primary },
+  badge: { ...textPresets.tag, color: colors.accent.strong }, // mono uppercase ember
+  meta: { ...textPresets.meta, color: colors.text.secondary, marginTop: space[1] },
 });

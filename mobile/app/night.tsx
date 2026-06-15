@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Button,
   FlatList,
   Image,
   Pressable,
@@ -28,6 +27,16 @@ import {
 } from "../lib/nights";
 import { movieLabel, searchMovies, type Movie } from "../lib/movies";
 import { type TurnMember } from "../lib/turn";
+import { AppButton } from "../components/AppButton";
+import {
+  borderWidth,
+  colors,
+  pressedOpacity,
+  radius,
+  shadow,
+  space,
+  textPresets,
+} from "../theme";
 
 const API_URL = resolveApiBaseUrl({
   envUrl: process.env.EXPO_PUBLIC_API_URL,
@@ -263,7 +272,13 @@ export default function NightScreen() {
   );
 
   if (loading) {
-    return <ActivityIndicator style={styles.center} size="large" />;
+    return (
+      <ActivityIndicator
+        style={styles.center}
+        size="large"
+        color={colors.accent.base}
+      />
+    );
   }
   if (error !== null) {
     return <Text style={[styles.center, styles.error]}>{`Couldn't load members: ${error}`}</Text>;
@@ -276,7 +291,11 @@ export default function NightScreen() {
       {night === null ? (
         <View style={styles.createRow}>
           <Text style={styles.hint}>{"Start a night to record who's here."}</Text>
-          <Button title="Start tonight's night" onPress={onCreate} disabled={busy !== null} />
+          <AppButton
+            title="Start tonight's night"
+            onPress={onCreate}
+            disabled={busy !== null}
+          />
         </View>
       ) : (
         // The whole screen is one FlatList so it scrolls as a unit: the
@@ -300,9 +319,14 @@ export default function NightScreen() {
                 <View style={styles.movieRow}>
                   <View style={styles.movieInfo}>
                     <Poster uri={night.movie.posterUrl} />
-                    <Text style={styles.name}>{movieLabel(night.movie)}</Text>
+                    <Text style={styles.movieTitle}>{movieLabel(night.movie)}</Text>
                   </View>
-                  <Button title="Change movie" onPress={() => setChangingMovie(true)} disabled={busy !== null} />
+                  <AppButton
+                    title="Change movie"
+                    variant="secondary"
+                    onPress={() => setChangingMovie(true)}
+                    disabled={busy !== null}
+                  />
                 </View>
               ) : (
                 <View>
@@ -310,13 +334,19 @@ export default function NightScreen() {
                     <TextInput
                       style={styles.input}
                       placeholder="Search a film title…"
+                      placeholderTextColor={colors.text.tertiary}
                       value={movieQuery}
                       onChangeText={setMovieQuery}
                       onSubmitEditing={onSearch}
                       returnKeyType="search"
                       autoCorrect={false}
                     />
-                    <Button title="Search" onPress={onSearch} disabled={searching || movieQuery.trim() === ""} />
+                    <AppButton
+                      title="Search"
+                      variant="secondary"
+                      onPress={onSearch}
+                      disabled={searching || movieQuery.trim() === ""}
+                    />
                   </View>
                   {searchError !== null && <Text style={[styles.hint, styles.error]}>{searchError}</Text>}
                   {results.map((m) => (
@@ -386,7 +416,11 @@ export default function NightScreen() {
                 {night?.pickerId != null && (
                   <View style={styles.createRow}>
                     <Text style={styles.hint}>{"Pick recorded. Tap another name to change it, or start the next night."}</Text>
-                    <Button title="Start a new night" onPress={onCreate} disabled={busy !== null} />
+                    <AppButton
+                      title="Start a new night"
+                      onPress={onCreate}
+                      disabled={busy !== null}
+                    />
                   </View>
                 )}
               </View>
@@ -398,54 +432,96 @@ export default function NightScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 16 },
-  center: { marginTop: 32, textAlign: "center" },
-  error: { color: "#b00020" },
-  banner: { paddingVertical: 8, textAlign: "center" },
-  createRow: { marginTop: 32, gap: 12, alignItems: "center" },
-  hint: { fontSize: 14, color: "#666" },
-  heading: { fontSize: 20, fontWeight: "600", paddingVertical: 12 },
-  section: { fontSize: 14, fontWeight: "600", color: "#666", textTransform: "uppercase", marginTop: 12, marginBottom: 4 },
+  container: {
+    flex: 1,
+    backgroundColor: colors.surface.page, // the dim room
+    paddingHorizontal: space[4],
+  },
+  center: { marginTop: space[8], textAlign: "center" },
+  error: { ...textPresets.body, color: colors.text.danger },
+  banner: { paddingVertical: space[2], textAlign: "center" },
+  createRow: { marginTop: space[8], gap: space[3], alignItems: "center" },
+  hint: { ...textPresets.meta, color: colors.text.secondary },
+  heading: {
+    ...textPresets.screenTitle, // Instrument Serif screen title
+    color: colors.text.primary,
+    paddingVertical: space[3],
+  },
+  section: {
+    ...textPresets.sectionHeading,
+    color: colors.text.primary,
+    marginTop: space[4],
+    marginBottom: space[1],
+  },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ccc",
+    paddingVertical: space[3],
+    borderBottomWidth: borderWidth.hairline,
+    borderBottomColor: colors.border.hairline,
   },
-  rowPresent: { backgroundColor: "#eef6ff", borderRadius: 8, paddingHorizontal: 8 },
-  rowPressed: { opacity: 0.6 },
-  name: { fontSize: 18 },
-  tag: { fontSize: 12, fontWeight: "600", color: "#666", textTransform: "uppercase" },
-  orderBlock: { paddingTop: 8 },
+  // Attendance (present) is NOT "whose turn" — keep ember rationed and mark it
+  // with a neutral raised surface instead of the spotlight wash.
+  rowPresent: {
+    backgroundColor: colors.surface.subtle,
+    borderRadius: radius.md,
+    paddingHorizontal: space[2],
+  },
+  rowPressed: { opacity: pressedOpacity },
+  name: { ...textPresets.rowName, color: colors.text.primary },
+  movieTitle: {
+    ...textPresets.screenTitle, // serif — the tonight's movie title
+    color: colors.text.primary,
+    flexShrink: 1,
+  },
+  tag: { ...textPresets.tag, color: colors.text.secondary },
+  orderBlock: { paddingTop: space[2] },
   orderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: space[2],
   },
-  pickerRow: { backgroundColor: "#eef6ff", borderRadius: 8, paddingHorizontal: 8 },
-  badge: { fontSize: 12, fontWeight: "600", color: "#0b66c3", textTransform: "uppercase" },
+  // The pick order highlight IS "whose turn" — the rationed ember spotlight.
+  pickerRow: {
+    backgroundColor: colors.surface.spotlight, // ember wash — "next up"
+    borderRadius: radius.md,
+    borderWidth: borderWidth.hairline,
+    borderColor: colors.accent.base, // ember ring
+    paddingHorizontal: space[2],
+    ...shadow.spotlight, // the bonfire halo
+  },
+  badge: { ...textPresets.tag, color: colors.accent.strong }, // mono uppercase ember
   movieRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: space[2],
   },
-  poster: { width: 46, height: 69, borderRadius: 4, backgroundColor: "#eee" },
-  posterPlaceholder: { borderWidth: StyleSheet.hairlineWidth, borderColor: "#ccc" },
-  movieInfo: { flexDirection: "row", alignItems: "center", gap: 12, flexShrink: 1 },
-  resultRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 },
+  poster: {
+    width: 46,
+    height: 69,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surface.subtle,
+  },
+  posterPlaceholder: {
+    borderWidth: borderWidth.hairline,
+    borderColor: colors.border.hairline,
+  },
+  movieInfo: { flexDirection: "row", alignItems: "center", gap: space[3], flexShrink: 1 },
+  resultRow: { flexDirection: "row", alignItems: "center", gap: space[3], paddingVertical: space[2] },
   resultLabel: { flex: 1 },
-  searchRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: space[2], paddingVertical: space[2] },
   input: {
     flex: 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    fontSize: 16,
+    ...textPresets.body,
+    color: colors.text.primary,
+    backgroundColor: colors.surface.card,
+    borderWidth: borderWidth.hairline,
+    borderColor: colors.border.strong,
+    borderRadius: radius.md,
+    paddingHorizontal: space[3],
+    paddingVertical: space[2],
   },
 });
