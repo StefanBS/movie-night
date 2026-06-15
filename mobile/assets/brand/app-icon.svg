@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Movie Night app icon">
+  <defs>
+    <radialGradient id="mn-glow" cx="50%" cy="6%" r="68%">
+      <stop offset="0" stop-color="#F68B36" stop-opacity="0.34"></stop>
+      <stop offset="0.62" stop-color="#F68B36" stop-opacity="0"></stop>
+    </radialGradient>
+  </defs>
+  <rect width="200" height="200" rx="46" fill="#0C0A1B"></rect>
+  <rect width="200" height="200" rx="46" fill="url(#mn-glow)"></rect>
+  
+  <g transform="translate(100,104)">
+    <circle cx="0" cy="-58" r="24" fill="#F68B36" opacity="0.16"></circle>
+    <circle cx="41.01" cy="-41.01" r="8.9" fill="#F4B36A"></circle>
+    <circle cx="58" cy="0" r="8.9" fill="#EC92AC"></circle>
+    <circle cx="41.01" cy="41.01" r="8.9" fill="#D79BD6"></circle>
+    <circle cx="0" cy="58" r="8.9" fill="#B79BEA"></circle>
+    <circle cx="-41.01" cy="41.01" r="8.9" fill="#9DA8EE"></circle>
+    <circle cx="-58" cy="0" r="8.9" fill="#8C9CEC"></circle>
+    <circle cx="-41.01" cy="-41.01" r="8.9" fill="#6FC6D6"></circle>
+    <circle cx="0" cy="-58" r="15.5" fill="#F68B36"></circle>
+    <circle cx="0" cy="-58" r="24" fill="none" stroke="#F68B36" stroke-width="2.9" opacity="0.5"></circle>
+  </g>
+</svg>
