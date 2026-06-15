@@ -173,6 +173,8 @@ just db-reset       # destroy the container AND its data volume
 
 ```
 backend/
+├── internal/db/       # sqlc-generated queries/models (DO NOT EDIT) + query/*.sql
+├── migrations/        # goose SQL migrations
 ├── main.go            # server entrypoint, route table, withCORS, graceful shutdown
 ├── http.go            # shared HTTP plumbing (UUID parsing, JSON/error responses)
 ├── cors.go            # CORS middleware (parseAllowedOrigins, withCORS)
@@ -184,8 +186,6 @@ backend/
 ├── tmdb.go            # TMDB client (search, fetch, poster URLs)
 ├── *_test.go          # table-driven unit tests (pure functions, no mocks)
 ├── *_integration_test.go  # testcontainers integration tests (//go:build integration)
-├── migrations/        # goose SQL migrations
-├── internal/db/       # sqlc-generated queries/models (DO NOT EDIT) + query/*.sql
 ├── seed.sql           # idempotent dev fixtures
 ├── compose.yaml       # PostgreSQL 18 dev container
 └── justfile           # all dev commands
