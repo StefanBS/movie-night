@@ -1,15 +1,25 @@
 # Movie Night — Mobile
 
 The Movie Night mobile app, built with [Expo](https://expo.dev) and React
-Native. It renders a turn-ranking screen ("Whose turn?") fetched from the
-[backend](../backend) API via `fetchTurn` (`lib/turn.ts`): the least-served
-member is highlighted with a "Tonight's pick" badge and a served-count /
-last-picked subtitle, with the rest of the standings listed below.
+Native. It talks to the [backend](../backend) API and is organised as three
+[expo-router](https://docs.expo.dev/router/introduction/) screens:
+
+- **Whose turn?** (`app/index.tsx`) — the least-served standings via `fetchTurn`
+  (`lib/turn.ts`); element 0 is highlighted as "Next up" with a served-count /
+  last-picked subtitle.
+- **Manage members** (`app/manage.tsx`) — join a member and run the churn
+  transitions (deactivate / reactivate / promote) via `lib/members.ts`.
+- **Tonight** (`app/night.tsx`) — the per-night flow: track attendees, search and
+  attach a movie (TMDB), and record the pick (`lib/nights.ts`, `lib/movies.ts`).
+
+The UI follows the "Spotlight" design system — tokens live in `theme/` and are
+described in [`CLAUDE.md`](CLAUDE.md); ember accent means "whose turn it is."
 
 ## Stack
 
 - **Expo SDK 56** — React Native tooling and runtime
-- **React Native 0.85** / **React 19.2**
+- **[expo-router](https://docs.expo.dev/router/introduction/)** — file-based navigation (`app/`)
+- **React Native 0.86** / **React 19.2**
 - **TypeScript 6.0**
 
 > **Heads up:** Expo APIs are version-specific. Before changing native or Expo
@@ -97,7 +107,7 @@ group shows "No members yet."
 
 ## Troubleshooting
 
-**"Couldn't load turn ranking: Network request failed" on a physical phone.** Usually
+**"Couldn't load turn order: Network request failed" on a physical phone.** Usually
 a *stale bundle*: a long-running Metro server keeps serving old JavaScript after
 you change code or add a dependency, and the older code falls back to
 `localhost` — which, on a phone, is the phone itself. Restart Metro with a
@@ -126,14 +136,14 @@ just typecheck      # tsc --noEmit
 just test           # unit + integration tests (node:test runner)
 ```
 
-Tests use Node's built-in test runner via `tsx`, mirroring the Go backend's
-table-driven style:
+Tests live next to the code in `lib/` and run on Node's built-in test runner via
+`tsx` (`lib/**/*.test.ts`), mirroring the Go backend's table-driven style:
 
-- **Unit tests** cover pure logic with no mocks — `lib/api.test.ts`
-  (URL resolution), `lib/members.test.ts` (roster payload validation), and
-  `lib/turn.test.ts` (turn payload validation).
-- **Integration tests** exercise `fetchMembers` (`lib/members.integration.test.ts`)
-  and `fetchTurn` (`lib/turn.integration.test.ts`) against a real local HTTP
+- **Unit tests** (`*.test.ts`) cover pure logic with no mocks — URL resolution
+  (`api`), payload validation (`members`, `turn`, `movies`, `nights`), date
+  helpers (`date`), and error-message extraction (`errors`).
+- **Integration tests** (`*.integration.test.ts`) exercise the fetch helpers
+  (`http`, `members`, `turn`, `movies`, `nights`) against a real local HTTP
   server over a real `fetch`, with no mocking.
 
 There are no component/render tests yet — deferred until there's UI logic worth
@@ -159,15 +169,25 @@ lefthook install               # from the repo root
 
 ```
 mobile/
-├── App.tsx            # root component — the turn-ranking screen ("Whose turn?")
-├── index.ts           # Expo entrypoint (registerRootComponent)
-├── lib/               # framework-free logic + its tests
-│   ├── api.ts         # resolveApiBaseUrl — picks the backend URL
-│   ├── turn.ts        # fetchTurn + parseTurn (validation) — used by the screen
-│   └── members.ts     # fetchMembers + parseMembers (still tested; /members endpoint)
+├── app/               # expo-router screens (entry = expo-router/entry)
+│   ├── _layout.tsx    # root Stack + font loading + Spotlight theming
+│   ├── index.tsx      # "Whose turn?" — turn standings
+│   ├── manage.tsx     # "Manage members" — join + churn transitions
+│   └── night.tsx      # "Tonight" — attendees, movie attach, record pick
+├── lib/               # framework-free logic + its tests (unit + integration)
+│   ├── api.ts         # resolveApiBaseUrl + GROUP_ID — picks the backend URL
+│   ├── http.ts        # shared fetch/JSON/error helper
+│   ├── turn.ts        # fetchTurn + validation
+│   ├── members.ts     # fetchMembers, joinMember, transitionMember
+│   ├── nights.ts      # night lifecycle calls (create/attendee/pick/movie)
+│   ├── movies.ts      # searchMovies + movie helpers
+│   ├── date.ts        # local-date helpers (todayLocalISO)
+│   └── errors.ts      # errorMessage — backend error extraction
+├── components/        # shared presentational components (AppButton)
+├── theme/             # "Spotlight" design tokens (colors, spacing, typography)
+├── assets/            # icons, images, and brand fonts
 ├── app.json           # Expo app config
 ├── eslint.config.js   # ESLint flat config
 ├── justfile           # task recipes (just) — parity with the backend
-├── tsconfig.json      # TypeScript config
-└── assets/            # icons and images
+└── tsconfig.json      # TypeScript config
 ```
