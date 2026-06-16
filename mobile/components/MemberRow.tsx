@@ -6,6 +6,7 @@ import {
   colors,
   fontFamily,
   fontSize,
+  pressedOpacity,
   radius,
   shadow,
   space,
@@ -83,7 +84,7 @@ const styles = StyleSheet.create({
     borderColor: colors.accent.base,
     ...shadow.spotlight,
   },
-  pressed: { opacity: 0.72 },
+  pressed: { opacity: pressedOpacity },
   rank: {
     fontFamily: fontFamily.monoBold,
     fontSize: fontSize.sm,
