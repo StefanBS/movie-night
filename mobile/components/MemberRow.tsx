@@ -36,7 +36,9 @@ export function MemberRow({
 }) {
   const content = (
     <>
-      {rank != null ? <Text style={styles.rank}>{rank}</Text> : null}
+      {rank != null ? (
+        <Text style={[styles.rank, spotlight && styles.rankSpotlight]}>{rank}</Text>
+      ) : null}
       <Avatar name={name} size={avatarSize} glow={spotlight} />
       <View style={styles.text}>
         <Text style={styles.name} numberOfLines={1}>
@@ -92,6 +94,7 @@ const styles = StyleSheet.create({
     width: 20,
     textAlign: "center",
   },
+  rankSpotlight: { color: colors.accent.strong },
   text: { flex: 1, minWidth: 0, gap: 2 },
   name: { ...textPresets.rowName, color: colors.text.primary },
   meta: {

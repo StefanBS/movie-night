@@ -190,7 +190,7 @@ export default function TonightScreen() {
             <AppButton
               title="See full rotation  →"
               variant="ghost"
-              onPress={() => {}}
+              onPress={() => router.navigate("/rotation")}
             />
           </View>
         </ScrollView>
