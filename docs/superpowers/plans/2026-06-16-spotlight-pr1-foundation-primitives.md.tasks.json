@@ -1,0 +1,174 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-16-spotlight-pr1-foundation-primitives.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 0: Foundation \u2014 lucide icons + Logomark",
+      "status": "completed",
+      "description": "Add lucide-react-native and a Logomark component wrapping assets/brand/logomark.svg; fonts already wired. Verify: cd mobile && just check.",
+      "metadata": {
+        "files": [
+          "mobile/components/Logomark.tsx",
+          "mobile/package.json"
+        ],
+        "verifyCommand": "cd mobile && just check",
+        "modelTier": "mechanical"
+      }
+    },
+    {
+      "id": 2,
+      "subject": "Task 1: Avatar tint/initials helper (pure, tested)",
+      "status": "completed",
+      "description": "Add avatarTints (7 ring hexes) to theme; lib/avatar.ts with deterministic avatarTint + initials; table-driven test. Verify: node --import tsx --test lib/avatar.test.ts.",
+      "metadata": {
+        "files": [
+          "mobile/theme/colors.ts",
+          "mobile/lib/avatar.ts",
+          "mobile/lib/avatar.test.ts"
+        ],
+        "verifyCommand": "cd mobile && node --import tsx --test lib/avatar.test.ts",
+        "modelTier": "standard"
+      }
+    },
+    {
+      "id": 3,
+      "subject": "Task 2: Avatar component",
+      "status": "completed",
+      "blockedBy": [
+        2
+      ],
+      "description": "components/Avatar.tsx: tinted full-radius initials chip, size-scaled font, optional ember glow ring. Verify: just typecheck.",
+      "metadata": {
+        "files": [
+          "mobile/components/Avatar.tsx"
+        ],
+        "verifyCommand": "cd mobile && just typecheck",
+        "modelTier": "standard"
+      }
+    },
+    {
+      "id": 4,
+      "subject": "Task 3: Button \u2014 ghost + danger variants + fullWidth",
+      "status": "completed",
+      "description": "Extend AppButton: variants primary|secondary|ghost|danger + fullWidth; keep existing callers compiling. Verify: just check.",
+      "metadata": {
+        "files": [
+          "mobile/components/AppButton.tsx"
+        ],
+        "verifyCommand": "cd mobile && just check",
+        "modelTier": "standard"
+      }
+    },
+    {
+      "id": 5,
+      "subject": "Task 4: Badge status tag",
+      "status": "completed",
+      "description": "components/Badge.tsx: tones solid|ember|neutral|muted|danger; mono uppercase default with opt-out; pill shape. Verify: just typecheck.",
+      "metadata": {
+        "files": [
+          "mobile/components/Badge.tsx"
+        ],
+        "verifyCommand": "cd mobile && just typecheck",
+        "modelTier": "standard"
+      }
+    },
+    {
+      "id": 6,
+      "subject": "Task 5: Input field",
+      "status": "completed",
+      "description": "components/Input.tsx: themed field, ember focus border, optional trailing addon button. Verify: just typecheck.",
+      "metadata": {
+        "files": [
+          "mobile/components/Input.tsx"
+        ],
+        "verifyCommand": "cd mobile && just typecheck",
+        "modelTier": "standard"
+      }
+    },
+    {
+      "id": 7,
+      "subject": "Task 6: Toggle pill switch",
+      "status": "completed",
+      "description": "components/Toggle.tsx: 44x26 pill, ember on / night-600 off, white sliding knob, switch a11y. Verify: just typecheck.",
+      "metadata": {
+        "files": [
+          "mobile/components/Toggle.tsx"
+        ],
+        "verifyCommand": "cd mobile && just typecheck",
+        "modelTier": "mechanical"
+      }
+    },
+    {
+      "id": 8,
+      "subject": "Task 7: MemberRow",
+      "status": "completed",
+      "blockedBy": [
+        3
+      ],
+      "description": "components/MemberRow.tsx: rank+avatar+name+meta row, spotlight next-up variant, right slot + onPress. Verify: just typecheck.",
+      "metadata": {
+        "files": [
+          "mobile/components/MemberRow.tsx"
+        ],
+        "verifyCommand": "cd mobile && just typecheck",
+        "modelTier": "standard"
+      }
+    },
+    {
+      "id": 9,
+      "subject": "Task 8: Poster tile",
+      "status": "completed",
+      "description": "expo install expo-linear-gradient; components/Poster.tsx: TMDB image with hue-gradient fallback (title or film glyph). Verify: just typecheck.",
+      "metadata": {
+        "files": [
+          "mobile/components/Poster.tsx",
+          "mobile/package.json"
+        ],
+        "verifyCommand": "cd mobile && just typecheck",
+        "modelTier": "standard"
+      }
+    },
+    {
+      "id": 10,
+      "subject": "Task 9: Stat + SectionLabel",
+      "status": "completed",
+      "description": "components/Stat.tsx (mono value+caption, accent value) + components/SectionLabel.tsx (mono uppercase tertiary). Verify: just typecheck.",
+      "metadata": {
+        "files": [
+          "mobile/components/Stat.tsx",
+          "mobile/components/SectionLabel.tsx"
+        ],
+        "verifyCommand": "cd mobile && just typecheck",
+        "modelTier": "mechanical"
+      }
+    },
+    {
+      "id": 11,
+      "subject": "Task 10: Banner + IconButton + barrel",
+      "status": "completed",
+      "blockedBy": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "description": "components/Banner.tsx + IconButton.tsx + index.ts barrel re-exporting all primitives. Verify: just check. Then open PR closing #29 + #30.",
+      "metadata": {
+        "files": [
+          "mobile/components/Banner.tsx",
+          "mobile/components/IconButton.tsx",
+          "mobile/components/index.ts"
+        ],
+        "verifyCommand": "cd mobile && just check",
+        "modelTier": "standard"
+      }
+    }
+  ],
+  "lastUpdated": "2026-06-16T12:02:00Z"
+}
