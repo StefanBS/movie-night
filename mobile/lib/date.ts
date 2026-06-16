@@ -7,3 +7,16 @@ export function todayLocalISO(now: Date = new Date()): string {
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+const SHORT_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+// formatShortDate turns a YYYY-MM-DD string into a short "May 30" label. It
+// splits the ISO string by hand (no Date parsing) so it stays timezone-
+// independent, like todayLocalISO. The day is not zero-padded.
+export function formatShortDate(iso: string): string {
+  const [, month, day] = iso.split("-").map(Number);
+  return `${SHORT_MONTHS[month - 1]} ${day}`;
+}

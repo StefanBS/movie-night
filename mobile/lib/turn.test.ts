@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseTurn, type TurnMember } from "./turn";
+import { parseTurn, picksLabel, pickerMeta, type TurnMember } from "./turn";
 
 // parseTurn validates an untrusted JSON payload from the backend and returns
 // typed TurnMembers, or throws a descriptive error. Pure, table-driven.
@@ -38,3 +38,39 @@ for (const c of invalid) {
     assert.throws(() => parseTurn(c.raw), c.wantError);
   });
 }
+
+test("picksLabel singularizes one pick", () => {
+  assert.equal(picksLabel(1), "1 pick");
+});
+
+const picksCases: { n: number; want: string }[] = [
+  { n: 0, want: "0 picks" },
+  { n: 2, want: "2 picks" },
+  { n: 12, want: "12 picks" },
+];
+for (const c of picksCases) {
+  test(`picksLabel(${c.n}) is "${c.want}"`, () => {
+    assert.equal(picksLabel(c.n), c.want);
+  });
+}
+
+test("pickerMeta shows the first-turn copy when never picked", () => {
+  const m: TurnMember = {
+    id: "a", name: "Ada", role: "core", servedCount: 0, lastPickedOn: null,
+  };
+  assert.equal(pickerMeta(m), "First turn · hasn't picked yet");
+});
+
+test("pickerMeta shows picks count and last date once picked", () => {
+  const m: TurnMember = {
+    id: "b", name: "Bo", role: "core", servedCount: 2, lastPickedOn: "2026-05-30",
+  };
+  assert.equal(pickerMeta(m), "2 picks · last May 30");
+});
+
+test("pickerMeta falls back to first-turn copy if servedCount>0 but date missing", () => {
+  const m: TurnMember = {
+    id: "c", name: "Cy", role: "core", servedCount: 1, lastPickedOn: null,
+  };
+  assert.equal(pickerMeta(m), "First turn · hasn't picked yet");
+});

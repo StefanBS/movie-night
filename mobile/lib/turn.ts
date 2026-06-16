@@ -1,4 +1,5 @@
 import { requestJson } from "./http";
+import { formatShortDate } from "./date";
 
 export type TurnMember = {
   id: string;
@@ -51,4 +52,19 @@ export function fetchTurn(
   signal?: AbortSignal,
 ): Promise<TurnMember[]> {
   return requestJson(`${baseUrl}/groups/${groupId}/turn`, parseTurn, { signal });
+}
+
+// picksLabel renders a served-count as a human label: "1 pick", "2 picks".
+export function picksLabel(n: number): string {
+  return `${n} pick${n === 1 ? "" : "s"}`;
+}
+
+// pickerMeta is the spotlight hero's mono meta line. A member who has never
+// picked (servedCount 0, or no recorded date) shows the first-turn copy;
+// otherwise their pick count and the short date of their last pick.
+export function pickerMeta(member: TurnMember): string {
+  if (member.servedCount === 0 || member.lastPickedOn === null) {
+    return "First turn · hasn't picked yet";
+  }
+  return `${picksLabel(member.servedCount)} · last ${formatShortDate(member.lastPickedOn)}`;
 }
