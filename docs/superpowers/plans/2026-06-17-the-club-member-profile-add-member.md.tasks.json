@@ -1,0 +1,66 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-17-the-club-member-profile-add-member.md",
+  "tasks": [
+    {
+      "id": 5,
+      "subject": "Task 1: Backend — joinedOn on the member DTO",
+      "status": "pending",
+      "description": "**Goal:** Every member JSON response carries a `joinedOn` date string, sourced from `memberships.joined_at`.\n\n**Files:** backend/internal/db/query/members.sql, backend/internal/db/query/roster.sql, backend/roster.go, backend/membership.go, backend/roster_integration_test.go (+ `just sqlc` regen)\n\n**Acceptance Criteria:** GET /members rows include joinedOn YYYY-MM-DD; create + 3 transitions include joinedOn; just check passes.\n\n**Verify:** cd backend && just check\n\n```json:metadata\n{\"files\": [\"backend/internal/db/query/members.sql\", \"backend/internal/db/query/roster.sql\", \"backend/roster.go\", \"backend/membership.go\", \"backend/roster_integration_test.go\"], \"verifyCommand\": \"cd backend && just check\", \"acceptanceCriteria\": [\"GET /members rows include joinedOn YYYY-MM-DD\", \"create + 3 transitions include joinedOn\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 2: Backend — role param on POST /members (guest creation)",
+      "status": "pending",
+      "blockedBy": [5],
+      "description": "**Goal:** POST /groups/{id}/members accepts an optional role (core|guest, default core) and creates a guest membership that stays out of the rotation.\n\n**Files:** backend/membership.go, backend/membership_test.go, backend/membership_integration_test.go\n\n**Acceptance Criteria:** guest join returns role guest and is absent from /turn; omitted role creates active core in /turn; invalid role returns 400; just check passes.\n\n**Verify:** cd backend && just check\n\n```json:metadata\n{\"files\": [\"backend/membership.go\", \"backend/membership_test.go\", \"backend/membership_integration_test.go\"], \"verifyCommand\": \"cd backend && just check\", \"acceptanceCriteria\": [\"guest join returns role guest and is absent from /turn\", \"omitted role creates active core in /turn\", \"invalid role returns 400\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 3: Mobile — members.ts joinedOn + role",
+      "status": "pending",
+      "blockedBy": [6],
+      "description": "**Goal:** The Member type carries joinedOn, the parser validates it, and joinMember sends a role.\n\n**Files:** mobile/lib/members.ts, mobile/lib/members.test.ts, mobile/lib/members.integration.test.ts\n\n**Acceptance Criteria:** parseMember requires joinedOn string; joinMember posts {name, role}; just check passes.\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/lib/members.ts\", \"mobile/lib/members.test.ts\", \"mobile/lib/members.integration.test.ts\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"parseMember requires joinedOn string\", \"joinMember posts {name, role}\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 8,
+      "subject": "Task 4: Mobile — lib/club.ts section + profile helpers",
+      "status": "pending",
+      "blockedBy": [7],
+      "description": "**Goal:** Pure helpers that shape /members + /turn into the Club sections, the header summary, and a member-profile lookup.\n\n**Files:** mobile/lib/club.ts, mobile/lib/club.test.ts\n\n**Acceptance Criteria:** buildClubSections splits rotation/guests/inactive; clubSummary pluralizes; memberProfile returns rank or nulls or null; just check passes.\n\n**Verify:** cd mobile && node --import tsx --test lib/club.test.ts\n\n```json:metadata\n{\"files\": [\"mobile/lib/club.ts\", \"mobile/lib/club.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/club.test.ts\", \"acceptanceCriteria\": [\"buildClubSections splits rotation/guests/inactive\", \"clubSummary pluralizes\", \"memberProfile returns rank or nulls or null\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 9,
+      "subject": "Task 5: Mobile — formatMonthYear date helper",
+      "status": "pending",
+      "description": "**Goal:** A pure \"2024-06-15\" → \"Jun 2024\" formatter for the profile's since line.\n\n**Files:** mobile/lib/date.ts, mobile/lib/date.test.ts\n\n**Acceptance Criteria:** formatMonthYear(\"2024-06-15\") === \"Jun 2024\"; timezone-independent string split; just check passes.\n\n**Verify:** cd mobile && node --import tsx --test lib/date.test.ts\n\n```json:metadata\n{\"files\": [\"mobile/lib/date.ts\", \"mobile/lib/date.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/date.test.ts\", \"acceptanceCriteria\": [\"formatMonthYear renders Jun 2024\", \"timezone-independent string split\", \"just check passes\"], \"modelTier\": \"mechanical\"}\n```"
+    },
+    {
+      "id": 10,
+      "subject": "Task 6: Mobile — IconButton accent variant",
+      "status": "pending",
+      "description": "**Goal:** IconButton gains a solid-ember variant=\"accent\" for the Club's add-member plus.\n\n**Files:** mobile/components/IconButton.tsx\n\n**Acceptance Criteria:** accent variant fills accent.base with ember shadow; card/ghost unchanged; typecheck + lint pass.\n\n**Verify:** cd mobile && just typecheck && just lint\n\n```json:metadata\n{\"files\": [\"mobile/components/IconButton.tsx\"], \"verifyCommand\": \"cd mobile && just typecheck && just lint\", \"acceptanceCriteria\": [\"accent variant fills accent.base with ember shadow\", \"card/ghost unchanged\", \"typecheck + lint pass\"], \"modelTier\": \"mechanical\"}\n```"
+    },
+    {
+      "id": 11,
+      "subject": "Task 7: Mobile screen — The Club tab",
+      "status": "pending",
+      "blockedBy": [8, 10],
+      "description": "**Goal:** Replace the Club placeholder with the real members screen: header summary + add button, and three sections that push to a profile.\n\n**Files:** mobile/app/(tabs)/club.tsx\n\n**Acceptance Criteria:** parallel /members + /turn fetch with loading/error/empty; rotation/guests/inactive sections render correctly; rows push /member/{id}, add pushes /member/new; refetch on focus; just check passes.\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/app/(tabs)/club.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"parallel /members + /turn fetch with loading/error/empty\", \"rotation/guests/inactive sections render correctly\", \"rows push /member/{id}, add pushes /member/new\", \"refetch on focus\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 12,
+      "subject": "Task 8: Mobile screen — Member profile (member/[id].tsx)",
+      "status": "pending",
+      "blockedBy": [8, 9],
+      "description": "**Goal:** A pushed profile screen: avatar/name/role/since, a stats card, a picks-list placeholder, and transition actions.\n\n**Files:** mobile/app/member/[id].tsx, mobile/app/_layout.tsx\n\n**Acceptance Criteria:** resolves member by id with not-found state; header avatar/name/role/since; stats real or — fallback; picks placeholder; footer transitions then back; just check passes.\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/app/member/[id].tsx\", \"mobile/app/_layout.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"resolves member by id with not-found state\", \"header avatar/name/role/since\", \"stats real or — fallback\", \"picks placeholder\", \"footer transitions then back\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 13,
+      "subject": "Task 9: Mobile screen — Add member (member/new.tsx)",
+      "status": "pending",
+      "blockedBy": [7, 12],
+      "description": "**Goal:** A pushed screen with a name input and a Core/Guest selectable-card choice that creates a member via joinMember.\n\n**Files:** mobile/app/member/new.tsx, mobile/app/_layout.tsx\n\n**Acceptance Criteria:** name Input + two selectable cards with selected styling; submit disabled when empty/busy; success joinMember then back, failure inline error; just check passes.\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/app/member/new.tsx\", \"mobile/app/_layout.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"name input + Core/Guest cards with selected styling\", \"submit disabled when empty/busy\", \"success joinMember then back, failure inline error\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-17"
+}
