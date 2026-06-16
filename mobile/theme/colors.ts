@@ -86,3 +86,15 @@ export const colors = {
     success: palette.green[500],
   },
 } as const;
+
+// --- Avatar tints — the seven jewel friends of the logo ring (assets/brand/logomark.svg).
+// A name hashes to one of these so a person is always the same color (no photos).
+export const avatarTints = [
+  "#F4B36A", // warm gold
+  "#EC92AC", // rose
+  "#D79BD6", // orchid
+  "#B79BEA", // violet
+  "#9DA8EE", // periwinkle
+  "#8C9CEC", // moon
+  "#6FC6D6", // teal
+] as const;
