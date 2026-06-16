@@ -104,4 +104,44 @@ export const textPresets = {
     letterSpacing: trackPx(fontSize.caption, "caption"),
     textTransform: "uppercase" as const,
   },
+  // ── App chrome (top bars + tab bar) ──
+  // Serif wordmark in the home top bar.
+  wordmark: {
+    fontFamily: fontFamily.display,
+    fontSize: 20,
+    lineHeight: lh(20, "tight"),
+    letterSpacing: trackPx(20, "display"),
+  },
+  // Large left-aligned serif title in the `tab` top bar.
+  tabTitle: {
+    fontFamily: fontFamily.display,
+    fontSize: 34,
+    lineHeight: lh(34, "tight"),
+    letterSpacing: trackPx(34, "display"),
+  },
+  // Centered serif title in the `title` top bar.
+  barTitle: {
+    fontFamily: fontFamily.display,
+    fontSize: 24,
+    lineHeight: lh(24, "tight"),
+    letterSpacing: trackPx(24, "display"),
+  },
+  // Ember back-link beside a `title` top bar.
+  backLink: {
+    fontFamily: fontFamily.sansSemibold,
+    fontSize: 15,
+    lineHeight: lh(15, "normal"),
+  },
+  // Bottom tab-bar item label (inactive weight; active swaps to sansBold).
+  tabLabel: {
+    fontFamily: fontFamily.sansMedium,
+    fontSize: 11,
+    lineHeight: lh(11, "normal"),
+  },
+  // Mono sub-line under a top-bar title (group name / count strip).
+  barMeta: {
+    fontFamily: fontFamily.mono,
+    fontSize: 11,
+    letterSpacing: 11 * 0.04,
+  },
 } as const;
