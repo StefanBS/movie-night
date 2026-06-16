@@ -62,6 +62,7 @@ export const colors = {
     subtle: palette.night[700],
     spotlight: "rgba(246, 139, 54, 0.15)", // the bonfire wash — "next up"
     dark: palette.night[950], // deepest theater / hero / marquee
+    tabBar: "rgba(12, 10, 27, 0.86)", // night-950 @ 86% — the blurred bottom tab bar
     danger: "rgba(240, 122, 107, 0.13)",
     success: "rgba(111, 203, 151, 0.13)",
   },

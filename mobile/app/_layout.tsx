@@ -33,7 +33,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.surface.page },
         }}
       >
-        <Stack.Screen name="index" options={{ title: "Whose turn?" }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="manage" options={{ title: "Manage members" }} />
         <Stack.Screen name="night" options={{ title: "Tonight" }} />
       </Stack>
