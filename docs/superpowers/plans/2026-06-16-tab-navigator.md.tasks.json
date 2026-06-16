@@ -1,0 +1,26 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-16-tab-navigator.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Theme chrome presets + expo-blur",
+      "status": "pending",
+      "description": "**Goal:** Add the type presets and tab-bar surface colour the chrome needs, and install `expo-blur`, so later tasks reference tokens instead of hardcoding.\n\n**Files:**\n- Modify: `mobile/theme/typography.ts` (append wordmark/tabTitle/barTitle/backLink/tabLabel/barMeta to textPresets)\n- Modify: `mobile/theme/colors.ts` (add surface.tabBar)\n- Modify: `mobile/package.json` (npx expo install expo-blur)\n\n**Acceptance Criteria:**\n- textPresets exposes wordmark/tabTitle/barTitle/backLink/tabLabel/barMeta\n- colors.surface.tabBar == rgba(12, 10, 27, 0.86)\n- expo-blur in package.json\n- just typecheck && just lint pass\n\n**Verify:** `cd mobile && just typecheck && just lint`\n\n```json:metadata\n{\"files\": [\"mobile/theme/typography.ts\", \"mobile/theme/colors.ts\", \"mobile/package.json\"], \"verifyCommand\": \"cd mobile && just typecheck && just lint\", \"acceptanceCriteria\": [\"textPresets exposes wordmark/tabTitle/barTitle/backLink/tabLabel/barMeta\", \"colors.surface.tabBar == rgba(12,10,27,0.86)\", \"expo-blur in package.json\", \"just typecheck && just lint pass\"], \"modelTier\": \"mechanical\"}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: TopBar shared chrome component",
+      "status": "pending",
+      "blockedBy": [1],
+      "description": "**Goal:** One TopBar component implementing all three top-bar kinds (home, tab, title), exported from the components barrel.\n\n**Files:**\n- Create: `mobile/components/TopBar.tsx`\n- Modify: `mobile/components/index.ts`\n\n**Acceptance Criteria:**\n- TopBar discriminated kind prop home/tab/title\n- home/tab/title each render their specified chrome\n- top inset from useSafeAreaInsets\n- tokens only; just typecheck && just lint pass\n\n**Verify:** `cd mobile && just typecheck && just lint`\n\n```json:metadata\n{\"files\": [\"mobile/components/TopBar.tsx\", \"mobile/components/index.ts\"], \"verifyCommand\": \"cd mobile && just typecheck && just lint\", \"acceptanceCriteria\": [\"TopBar discriminated kind prop home/tab/title\", \"home/tab/title each render their specified chrome\", \"top inset from useSafeAreaInsets\", \"tokens only; typecheck + lint pass\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Tab navigator, four shells, and root restructure",
+      "status": "pending",
+      "blockedBy": [1, 2],
+      "description": "**Goal:** Introduce the (tabs) group with a custom blurred tab bar and four placeholder shells, rewire the root layout to mount (tabs) headerless alongside parked night/manage, and remove the old index.tsx. Atomic — expo-router rejects two files mapping to /.\n\n**Files:**\n- Create: `mobile/app/(tabs)/_layout.tsx`, `index.tsx`, `history.tsx`, `club.tsx`, `settings.tsx`\n- Modify: `mobile/app/_layout.tsx`\n- Delete: `mobile/app/index.tsx`\n\n**Acceptance Criteria:**\n- four tabs render and switch, active ember + bold, inactive tertiary\n- tab bar BlurView tinted surface.tabBar + hairline top + safe-area bottom\n- Tonight home bar (gear->Settings); History/Club/Settings tab bars; placeholder lines\n- night + manage still load as routes; app/index.tsx deleted\n- just check passes\n\n**Verify:** `cd mobile && just check`, then `just start` manual smoke.\n\n```json:metadata\n{\"files\": [\"mobile/app/(tabs)/_layout.tsx\", \"mobile/app/(tabs)/index.tsx\", \"mobile/app/(tabs)/history.tsx\", \"mobile/app/(tabs)/club.tsx\", \"mobile/app/(tabs)/settings.tsx\", \"mobile/app/_layout.tsx\", \"mobile/app/index.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"four tabs render and switch, active ember + bold\", \"tab bar BlurView tinted surface.tabBar + hairline top + safe-area bottom\", \"Tonight home bar (gear->Settings); History/Club/Settings tab bars; placeholder lines\", \"night + manage still load as routes; app/index.tsx deleted\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-16T00:00:00Z"
+}
