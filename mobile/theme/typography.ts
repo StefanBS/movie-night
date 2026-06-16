@@ -53,6 +53,7 @@ export const leading = {
 export const tracking = {
   display: -0.01, // multiply by fontSize for px
   caption: 0.08,
+  loose: 0.04, // gentle mono tracking — top-bar meta / group line
   normal: 0,
 } as const;
 
@@ -131,6 +132,7 @@ export const textPresets = {
     fontFamily: fontFamily.sansSemibold,
     fontSize: 15,
     lineHeight: lh(15, "normal"),
+    letterSpacing: trackPx(15, "normal"),
   },
   // Bottom tab-bar item label (inactive weight; active swaps to sansBold).
   tabLabel: {
@@ -142,6 +144,6 @@ export const textPresets = {
   barMeta: {
     fontFamily: fontFamily.mono,
     fontSize: 11,
-    letterSpacing: 11 * 0.04,
+    letterSpacing: trackPx(11, "loose"),
   },
 } as const;
