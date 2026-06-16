@@ -28,7 +28,7 @@ function SpotlightTabBar({ state, navigation }: BottomTabBarProps) {
     <View style={[styles.bar, { paddingBottom: insets.bottom + space[2] }]}>
       <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
       <View style={styles.tint} />
-      <View style={styles.items}>
+      <View accessibilityRole="tablist" style={styles.items}>
         {state.routes.map((route, index) => {
           const tab = TABS.find((t) => t.name === route.name);
           if (!tab) return null;
@@ -48,8 +48,8 @@ function SpotlightTabBar({ state, navigation }: BottomTabBarProps) {
             <Pressable
               key={route.key}
               onPress={onPress}
-              accessibilityRole="button"
-              accessibilityState={focused ? { selected: true } : {}}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: focused }}
               accessibilityLabel={tab.label}
               style={styles.item}
             >
