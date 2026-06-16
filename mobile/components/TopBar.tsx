@@ -10,14 +10,14 @@ import { colors, pressedOpacity, space, textPresets } from "../theme";
 //   home  — logomark + "Movie Night" wordmark + group name + right slot (Tonight)
 //   tab   — large left-aligned serif title + optional mono sub + right slot
 //   title — centered serif title + ember back link + right slot (pushed screens)
+// `back` couples its label and handler so a title bar can't render a dead button.
 type TopBarProps =
   | { kind: "home"; group: string; right?: ReactNode }
   | { kind: "tab"; title: string; sub?: string; right?: ReactNode }
   | {
       kind: "title";
       title: string;
-      back?: string;
-      onBack?: () => void;
+      back?: { label: string; onPress: () => void };
       right?: ReactNode;
     };
 
@@ -29,7 +29,12 @@ export function TopBar(props: TopBarProps) {
     return (
       <View style={[styles.row, { paddingTop }]}>
         <View style={styles.homeLeft}>
-          <Logomark size={30} />
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Logomark size={30} />
+          </View>
           <View style={styles.flexShrink}>
             <Text style={styles.wordmark} allowFontScaling={false}>
               Movie Night
@@ -48,7 +53,7 @@ export function TopBar(props: TopBarProps) {
     return (
       <View style={[styles.row, styles.tabRow, { paddingTop }]}>
         <View style={styles.flexShrink}>
-          <Text style={styles.tabTitle} allowFontScaling={false}>
+          <Text style={styles.tabTitle} allowFontScaling={false} numberOfLines={1}>
             {props.title}
           </Text>
           {props.sub ? <Text style={styles.meta}>{props.sub}</Text> : null}
@@ -62,13 +67,13 @@ export function TopBar(props: TopBarProps) {
     <View style={[styles.titleBar, { paddingTop }]}>
       {props.back ? (
         <Pressable
-          onPress={props.onBack}
+          onPress={props.back.onPress}
           accessibilityRole="button"
-          accessibilityLabel={`Back to ${props.back}`}
+          accessibilityLabel={`Back to ${props.back.label}`}
           style={({ pressed }) => [styles.back, pressed && styles.pressed]}
         >
           <ChevronLeft size={18} color={colors.accent.strong} strokeWidth={2.4} />
-          <Text style={styles.backText}>{props.back}</Text>
+          <Text style={styles.backText}>{props.back.label}</Text>
         </Pressable>
       ) : null}
       <Text style={styles.barTitle} allowFontScaling={false} numberOfLines={1}>
@@ -108,7 +113,7 @@ const styles = StyleSheet.create({
   },
   back: {
     position: "absolute",
-    left: space[3],
+    left: space[5],
     bottom: space[2],
     flexDirection: "row",
     alignItems: "center",
@@ -116,6 +121,6 @@ const styles = StyleSheet.create({
   },
   backText: { ...textPresets.backLink, color: colors.accent.strong },
   barTitle: { ...textPresets.barTitle, color: colors.text.primary },
-  titleRight: { position: "absolute", right: space[4], bottom: space[2] },
+  titleRight: { position: "absolute", right: space[5], bottom: space[2] },
   pressed: { opacity: pressedOpacity },
 });
