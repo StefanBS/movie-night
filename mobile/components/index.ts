@@ -10,3 +10,4 @@ export { Stat } from "./Stat";
 export { SectionLabel } from "./SectionLabel";
 export { Banner } from "./Banner";
 export { IconButton } from "./IconButton";
+export { TopBar } from "./TopBar";
