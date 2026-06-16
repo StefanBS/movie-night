@@ -70,7 +70,15 @@ const styles = StyleSheet.create({
     borderColor: colors.border.hairline,
     backgroundColor: colors.surface.card,
   },
-  center: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center" },
+  center: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   caption: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 9 },
   title: {
     fontFamily: fontFamily.display,
