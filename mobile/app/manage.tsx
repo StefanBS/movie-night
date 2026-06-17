@@ -85,7 +85,7 @@ export default function ManageScreen() {
     setBusy("add");
     setActionError(null);
     try {
-      await joinMember(API_URL, GROUP_ID, trimmed);
+      await joinMember(API_URL, GROUP_ID, trimmed, "core");
       setName("");
       await load();
     } catch (e) {

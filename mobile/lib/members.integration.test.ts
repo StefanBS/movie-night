@@ -60,19 +60,31 @@ async function capture(
   }
 }
 
-test("joinMember posts {name} to the members path and returns the member", async () => {
-  const created: Member = { id: "u1", name: "Newbie", role: "core", status: "active" };
+test("joinMember posts {name, role} to the members path and returns the member", async () => {
+  const created: Member = {
+    id: "u1",
+    name: "Newbie",
+    role: "core",
+    status: "active",
+    joinedOn: "2026-06-17",
+  };
   const { method, path, body, result } = await capture(201, created, (url) =>
-    joinMember(url, GROUP, "Newbie"),
+    joinMember(url, GROUP, "Newbie", "core"),
   );
   assert.equal(method, "POST");
   assert.equal(path, `/groups/${GROUP}/members`);
-  assert.deepEqual(JSON.parse(body), { name: "Newbie" });
+  assert.deepEqual(JSON.parse(body), { name: "Newbie", role: "core" });
   assert.deepEqual(result, created);
 });
 
 test("transitionMember posts to the deactivate path with no body", async () => {
-  const m: Member = { id: USER, name: "Frankie", role: "guest", status: "inactive" };
+  const m: Member = {
+    id: USER,
+    name: "Frankie",
+    role: "guest",
+    status: "inactive",
+    joinedOn: "2025-03-01",
+  };
   const { method, path, body, result } = await capture(200, m, (url) =>
     transitionMember(url, GROUP, USER, "deactivate"),
   );
@@ -83,13 +95,25 @@ test("transitionMember posts to the deactivate path with no body", async () => {
 });
 
 test("transitionMember posts to the reactivate path", async () => {
-  const m: Member = { id: USER, name: "Frankie", role: "core", status: "active" };
+  const m: Member = {
+    id: USER,
+    name: "Frankie",
+    role: "core",
+    status: "active",
+    joinedOn: "2025-03-01",
+  };
   const { path } = await capture(200, m, (url) => transitionMember(url, GROUP, USER, "reactivate"));
   assert.equal(path, `/groups/${GROUP}/members/${USER}/reactivate`);
 });
 
 test("transitionMember posts to the promote path", async () => {
-  const m: Member = { id: USER, name: "Frankie", role: "core", status: "active" };
+  const m: Member = {
+    id: USER,
+    name: "Frankie",
+    role: "core",
+    status: "active",
+    joinedOn: "2025-03-01",
+  };
   const { path } = await capture(200, m, (url) => transitionMember(url, GROUP, USER, "promote"));
   assert.equal(path, `/groups/${GROUP}/members/${USER}/promote`);
 });
@@ -111,7 +135,13 @@ test("a write op throws on a non-2xx response", async () => {
 
 test("requests the group members path and returns parsed members", async () => {
   let requestedPath = "";
-  const member: Member = { id: "a", name: "Ada", role: "core", status: "active" };
+  const member: Member = {
+    id: "a",
+    name: "Ada",
+    role: "core",
+    status: "active",
+    joinedOn: "2024-06-15",
+  };
   const server = await startServer((req, res) => {
     requestedPath = req.url ?? "";
     res.setHeader("content-type", "application/json");

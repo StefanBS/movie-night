@@ -8,12 +8,12 @@ import { memberActions, parseMembers, type Member, type MemberAction } from "./m
 
 test("parses a valid array of members", () => {
   const raw = [
-    { id: "a", name: "Ada", role: "core", status: "active" },
-    { id: "b", name: "Bo", role: "guest", status: "inactive" },
+    { id: "a", name: "Ada", role: "core", status: "active", joinedOn: "2024-06-15" },
+    { id: "b", name: "Bo", role: "guest", status: "inactive", joinedOn: "2025-01-02" },
   ];
   const want: Member[] = [
-    { id: "a", name: "Ada", role: "core", status: "active" },
-    { id: "b", name: "Bo", role: "guest", status: "inactive" },
+    { id: "a", name: "Ada", role: "core", status: "active", joinedOn: "2024-06-15" },
+    { id: "b", name: "Bo", role: "guest", status: "inactive", joinedOn: "2025-01-02" },
   ];
   assert.deepEqual(parseMembers(raw), want);
 });
@@ -50,6 +50,11 @@ const invalid: { name: string; raw: unknown; wantError: RegExp }[] = [
     raw: [{ id: "a", name: "Ada", role: "core", status: "left" }],
     wantError: /member 0.*status/,
   },
+  {
+    name: "rejects a missing joinedOn",
+    raw: [{ id: "a", name: "Ada", role: "core", status: "active" }],
+    wantError: /member 0.*joinedOn/,
+  },
 ];
 
 for (const c of invalid) {
@@ -62,17 +67,17 @@ for (const c of invalid) {
 const actionCases: { name: string; member: Member; want: MemberAction[] }[] = [
   {
     name: "inactive member can only reactivate",
-    member: { id: "a", name: "Ada", role: "core", status: "inactive" },
+    member: { id: "a", name: "Ada", role: "core", status: "inactive", joinedOn: "2024-06-15" },
     want: ["reactivate"],
   },
   {
     name: "active guest can promote or deactivate",
-    member: { id: "b", name: "Bo", role: "guest", status: "active" },
+    member: { id: "b", name: "Bo", role: "guest", status: "active", joinedOn: "2025-01-02" },
     want: ["promote", "deactivate"],
   },
   {
     name: "active core member can only deactivate",
-    member: { id: "c", name: "Cy", role: "core", status: "active" },
+    member: { id: "c", name: "Cy", role: "core", status: "active", joinedOn: "2023-11-20" },
     want: ["deactivate"],
   },
 ];
