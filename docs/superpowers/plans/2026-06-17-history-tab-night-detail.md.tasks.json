@@ -4,19 +4,19 @@
     {
       "id": 1,
       "subject": "Task 1: Move the night flow into the night/ folder",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Relocate the existing night-flow screen to `app/night/new.tsx` and update its single caller, so a `night/` folder can also hold the detail route — with no behavior change.\n\n**Files:**\n- Move: `mobile/app/night.tsx` → `mobile/app/night/new.tsx`\n- Modify: moved file relative imports (`../` → `../../`)\n- Modify: `mobile/app/(tabs)/index.tsx:178` (→ `/night/new`)\n\n**Acceptance Criteria:**\n- app/night.tsx removed, app/night/new.tsx exists with identical logic\n- moved file relative imports fixed to ../../\n- index.tsx navigates to /night/new\n- just lint && just test pass\n\n**Verify:** `cd mobile && just lint && just test`\n\n```json:metadata\n{\"files\": [\"mobile/app/night/new.tsx\", \"mobile/app/(tabs)/index.tsx\"], \"verifyCommand\": \"cd mobile && just lint && just test\", \"acceptanceCriteria\": [\"app/night.tsx removed, app/night/new.tsx exists with identical logic\", \"moved file relative imports fixed to ../../\", \"index.tsx navigates to /night/new\", \"just lint && just test pass\"], \"modelTier\": \"mechanical\"}\n```"
     },
     {
       "id": 2,
       "subject": "Task 2: lib/history.ts — stat summary + month grouping (pure, TDD)",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Add the pure logic that backs the History stat strip and month sections, fully unit-tested with no mocks.\n\n**Files:**\n- Create: `mobile/lib/history.ts`\n- Test: `mobile/lib/history.test.ts`\n\n**Acceptance Criteria:**\n- historyStats: nights=count, films=distinct tmdbId, loved=0; movie-less night not a film; dup film counts once\n- buildHistoryMonths: newest month first, newest night first within, empty->[]\n- all tests pass\n\n**Verify:** `cd mobile && node --import tsx --test lib/history.test.ts`\n\n```json:metadata\n{\"files\": [\"mobile/lib/history.ts\", \"mobile/lib/history.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/history.test.ts\", \"acceptanceCriteria\": [\"historyStats: nights=count, films=distinct tmdbId, loved=0; movie-less night not a film; dup film counts once\", \"buildHistoryMonths: newest month first, newest night first within, empty->[]\", \"all tests pass\"], \"modelTier\": \"standard\"}\n```"
     },
     {
       "id": 3,
       "subject": "Task 3: app/night/[id].tsx — night detail screen",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** Add the pushed night-detail screen: editorial header (poster + title), \"The pick\" spotlight row, and \"Who watched\" list, loaded via `getNight`.\n\n**Files:**\n- Create: `mobile/app/night/[id].tsx`\n\n**Acceptance Criteria:**\n- reads id, fetches via getNight in useFocusEffect+AbortController, loading/error/not-found states\n- editorial header poster+title+year, no reaction (TODO #40)\n- The pick spotlight row with glow avatar + date, fallback when pickerId null\n- Who watched attendee list, guests badged, no members fetch\n- just check passes\n\n**Verify:** `cd mobile && just check`\n\n```json:metadata\n{\"files\": [\"mobile/app/night/[id].tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"reads id, fetches via getNight in useFocusEffect+AbortController, loading/error/not-found states\", \"editorial header poster+title+year, no reaction (TODO #40)\", \"The pick spotlight row with glow avatar + date, fallback when pickerId null\", \"Who watched attendee list, guests badged, no members fetch\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
     },
     {
@@ -27,5 +27,5 @@
       "description": "**Goal:** Replace the History placeholder with the full Spotlight UI — stat strip, month sections, per-night rows — driven by `lib/history.ts`, behind a `// TODO(#39)` seam so the honest empty state shows until the list endpoint lands.\n\n**Files:**\n- Modify: `mobile/app/(tabs)/history.tsx`\n\n**Acceptance Criteria:**\n- empty nights -> honest empty state under tab top bar\n- non-empty -> 3-cell stat strip (Loved accented) + per-month sections\n- row poster+serif title+FirstName·date, pressable -> /night/[id]; no reaction glyph (TODO #40)\n- // TODO(#39) seam marks the fetch wiring point\n- just check passes\n\n**Verify:** `cd mobile && just check`\n\n```json:metadata\n{\"files\": [\"mobile/app/(tabs)/history.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"empty nights -> honest empty state under tab top bar\", \"non-empty -> 3-cell stat strip (Loved accented) + per-month sections\", \"row poster+serif title+FirstName·date, pressable -> /night/[id]; no reaction glyph (TODO #40)\", \"// TODO(#39) seam marks the fetch wiring point\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
     }
   ],
-  "lastUpdated": "2026-06-17T00:00:00Z"
+  "lastUpdated": "2026-06-17T16:05:00Z"
 }

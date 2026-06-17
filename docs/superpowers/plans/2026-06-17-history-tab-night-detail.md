@@ -287,9 +287,12 @@ git commit -m "feat(mobile): history stat + month-grouping helpers (#36)"
 
 **Files:**
 - Create: `mobile/app/night/[id].tsx`
+- Modify: `mobile/app/_layout.tsx` (register the new route so it hides the default Stack header)
+- Modify: `mobile/lib/nights.ts` (add `getNightOrNull` — `requestJsonOrNull` wrapper mirroring `getCurrentNight`, so a 404 renders the not-found state instead of a generic error)
 
 **Acceptance Criteria:**
 - [ ] Reads `id` from the route, fetches the night in a `useFocusEffect` with an `AbortController`, and renders loading / error / not-found states.
+- [ ] `app/_layout.tsx` registers `<Stack.Screen name="night/[id]" options={{ headerShown: false }} />` (the screen draws its own `TopBar`; routes are registered per-file here, like `member/[id]`).
 - [ ] Editorial header shows the movie poster + title (+ year when known); no reaction is rendered (marked `// TODO(#40)`).
 - [ ] "The pick" row spotlights the picker (`Avatar` glow + name + date) using the ember spotlight surface; falls back to "No pick recorded." when `pickerId` is null.
 - [ ] "Who watched" lists every attendee (avatar + name; guests carry a neutral `Badge`). Picker/attendee names come from the `Night` payload — no members fetch.
@@ -509,15 +512,23 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 2: Verify**
+- [ ] **Step 2: Register the route in `app/_layout.tsx`**
+
+Routes here are registered per-file so they can hide the default Stack header (the screen draws its own `TopBar`). Add an entry next to the existing `night/new` / `member/[id]` ones:
+
+```tsx
+<Stack.Screen name="night/[id]" options={{ headerShown: false }} />
+```
+
+- [ ] **Step 3: Verify**
 
 Run: `cd mobile && just check`
 Expected: lint clean, `tsc --noEmit` clean, all tests pass. (If `tsc` flags `/night/[id]`, regenerate typed routes per Task 1 Step 4 — `.expo/types` is local-only.)
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add app/night/\[id\].tsx
+git add app/night/\[id\].tsx app/_layout.tsx
 git commit -m "feat(mobile): night detail screen (#36)"
 ```
 
