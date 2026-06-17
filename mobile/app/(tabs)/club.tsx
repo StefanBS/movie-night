@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useFocusEffect, useRouter, type Href } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import Constants from "expo-constants";
 import { ChevronRight, Plus } from "lucide-react-native";
 
@@ -63,9 +63,8 @@ export default function ClubScreen() {
   );
 
   const sections = buildClubSections(members, turn);
-  // `/member/...` routes arrive in later tasks; cast keeps this typed-routes
-  // build green until expo-router's generated href map includes them.
-  const open = (id: string) => router.push(`/member/${id}` as Href);
+  const open = (id: string) =>
+    router.push({ pathname: "/member/[id]", params: { id } });
 
   return (
     <View style={styles.screen}>
@@ -77,7 +76,7 @@ export default function ClubScreen() {
           <IconButton
             variant="accent"
             accessibilityLabel="Add member"
-            onPress={() => router.push("/member/new" as Href)}
+            onPress={() => router.push("/member/new")}
             icon={<Plus size={20} color={colors.text.onAccent} strokeWidth={2.4} />}
           />
         }
