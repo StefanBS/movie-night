@@ -22,10 +22,10 @@
     {
       "id": 4,
       "subject": "Task 4: app/(tabs)/history.tsx — History tab UI",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [1, 2, 3],
       "description": "**Goal:** Replace the History placeholder with the full Spotlight UI — stat strip, month sections, per-night rows — driven by `lib/history.ts`, behind a `// TODO(#39)` seam so the honest empty state shows until the list endpoint lands.\n\n**Files:**\n- Modify: `mobile/app/(tabs)/history.tsx`\n\n**Acceptance Criteria:**\n- empty nights -> honest empty state under tab top bar\n- non-empty -> 3-cell stat strip (Loved accented) + per-month sections\n- row poster+serif title+FirstName·date, pressable -> /night/[id]; no reaction glyph (TODO #40)\n- // TODO(#39) seam marks the fetch wiring point\n- just check passes\n\n**Verify:** `cd mobile && just check`\n\n```json:metadata\n{\"files\": [\"mobile/app/(tabs)/history.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"empty nights -> honest empty state under tab top bar\", \"non-empty -> 3-cell stat strip (Loved accented) + per-month sections\", \"row poster+serif title+FirstName·date, pressable -> /night/[id]; no reaction glyph (TODO #40)\", \"// TODO(#39) seam marks the fetch wiring point\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
     }
   ],
-  "lastUpdated": "2026-06-17T16:05:00Z"
+  "lastUpdated": "2026-06-17T23:30:00Z"
 }
