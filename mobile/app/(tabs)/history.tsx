@@ -1,15 +1,104 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 
-import { TopBar } from "../../components";
-import { colors, space, textPresets } from "../../theme";
+import { Poster, SectionLabel, Stat, TopBar } from "../../components";
+import { formatShortDate } from "../../lib/date";
+import { buildHistoryMonths, historyStats } from "../../lib/history";
+import type { Night } from "../../lib/nights";
+import {
+  borderWidth,
+  colors,
+  fontFamily,
+  fontSize,
+  pressedOpacity,
+  radius,
+  space,
+  textPresets,
+} from "../../theme";
+
+function firstNameOf(name: string): string {
+  return name.split(" ")[0];
+}
 
 export default function HistoryScreen() {
+  const router = useRouter();
+  // TODO(#39): fetch recorded nights from the nights-list endpoint once it
+  // exists. Until then there is no list endpoint, so the history is empty and the
+  // screen shows its honest empty state. The render path below is ready to wire.
+  const nights: Night[] = [];
+
+  if (nights.length === 0) {
+    return (
+      <View style={styles.screen}>
+        <TopBar kind="tab" title="History" />
+        <View style={styles.body}>
+          <Text style={styles.empty}>No nights yet — start one.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const stats = historyStats(nights);
+  const months = buildHistoryMonths(nights);
+  const open = (id: string) =>
+    router.push({ pathname: "/night/[id]", params: { id } });
+
   return (
     <View style={styles.screen}>
       <TopBar kind="tab" title="History" />
-      <View style={styles.body}>
-        <Text style={styles.placeholder}>No nights yet — start one.</Text>
-      </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.stats}>
+          <View style={styles.statCell}>
+            <Stat value={stats.nights} label="Nights" />
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statCell}>
+            <Stat value={stats.films} label="Films" />
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statCell}>
+            <Stat value={stats.loved} label="Loved" accent />
+          </View>
+        </View>
+
+        {months.map((month) => (
+          <View key={month.label}>
+            <SectionLabel>{month.label}</SectionLabel>
+            {month.nights.map((n, i) => {
+              const picker =
+                n.attendees.find((a) => a.id === n.pickerId) ?? null;
+              return (
+                <Pressable
+                  key={n.id}
+                  onPress={() => open(n.id)}
+                  style={({ pressed }) => [
+                    styles.row,
+                    i < month.nights.length - 1 && styles.divider,
+                    pressed && styles.rowPressed,
+                  ]}
+                >
+                  <Poster
+                    uri={n.movie?.posterUrl}
+                    title={n.movie?.title}
+                    w={46}
+                    h={69}
+                  />
+                  <View style={styles.rowText}>
+                    <Text style={styles.rowTitle} numberOfLines={2}>
+                      {n.movie ? n.movie.title : "Untitled night"}
+                    </Text>
+                    <Text style={styles.rowMeta} numberOfLines={1}>
+                      {picker !== null ? `${firstNameOf(picker.name)} · ` : ""}
+                      {formatShortDate(n.scheduledFor)}
+                    </Text>
+                  </View>
+                  {/* TODO(#40): reaction glyph renders here when present */}
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 }
@@ -17,5 +106,47 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
-  placeholder: { ...textPresets.body, color: colors.text.secondary },
+  empty: { ...textPresets.body, color: colors.text.secondary },
+  content: { paddingHorizontal: space[5], paddingBottom: space[10] },
+  stats: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface.card,
+    borderWidth: borderWidth.hairline,
+    borderColor: colors.border.hairline,
+    borderRadius: radius.lg,
+    paddingVertical: space[4],
+    paddingHorizontal: space[4],
+    marginTop: space[5],
+  },
+  statCell: { flex: 1, alignItems: "center" },
+  statDivider: {
+    width: borderWidth.hairline,
+    alignSelf: "stretch",
+    backgroundColor: colors.border.hairline,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space[3],
+    paddingVertical: space[3],
+  },
+  divider: {
+    borderBottomWidth: borderWidth.hairline,
+    borderBottomColor: colors.border.hairline,
+  },
+  rowPressed: { opacity: pressedOpacity },
+  rowText: { flex: 1 },
+  rowTitle: {
+    fontFamily: fontFamily.display,
+    fontSize: 20,
+    lineHeight: 22,
+    color: colors.text.primary,
+  },
+  rowMeta: {
+    fontFamily: fontFamily.mono,
+    fontSize: fontSize.caption,
+    color: colors.text.tertiary,
+    marginTop: space[1],
+  },
 });

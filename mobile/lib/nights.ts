@@ -92,6 +92,18 @@ export function getNight(
   return fetchNight(`${baseUrl}/groups/${groupId}/nights/${nightId}`, { signal });
 }
 
+// getNightOrNull loads a single night by id, or null when the backend has no
+// such night (it returns 404 in that case) — so the detail screen can show an
+// honest "not found" state instead of a generic error.
+export function getNightOrNull(
+  baseUrl: string,
+  groupId: string,
+  nightId: string,
+  signal?: AbortSignal,
+): Promise<Night | null> {
+  return requestJsonOrNull(`${baseUrl}/groups/${groupId}/nights/${nightId}`, parseNight, { signal });
+}
+
 // getCurrentNight loads the group's latest night (open OR finalized) so the screen
 // can resume and correct it across sessions, or null when there is none (the
 // backend returns 404 in that case).

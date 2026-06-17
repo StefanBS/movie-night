@@ -175,7 +175,7 @@ export default function TonightScreen() {
             <AppButton
               title="Plan a night  →"
               fullWidth
-              onPress={() => router.navigate("/night")}
+              onPress={() => router.navigate("/night/new")}
             />
           </View>
           <View style={styles.skipRow}>

@@ -18,11 +18,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 
-import { AppButton, Avatar, Badge, Input, Poster, SectionLabel, TopBar } from "../components";
-import { GROUP_ID, resolveApiBaseUrl } from "../lib/api";
-import { formatShortDate, todayLocalISO } from "../lib/date";
-import { errorMessage } from "../lib/errors";
-import { fetchMembers, type Member } from "../lib/members";
+import { AppButton, Avatar, Badge, Input, Poster, SectionLabel, TopBar } from "../../components";
+import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
+import { formatShortDate, todayLocalISO } from "../../lib/date";
+import { errorMessage } from "../../lib/errors";
+import { fetchMembers, type Member } from "../../lib/members";
 import {
   addAttendee,
   attachMovie,
@@ -32,10 +32,10 @@ import {
   recordNightPick,
   removeAttendee,
   type Night,
-} from "../lib/nights";
-import { searchMovies, type Movie } from "../lib/movies";
-import { type TurnMember } from "../lib/turn";
-import { deriveInitialStep, type Step } from "../lib/nightFlow";
+} from "../../lib/nights";
+import { searchMovies, type Movie } from "../../lib/movies";
+import { type TurnMember } from "../../lib/turn";
+import { deriveInitialStep, type Step } from "../../lib/nightFlow";
 import {
   borderWidth,
   colors,
@@ -47,7 +47,7 @@ import {
   space,
   textPresets,
   trackPx,
-} from "../theme";
+} from "../../theme";
 
 const API_URL = resolveApiBaseUrl({
   envUrl: process.env.EXPO_PUBLIC_API_URL,
