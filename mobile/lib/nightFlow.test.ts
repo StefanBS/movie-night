@@ -16,16 +16,17 @@ function night(overrides: Partial<Night>): Night {
   };
 }
 
-const MOVIE = { tmdbId: 1, title: "Past Lives", releaseYear: 2023, posterUrl: null };
+const movie = { tmdbId: 1, title: "Past Lives", releaseYear: 2023, posterUrl: null };
 
-test("deriveInitialStep maps a resumed night to its wizard step", () => {
-  const cases: { name: string; input: Night; want: Step }[] = [
-    { name: "fresh night → who", input: night({}), want: "who" },
-    { name: "picker recorded, no movie → pick", input: night({ pickerId: "m1" }), want: "pick" },
-    { name: "movie attached → recorded", input: night({ pickerId: "m1", movie: MOVIE }), want: "recorded" },
-    { name: "movie attached without picker (defensive) → recorded", input: night({ movie: MOVIE }), want: "recorded" },
-  ];
-  for (const c of cases) {
-    assert.equal(deriveInitialStep(c.input), c.want, c.name);
-  }
-});
+const cases: { name: string; input: Night; want: Step }[] = [
+  { name: "fresh night → who", input: night({}), want: "who" },
+  { name: "picker recorded, no movie → pick", input: night({ pickerId: "m1" }), want: "pick" },
+  { name: "movie attached → recorded", input: night({ pickerId: "m1", movie }), want: "recorded" },
+  { name: "movie attached without picker (defensive) → recorded", input: night({ movie }), want: "recorded" },
+];
+
+for (const c of cases) {
+  test(`deriveInitialStep: ${c.name}`, () => {
+    assert.equal(deriveInitialStep(c.input), c.want);
+  });
+}
