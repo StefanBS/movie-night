@@ -1,23 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
-  FlatList,
-  Image,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 
+import { AppButton, Avatar, Badge, SectionLabel, TopBar } from "../components";
 import { GROUP_ID, resolveApiBaseUrl } from "../lib/api";
-import { todayLocalISO } from "../lib/date";
+import { formatShortDate, todayLocalISO } from "../lib/date";
 import { errorMessage } from "../lib/errors";
 import { fetchMembers, type Member } from "../lib/members";
 import {
   addAttendee,
-  attachMovie,
   createNight,
   getCurrentNight,
   getNightTurn,
@@ -25,12 +32,13 @@ import {
   removeAttendee,
   type Night,
 } from "../lib/nights";
-import { movieLabel, searchMovies, type Movie } from "../lib/movies";
 import { type TurnMember } from "../lib/turn";
-import { AppButton } from "../components/AppButton";
+import { deriveInitialStep, type Step } from "../lib/nightFlow";
 import {
   borderWidth,
   colors,
+  fontFamily,
+  fontSize,
   pressedOpacity,
   radius,
   shadow,
@@ -43,75 +51,152 @@ const API_URL = resolveApiBaseUrl({
   hostUri: Constants.expoConfig?.hostUri,
 });
 
-// Poster renders a fixed-size TMDB thumbnail, or a plain neutral box when the
-// movie has no poster (posterUrl null) — never a broken-image icon.
-function Poster({ uri }: { uri: string | null }) {
-  if (uri === null) {
-    return <View style={[styles.poster, styles.posterPlaceholder]} />;
-  }
-  return <Image source={{ uri }} style={styles.poster} resizeMode="cover" />;
+const STEP_LABELS = ["Here", "Pick", "Done"] as const;
+const STEP_INDEX: Record<Step, number> = { who: 0, pick: 1, recorded: 2 };
+
+function firstNameOf(name: string): string {
+  return name.split(" ")[0];
 }
 
-// PickRow is one tappable name in the night's pick lists (the core pick order
-// or the guests present). It highlights the recorded picker, or — before a pick
-// is recorded — the implied next pick; tapping it records that member.
-function PickRow({
-  label,
-  recorded,
-  impliedPick,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  recorded: boolean;
-  impliedPick: boolean;
-  disabled: boolean;
-  onPress: () => void;
-}) {
+// Stepper is the wizard's three-dot progress rail (Here · Pick · Done). Dots
+// before the current step show a check; the current dot is ember; the rest are
+// muted. Tonight-only — "When" is prepended in Phase 3.
+function Stepper({ current }: { current: number }) {
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.orderRow,
-        (recorded || impliedPick) && styles.pickerRow,
-        pressed && styles.rowPressed,
-      ]}
-    >
-      <Text style={styles.name}>{label}</Text>
-      {recorded ? (
-        <Text style={styles.badge}>{"Recorded ✓"}</Text>
-      ) : impliedPick ? (
-        <Text style={styles.badge}>{"Tonight's pick"}</Text>
-      ) : null}
-    </Pressable>
+    <View style={styles.stepper}>
+      {STEP_LABELS.map((label, i) => {
+        const on = i === current;
+        const done = i < current;
+        return (
+          <Fragment key={label}>
+            {i > 0 ? (
+              <View style={[styles.stepBar, done && styles.stepBarDone]} />
+            ) : null}
+            <View style={styles.stepItem}>
+              <View style={[styles.stepDot, (on || done) && styles.stepDotActive]}>
+                <Text
+                  style={[styles.stepDotText, (on || done) && styles.stepDotTextActive]}
+                  allowFontScaling={false}
+                >
+                  {done ? "✓" : String(i + 1)}
+                </Text>
+              </View>
+              <Text
+                style={[styles.stepLabel, on && styles.stepLabelActive]}
+                allowFontScaling={false}
+              >
+                {label}
+              </Text>
+            </View>
+          </Fragment>
+        );
+      })}
+    </View>
+  );
+}
+
+// WizardFooter pins a step's action(s) to the bottom, clearing the safe-area
+// inset, with a hairline top edge over the page.
+function WizardFooter({ children }: { children: ReactNode }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.footer, { paddingBottom: insets.bottom + space[4] }]}>
+      {children}
+    </View>
+  );
+}
+
+// WhoStep — attendance toggles for the full roster. The next-up present core
+// member (order[0]) is spotlighted as the picker; the footer records the pick
+// and advances.
+function WhoStep({
+  night,
+  members,
+  order,
+  attendeeIds,
+  busy,
+  onToggle,
+  onNext,
+}: {
+  night: Night;
+  members: Member[];
+  order: TurnMember[];
+  attendeeIds: Set<string>;
+  busy: string | null;
+  onToggle: (m: Member) => void;
+  onNext: () => void;
+}) {
+  const picker = order[0] ?? null;
+  return (
+    <View style={styles.flex}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Stepper current={0} />
+        <Text style={styles.heading}>{`Night of ${formatShortDate(night.scheduledFor)}`}</Text>
+        <Text style={styles.hint}>
+          {"Tap who made it. Tonight's pick goes to whoever's next up and here."}
+        </Text>
+
+        <SectionLabel>{"Who's here?"}</SectionLabel>
+        {members.map((m) => {
+          const here = attendeeIds.has(m.id);
+          const isPicker = picker?.id === m.id;
+          return (
+            <Pressable
+              key={m.id}
+              onPress={() => onToggle(m)}
+              disabled={busy !== null}
+              style={({ pressed }) => [
+                styles.attendRow,
+                isPicker ? styles.pickerRow : styles.attendDivider,
+                !here && styles.dimmed,
+                pressed && styles.rowPressed,
+              ]}
+            >
+              <Avatar name={m.name} size={40} glow={isPicker} />
+              <View style={styles.rowText}>
+                <Text style={styles.name} numberOfLines={1}>
+                  {m.name}
+                </Text>
+                {isPicker ? <Text style={styles.getsPick}>GETS THE PICK</Text> : null}
+              </View>
+              {busy === m.id ? (
+                <Text style={styles.tag}>…</Text>
+              ) : here ? (
+                <Badge label="✓ In" tone="solid" uppercase={false} />
+              ) : (
+                <Text style={styles.outTag}>OUT</Text>
+              )}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <WizardFooter>
+        <AppButton
+          title={picker ? `Next — ${firstNameOf(picker.name)} picks  →` : "Add who's here  →"}
+          fullWidth
+          disabled={busy !== null || picker === null}
+          onPress={onNext}
+        />
+      </WizardFooter>
+    </View>
   );
 }
 
 export default function NightScreen() {
+  const router = useRouter();
   const [members, setMembers] = useState<Member[]>([]);
   const [night, setNight] = useState<Night | null>(null);
   const [order, setOrder] = useState<TurnMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  // The member id with an action in flight, or "create" while creating.
+  // The member id with an action in flight, "create" while creating, or "movie"
+  // while attaching.
   const [busy, setBusy] = useState<string | null>(null);
+  const [step, setStep] = useState<Step>("who");
 
-  const [movieQuery, setMovieQuery] = useState("");
-  const [results, setResults] = useState<Movie[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  // Show the search UI when no movie is attached yet, or when the user taps
-  // "Change movie" on a night that already has one.
-  const [changingMovie, setChangingMovie] = useState(false);
-
-  // Load the full roster (everyone — guests AND inactive members) so anyone
-  // present can be recorded. Attendance is presence; the pick order (getNightTurn)
-  // filters to active core, so guests/inactive attendees never appear in it. We
-  // also resume the group's open night (if any) so leaving and returning doesn't
-  // strand it — the backend enforces at most one open night per group (a partial
-  // unique index), and create is idempotent, so resuming is always unambiguous.
+  // Resume the group's open night (if any) and land on the right step. The
+  // backend enforces at most one open night per group, so resume is unambiguous.
   useEffect(() => {
     const controller = new AbortController();
     (async () => {
@@ -123,11 +208,12 @@ export default function NightScreen() {
         setMembers(roster);
         if (current !== null) {
           setNight(current);
+          setStep(deriveInitialStep(current));
           setOrder(await getNightTurn(API_URL, GROUP_ID, current.id, controller.signal));
         }
       } catch (e) {
         if (!controller.signal.aborted) {
-          setError(errorMessage(e, "failed to load members"));
+          setError(errorMessage(e, "failed to load tonight"));
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -147,24 +233,20 @@ export default function NightScreen() {
     setOrder(await getNightTurn(API_URL, GROUP_ID, nightId));
   }, []);
 
-  // runNightWrite is the shared envelope for the screen's write actions: guard
-  // against a concurrent action, mark `busyKey` in flight, run the write, adopt
-  // the returned night, then refresh the pick order — reporting a refresh
-  // failure on its own so a successful write is never shown as failed. When
-  // `clearOrder` is set (starting a night) the previous order is dropped before
-  // the refresh so it doesn't linger on screen.
-  //
-  // No abort signal on write actions: a write should finish even if the screen
-  // unmounts mid-request; a stray state set after unmount is benign under React 18.
+  // runNightWrite is the shared envelope for write actions: guard against a
+  // concurrent action, mark busyKey in flight, run the write, adopt the returned
+  // night, then refresh the pick order — reporting a refresh failure on its own
+  // so a successful write is never shown as failed. Returns the updated night,
+  // or null on failure, so callers can advance the step only on success.
   const runNightWrite = useCallback(
     async (
       busyKey: string,
       write: () => Promise<Night>,
       fallback: string,
       clearOrder = false,
-    ) => {
+    ): Promise<Night | null> => {
       if (busy !== null) {
-        return;
+        return null;
       }
       setBusy(busyKey);
       setActionError(null);
@@ -179,8 +261,10 @@ export default function NightScreen() {
         } catch (e) {
           setActionError(errorMessage(e, "failed to load pick order"));
         }
+        return updated;
       } catch (e) {
         setActionError(errorMessage(e, fallback));
+        return null;
       } finally {
         setBusy(null);
       }
@@ -188,18 +272,17 @@ export default function NightScreen() {
     [busy, refreshOrder],
   );
 
-  // onCreate starts tonight's night — used both for the first night and to
-  // start the next one (clearOrder drops the finished night's order).
-  const onCreate = useCallback(
-    () =>
-      runNightWrite(
-        "create",
-        () => createNight(API_URL, GROUP_ID, todayLocalISO()),
-        "failed to create night",
-        true,
-      ),
-    [runNightWrite],
-  );
+  const onCreate = useCallback(async () => {
+    const created = await runNightWrite(
+      "create",
+      () => createNight(API_URL, GROUP_ID, todayLocalISO()),
+      "failed to create night",
+      true,
+    );
+    if (created !== null) {
+      setStep("who");
+    }
+  }, [runNightWrite]);
 
   const onToggle = useCallback(
     (member: Member) => {
@@ -218,310 +301,154 @@ export default function NightScreen() {
     [night, attendeeIds, runNightWrite],
   );
 
-  const onRecordPick = useCallback(
-    (memberId: string) => {
-      if (night === null) {
-        return;
-      }
-      return runNightWrite(
-        memberId,
-        () => recordNightPick(API_URL, GROUP_ID, night.id, memberId),
-        "failed to record pick",
-      );
-    },
-    [night, runNightWrite],
-  );
-
-  const onSearch = useCallback(async () => {
-    const q = movieQuery.trim();
-    if (q === "") {
+  // onAdvanceToPick records the auto-picker (the next-up present core member)
+  // then moves to the pick step. Recording is what credits the turn, so it must
+  // happen — a movie alone does not advance fairness standings.
+  const onAdvanceToPick = useCallback(async () => {
+    const top = order[0] ?? null;
+    if (night === null || top === null) {
       return;
     }
-    setSearching(true);
-    setSearchError(null);
-    try {
-      setResults(await searchMovies(API_URL, q));
-    } catch (e) {
-      setSearchError(errorMessage(e, "search failed"));
-    } finally {
-      setSearching(false);
+    const recorded = await runNightWrite(
+      top.id,
+      () => recordNightPick(API_URL, GROUP_ID, night.id, top.id),
+      "failed to record pick",
+    );
+    if (recorded !== null) {
+      setStep("pick");
     }
-  }, [movieQuery]);
-
-  const onAttach = useCallback(
-    async (tmdbId: number) => {
-      if (night === null || busy !== null) {
-        return;
-      }
-      setBusy("movie");
-      setActionError(null);
-      try {
-        const updated = await attachMovie(API_URL, GROUP_ID, night.id, tmdbId);
-        setNight(updated);
-        setResults([]);
-        setSearchError(null);
-        setMovieQuery("");
-        setChangingMovie(false);
-      } catch (e) {
-        setActionError(errorMessage(e, "failed to attach movie"));
-      } finally {
-        setBusy(null);
-      }
-    },
-    [night, busy],
-  );
+  }, [night, order, runNightWrite]);
 
   if (loading) {
     return (
-      <ActivityIndicator
-        style={styles.center}
-        size="large"
-        color={colors.accent.base}
-      />
+      <View style={styles.screen}>
+        <ActivityIndicator style={styles.center} size="large" color={colors.accent.base} />
+      </View>
     );
   }
   if (error !== null) {
-    return <Text style={[styles.center, styles.error]}>{`Couldn't load members: ${error}`}</Text>;
+    return (
+      <View style={styles.screen}>
+        <Text style={[styles.center, styles.error]}>{`Couldn't load tonight: ${error}`}</Text>
+      </View>
+    );
   }
 
-  const guestsPresent = (night?.attendees ?? []).filter((a) => a.role === "guest");
+  const back =
+    step === "pick"
+      ? { label: "Here", onPress: () => setStep("who") }
+      : { label: "Cancel", onPress: () => router.back() };
+  const title = step === "pick" ? "The pick" : step === "recorded" ? "Tonight" : "New night";
 
   return (
-    <View style={styles.container}>
+    <View style={styles.screen}>
+      <TopBar
+        kind="title"
+        title={title}
+        back={step === "recorded" ? undefined : back}
+      />
+      {actionError !== null ? (
+        <Text style={[styles.banner, styles.error]}>{actionError}</Text>
+      ) : null}
+
       {night === null ? (
-        <View style={styles.createRow}>
-          <Text style={styles.hint}>{"Start a night to record who's here."}</Text>
+        <View style={styles.start}>
+          <Text style={styles.hint}>{"Start tonight's night to record who's here."}</Text>
           <AppButton
             title="Start tonight's night"
             onPress={onCreate}
             disabled={busy !== null}
           />
         </View>
+      ) : step === "who" ? (
+        <WhoStep
+          night={night}
+          members={members}
+          order={order}
+          attendeeIds={attendeeIds}
+          busy={busy}
+          onToggle={onToggle}
+          onNext={onAdvanceToPick}
+        />
       ) : (
-        // The whole screen is one FlatList so it scrolls as a unit: the
-        // heading + movie search live in ListHeaderComponent, the members are
-        // the data rows, and the pick order is the footer. Passing the header
-        // as a JSX element (not a function component) keeps the search
-        // TextInput from remounting — and losing focus — on every keystroke.
-        <FlatList
-          data={members}
-          keyExtractor={(m) => m.id}
-          ListHeaderComponent={
-            <>
-              <Text style={styles.heading}>{`Night of ${night.scheduledFor}`}</Text>
-              <Text style={styles.hint}>
-                {"Tap to add or remove — attendance saves automatically."}
-              </Text>
-              {actionError !== null && <Text style={[styles.banner, styles.error]}>{actionError}</Text>}
-
-              <Text style={styles.section}>{"Tonight's movie"}</Text>
-              {night.movie !== null && !changingMovie ? (
-                <View style={styles.movieRow}>
-                  <View style={styles.movieInfo}>
-                    <Poster uri={night.movie.posterUrl} />
-                    <Text style={styles.movieTitle}>{movieLabel(night.movie)}</Text>
-                  </View>
-                  <AppButton
-                    title="Change movie"
-                    variant="secondary"
-                    onPress={() => setChangingMovie(true)}
-                    disabled={busy !== null}
-                  />
-                </View>
-              ) : (
-                <View>
-                  <View style={styles.searchRow}>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Search a film title…"
-                      placeholderTextColor={colors.text.tertiary}
-                      value={movieQuery}
-                      onChangeText={setMovieQuery}
-                      onSubmitEditing={onSearch}
-                      returnKeyType="search"
-                      autoCorrect={false}
-                    />
-                    <AppButton
-                      title="Search"
-                      variant="secondary"
-                      onPress={onSearch}
-                      disabled={searching || movieQuery.trim() === ""}
-                    />
-                  </View>
-                  {searchError !== null && <Text style={[styles.hint, styles.error]}>{searchError}</Text>}
-                  {results.map((m) => (
-                    <Pressable
-                      key={m.tmdbId}
-                      onPress={() => onAttach(m.tmdbId)}
-                      disabled={busy !== null}
-                      style={({ pressed }) => [styles.resultRow, pressed && styles.rowPressed]}
-                    >
-                      <Poster uri={m.posterUrl} />
-                      <Text style={[styles.name, styles.resultLabel]}>{movieLabel(m)}</Text>
-                      {busy === "movie" ? <Text style={styles.tag}>…</Text> : null}
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-
-              <Text style={styles.section}>{"Who's here?"}</Text>
-            </>
-          }
-          renderItem={({ item }) => {
-              const present = attendeeIds.has(item.id);
-              const isBusy = busy === item.id;
-              return (
-                <Pressable
-                  onPress={() => onToggle(item)}
-                  disabled={busy !== null}
-                  style={({ pressed }) => [styles.row, present && styles.rowPresent, pressed && styles.rowPressed]}
-                >
-                  <Text style={styles.name}>{item.name}</Text>
-                  <Text style={styles.tag}>{isBusy ? "…" : present ? "✓ here" : item.role}</Text>
-                </Pressable>
-              );
-            }}
-            ListFooterComponent={
-              <View style={styles.orderBlock}>
-                <Text style={styles.section}>Pick order</Text>
-                {order.length === 0 ? (
-                  <Text style={styles.hint}>No core members here yet.</Text>
-                ) : (
-                  order.map((m, i) => (
-                    <PickRow
-                      key={m.id}
-                      label={`${i + 1}. ${m.name}`}
-                      recorded={night?.pickerId === m.id}
-                      impliedPick={night?.pickerId == null && i === 0}
-                      disabled={busy !== null}
-                      onPress={() => onRecordPick(m.id)}
-                    />
-                  ))
-                )}
-                {guestsPresent.length > 0 && (
-                  <>
-                    <Text style={styles.section}>{"Also present"}</Text>
-                    {guestsPresent.map((g) => (
-                      <PickRow
-                        key={g.id}
-                        label={g.name}
-                        recorded={night?.pickerId === g.id}
-                        impliedPick={false}
-                        disabled={busy !== null}
-                        onPress={() => onRecordPick(g.id)}
-                      />
-                    ))}
-                  </>
-                )}
-                {night?.pickerId != null && (
-                  <View style={styles.createRow}>
-                    <Text style={styles.hint}>{"Pick recorded. Tap another name to change it, or start the next night."}</Text>
-                    <AppButton
-                      title="Start a new night"
-                      onPress={onCreate}
-                      disabled={busy !== null}
-                    />
-                  </View>
-                )}
-              </View>
-            }
-          />
+        // Placeholder for the pick/recorded steps — replaced in Tasks 3–4.
+        <View style={styles.flex}>
+          <ScrollView contentContainerStyle={styles.content}>
+            <Stepper current={STEP_INDEX[step]} />
+            <Text style={styles.hint}>{"This step lands in a following task."}</Text>
+          </ScrollView>
+        </View>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface.page, // the dim room
-    paddingHorizontal: space[4],
-  },
+  screen: { flex: 1, backgroundColor: colors.surface.page },
+  flex: { flex: 1 },
   center: { marginTop: space[8], textAlign: "center" },
   error: { ...textPresets.body, color: colors.text.danger },
-  banner: { paddingVertical: space[2], textAlign: "center" },
-  createRow: { marginTop: space[8], gap: space[3], alignItems: "center" },
+  banner: { paddingVertical: space[2], paddingHorizontal: space[5], textAlign: "center" },
+  content: {
+    paddingHorizontal: space[5],
+    paddingTop: space[3],
+    paddingBottom: space[6],
+  },
+  start: { marginTop: space[8], gap: space[3], alignItems: "center", paddingHorizontal: space[5] },
   hint: { ...textPresets.meta, color: colors.text.secondary },
   heading: {
-    ...textPresets.screenTitle, // Instrument Serif screen title
-    color: colors.text.primary,
-    paddingVertical: space[3],
-  },
-  section: {
-    ...textPresets.sectionHeading,
+    ...textPresets.screenTitle,
     color: colors.text.primary,
     marginTop: space[4],
-    marginBottom: space[1],
   },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  footer: {
+    paddingHorizontal: space[5],
+    paddingTop: space[3],
+    borderTopWidth: borderWidth.hairline,
+    borderTopColor: colors.border.hairline,
+    backgroundColor: colors.surface.page,
+    gap: space[2],
+  },
+  stepper: { flexDirection: "row", alignItems: "center", gap: space[2], marginTop: space[2] },
+  stepItem: { flexDirection: "row", alignItems: "center", gap: space[1] },
+  stepBar: { flex: 1, height: 1, backgroundColor: colors.border.hairline },
+  stepBarDone: { backgroundColor: colors.accent.base },
+  stepDot: {
+    width: 18,
+    height: 18,
+    borderRadius: radius.full,
     alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface.subtle,
+  },
+  stepDotActive: { backgroundColor: colors.accent.base },
+  stepDotText: { fontFamily: fontFamily.monoBold, fontSize: 10, color: colors.text.tertiary },
+  stepDotTextActive: { color: colors.text.onAccent },
+  stepLabel: { ...textPresets.tag, color: colors.text.tertiary },
+  stepLabelActive: { color: colors.accent.strong },
+  attendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space[3],
     paddingVertical: space[3],
+    paddingHorizontal: space[2],
+  },
+  attendDivider: {
     borderBottomWidth: borderWidth.hairline,
     borderBottomColor: colors.border.hairline,
   },
-  // Attendance (present) is NOT "whose turn" — keep ember rationed and mark it
-  // with a neutral raised surface instead of the spotlight wash.
-  rowPresent: {
-    backgroundColor: colors.surface.subtle,
-    borderRadius: radius.md,
-    paddingHorizontal: space[2],
-  },
-  rowPressed: { opacity: pressedOpacity },
-  name: { ...textPresets.rowName, color: colors.text.primary },
-  movieTitle: {
-    ...textPresets.screenTitle, // serif — the tonight's movie title
-    color: colors.text.primary,
-    flexShrink: 1,
-  },
-  tag: { ...textPresets.tag, color: colors.text.secondary },
-  orderBlock: { paddingTop: space[2] },
-  orderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: space[2],
-  },
-  // The pick order highlight IS "whose turn" — the rationed ember spotlight.
   pickerRow: {
-    backgroundColor: colors.surface.spotlight, // ember wash — "next up"
+    backgroundColor: colors.surface.spotlight,
     borderRadius: radius.md,
     borderWidth: borderWidth.hairline,
-    borderColor: colors.accent.base, // ember ring
-    paddingHorizontal: space[2],
-    ...shadow.spotlight, // the bonfire halo
+    borderColor: colors.accent.base,
+    ...shadow.spotlight,
   },
-  badge: { ...textPresets.tag, color: colors.accent.strong }, // mono uppercase ember
-  movieRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: space[2],
-  },
-  poster: {
-    width: 46,
-    height: 69,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surface.subtle,
-  },
-  posterPlaceholder: {
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
-  },
-  movieInfo: { flexDirection: "row", alignItems: "center", gap: space[3], flexShrink: 1 },
-  resultRow: { flexDirection: "row", alignItems: "center", gap: space[3], paddingVertical: space[2] },
-  resultLabel: { flex: 1 },
-  searchRow: { flexDirection: "row", alignItems: "center", gap: space[2], paddingVertical: space[2] },
-  input: {
-    flex: 1,
-    ...textPresets.body,
-    color: colors.text.primary,
-    backgroundColor: colors.surface.card,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.strong,
-    borderRadius: radius.md,
-    paddingHorizontal: space[3],
-    paddingVertical: space[2],
-  },
+  dimmed: { opacity: 0.5 },
+  rowPressed: { opacity: pressedOpacity },
+  rowText: { flex: 1 },
+  name: { ...textPresets.rowName, color: colors.text.primary },
+  getsPick: { ...textPresets.tag, color: colors.accent.strong, marginTop: space[1] },
+  outTag: { ...textPresets.tag, color: colors.text.tertiary },
+  tag: { ...textPresets.tag, color: colors.text.secondary },
 });
