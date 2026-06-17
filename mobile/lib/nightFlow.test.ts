@@ -20,7 +20,11 @@ const movie = { tmdbId: 1, title: "Past Lives", releaseYear: 2023, posterUrl: nu
 
 const cases: { name: string; input: Night; want: Step }[] = [
   { name: "fresh night → who", input: night({}), want: "who" },
-  { name: "picker recorded, no movie → pick", input: night({ pickerId: "m1" }), want: "pick" },
+  // A picker recorded without a movie resumes at attendance, not mid-pick: the
+  // "pick" step is a forward-only transition, never a resume target. Attendance
+  // is preserved and the picker is re-derived, so re-entering at "who" is
+  // non-destructive — and avoids the wizard skipping step 1 on resume.
+  { name: "picker recorded, no movie → who", input: night({ pickerId: "m1" }), want: "who" },
   { name: "movie attached → recorded", input: night({ pickerId: "m1", movie }), want: "recorded" },
   { name: "movie attached without picker (defensive) → recorded", input: night({ movie }), want: "recorded" },
 ];
