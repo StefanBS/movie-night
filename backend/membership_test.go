@@ -26,22 +26,35 @@ func TestSeedBaseline(t *testing.T) {
 	}
 }
 
-func TestValidateJoinName(t *testing.T) {
-	t.Run("trims and accepts a real name", func(t *testing.T) {
-		got, err := validateJoinName(joinRequest{Name: "  Ada  "})
+func TestValidateJoin(t *testing.T) {
+	t.Run("trims name and defaults role to core", func(t *testing.T) {
+		name, role, err := validateJoin(joinRequest{Name: "  Ada  "})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if got != "Ada" {
-			t.Errorf("name = %q, want %q", got, "Ada")
+		if name != "Ada" || role != "core" {
+			t.Errorf("got (%q, %q), want (\"Ada\", \"core\")", name, role)
 		}
 	})
-	for _, tc := range []struct{ name, in string }{
-		{name: "empty", in: ""},
-		{name: "whitespace only", in: "   "},
+	t.Run("accepts an explicit guest role", func(t *testing.T) {
+		_, role, err := validateJoin(joinRequest{Name: "Bo", Role: "guest"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if role != "guest" {
+			t.Errorf("role = %q, want \"guest\"", role)
+		}
+	})
+	for _, tc := range []struct {
+		name string
+		req  joinRequest
+	}{
+		{name: "empty name", req: joinRequest{Name: ""}},
+		{name: "whitespace name", req: joinRequest{Name: "   "}},
+		{name: "unknown role", req: joinRequest{Name: "Ada", Role: "admin"}},
 	} {
 		t.Run("rejects "+tc.name, func(t *testing.T) {
-			if _, err := validateJoinName(joinRequest{Name: tc.in}); err == nil {
+			if _, _, err := validateJoin(tc.req); err == nil {
 				t.Fatal("expected error, got nil")
 			}
 		})

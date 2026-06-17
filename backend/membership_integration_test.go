@@ -191,6 +191,29 @@ func TestMembershipChurnIntegration(t *testing.T) {
 		}
 	})
 
+	t.Run("guest join is created as a guest and stays out of the rotation", func(t *testing.T) {
+		code, m := do(t, http.MethodPost, "/groups/"+seededGroup+"/members", `{"name":"Guesty","role":"guest"}`)
+		if code != http.StatusCreated {
+			t.Fatalf("status = %d, want 201", code)
+		}
+		if m.Name != "Guesty" || m.Role != "guest" || m.Status != "active" || m.ID == "" {
+			t.Fatalf("response = %+v", m)
+		}
+		if m.JoinedOn == "" {
+			t.Error("guest response missing joinedOn")
+		}
+		if _, ok := servedOf(t, "Guesty"); ok {
+			t.Error("Guesty should not appear in /turn (guests are not in the rotation)")
+		}
+	})
+
+	t.Run("invalid role is rejected", func(t *testing.T) {
+		code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/members", `{"name":"Nope","role":"admin"}`)
+		if code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400", code)
+		}
+	})
+
 	t.Run("bad targets and input", func(t *testing.T) {
 		// Unknown but well-formed userId → 404.
 		code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/members/a0000000-0000-0000-0000-0000000000ff/deactivate", "")

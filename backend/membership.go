@@ -17,18 +17,28 @@ import (
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
-// joinRequest is the JSON body of POST /groups/{groupId}/members.
+// joinRequest is the JSON body of POST /groups/{groupId}/members. Role is
+// optional and defaults to "core" (the historical behavior).
 type joinRequest struct {
 	Name string `json:"name"`
+	Role string `json:"role"`
 }
 
-// validateJoinName trims and requires a non-empty member name. Pure.
-func validateJoinName(req joinRequest) (string, error) {
-	name := strings.TrimSpace(req.Name)
+// validateJoin trims and requires a non-empty name, and resolves the role:
+// empty defaults to "core", otherwise it must be "core" or "guest". Pure.
+func validateJoin(req joinRequest) (name, role string, err error) {
+	name = strings.TrimSpace(req.Name)
 	if name == "" {
-		return "", fmt.Errorf("name is required")
+		return "", "", fmt.Errorf("name is required")
 	}
-	return name, nil
+	role = req.Role
+	if role == "" {
+		role = string(db.MembershipRoleCore)
+	}
+	if role != string(db.MembershipRoleCore) && role != string(db.MembershipRoleGuest) {
+		return "", "", fmt.Errorf("role must be \"core\" or \"guest\"")
+	}
+	return name, role, nil
 }
 
 // seedBaseline computes the baseline_picks to stamp on a membership entering the
@@ -85,7 +95,8 @@ func encodeMember(w http.ResponseWriter, gid, userID uuid.UUID, name, role, stat
 }
 
 // joinMemberHandler serves POST /groups/{groupId}/members: a new person joins
-// the rotation as an active core member, seeded to the current average.
+// as an active member. A core member (the default) enters the rotation seeded
+// to the current average; a guest stays out of the rotation.
 func joinMemberHandler(store memberStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
@@ -97,39 +108,50 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 			writeJSONError(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
-		name, err := validateJoinName(req)
+		name, role, err := validateJoin(req)
 		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 
-		// Read-then-write without a transaction is deliberate. Two distinct
-		// concerns, both acceptable for this single-group, admin-driven app:
-		//
-		//   Consistency: under simultaneous joins the avg/maxPos reads can go
-		//   stale, but rotation_position is only an ORDER BY tiebreak (no
-		//   uniqueness constraint) so a collision just falls back to name order,
-		//   and the seed drifts at most ±1 — within fairness tolerance. A plain
-		//   transaction would NOT fix this (READ COMMITTED still sees concurrent
-		//   commits between the reads and the write); it needs SERIALIZABLE+retry
-		//   or locking, which isn't warranted at this concurrency.
-		//
-		//   Atomicity: if InsertMembership fails after CreateUser, the user row
-		//   is orphaned. It's inert — nothing reads users except through
-		//   memberships — and a retried join just creates a fresh user. Wrapping
-		//   in a tx would fix this cheaply but is the codebase's first transaction;
-		//   defer it until a second multi-statement write justifies a WithTx helper.
 		ctx := r.Context()
-		avg, err := store.AverageServedCount(ctx, gid)
-		if err != nil {
-			internalError(w, gid, "average served", err)
-			return
+
+		// Guests never enter the rotation: skip the seed/position reads and
+		// stamp inert zero values. Core members seed to the active-core average
+		// and take the next rotation slot (the original behavior).
+		baseline := int32(0)
+		position := int32(0)
+		if role == string(db.MembershipRoleCore) {
+			// Read-then-write without a transaction is deliberate. Two distinct
+			// concerns, both acceptable for this single-group, admin-driven app:
+			//
+			//   Consistency: under simultaneous joins the avg/maxPos reads can go
+			//   stale, but rotation_position is only an ORDER BY tiebreak (no
+			//   uniqueness constraint) so a collision just falls back to name order,
+			//   and the seed drifts at most ±1 — within fairness tolerance. A plain
+			//   transaction would NOT fix this (READ COMMITTED still sees concurrent
+			//   commits between the reads and the write); it needs SERIALIZABLE+retry
+			//   or locking, which isn't warranted at this concurrency.
+			//
+			//   Atomicity: if InsertMembership fails after CreateUser, the user row
+			//   is orphaned. It's inert — nothing reads users except through
+			//   memberships — and a retried join just creates a fresh user. Wrapping
+			//   in a tx would fix this cheaply but is the codebase's first transaction;
+			//   defer it until a second multi-statement write justifies a WithTx helper.
+			avg, err := store.AverageServedCount(ctx, gid)
+			if err != nil {
+				internalError(w, gid, "average served", err)
+				return
+			}
+			maxPos, err := store.MaxRotationPosition(ctx, gid)
+			if err != nil {
+				internalError(w, gid, "max rotation position", err)
+				return
+			}
+			baseline = seedBaseline(avg, 0)
+			position = maxPos + 1
 		}
-		maxPos, err := store.MaxRotationPosition(ctx, gid)
-		if err != nil {
-			internalError(w, gid, "max rotation position", err)
-			return
-		}
+
 		user, err := store.CreateUser(ctx, name)
 		if err != nil {
 			internalError(w, gid, "create user", err)
@@ -138,10 +160,10 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 		membership, err := store.InsertMembership(ctx, db.InsertMembershipParams{
 			GroupID:          gid,
 			UserID:           user.ID,
-			Role:             db.MembershipRoleCore,
+			Role:             db.MembershipRole(role),
 			Status:           db.MembershipStatusActive,
-			BaselinePicks:    seedBaseline(avg, 0),
-			RotationPosition: maxPos + 1,
+			BaselinePicks:    baseline,
+			RotationPosition: position,
 		})
 		if err != nil {
 			internalError(w, gid, "insert membership", err)
