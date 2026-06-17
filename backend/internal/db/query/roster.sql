@@ -1,5 +1,5 @@
 -- name: ListGroupMembers :many
-SELECT u.id, u.name, m.role, m.status
+SELECT u.id, u.name, m.role, m.status, m.joined_at
 FROM memberships m
 JOIN users u ON u.id = m.user_id
 WHERE m.group_id = $1

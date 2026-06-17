@@ -9,10 +9,11 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const listGroupMembers = `-- name: ListGroupMembers :many
-SELECT u.id, u.name, m.role, m.status
+SELECT u.id, u.name, m.role, m.status, m.joined_at
 FROM memberships m
 JOIN users u ON u.id = m.user_id
 WHERE m.group_id = $1
@@ -27,10 +28,11 @@ ORDER BY
 `
 
 type ListGroupMembersRow struct {
-	ID     uuid.UUID        `json:"id"`
-	Name   string           `json:"name"`
-	Role   MembershipRole   `json:"role"`
-	Status MembershipStatus `json:"status"`
+	ID       uuid.UUID          `json:"id"`
+	Name     string             `json:"name"`
+	Role     MembershipRole     `json:"role"`
+	Status   MembershipStatus   `json:"status"`
+	JoinedAt pgtype.Timestamptz `json:"joined_at"`
 }
 
 func (q *Queries) ListGroupMembers(ctx context.Context, groupID uuid.UUID) ([]ListGroupMembersRow, error) {
@@ -47,6 +49,7 @@ func (q *Queries) ListGroupMembers(ctx context.Context, groupID uuid.UUID) ([]Li
 			&i.Name,
 			&i.Role,
 			&i.Status,
+			&i.JoinedAt,
 		); err != nil {
 			return nil, err
 		}

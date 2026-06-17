@@ -14,10 +14,11 @@ import (
 // memberResponse is the JSON shape returned by GET /groups/{groupId}/members and
 // by the membership-churn write endpoints.
 type memberResponse struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Role   string `json:"role"`
-	Status string `json:"status"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Role     string `json:"role"`
+	Status   string `json:"status"`
+	JoinedOn string `json:"joinedOn"`
 }
 
 // toMemberResponses maps sqlc rows to JSON responses, preserving order. It always
@@ -26,10 +27,11 @@ func toMemberResponses(rows []db.ListGroupMembersRow) []memberResponse {
 	out := make([]memberResponse, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, memberResponse{
-			ID:     r.ID.String(),
-			Name:   r.Name,
-			Role:   string(r.Role),
-			Status: string(r.Status),
+			ID:       r.ID.String(),
+			Name:     r.Name,
+			Role:     string(r.Role),
+			Status:   string(r.Status),
+			JoinedOn: memberDate(r.JoinedAt),
 		})
 	}
 	return out
