@@ -18,13 +18,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 
-import { AppButton, Avatar, Badge, SectionLabel, TopBar } from "../components";
+import { AppButton, Avatar, Badge, Input, Poster, SectionLabel, TopBar } from "../components";
 import { GROUP_ID, resolveApiBaseUrl } from "../lib/api";
 import { formatShortDate, todayLocalISO } from "../lib/date";
 import { errorMessage } from "../lib/errors";
 import { fetchMembers, type Member } from "../lib/members";
 import {
   addAttendee,
+  attachMovie,
   createNight,
   getCurrentNight,
   getNightTurn,
@@ -32,6 +33,7 @@ import {
   removeAttendee,
   type Night,
 } from "../lib/nights";
+import { searchMovies, type Movie } from "../lib/movies";
 import { type TurnMember } from "../lib/turn";
 import { deriveInitialStep, type Step } from "../lib/nightFlow";
 import {
@@ -52,7 +54,6 @@ const API_URL = resolveApiBaseUrl({
 });
 
 const STEP_LABELS = ["Here", "Pick", "Done"] as const;
-const STEP_INDEX: Record<Step, number> = { who: 0, pick: 1, recorded: 2 };
 
 function firstNameOf(name: string): string {
   return name.split(" ")[0];
@@ -182,6 +183,127 @@ function WhoStep({
   );
 }
 
+// PickStep — the picker spotlight (with a correction reveal over present
+// attendees), then film search. Selecting a result attaches the movie and
+// advances; selection is the action, so this step has no footer CTA.
+function PickStep({
+  night,
+  members,
+  busy,
+  changingPicker,
+  setChangingPicker,
+  movieQuery,
+  setMovieQuery,
+  results,
+  searching,
+  searchError,
+  onSearch,
+  onAttach,
+  onRecordPicker,
+}: {
+  night: Night;
+  members: Member[];
+  busy: string | null;
+  changingPicker: boolean;
+  setChangingPicker: (v: boolean) => void;
+  movieQuery: string;
+  setMovieQuery: (v: string) => void;
+  results: Movie[];
+  searching: boolean;
+  searchError: string | null;
+  onSearch: () => void;
+  onAttach: (tmdbId: number) => void;
+  onRecordPicker: (memberId: string) => void;
+}) {
+  const pickerName = members.find((m) => m.id === night.pickerId)?.name ?? "";
+  return (
+    <View style={styles.flex}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Stepper current={1} />
+
+        <View style={styles.pickerCard}>
+          <Avatar name={pickerName} size={44} glow />
+          <View style={styles.rowText}>
+            <Text style={styles.pickingTag}>{"✦ Picking tonight"}</Text>
+            <Text style={styles.pickerName} numberOfLines={1}>
+              {pickerName}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.changeRow}>
+          <AppButton
+            title={
+              changingPicker
+                ? "Keep this picker"
+                : `Not ${firstNameOf(pickerName)}? Choose who picks`
+            }
+            variant="ghost"
+            onPress={() => setChangingPicker(!changingPicker)}
+            disabled={busy !== null}
+          />
+        </View>
+        {changingPicker
+          ? night.attendees.map((a) => (
+              <Pressable
+                key={a.id}
+                onPress={() => onRecordPicker(a.id)}
+                disabled={busy !== null}
+                style={({ pressed }) => [styles.chooseRow, pressed && styles.rowPressed]}
+              >
+                <Avatar name={a.name} size={32} />
+                <Text style={[styles.name, styles.rowText]} numberOfLines={1}>
+                  {a.name}
+                </Text>
+                {busy === a.id ? (
+                  <Text style={styles.tag}>…</Text>
+                ) : night.pickerId === a.id ? (
+                  <Badge label="Picking" />
+                ) : null}
+              </Pressable>
+            ))
+          : null}
+
+        <SectionLabel>{"Find a film"}</SectionLabel>
+        <Input
+          value={movieQuery}
+          onChangeText={setMovieQuery}
+          placeholder="Search a film title…"
+          onSubmitEditing={onSearch}
+          addonLabel="Search"
+          onAddonPress={onSearch}
+        />
+        {searchError !== null ? (
+          <Text style={[styles.hint, styles.error]}>{searchError}</Text>
+        ) : null}
+        {searching ? (
+          <ActivityIndicator style={styles.searchSpinner} color={colors.accent.base} />
+        ) : null}
+
+        {results.map((mv) => (
+          <Pressable
+            key={mv.tmdbId}
+            onPress={() => onAttach(mv.tmdbId)}
+            disabled={busy !== null}
+            style={({ pressed }) => [styles.resultRow, pressed && styles.rowPressed]}
+          >
+            <Poster uri={mv.posterUrl} title={mv.title} w={42} h={63} />
+            <View style={styles.rowText}>
+              <Text style={styles.resultTitle} numberOfLines={2}>
+                {mv.title}
+              </Text>
+              {mv.releaseYear !== null ? (
+                <Text style={styles.resultYear}>{mv.releaseYear}</Text>
+              ) : null}
+            </View>
+            {busy === String(mv.tmdbId) ? <Text style={styles.tag}>…</Text> : null}
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 export default function NightScreen() {
   const router = useRouter();
   const [members, setMembers] = useState<Member[]>([]);
@@ -190,10 +312,15 @@ export default function NightScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  // The member id with an action in flight, "create" while creating, or "movie"
-  // while attaching.
+  // The id with an action in flight: a member id (attendance / pick), "create"
+  // while creating, or the movie's tmdbId (as a string) while attaching.
   const [busy, setBusy] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("who");
+  const [movieQuery, setMovieQuery] = useState("");
+  const [results, setResults] = useState<Movie[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [changingPicker, setChangingPicker] = useState(false);
 
   // Resume the group's open night (if any) and land on the right step. The
   // backend enforces at most one open night per group, so resume is unambiguous.
@@ -319,6 +446,65 @@ export default function NightScreen() {
     }
   }, [night, order, runNightWrite]);
 
+  // onRecordPicker corrects the night's picker to another present attendee.
+  const onRecordPicker = useCallback(
+    async (memberId: string) => {
+      if (night === null) {
+        return;
+      }
+      const recorded = await runNightWrite(
+        memberId,
+        () => recordNightPick(API_URL, GROUP_ID, night.id, memberId),
+        "failed to record pick",
+      );
+      if (recorded !== null) {
+        setChangingPicker(false);
+      }
+    },
+    [night, runNightWrite],
+  );
+
+  const onSearch = useCallback(async () => {
+    const q = movieQuery.trim();
+    if (q === "" || busy !== null) {
+      return;
+    }
+    setSearching(true);
+    setSearchError(null);
+    try {
+      setResults(await searchMovies(API_URL, q));
+    } catch (e) {
+      setSearchError(errorMessage(e, "search failed"));
+    } finally {
+      setSearching(false);
+    }
+  }, [movieQuery, busy]);
+
+  // onAttach sets (or changes) the movie, then advances to Recorded. Bypasses
+  // runNightWrite because it advances the step and clears search state on success.
+  const onAttach = useCallback(
+    async (tmdbId: number) => {
+      if (night === null || busy !== null) {
+        return;
+      }
+      setBusy(String(tmdbId));
+      setActionError(null);
+      try {
+        const updated = await attachMovie(API_URL, GROUP_ID, night.id, tmdbId);
+        setNight(updated);
+        setResults([]);
+        setSearchError(null);
+        setMovieQuery("");
+        setStep("recorded");
+      } catch (e) {
+        setActionError(errorMessage(e, "failed to attach movie"));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [night, busy],
+  );
+
   if (loading) {
     return (
       <View style={styles.screen}>
@@ -370,12 +556,28 @@ export default function NightScreen() {
           onToggle={onToggle}
           onNext={onAdvanceToPick}
         />
+      ) : step === "pick" ? (
+        <PickStep
+          night={night}
+          members={members}
+          busy={busy}
+          changingPicker={changingPicker}
+          setChangingPicker={setChangingPicker}
+          movieQuery={movieQuery}
+          setMovieQuery={setMovieQuery}
+          results={results}
+          searching={searching}
+          searchError={searchError}
+          onSearch={onSearch}
+          onAttach={onAttach}
+          onRecordPicker={onRecordPicker}
+        />
       ) : (
-        // Placeholder for the pick/recorded steps — replaced in Tasks 3–4.
+        // Placeholder for the recorded step — replaced in Task 4.
         <View style={styles.flex}>
           <ScrollView contentContainerStyle={styles.content}>
-            <Stepper current={STEP_INDEX[step]} />
-            <Text style={styles.hint}>{"This step lands in a following task."}</Text>
+            <Stepper current={2} />
+            <Text style={styles.hint}>{"Recorded step lands in the next task."}</Text>
           </ScrollView>
         </View>
       )}
@@ -451,4 +653,50 @@ const styles = StyleSheet.create({
   getsPick: { ...textPresets.tag, color: colors.accent.strong, marginTop: space[1] },
   outTag: { ...textPresets.tag, color: colors.text.tertiary },
   tag: { ...textPresets.tag, color: colors.text.secondary },
+  pickerCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space[3],
+    paddingVertical: space[3],
+    paddingHorizontal: space[4],
+    marginTop: space[4],
+    backgroundColor: colors.surface.spotlight,
+    borderRadius: radius.md,
+    borderWidth: borderWidth.hairline,
+    borderColor: colors.accent.base,
+    ...shadow.spotlight,
+  },
+  pickingTag: { ...textPresets.tag, color: colors.accent.strong },
+  pickerName: { ...textPresets.screenTitle, color: colors.text.primary, marginTop: space[1] },
+  changeRow: { marginTop: space[2], alignItems: "flex-start" },
+  chooseRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space[3],
+    paddingVertical: space[2],
+    paddingHorizontal: space[2],
+    borderBottomWidth: borderWidth.hairline,
+    borderBottomColor: colors.border.hairline,
+  },
+  searchSpinner: { marginTop: space[3] },
+  resultRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space[3],
+    paddingVertical: space[2],
+    borderBottomWidth: borderWidth.hairline,
+    borderBottomColor: colors.border.hairline,
+  },
+  resultTitle: {
+    fontFamily: fontFamily.display,
+    fontSize: 20,
+    lineHeight: 22,
+    color: colors.text.primary,
+  },
+  resultYear: {
+    fontFamily: fontFamily.mono,
+    fontSize: fontSize.caption,
+    color: colors.text.tertiary,
+    marginTop: space[1],
+  },
 });
