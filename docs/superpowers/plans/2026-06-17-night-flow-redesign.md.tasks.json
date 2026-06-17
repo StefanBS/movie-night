@@ -4,27 +4,27 @@
     {
       "id": 1,
       "subject": "Task 1: deriveInitialStep pure helper",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** A pure, unit-tested function mapping a resumed Night to the wizard step it should open on.\n\n**Files:**\n- Create: `mobile/lib/nightFlow.ts`\n- Test: `mobile/lib/nightFlow.test.ts`\n\n**Acceptance Criteria:**\n- deriveInitialStep returns \"recorded\" when movie!==null, \"pick\" when movie===null && pickerId!==null, else \"who\".\n- Step type exported as \"who\" | \"pick\" | \"recorded\".\n- Table-driven test passes under node:test.\n\n**Verify:** `cd mobile && node --import tsx --test lib/nightFlow.test.ts`\n\n```json:metadata\n{\"files\": [\"mobile/lib/nightFlow.ts\", \"mobile/lib/nightFlow.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/nightFlow.test.ts\", \"acceptanceCriteria\": [\"deriveInitialStep returns recorded/pick/who per movie+pickerId\", \"Step type exported\", \"table-driven test passes\"], \"modelTier\": \"mechanical\"}\n```"
     },
     {
       "id": 2,
       "subject": "Task 2: Wizard container + Who's here step + layout flip",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [1],
       "description": "**Goal:** Rewrite app/night.tsx as the wizard: data load + resume, explicit-start screen, Stepper/WizardFooter chrome, complete Who's here step; flip the night route to its own header. Pick/recorded branches render a temporary placeholder.\n\n**Files:**\n- Rewrite: `mobile/app/night.tsx`\n- Modify: `mobile/app/_layout.tsx:38`\n\n**Acceptance Criteria:**\n- No open night shows Start tonight's night; tapping creates tonight's night and lands on Who's here.\n- Resume loads turn order and opens on deriveInitialStep(night).\n- Who's here lists full roster as attendance toggles (present bright, absent dimmed); order[0] spotlighted GETS THE PICK.\n- Footer CTA disabled until present core picker; pressing records pick and advances.\n- just check passes.\n\n**Verify:** `cd mobile && just check`; then `just start` walk Who's here.\n\n```json:metadata\n{\"files\": [\"mobile/app/night.tsx\", \"mobile/app/_layout.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"no-night start button creates tonight and lands on Who's here\", \"resume opens on deriveInitialStep with turn order\", \"attendance toggles wired; order[0] spotlighted GETS THE PICK\", \"footer records pick and advances; disabled until present picker\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
     },
     {
       "id": 3,
       "subject": "Task 3: The pick step (search + picker correction)",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [2],
       "description": "**Goal:** Replace the placeholder branch with PickStep: picker spotlight card, Choose who picks correction reveal over present attendees, and film search whose result selection attaches the movie and advances to Recorded.\n\n**Files:**\n- Modify: `mobile/app/night.tsx`\n\n**Acceptance Criteria:**\n- Pick step shows recorded picker (from night.pickerId) in ember spotlight card.\n- Choose who picks reveals present attendees (incl. guests); tapping calls recordNightPick and collapses.\n- Search calls searchMovies; results show poster + title + year; tapping attaches and advances.\n- Search errors inline; controls disable while busy.\n- just check passes.\n\n**Verify:** `cd mobile && just check`; then `just start` walk correction + search + select.\n\n```json:metadata\n{\"files\": [\"mobile/app/night.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"picker spotlight resolved from pickerId\", \"Choose who picks reveal records + collapses\", \"search results attach movie and advance\", \"search errors inline; controls disabled while busy\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
     },
     {
       "id": 4,
       "subject": "Task 4: The Recorded step",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [3],
       "description": "**Goal:** Replace the recorded placeholder with RecordedStep: poster hero, RECORDED badge, title/year, picked-by line, who-watched avatar cluster, Done / Change movie footer actions.\n\n**Files:**\n- Modify: `mobile/app/night.tsx`\n\n**Acceptance Criteria:**\n- Recorded shows poster 150x222, solid RECORDED badge, serif title, mono year (omit when null), Picked by {name} · {date}.\n- Who watched overlapping avatar cluster lists all night.attendees.\n- Done calls router.back(); Change movie returns to pick step.\n- just check passes.\n\n**Verify:** `cd mobile && just check`; then `just start` complete a night + confirm hero/cluster + Change/Done + resume.\n\n```json:metadata\n{\"files\": [\"mobile/app/night.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"poster 150x222 + RECORDED badge + title/year + picked-by\", \"who-watched cluster of all attendees\", \"Done -> router.back(); Change movie -> pick step\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
     }
