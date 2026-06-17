@@ -528,7 +528,7 @@ export default function NightScreen() {
 
   const onSearch = useCallback(async () => {
     const q = movieQuery.trim();
-    if (q === "" || busy !== null) {
+    if (q === "" || busy !== null || searching) {
       return;
     }
     setSearching(true);
@@ -540,7 +540,7 @@ export default function NightScreen() {
     } finally {
       setSearching(false);
     }
-  }, [movieQuery, busy]);
+  }, [movieQuery, busy, searching]);
 
   // onAttach sets (or changes) the movie, then advances to Recorded. Bypasses
   // runNightWrite because it advances the step and clears search state on success.
@@ -584,7 +584,13 @@ export default function NightScreen() {
 
   const back =
     step === "pick"
-      ? { label: "Here", onPress: () => setStep("who") }
+      ? {
+          label: "Here",
+          onPress: () => {
+            setChangingPicker(false);
+            setStep("who");
+          },
+        }
       : { label: "Cancel", onPress: () => router.back() };
   const title = step === "pick" ? "The pick" : step === "recorded" ? "Tonight" : "New night";
 
