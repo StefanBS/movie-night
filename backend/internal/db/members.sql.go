@@ -78,7 +78,7 @@ func (q *Queries) DeactivateMembership(ctx context.Context, arg DeactivateMember
 }
 
 const getGroupMember = `-- name: GetGroupMember :one
-SELECT u.id AS user_id, u.name, m.role, m.status, m.baseline_picks
+SELECT u.id AS user_id, u.name, m.role, m.status, m.baseline_picks, m.joined_at
 FROM memberships m
 JOIN users u ON u.id = m.user_id
 WHERE m.group_id = $1 AND m.user_id = $2
@@ -90,11 +90,12 @@ type GetGroupMemberParams struct {
 }
 
 type GetGroupMemberRow struct {
-	UserID        uuid.UUID        `json:"user_id"`
-	Name          string           `json:"name"`
-	Role          MembershipRole   `json:"role"`
-	Status        MembershipStatus `json:"status"`
-	BaselinePicks int32            `json:"baseline_picks"`
+	UserID        uuid.UUID          `json:"user_id"`
+	Name          string             `json:"name"`
+	Role          MembershipRole     `json:"role"`
+	Status        MembershipStatus   `json:"status"`
+	BaselinePicks int32              `json:"baseline_picks"`
+	JoinedAt      pgtype.Timestamptz `json:"joined_at"`
 }
 
 func (q *Queries) GetGroupMember(ctx context.Context, arg GetGroupMemberParams) (GetGroupMemberRow, error) {
@@ -106,6 +107,7 @@ func (q *Queries) GetGroupMember(ctx context.Context, arg GetGroupMemberParams) 
 		&i.Role,
 		&i.Status,
 		&i.BaselinePicks,
+		&i.JoinedAt,
 	)
 	return i, err
 }

@@ -38,6 +38,8 @@ export default function RootLayout() {
         <Stack.Screen name="night" options={{ title: "Tonight" }} />
         {/* Custom TopBar (kind="title") supplies its own header + back link. */}
         <Stack.Screen name="rotation" options={{ headerShown: false }} />
+        <Stack.Screen name="member/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="member/new" options={{ headerShown: false }} />
       </Stack>
     </SafeAreaProvider>
   );

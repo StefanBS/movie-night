@@ -153,6 +153,11 @@ func TestMembersHandlerIntegration(t *testing.T) {
 					got[i].Name, got[i].Role, got[i].Status, w.Name, w.Role, w.Status)
 			}
 		}
+		for i := range got {
+			if _, err := time.Parse("2006-01-02", got[i].JoinedOn); err != nil {
+				t.Errorf("[%d] %s joinedOn = %q, want a YYYY-MM-DD date: %v", i, got[i].Name, got[i].JoinedOn, err)
+			}
+		}
 	})
 
 	t.Run("valid but unknown group returns empty array", func(t *testing.T) {

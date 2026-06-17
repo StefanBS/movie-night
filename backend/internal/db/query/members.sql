@@ -8,7 +8,7 @@ VALUES (sqlc.arg(group_id), sqlc.arg(user_id), sqlc.arg(role), sqlc.arg(status),
 RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at;
 
 -- name: GetGroupMember :one
-SELECT u.id AS user_id, u.name, m.role, m.status, m.baseline_picks
+SELECT u.id AS user_id, u.name, m.role, m.status, m.baseline_picks, m.joined_at
 FROM memberships m
 JOIN users u ON u.id = m.user_id
 WHERE m.group_id = sqlc.arg(group_id) AND m.user_id = sqlc.arg(user_id);

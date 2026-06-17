@@ -5,13 +5,14 @@ export type Member = {
   name: string;
   role: "core" | "guest";
   status: "active" | "inactive";
+  joinedOn: string;
 };
 
 function parseMember(raw: unknown, index = 0): Member {
   if (typeof raw !== "object" || raw === null) {
     throw new Error(`member ${index}: expected an object`);
   }
-  const { id, name, role, status } = raw as Record<string, unknown>;
+  const { id, name, role, status, joinedOn } = raw as Record<string, unknown>;
   if (typeof id !== "string") {
     throw new Error(`member ${index}: id must be a string`);
   }
@@ -24,7 +25,10 @@ function parseMember(raw: unknown, index = 0): Member {
   if (status !== "active" && status !== "inactive") {
     throw new Error(`member ${index}: status must be "active" or "inactive"`);
   }
-  return { id, name, role, status };
+  if (typeof joinedOn !== "string") {
+    throw new Error(`member ${index}: joinedOn must be a string`);
+  }
+  return { id, name, role, status, joinedOn };
 }
 
 // parseMembers validates an untrusted JSON payload and returns typed Members,
@@ -62,14 +66,16 @@ function postMember(
   });
 }
 
-// joinMember adds a new core member by name (add). Returns the created Member.
+// joinMember adds a new member by name with the given role (core enters the
+// rotation; guest watches but never picks). Returns the created Member.
 export function joinMember(
   baseUrl: string,
   groupId: string,
   name: string,
+  role: "core" | "guest",
   signal?: AbortSignal,
 ): Promise<Member> {
-  return postMember(`${baseUrl}/groups/${groupId}/members`, { name }, signal);
+  return postMember(`${baseUrl}/groups/${groupId}/members`, { name, role }, signal);
 }
 
 // A churn transition a member can undergo: leave (deactivate), return

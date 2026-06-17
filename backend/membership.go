@@ -17,18 +17,28 @@ import (
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
-// joinRequest is the JSON body of POST /groups/{groupId}/members.
+// joinRequest is the JSON body of POST /groups/{groupId}/members. Role is
+// optional and defaults to "core" (the historical behavior).
 type joinRequest struct {
 	Name string `json:"name"`
+	Role string `json:"role"`
 }
 
-// validateJoinName trims and requires a non-empty member name. Pure.
-func validateJoinName(req joinRequest) (string, error) {
-	name := strings.TrimSpace(req.Name)
+// validateJoin trims and requires a non-empty name, and resolves the role:
+// empty defaults to "core", otherwise it must be "core" or "guest". Pure.
+func validateJoin(req joinRequest) (name, role string, err error) {
+	name = strings.TrimSpace(req.Name)
 	if name == "" {
-		return "", fmt.Errorf("name is required")
+		return "", "", fmt.Errorf("name is required")
 	}
-	return name, nil
+	role = req.Role
+	if role == "" {
+		role = string(db.MembershipRoleCore)
+	}
+	if role != string(db.MembershipRoleCore) && role != string(db.MembershipRoleGuest) {
+		return "", "", fmt.Errorf("role must be \"core\" or \"guest\"")
+	}
+	return name, role, nil
 }
 
 // seedBaseline computes the baseline_picks to stamp on a membership entering the
@@ -58,22 +68,35 @@ type memberStore interface {
 	MaxRotationPosition(ctx context.Context, groupID uuid.UUID) (int32, error)
 }
 
+// memberDate renders a membership's joined_at as a YYYY-MM-DD string. joined_at
+// is a timestamptz, so this is its UTC calendar date (the format matches the
+// turn handler's lastPickedOn, though that field is already a pure ::date). An
+// unset timestamp yields "", though joined_at is NOT NULL in practice.
+func memberDate(ts pgtype.Timestamptz) string {
+	if !ts.Valid {
+		return ""
+	}
+	return ts.Time.Format("2006-01-02")
+}
+
 // encodeMember writes a member DTO as JSON with the given status code.
-func encodeMember(w http.ResponseWriter, gid, userID uuid.UUID, name, role, status string, code int) {
+func encodeMember(w http.ResponseWriter, gid, userID uuid.UUID, name, role, status, joinedOn string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(memberResponse{
-		ID:     userID.String(),
-		Name:   name,
-		Role:   role,
-		Status: status,
+		ID:       userID.String(),
+		Name:     name,
+		Role:     role,
+		Status:   status,
+		JoinedOn: joinedOn,
 	}); err != nil {
 		log.Printf("encode member response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID
 	}
 }
 
 // joinMemberHandler serves POST /groups/{groupId}/members: a new person joins
-// the rotation as an active core member, seeded to the current average.
+// as an active member. A core member (the default) enters the rotation seeded
+// to the current average; a guest stays out of the rotation.
 func joinMemberHandler(store memberStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
@@ -85,39 +108,50 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 			writeJSONError(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
-		name, err := validateJoinName(req)
+		name, role, err := validateJoin(req)
 		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 
-		// Read-then-write without a transaction is deliberate. Two distinct
-		// concerns, both acceptable for this single-group, admin-driven app:
-		//
-		//   Consistency: under simultaneous joins the avg/maxPos reads can go
-		//   stale, but rotation_position is only an ORDER BY tiebreak (no
-		//   uniqueness constraint) so a collision just falls back to name order,
-		//   and the seed drifts at most ±1 — within fairness tolerance. A plain
-		//   transaction would NOT fix this (READ COMMITTED still sees concurrent
-		//   commits between the reads and the write); it needs SERIALIZABLE+retry
-		//   or locking, which isn't warranted at this concurrency.
-		//
-		//   Atomicity: if InsertMembership fails after CreateUser, the user row
-		//   is orphaned. It's inert — nothing reads users except through
-		//   memberships — and a retried join just creates a fresh user. Wrapping
-		//   in a tx would fix this cheaply but is the codebase's first transaction;
-		//   defer it until a second multi-statement write justifies a WithTx helper.
 		ctx := r.Context()
-		avg, err := store.AverageServedCount(ctx, gid)
-		if err != nil {
-			internalError(w, gid, "average served", err)
-			return
+
+		// Guests never enter the rotation: skip the seed/position reads and
+		// stamp inert zero values. Core members seed to the active-core average
+		// and take the next rotation slot (the original behavior).
+		baseline := int32(0)
+		position := int32(0)
+		if role == string(db.MembershipRoleCore) {
+			// Read-then-write without a transaction is deliberate. Two distinct
+			// concerns, both acceptable for this single-group, admin-driven app:
+			//
+			//   Consistency: under simultaneous joins the avg/maxPos reads can go
+			//   stale, but rotation_position is only an ORDER BY tiebreak (no
+			//   uniqueness constraint) so a collision just falls back to name order,
+			//   and the seed drifts at most ±1 — within fairness tolerance. A plain
+			//   transaction would NOT fix this (READ COMMITTED still sees concurrent
+			//   commits between the reads and the write); it needs SERIALIZABLE+retry
+			//   or locking, which isn't warranted at this concurrency.
+			//
+			//   Atomicity: if InsertMembership fails after CreateUser, the user row
+			//   is orphaned. It's inert — nothing reads users except through
+			//   memberships — and a retried join just creates a fresh user. Wrapping
+			//   in a tx would fix this cheaply but is the codebase's first transaction;
+			//   defer it until a second multi-statement write justifies a WithTx helper.
+			avg, err := store.AverageServedCount(ctx, gid)
+			if err != nil {
+				internalError(w, gid, "average served", err)
+				return
+			}
+			maxPos, err := store.MaxRotationPosition(ctx, gid)
+			if err != nil {
+				internalError(w, gid, "max rotation position", err)
+				return
+			}
+			baseline = seedBaseline(avg, 0)
+			position = maxPos + 1
 		}
-		maxPos, err := store.MaxRotationPosition(ctx, gid)
-		if err != nil {
-			internalError(w, gid, "max rotation position", err)
-			return
-		}
+
 		user, err := store.CreateUser(ctx, name)
 		if err != nil {
 			internalError(w, gid, "create user", err)
@@ -126,17 +160,17 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 		membership, err := store.InsertMembership(ctx, db.InsertMembershipParams{
 			GroupID:          gid,
 			UserID:           user.ID,
-			Role:             db.MembershipRoleCore,
+			Role:             db.MembershipRole(role),
 			Status:           db.MembershipStatusActive,
-			BaselinePicks:    seedBaseline(avg, 0),
-			RotationPosition: maxPos + 1,
+			BaselinePicks:    baseline,
+			RotationPosition: position,
 		})
 		if err != nil {
 			internalError(w, gid, "insert membership", err)
 			return
 		}
 
-		encodeMember(w, gid, user.ID, user.Name, string(membership.Role), string(membership.Status), http.StatusCreated)
+		encodeMember(w, gid, user.ID, user.Name, string(membership.Role), string(membership.Status), memberDate(membership.JoinedAt), http.StatusCreated)
 	}
 }
 
@@ -173,7 +207,7 @@ func deactivateMemberHandler(store memberStore) http.HandlerFunc {
 		}
 		// Idempotent: already inactive → no-op.
 		if m.Status == db.MembershipStatusInactive {
-			encodeMember(w, gid, m.UserID, m.Name, string(m.Role), string(m.Status), http.StatusOK)
+			encodeMember(w, gid, m.UserID, m.Name, string(m.Role), string(m.Status), memberDate(m.JoinedAt), http.StatusOK)
 			return
 		}
 		updated, err := store.DeactivateMembership(r.Context(), db.DeactivateMembershipParams{GroupID: gid, UserID: uid})
@@ -181,7 +215,7 @@ func deactivateMemberHandler(store memberStore) http.HandlerFunc {
 			internalError(w, gid, "deactivate membership", err)
 			return
 		}
-		encodeMember(w, gid, updated.UserID, m.Name, string(updated.Role), string(updated.Status), http.StatusOK)
+		encodeMember(w, gid, updated.UserID, m.Name, string(updated.Role), string(updated.Status), memberDate(updated.JoinedAt), http.StatusOK)
 	}
 }
 
@@ -203,7 +237,7 @@ func reactivateMemberHandler(store memberStore) http.HandlerFunc {
 		}
 		// Idempotent: already active → no-op.
 		if m.Status == db.MembershipStatusActive {
-			encodeMember(w, gid, m.UserID, m.Name, string(m.Role), string(m.Status), http.StatusOK)
+			encodeMember(w, gid, m.UserID, m.Name, string(m.Role), string(m.Status), memberDate(m.JoinedAt), http.StatusOK)
 			return
 		}
 		// Seed only when this crosses into the rotation (active core). A
@@ -227,7 +261,7 @@ func reactivateMemberHandler(store memberStore) http.HandlerFunc {
 			internalError(w, gid, "reactivate membership", err)
 			return
 		}
-		encodeMember(w, gid, updated.UserID, m.Name, string(updated.Role), string(updated.Status), http.StatusOK)
+		encodeMember(w, gid, updated.UserID, m.Name, string(updated.Role), string(updated.Status), memberDate(updated.JoinedAt), http.StatusOK)
 	}
 }
 
@@ -249,7 +283,7 @@ func promoteMemberHandler(store memberStore) http.HandlerFunc {
 		}
 		// Idempotent: already active core → no-op.
 		if m.Role == db.MembershipRoleCore && m.Status == db.MembershipStatusActive {
-			encodeMember(w, gid, m.UserID, m.Name, string(m.Role), string(m.Status), http.StatusOK)
+			encodeMember(w, gid, m.UserID, m.Name, string(m.Role), string(m.Status), memberDate(m.JoinedAt), http.StatusOK)
 			return
 		}
 		avg, err := store.AverageServedCount(ctx, gid)
@@ -277,6 +311,6 @@ func promoteMemberHandler(store memberStore) http.HandlerFunc {
 			internalError(w, gid, "promote membership", err)
 			return
 		}
-		encodeMember(w, gid, updated.UserID, m.Name, string(updated.Role), string(updated.Status), http.StatusOK)
+		encodeMember(w, gid, updated.UserID, m.Name, string(updated.Role), string(updated.Status), memberDate(updated.JoinedAt), http.StatusOK)
 	}
 }
