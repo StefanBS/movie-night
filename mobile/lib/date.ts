@@ -20,3 +20,11 @@ export function formatShortDate(iso: string): string {
   const [, month, day] = iso.split("-").map(Number);
   return `${SHORT_MONTHS[month - 1]} ${day}`;
 }
+
+// formatMonthYear turns a YYYY-MM-DD string into a "Jun 2024" label. Like
+// formatShortDate, it splits the ISO string by hand so it stays timezone-
+// independent. Used for the member profile's "since" line.
+export function formatMonthYear(iso: string): string {
+  const [year, month] = iso.split("-").map(Number);
+  return `${SHORT_MONTHS[month - 1]} ${year}`;
+}
