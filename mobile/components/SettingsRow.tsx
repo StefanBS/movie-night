@@ -63,6 +63,7 @@ export function SettingsRow({
   return (
     <View
       style={[styles.row, disabled && styles.disabled]}
+      accessibilityRole={disabled ? "button" : undefined}
       accessibilityState={disabled ? { disabled: true } : undefined}
     >
       {content}
