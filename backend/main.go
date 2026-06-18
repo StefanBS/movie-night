@@ -50,6 +50,8 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+	mux.Handle("GET /groups/{groupId}", getGroupHandler(queries))
+	mux.Handle("PATCH /groups/{groupId}", renameGroupHandler(queries))
 	mux.Handle("GET /groups/{groupId}/members", membersHandler(queries))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(queries))
 	mux.Handle("POST /groups/{groupId}/members", joinMemberHandler(queries))
