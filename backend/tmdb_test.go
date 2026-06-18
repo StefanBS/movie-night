@@ -4,15 +4,14 @@ import "testing"
 
 func intp(n int32) *int32 { return &n }
 
-func strp(s string) *string { return &s }
-
 func TestPosterURL(t *testing.T) {
+	full := "https://image.tmdb.org/t/p/w342/abc.jpg"
 	tests := []struct {
 		name string
 		in   string
 		want *string
 	}{
-		{name: "path builds a full w342 url", in: "/abc.jpg", want: strp("https://image.tmdb.org/t/p/w342/abc.jpg")},
+		{name: "path builds a full w342 url", in: "/abc.jpg", want: &full},
 		{name: "empty string returns nil", in: "", want: nil},
 	}
 	for _, tt := range tests {
