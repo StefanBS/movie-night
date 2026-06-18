@@ -168,6 +168,113 @@ func (q *Queries) ListNightAttendees(ctx context.Context, arg ListNightAttendees
 	return items, nil
 }
 
+const listNightsAttendees = `-- name: ListNightsAttendees :many
+SELECT a.pick_id, u.id, u.name, m.role
+FROM attendances a
+JOIN users u ON u.id = a.user_id
+JOIN memberships m ON m.user_id = a.user_id AND m.group_id = $1
+WHERE a.pick_id = ANY($2::uuid[])
+ORDER BY
+  CASE WHEN m.role = 'core' THEN 0 ELSE 1 END,
+  u.name
+`
+
+type ListNightsAttendeesParams struct {
+	GroupID  uuid.UUID   `json:"group_id"`
+	NightIds []uuid.UUID `json:"night_ids"`
+}
+
+type ListNightsAttendeesRow struct {
+	PickID uuid.UUID      `json:"pick_id"`
+	ID     uuid.UUID      `json:"id"`
+	Name   string         `json:"name"`
+	Role   MembershipRole `json:"role"`
+}
+
+func (q *Queries) ListNightsAttendees(ctx context.Context, arg ListNightsAttendeesParams) ([]ListNightsAttendeesRow, error) {
+	rows, err := q.db.Query(ctx, listNightsAttendees, arg.GroupID, arg.NightIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListNightsAttendeesRow
+	for rows.Next() {
+		var i ListNightsAttendeesRow
+		if err := rows.Scan(
+			&i.PickID,
+			&i.ID,
+			&i.Name,
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRecordedNights = `-- name: ListRecordedNights :many
+SELECT
+  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at, p.movie_id,
+  m.tmdb_id      AS movie_tmdb_id,
+  m.title        AS movie_title,
+  m.release_year AS movie_release_year,
+  m.poster_path  AS movie_poster_path
+FROM picks p
+LEFT JOIN movies m ON m.id = p.movie_id
+WHERE p.group_id = $1 AND p.picker_id IS NOT NULL
+ORDER BY p.scheduled_for DESC, p.created_at DESC
+`
+
+type ListRecordedNightsRow struct {
+	ID               uuid.UUID          `json:"id"`
+	GroupID          uuid.UUID          `json:"group_id"`
+	PickerID         pgtype.UUID        `json:"picker_id"`
+	IsCredited       bool               `json:"is_credited"`
+	ScheduledFor     pgtype.Date        `json:"scheduled_for"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	MovieID          pgtype.UUID        `json:"movie_id"`
+	MovieTmdbID      pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle       pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath  pgtype.Text        `json:"movie_poster_path"`
+}
+
+func (q *Queries) ListRecordedNights(ctx context.Context, groupID uuid.UUID) ([]ListRecordedNightsRow, error) {
+	rows, err := q.db.Query(ctx, listRecordedNights, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRecordedNightsRow
+	for rows.Next() {
+		var i ListRecordedNightsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.GroupID,
+			&i.PickerID,
+			&i.IsCredited,
+			&i.ScheduledFor,
+			&i.CreatedAt,
+			&i.MovieID,
+			&i.MovieTmdbID,
+			&i.MovieTitle,
+			&i.MovieReleaseYear,
+			&i.MoviePosterPath,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const removeAttendee = `-- name: RemoveAttendee :exec
 DELETE FROM attendances
 WHERE pick_id = $1 AND user_id = $2
