@@ -1,15 +1,8 @@
 import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { Settings } from "lucide-react-native";
 import { useRouter } from "expo-router";
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import Constants from "expo-constants";
 
 import {
@@ -17,6 +10,7 @@ import {
   Avatar,
   IconButton,
   SectionLabel,
+  TabScrollView,
   TopBar,
 } from "../../components";
 import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
@@ -117,7 +111,6 @@ function OnDeck({ members }: { members: TurnMember[] }) {
 
 export default function TonightScreen() {
   const router = useRouter();
-  const tabBarHeight = useBottomTabBarHeight();
   const [order, setOrder] = useState<TurnMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -171,12 +164,7 @@ export default function TonightScreen() {
           <Text style={styles.empty}>{"No one's in the rotation yet."}</Text>
         </View>
       ) : (
-        <ScrollView
-          contentContainerStyle={[
-            styles.content,
-            { paddingBottom: tabBarHeight + space[5] },
-          ]}
-        >
+        <TabScrollView contentContainerStyle={styles.content}>
           <SpotlightHero member={picker} />
           <View style={styles.planRow}>
             <AppButton
@@ -200,7 +188,7 @@ export default function TonightScreen() {
               onPress={() => router.navigate("/rotation")}
             />
           </View>
-        </ScrollView>
+        </TabScrollView>
       )}
     </View>
   );
@@ -212,8 +200,6 @@ const styles = StyleSheet.create({
   center: { marginTop: space[8], textAlign: "center" },
   error: { ...textPresets.body, color: colors.text.danger },
   empty: { ...textPresets.body, color: colors.text.secondary, textAlign: "center" },
-  // paddingBottom is applied inline from the live tab bar height (the bar is
-  // absolutely positioned and would otherwise hide the last row).
   content: {
     paddingHorizontal: space[5],
     paddingTop: space[4],
