@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { Settings } from "lucide-react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import Constants from "expo-constants";
 
 import {
@@ -15,6 +15,7 @@ import {
 } from "../../components";
 import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
+import { fetchGroup } from "../../lib/group";
 import { fetchTurn, pickerMeta, picksLabel, type TurnMember } from "../../lib/turn";
 import {
   borderWidth,
@@ -26,9 +27,6 @@ import {
   space,
   textPresets,
 } from "../../theme";
-
-// Seeded group name (shared contract). A real source arrives with later work.
-const GROUP_NAME = "Friday Film Club";
 
 const API_URL = resolveApiBaseUrl({
   envUrl: process.env.EXPO_PUBLIC_API_URL,
@@ -112,26 +110,53 @@ function OnDeck({ members }: { members: TurnMember[] }) {
 export default function TonightScreen() {
   const router = useRouter();
   const [order, setOrder] = useState<TurnMember[]>([]);
+  const [groupName, setGroupName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        setOrder(await fetchTurn(API_URL, GROUP_ID, controller.signal));
-      } catch (e) {
-        if (!controller.signal.aborted) {
-          setError(errorMessage(e, "failed to load tonight"));
+  // Refetch the turn on focus (not just mount): a pick recorded or roster change
+  // made on another tab must show up when the user returns — the tab screen
+  // stays mounted. `loading` only gates the first load, so later focuses refresh
+  // in the background without flashing the spinner.
+  useFocusEffect(
+    useCallback(() => {
+      const controller = new AbortController();
+      (async () => {
+        try {
+          setOrder(await fetchTurn(API_URL, GROUP_ID, controller.signal));
+          setError(null);
+        } catch (e) {
+          if (!controller.signal.aborted) {
+            setError(errorMessage(e, "failed to load tonight"));
+          }
+        } finally {
+          if (!controller.signal.aborted) {
+            setLoading(false);
+          }
         }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
+      })();
+      return () => controller.abort();
+    }, []),
+  );
+
+  // The group name is secondary header chrome, fetched independently of the
+  // turn. Refetch on focus (not just mount) so a rename on the Settings tab
+  // shows here when the user returns — tab screens stay mounted. A failure just
+  // leaves the header line blank rather than driving the screen's error state.
+  useFocusEffect(
+    useCallback(() => {
+      const controller = new AbortController();
+      (async () => {
+        try {
+          const g = await fetchGroup(API_URL, GROUP_ID, controller.signal);
+          setGroupName(g.name);
+        } catch {
+          // Ignored — the turn fetch owns the screen's error state.
         }
-      }
-    })();
-    return () => controller.abort();
-  }, []);
+      })();
+      return () => controller.abort();
+    }, []),
+  );
 
   const gear = (
     <IconButton
@@ -148,7 +173,7 @@ export default function TonightScreen() {
 
   return (
     <View style={styles.screen}>
-      <TopBar kind="home" group={GROUP_NAME} right={gear} />
+      <TopBar kind="home" group={groupName ?? ""} right={gear} />
       {loading ? (
         <ActivityIndicator
           style={styles.center}
