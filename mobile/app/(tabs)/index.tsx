@@ -15,6 +15,7 @@ import {
 } from "../../components";
 import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
+import { fetchGroup } from "../../lib/group";
 import { fetchTurn, pickerMeta, picksLabel, type TurnMember } from "../../lib/turn";
 import {
   borderWidth,
@@ -26,9 +27,6 @@ import {
   space,
   textPresets,
 } from "../../theme";
-
-// Seeded group name (shared contract). A real source arrives with later work.
-const GROUP_NAME = "Friday Film Club";
 
 const API_URL = resolveApiBaseUrl({
   envUrl: process.env.EXPO_PUBLIC_API_URL,
@@ -112,6 +110,7 @@ function OnDeck({ members }: { members: TurnMember[] }) {
 export default function TonightScreen() {
   const router = useRouter();
   const [order, setOrder] = useState<TurnMember[]>([]);
+  const [groupName, setGroupName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -133,6 +132,22 @@ export default function TonightScreen() {
     return () => controller.abort();
   }, []);
 
+  // The group name is secondary header chrome, fetched independently of the
+  // turn: a failure just leaves the header line blank rather than driving the
+  // screen's error state.
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const g = await fetchGroup(API_URL, GROUP_ID, controller.signal);
+        setGroupName(g.name);
+      } catch {
+        // Ignored — the turn fetch above owns the screen's error state.
+      }
+    })();
+    return () => controller.abort();
+  }, []);
+
   const gear = (
     <IconButton
       icon={<Settings size={22} color={colors.text.secondary} strokeWidth={2} />}
@@ -148,7 +163,7 @@ export default function TonightScreen() {
 
   return (
     <View style={styles.screen}>
-      <TopBar kind="home" group={GROUP_NAME} right={gear} />
+      <TopBar kind="home" group={groupName ?? ""} right={gear} />
       {loading ? (
         <ActivityIndicator
           style={styles.center}
