@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import Constants from "expo-constants";
 import { ChevronRight, Plus } from "lucide-react-native";
 
@@ -31,6 +32,7 @@ const API_URL = resolveApiBaseUrl({
 
 export default function ClubScreen() {
   const router = useRouter();
+  const tabBarHeight = useBottomTabBarHeight();
   const [members, setMembers] = useState<Member[]>([]);
   const [turn, setTurn] = useState<TurnMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +92,12 @@ export default function ClubScreen() {
           <Text style={styles.empty}>{"No one's in the club yet."}</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: tabBarHeight + space[5] },
+          ]}
+        >
           <SectionLabel>In rotation</SectionLabel>
           <View>
             {sections.inRotation.map((m, i) => (
@@ -164,7 +171,9 @@ export default function ClubScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   center: { flex: 1, textAlignVertical: "center" },
-  content: { paddingHorizontal: space[5], paddingBottom: space[10] },
+  // paddingBottom is applied inline from the live tab bar height (the bar is
+  // absolutely positioned and would otherwise hide the last row).
+  content: { paddingHorizontal: space[5] },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
   divider: {
     borderBottomWidth: StyleSheet.hairlineWidth,

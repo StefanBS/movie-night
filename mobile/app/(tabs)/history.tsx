@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -7,7 +7,8 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import Constants from "expo-constants";
 
 import { Poster, SectionLabel, Stat, TopBar } from "../../components";
@@ -38,27 +39,33 @@ function firstNameOf(name: string): string {
 
 export default function HistoryScreen() {
   const router = useRouter();
+  const tabBarHeight = useBottomTabBarHeight();
   const [nights, setNights] = useState<Night[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        setNights(await listNights(API_URL, GROUP_ID, controller.signal));
-      } catch (e) {
-        if (!controller.signal.aborted) {
-          setError(errorMessage(e, "failed to load history"));
+  // Refetch on focus (not just first mount): a night recorded on another tab
+  // must show up when the user returns here, and the tab screen stays mounted.
+  useFocusEffect(
+    useCallback(() => {
+      const controller = new AbortController();
+      (async () => {
+        try {
+          setNights(await listNights(API_URL, GROUP_ID, controller.signal));
+          setError(null);
+        } catch (e) {
+          if (!controller.signal.aborted) {
+            setError(errorMessage(e, "failed to load history"));
+          }
+        } finally {
+          if (!controller.signal.aborted) {
+            setLoading(false);
+          }
         }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, []);
+      })();
+      return () => controller.abort();
+    }, []),
+  );
 
   if (loading) {
     return (
@@ -103,7 +110,12 @@ export default function HistoryScreen() {
   return (
     <View style={styles.screen}>
       <TopBar kind="tab" title="History" />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: tabBarHeight + space[5] },
+        ]}
+      >
         <View style={styles.stats}>
           <View style={styles.statCell}>
             <Stat value={stats.nights} label="Nights" />
@@ -166,7 +178,9 @@ const styles = StyleSheet.create({
   empty: { ...textPresets.body, color: colors.text.secondary },
   center: { marginTop: space[8], alignSelf: "center" },
   errorText: { ...textPresets.body, color: colors.text.danger },
-  content: { paddingHorizontal: space[5], paddingBottom: space[10] },
+  // paddingBottom is applied inline from the live tab bar height (the bar is
+  // absolutely positioned and would otherwise hide the last row).
+  content: { paddingHorizontal: space[5] },
   stats: {
     flexDirection: "row",
     alignItems: "center",

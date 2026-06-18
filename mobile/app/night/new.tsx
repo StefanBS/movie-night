@@ -35,7 +35,7 @@ import {
 } from "../../lib/nights";
 import { searchMovies, type Movie } from "../../lib/movies";
 import { type TurnMember } from "../../lib/turn";
-import { deriveInitialStep, type Step } from "../../lib/nightFlow";
+import { deriveInitialStep, isResumable, type Step } from "../../lib/nightFlow";
 import {
   borderWidth,
   colors,
@@ -395,7 +395,10 @@ export default function NightScreen() {
           getCurrentNight(API_URL, GROUP_ID, controller.signal),
         ]);
         setMembers(roster);
-        if (current !== null) {
+        // Resume only an in-progress night. A night with a movie attached is
+        // done, so we leave night === null and show "Start tonight's night",
+        // which creates a fresh one — rather than re-opening a finished night.
+        if (current !== null && isResumable(current)) {
           setNight(current);
           setStep(deriveInitialStep(current));
           setOrder(await getNightTurn(API_URL, GROUP_ID, current.id, controller.signal));

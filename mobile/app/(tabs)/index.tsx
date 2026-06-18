@@ -9,6 +9,7 @@ import {
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { Settings } from "lucide-react-native";
 import { useRouter } from "expo-router";
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import Constants from "expo-constants";
 
 import {
@@ -116,6 +117,7 @@ function OnDeck({ members }: { members: TurnMember[] }) {
 
 export default function TonightScreen() {
   const router = useRouter();
+  const tabBarHeight = useBottomTabBarHeight();
   const [order, setOrder] = useState<TurnMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -169,7 +171,12 @@ export default function TonightScreen() {
           <Text style={styles.empty}>{"No one's in the rotation yet."}</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: tabBarHeight + space[5] },
+          ]}
+        >
           <SpotlightHero member={picker} />
           <View style={styles.planRow}>
             <AppButton
@@ -205,10 +212,11 @@ const styles = StyleSheet.create({
   center: { marginTop: space[8], textAlign: "center" },
   error: { ...textPresets.body, color: colors.text.danger },
   empty: { ...textPresets.body, color: colors.text.secondary, textAlign: "center" },
+  // paddingBottom is applied inline from the live tab bar height (the bar is
+  // absolutely positioned and would otherwise hide the last row).
   content: {
     paddingHorizontal: space[5],
     paddingTop: space[4],
-    paddingBottom: space[10],
   },
   planRow: { marginTop: space[5] },
   skipRow: { marginTop: space[3], marginBottom: space[5] },
