@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -190,10 +188,7 @@ func listNightsHandler(store nightStore) http.HandlerFunc {
 			}
 			byNight = groupAttendees(attRows)
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(toNightResponses(rows, byNight)); err != nil {
-			log.Printf("encode nights list response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
-		}
+		respondJSON(w, http.StatusOK, toNightResponses(rows, byNight), gid, "encode nights list response")
 	}
 }
 
@@ -286,11 +281,7 @@ func writeNightDTO(w http.ResponseWriter, r *http.Request, store nightStore, gid
 		internalError(w, gid, "list night attendees", err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(toNightResponse(night, rows, movie)); err != nil {
-		log.Printf("encode night response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
-	}
+	respondJSON(w, code, toNightResponse(night, rows, movie), gid, "encode night response")
 }
 
 // requireMember validates that uid has a membership in the group (active OR
@@ -328,9 +319,8 @@ func createNightHandler(store nightStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		var req createNightRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		req, ok := decodeJSON[createNightRequest](w, r)
+		if !ok {
 			return
 		}
 		parsed, err := validateCreateNightRequest(req)
@@ -391,9 +381,8 @@ func addAttendeeHandler(store nightStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		var req attendeeRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		req, ok := decodeJSON[attendeeRequest](w, r)
+		if !ok {
 			return
 		}
 		uid, ok := parseUUID(w, req.UserID, "invalid user id")
@@ -506,10 +495,7 @@ func nightTurnHandler(store nightStore) http.HandlerFunc {
 			internalError(w, gid, "rank group turn", err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(toTurnResponses(ranked)); err != nil {
-			log.Printf("encode turn response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
-		}
+		respondJSON(w, http.StatusOK, toTurnResponses(ranked), gid, "encode turn response")
 	}
 }
 
@@ -528,9 +514,8 @@ func recordNightPickHandler(store nightStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		var req recordPickRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		req, ok := decodeJSON[recordPickRequest](w, r)
+		if !ok {
 			return
 		}
 		pickerID, ok := parseUUID(w, req.PickerID, "invalid picker id")

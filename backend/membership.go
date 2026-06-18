@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"strings"
@@ -81,17 +79,13 @@ func memberDate(ts pgtype.Timestamptz) string {
 
 // encodeMember writes a member DTO as JSON with the given status code.
 func encodeMember(w http.ResponseWriter, gid, userID uuid.UUID, name, role, status, joinedOn string, code int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(memberResponse{
+	respondJSON(w, code, memberResponse{
 		ID:       userID.String(),
 		Name:     name,
 		Role:     role,
 		Status:   status,
 		JoinedOn: joinedOn,
-	}); err != nil {
-		log.Printf("encode member response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID
-	}
+	}, gid, "encode member response")
 }
 
 // joinMemberHandler serves POST /groups/{groupId}/members: a new person joins
@@ -103,9 +97,8 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		var req joinRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		req, ok := decodeJSON[joinRequest](w, r)
+		if !ok {
 			return
 		}
 		name, role, err := validateJoin(req)

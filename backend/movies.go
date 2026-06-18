@@ -134,9 +134,8 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 		if !ok {
 			return
 		}
-		var req movieRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		req, ok := decodeJSON[movieRequest](w, r)
+		if !ok {
 			return
 		}
 		if err := validateMovieRequest(req); err != nil {
