@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { Settings } from "lucide-react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import Constants from "expo-constants";
 
 import {
@@ -133,20 +133,23 @@ export default function TonightScreen() {
   }, []);
 
   // The group name is secondary header chrome, fetched independently of the
-  // turn: a failure just leaves the header line blank rather than driving the
-  // screen's error state.
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        const g = await fetchGroup(API_URL, GROUP_ID, controller.signal);
-        setGroupName(g.name);
-      } catch {
-        // Ignored — the turn fetch above owns the screen's error state.
-      }
-    })();
-    return () => controller.abort();
-  }, []);
+  // turn. Refetch on focus (not just mount) so a rename on the Settings tab
+  // shows here when the user returns — tab screens stay mounted. A failure just
+  // leaves the header line blank rather than driving the screen's error state.
+  useFocusEffect(
+    useCallback(() => {
+      const controller = new AbortController();
+      (async () => {
+        try {
+          const g = await fetchGroup(API_URL, GROUP_ID, controller.signal);
+          setGroupName(g.name);
+        } catch {
+          // Ignored — the turn fetch owns the screen's error state.
+        }
+      })();
+      return () => controller.abort();
+    }, []),
+  );
 
   const gear = (
     <IconButton
