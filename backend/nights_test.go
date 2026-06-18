@@ -180,6 +180,98 @@ func TestCreditedForRole(t *testing.T) {
 	}
 }
 
+func TestMovieDTOFromCols(t *testing.T) {
+	base := db.ListRecordedNightsRow{
+		ID:           uuid.MustParse("b0000000-0000-0000-0000-0000000000aa"),
+		ScheduledFor: pgtype.Date{Time: mustDate(t, "2026-05-01"), Valid: true},
+	}
+
+	t.Run("nil when no movie", func(t *testing.T) {
+		if got := movieDTOFromCols(base); got != nil {
+			t.Fatalf("want nil, got %+v", got)
+		}
+	})
+
+	t.Run("maps the nullable columns", func(t *testing.T) {
+		row := base
+		row.MovieTmdbID = pgtype.Int4{Int32: 27205, Valid: true}
+		row.MovieTitle = pgtype.Text{String: "Inception", Valid: true}
+		row.MovieReleaseYear = pgtype.Int4{Int32: 2010, Valid: true}
+		row.MoviePosterPath = pgtype.Text{String: "/inc.jpg", Valid: true}
+		got := movieDTOFromCols(row)
+		if got == nil || got.TMDBID != 27205 || got.Title != "Inception" {
+			t.Fatalf("unexpected movie dto: %+v", got)
+		}
+		if got.ReleaseYear == nil || *got.ReleaseYear != 2010 {
+			t.Fatalf("want release year 2010, got %v", got.ReleaseYear)
+		}
+		if got.PosterURL == nil {
+			t.Fatalf("want a poster url, got nil")
+		}
+	})
+}
+
+func TestGroupAttendees(t *testing.T) {
+	n1 := uuid.MustParse("b0000000-0000-0000-0000-0000000000aa")
+	n2 := uuid.MustParse("b0000000-0000-0000-0000-0000000000bb")
+	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
+	blake := uuid.MustParse("a0000000-0000-0000-0000-000000000002")
+	rows := []db.ListNightsAttendeesRow{
+		{PickID: n1, ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
+		{PickID: n1, ID: blake, Name: "Blake", Role: db.MembershipRoleCore},
+		{PickID: n2, ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
+	}
+	got := groupAttendees(rows)
+	if len(got[n1]) != 2 || len(got[n2]) != 1 {
+		t.Fatalf("want 2 + 1 attendees, got %d + %d", len(got[n1]), len(got[n2]))
+	}
+	if got[n1][0].Name != "Ada" || got[n1][1].Name != "Blake" {
+		t.Fatalf("attendee order not preserved: %+v", got[n1])
+	}
+}
+
+func TestToNightResponses(t *testing.T) {
+	n1 := uuid.MustParse("b0000000-0000-0000-0000-0000000000aa") // newest, has movie + attendees
+	n2 := uuid.MustParse("b0000000-0000-0000-0000-0000000000bb") // older, no movie, no attendees
+	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
+	rows := []db.ListRecordedNightsRow{
+		{
+			ID:           n1,
+			PickerID:     pgtype.UUID{Bytes: ada, Valid: true},
+			ScheduledFor: pgtype.Date{Time: mustDate(t, "2026-06-01"), Valid: true},
+			MovieTmdbID:  pgtype.Int4{Int32: 27205, Valid: true},
+			MovieTitle:   pgtype.Text{String: "Inception", Valid: true},
+		},
+		{
+			ID:           n2,
+			PickerID:     pgtype.UUID{Bytes: ada, Valid: true},
+			ScheduledFor: pgtype.Date{Time: mustDate(t, "2026-05-01"), Valid: true},
+		},
+	}
+	byNight := map[uuid.UUID][]attendee{
+		n1: {{ID: ada.String(), Name: "Ada", Role: "core"}},
+	}
+	got := toNightResponses(rows, byNight)
+	if len(got) != 2 {
+		t.Fatalf("want 2 nights, got %d", len(got))
+	}
+	if got[0].ID != n1.String() || got[1].ID != n2.String() {
+		t.Fatalf("order not preserved: %s then %s", got[0].ID, got[1].ID)
+	}
+	if got[0].ScheduledFor != "2026-06-01" {
+		t.Fatalf("want scheduledFor 2026-06-01, got %s", got[0].ScheduledFor)
+	}
+	if got[0].Movie == nil || got[0].Movie.Title != "Inception" {
+		t.Fatalf("want movie Inception, got %+v", got[0].Movie)
+	}
+	if got[1].Movie != nil {
+		t.Fatalf("want nil movie on second night, got %+v", got[1].Movie)
+	}
+	if got[1].Attendees == nil || len(got[1].Attendees) != 0 {
+		t.Fatalf("want empty (non-nil) attendees, got %+v", got[1].Attendees)
+	}
+}
+
 func TestValidateMovieRequest(t *testing.T) {
 	if err := validateMovieRequest(movieRequest{TMDBID: 438631}); err != nil {
 		t.Errorf("valid tmdbId rejected: %v", err)
