@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 
@@ -94,14 +92,10 @@ func turnHandler(store turnStore) http.HandlerFunc {
 			Present: present,
 		})
 		if err != nil {
-			log.Printf("rank group turn (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
-			writeJSONError(w, http.StatusInternalServerError, "internal server error")
+			internalError(w, gid, "rank group turn", err)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(toTurnResponses(rows)); err != nil {
-			log.Printf("encode turn response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
-		}
+		respondJSON(w, http.StatusOK, toTurnResponses(rows), gid, "encode turn response")
 	}
 }

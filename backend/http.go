@@ -40,6 +40,33 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
+// respondJSON writes v as a JSON success body with the matching Content-Type and
+// status — the success-path twin of writeJSONError, so the header/encode/log
+// dance lives in one place rather than in every handler. An encode failure is
+// only logged: the status line is already on the wire, so there's nothing to
+// recover. gid scopes the log line and is a parsed uuid.UUID, not free-form input.
+func respondJSON(w http.ResponseWriter, status int, v any, gid uuid.UUID, what string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("%s (%s): %v", what, gid, err) //#nosec G706 -- gid is a parsed uuid.UUID
+	}
+}
+
+// decodeJSON decodes the request body into a T, writing a 400 and returning
+// ok=false on malformed JSON (the handler should then return). It is the body
+// counterpart to pathUUID/parseUUID's "parse-or-400-and-signal-stop" contract,
+// and the single place a bad body maps to a 400 — so size limits or strict
+// field checks can later be added here once, not per handler.
+func decodeJSON[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
+	var v T
+	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		return v, false
+	}
+	return v, true
+}
+
 // internalError logs a failed store call and writes a 500. gid is a parsed
 // uuid.UUID (canonical hex), not free-form input.
 func internalError(w http.ResponseWriter, gid uuid.UUID, what string, err error) {
