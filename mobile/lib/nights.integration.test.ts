@@ -9,6 +9,7 @@ import {
   getNightTurn,
   getNight,
   getCurrentNight,
+  listNights,
   recordNightPick,
   attachMovie,
   type Night,
@@ -295,6 +296,24 @@ test("attachMovie posts the tmdbId and parses the night with its movie", async (
     assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/movie`);
     assert.deepEqual(JSON.parse(body), { tmdbId: 438631 });
     assert.deepEqual(got.movie, { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg" });
+  } finally {
+    await server.close();
+  }
+});
+
+test("listNights GETs the group's nights and parses the array", async () => {
+  let path = "";
+  const server = await startServer((req, res) => {
+    path = req.url ?? "";
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify([night, { ...night, id: "n2", scheduledFor: "2026-07-01" }]));
+  });
+  try {
+    const got = await listNights(server.url, GROUP);
+    assert.equal(path, `/groups/${GROUP}/nights`);
+    assert.equal(got.length, 2);
+    assert.equal(got[0].id, "n1");
+    assert.equal(got[1].id, "n2");
   } finally {
     await server.close();
   }

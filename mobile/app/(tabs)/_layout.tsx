@@ -1,6 +1,10 @@
-import type { ComponentType } from "react";
+import { useContext, type ComponentType } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Tabs, type BottomTabBarProps } from "expo-router/js-tabs";
+import {
+  BottomTabBarHeightCallbackContext,
+  Tabs,
+  type BottomTabBarProps,
+} from "expo-router/js-tabs";
 import { BlurView } from "expo-blur";
 import {
   Clapperboard,
@@ -24,8 +28,16 @@ const TABS: { name: string; label: string; Icon: ComponentType<IconProps> }[] = 
 
 function SpotlightTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  // The bar is absolutely positioned, so it overlays screen content. Report its
+  // real measured height up the tree so screens can read useBottomTabBarHeight()
+  // and pad their scroll content clear of it (the default estimate is too short
+  // for this custom bar).
+  const onHeightChange = useContext(BottomTabBarHeightCallbackContext);
   return (
-    <View style={[styles.bar, { paddingBottom: insets.bottom + space[2] }]}>
+    <View
+      style={[styles.bar, { paddingBottom: insets.bottom + space[2] }]}
+      onLayout={(e) => onHeightChange?.(e.nativeEvent.layout.height)}
+    >
       <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
       <View style={styles.tint} />
       <View accessibilityRole="tablist" style={styles.items}>

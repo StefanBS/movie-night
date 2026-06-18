@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { deriveInitialStep, type Step } from "./nightFlow";
+import { deriveInitialStep, isResumable, type Step } from "./nightFlow";
 import type { Night } from "./nights";
 
 // Minimal Night builder — only the fields deriveInitialStep reads matter.
@@ -32,5 +32,21 @@ const cases: { name: string; input: Night; want: Step }[] = [
 for (const c of cases) {
   test(`deriveInitialStep: ${c.name}`, () => {
     assert.equal(deriveInitialStep(c.input), c.want);
+  });
+}
+
+// A night is resumable only until it has a film attached. Once a movie is
+// recorded the night is done, so "Plan a night" starts a fresh one rather than
+// re-opening a finished (possibly long-past) night.
+const resumeCases: { name: string; input: Night; want: boolean }[] = [
+  { name: "fresh night → resumable", input: night({}), want: true },
+  { name: "picker recorded, no movie → resumable", input: night({ pickerId: "m1" }), want: true },
+  { name: "movie attached → done", input: night({ pickerId: "m1", movie }), want: false },
+  { name: "movie attached without picker (defensive) → done", input: night({ movie }), want: false },
+];
+
+for (const c of resumeCases) {
+  test(`isResumable: ${c.name}`, () => {
+    assert.equal(isResumable(c.input), c.want);
   });
 }

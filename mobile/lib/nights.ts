@@ -62,6 +62,15 @@ export function parseNight(raw: unknown): Night {
   };
 }
 
+// parseNights validates an untrusted JSON array and returns typed Nights,
+// throwing a descriptive error if the payload or any element is malformed.
+export function parseNights(raw: unknown): Night[] {
+  if (!Array.isArray(raw)) {
+    throw new Error("expected an array of nights");
+  }
+  return raw.map(parseNight);
+}
+
 function fetchNight(url: string, init?: RequestInit): Promise<Night> {
   return requestJson(url, parseNight, init);
 }
@@ -113,6 +122,15 @@ export function getCurrentNight(
   signal?: AbortSignal,
 ): Promise<Night | null> {
   return requestJsonOrNull(`${baseUrl}/groups/${groupId}/nights/current`, parseNight, { signal });
+}
+
+// listNights loads the group's recorded nights (picker set), newest first.
+export function listNights(
+  baseUrl: string,
+  groupId: string,
+  signal?: AbortSignal,
+): Promise<Night[]> {
+  return requestJson(`${baseUrl}/groups/${groupId}/nights`, parseNights, { signal });
 }
 
 export function addAttendee(

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseNight } from "./nights";
+import { parseNight, parseNights } from "./nights";
 
 const valid = {
   id: "n1",
@@ -91,4 +91,23 @@ test("parseNight accepts a null or absent movie", () => {
 
 test("parseNight rejects a bad movie shape", () => {
   assert.throws(() => parseNight({ ...valid, movie: { tmdbId: "x", title: "Dune" } }), /tmdbId/);
+});
+
+test("parseNights parses an array of nights", () => {
+  const ns = parseNights([valid, { id: "n2", scheduledFor: "2026-07-01", attendees: [] }]);
+  assert.equal(ns.length, 2);
+  assert.equal(ns[0].id, "n1");
+  assert.equal(ns[1].id, "n2");
+});
+
+test("parseNights accepts an empty array", () => {
+  assert.deepEqual(parseNights([]), []);
+});
+
+test("parseNights rejects a non-array", () => {
+  assert.throws(() => parseNights({}), /array of nights/);
+});
+
+test("parseNights rejects a malformed element", () => {
+  assert.throws(() => parseNights([valid, { id: 5 }]), /id/);
 });

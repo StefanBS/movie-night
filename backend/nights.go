@@ -113,6 +113,90 @@ func toNightResponse(p db.Pick, rows []db.ListNightAttendeesRow, movie *db.Movie
 	}
 }
 
+// movieDTOFromCols builds the movie DTO from the nullable LEFT JOIN columns of a
+// ListRecordedNights row; nil when the night has no movie attached.
+func movieDTOFromCols(row db.ListRecordedNightsRow) *movieDTO {
+	if !row.MovieTmdbID.Valid {
+		return nil
+	}
+	return &movieDTO{
+		TMDBID:      row.MovieTmdbID.Int32,
+		Title:       row.MovieTitle.String,
+		ReleaseYear: releaseYearPtr(row.MovieReleaseYear),
+		PosterURL:   posterURLPtr(row.MoviePosterPath),
+	}
+}
+
+// groupAttendees buckets attendee rows by their night (pick_id), preserving the
+// query's role-then-name order within each night.
+func groupAttendees(rows []db.ListNightsAttendeesRow) map[uuid.UUID][]attendee {
+	byNight := make(map[uuid.UUID][]attendee)
+	for _, r := range rows {
+		byNight[r.PickID] = append(byNight[r.PickID], attendee{
+			ID:   r.ID.String(),
+			Name: r.Name,
+			Role: string(r.Role),
+		})
+	}
+	return byNight
+}
+
+// toNightResponses assembles the ordered history list from recorded-night rows
+// and the attendees grouped by night. Attendees default to a non-nil empty slice
+// so a night with none encodes as [] rather than null.
+func toNightResponses(rows []db.ListRecordedNightsRow, byNight map[uuid.UUID][]attendee) []nightResponse {
+	out := make([]nightResponse, 0, len(rows))
+	for _, row := range rows {
+		atts := byNight[row.ID]
+		if atts == nil {
+			atts = []attendee{}
+		}
+		out = append(out, nightResponse{
+			ID:           row.ID.String(),
+			ScheduledFor: row.ScheduledFor.Time.Format("2006-01-02"),
+			PickerID:     pickerIDPtr(row.PickerID),
+			Movie:        movieDTOFromCols(row),
+			Attendees:    atts,
+		})
+	}
+	return out
+}
+
+// listNightsHandler serves GET /groups/{groupId}/nights — the group's recorded
+// nights (picker set), newest first. Two set-based queries (the nights, then all
+// of their attendees in one shot) keep it constant in the number of nights.
+func listNightsHandler(store nightStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		if !ok {
+			return
+		}
+		ctx := r.Context()
+		rows, err := store.ListRecordedNights(ctx, gid)
+		if err != nil {
+			internalError(w, gid, "list recorded nights", err)
+			return
+		}
+		ids := make([]uuid.UUID, 0, len(rows))
+		for _, row := range rows {
+			ids = append(ids, row.ID)
+		}
+		byNight := map[uuid.UUID][]attendee{}
+		if len(ids) > 0 {
+			attRows, err := store.ListNightsAttendees(ctx, db.ListNightsAttendeesParams{GroupID: gid, NightIds: ids})
+			if err != nil {
+				internalError(w, gid, "list nights attendees", err)
+				return
+			}
+			byNight = groupAttendees(attRows)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(toNightResponses(rows, byNight)); err != nil {
+			log.Printf("encode nights list response (%s): %v", gid, err) //#nosec G706 -- gid is a parsed uuid.UUID (canonical hex), not free-form input
+		}
+	}
+}
+
 // presentIDs extracts attendee user IDs as a NON-NIL (possibly empty) slice to
 // pass as RankGroupTurn's present set. Empty (not nil) makes the ranking exclude
 // everyone — distinct from nil, which RankGroupTurn treats as "rank all core".
@@ -141,6 +225,8 @@ type nightStore interface {
 	GetMovie(ctx context.Context, id uuid.UUID) (db.Movie, error)
 	UpsertMovie(ctx context.Context, arg db.UpsertMovieParams) (db.Movie, error)
 	SetNightMovie(ctx context.Context, arg db.SetNightMovieParams) (db.Pick, error)
+	ListRecordedNights(ctx context.Context, groupID uuid.UUID) ([]db.ListRecordedNightsRow, error)
+	ListNightsAttendees(ctx context.Context, arg db.ListNightsAttendeesParams) ([]db.ListNightsAttendeesRow, error)
 }
 
 // attendeeRequest is the JSON body of POST .../nights/{nightId}/attendees.
