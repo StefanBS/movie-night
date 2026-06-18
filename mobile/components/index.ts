@@ -5,6 +5,7 @@ export { Badge } from "./Badge";
 export { Input } from "./Input";
 export { Toggle } from "./Toggle";
 export { MemberRow } from "./MemberRow";
+export { SettingsRow } from "./SettingsRow";
 export { Poster } from "./Poster";
 export { Stat } from "./Stat";
 export { SectionLabel } from "./SectionLabel";

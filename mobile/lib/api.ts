@@ -5,6 +5,12 @@ const BACKEND_PORT = 8080;
 // seed, this app, and the backend integration test (the shared contract).
 export const GROUP_ID = "11111111-1111-1111-1111-111111111111";
 
+// GROUP_NAME is the seeded "Friday Film Club" group's display name — part of
+// the same shared seed contract as GROUP_ID. Rendered on the Settings screen
+// until a group-read endpoint exists (→ #41), at which point this is swapped
+// for a fetch (and the card gains a "since" line).
+export const GROUP_NAME = "Friday Film Club";
+
 function isLoopbackHost(host: string): boolean {
   return host === "localhost" || host === "127.0.0.1";
 }

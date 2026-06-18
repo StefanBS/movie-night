@@ -1,0 +1,19 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-18-settings-tab.md",
+  "tasks": [
+    {
+      "id": 6,
+      "subject": "Task 1: SettingsRow primitive",
+      "status": "completed",
+      "description": "**Goal:** Add a reusable grouped-row component (label + optional value / right slot, with `disabled` and `danger` variants) and export it.\n\n**Files:**\n- Create: `mobile/components/SettingsRow.tsx`\n- Modify: `mobile/components/index.ts`\n\n**Acceptance Criteria:**\n- renders label (textPresets.body, text.primary)\n- value mono right-aligned; right node wins over value\n- onPress -> Pressable w/ pressedOpacity; else View\n- disabled -> opacity 0.45, non-pressable, a11y disabled\n- danger -> label colors.text.danger\n- no card/border/divider drawn by component\n- exported from components/index.ts\n- just check passes\n\n**Verify:** `cd mobile && just check`\n\n```json:metadata\n{\"files\": [\"mobile/components/SettingsRow.tsx\", \"mobile/components/index.ts\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"renders label\", \"value/right slot\", \"pressable when onPress and not disabled\", \"disabled dims + a11y\", \"danger red label\", \"no card/divider drawn\", \"exported from index\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 2: Settings screen",
+      "status": "completed",
+      "blockedBy": [6],
+      "description": "**Goal:** Replace the Settings placeholder with the house-rule card + Group / Rotation / Notifications / Danger-zone groups, wiring session-local toggles and the `GROUP_NAME` constant.\n\n**Files:**\n- Modify: `mobile/lib/api.ts`\n- Rewrite: `mobile/app/(tabs)/settings.tsx`\n\n**Acceptance Criteria:**\n- GROUP_NAME constant in lib/api.ts beside GROUP_ID\n- house-rule card (mono kicker over serif rule), ember-free\n- info Banner 'not saved yet'\n- GROUP row shows GROUP_NAME, no since\n- ROTATION two working toggles (skip on, guests off)\n- NOTIFICATIONS disabled row w/ dimmed chevron\n- DANGER ZONE disabled red Reset history + Leave group\n- SectionLabel + cards + hairline dividers between rows only\n- TODO(#41) seam\n- no hardcoded tokens; just check passes\n\n**Verify:** `cd mobile && just check`, then manual Expo pass per spec.\n\n```json:metadata\n{\"files\": [\"mobile/lib/api.ts\", \"mobile/app/(tabs)/settings.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"GROUP_NAME constant\", \"house-rule card\", \"info banner\", \"group row\", \"two working toggles with defaults\", \"disabled notifications row\", \"disabled danger rows red\", \"cards + hairline dividers\", \"TODO(#41) seam\", \"no hardcoded tokens\"], \"modelTier\": \"standard\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-18T02:30:00Z"
+}
