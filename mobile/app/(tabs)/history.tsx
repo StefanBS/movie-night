@@ -2,16 +2,20 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import Constants from "expo-constants";
 
-import { Poster, SectionLabel, Stat, TopBar } from "../../components";
+import {
+  Poster,
+  SectionLabel,
+  Stat,
+  TabScrollView,
+  TopBar,
+} from "../../components";
 import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
 import { formatShortDate } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
@@ -39,7 +43,6 @@ function firstNameOf(name: string): string {
 
 export default function HistoryScreen() {
   const router = useRouter();
-  const tabBarHeight = useBottomTabBarHeight();
   const [nights, setNights] = useState<Night[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,12 +113,7 @@ export default function HistoryScreen() {
   return (
     <View style={styles.screen}>
       <TopBar kind="tab" title="History" />
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: tabBarHeight + space[5] },
-        ]}
-      >
+      <TabScrollView contentContainerStyle={styles.content}>
         <View style={styles.stats}>
           <View style={styles.statCell}>
             <Stat value={stats.nights} label="Nights" />
@@ -167,7 +165,7 @@ export default function HistoryScreen() {
             })}
           </View>
         ))}
-      </ScrollView>
+      </TabScrollView>
     </View>
   );
 }
@@ -178,8 +176,6 @@ const styles = StyleSheet.create({
   empty: { ...textPresets.body, color: colors.text.secondary },
   center: { marginTop: space[8], alignSelf: "center" },
   errorText: { ...textPresets.body, color: colors.text.danger },
-  // paddingBottom is applied inline from the live tab bar height (the bar is
-  // absolutely positioned and would otherwise hide the last row).
   content: { paddingHorizontal: space[5] },
   stats: {
     flexDirection: "row",

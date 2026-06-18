@@ -1,9 +1,15 @@
 import { useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
+import { StyleSheet, Text, View } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 
-import { Banner, SectionLabel, SettingsRow, Toggle, TopBar } from "../../components";
+import {
+  Banner,
+  SectionLabel,
+  SettingsRow,
+  TabScrollView,
+  Toggle,
+  TopBar,
+} from "../../components";
 import { GROUP_NAME } from "../../lib/api";
 import {
   borderWidth,
@@ -22,17 +28,11 @@ export default function SettingsScreen() {
   // reload) and the Notifications / Danger-zone rows are inert.
   const [allowSkipping, setAllowSkipping] = useState(true); // skip exists in-app
   const [guestsCanPick, setGuestsCanPick] = useState(false); // the house rule
-  const tabBarHeight = useBottomTabBarHeight();
 
   return (
     <View style={styles.screen}>
       <TopBar kind="tab" title="Settings" />
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: tabBarHeight + space[5] },
-        ]}
-      >
+      <TabScrollView contentContainerStyle={styles.content}>
         <View style={styles.ruleCard}>
           <Text style={styles.ruleKicker} allowFontScaling={false}>
             THE HOUSE RULE
@@ -85,15 +85,13 @@ export default function SettingsScreen() {
           </View>
           <SettingsRow label="Leave group" danger disabled />
         </View>
-      </ScrollView>
+      </TabScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface.page },
-  // paddingBottom is applied inline from the live tab bar height (the bar is
-  // absolutely positioned and would otherwise hide the last row).
   content: { paddingHorizontal: space[5] },
   ruleCard: {
     backgroundColor: colors.surface.card,
