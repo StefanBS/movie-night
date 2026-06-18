@@ -11,6 +11,15 @@ export const GROUP_ID = "11111111-1111-1111-1111-111111111111";
 // for a fetch (and the card gains a "since" line).
 export const GROUP_NAME = "Friday Film Club";
 
+// resolveGroupId returns the active group, or null when none is resolved (which
+// is when the Welcome / first-run screen is shown). Until group create/join
+// exists, it always returns the seeded group.
+// TODO(group-onboarding): read the persisted/selected group here; a null result
+// routes the app to /welcome (no redirect is wired yet — see app/welcome.tsx).
+export function resolveGroupId(): string | null {
+  return GROUP_ID;
+}
+
 function isLoopbackHost(host: string): boolean {
   return host === "localhost" || host === "127.0.0.1";
 }
