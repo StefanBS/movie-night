@@ -3,7 +3,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -48,7 +47,7 @@ func fakeTMDB(t *testing.T) *httptest.Server {
 }
 
 func TestMovieAttachIntegration(t *testing.T) {
-	pool := startPostgres(t)
+	pool := freshDB(t)
 	seedFixtures(t, pool)
 	upstream := fakeTMDB(t)
 	client := &tmdbClient{baseURL: upstream.URL, token: "test", client: upstream.Client()}
@@ -62,15 +61,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	do := func(t *testing.T, method, path, body string) (int, []byte) {
 		t.Helper()
-		rec := httptest.NewRecorder()
-		var r *http.Request
-		if body == "" {
-			r = httptest.NewRequest(method, path, nil)
-		} else {
-			r = httptest.NewRequest(method, path, bytes.NewBufferString(body))
-		}
-		mux.ServeHTTP(rec, r)
-		return rec.Code, rec.Body.Bytes()
+		return doReq(t, mux, method, path, body)
 	}
 
 	// mkNight clears the group's picks (one open night per group) and creates a
@@ -78,30 +69,17 @@ func TestMovieAttachIntegration(t *testing.T) {
 	// night to exist — no picker or attendee.
 	mkNight := func(t *testing.T, group string) string {
 		t.Helper()
-		if _, err := pool.Exec(context.Background(), "DELETE FROM picks WHERE group_id=$1", group); err != nil {
-			t.Fatalf("clear picks: %v", err)
-		}
-		code, b := do(t, http.MethodPost, "/groups/"+group+"/nights", `{"scheduledFor":"2026-06-12"}`)
+		clearAllPicks(t, pool, group)
+		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+group+"/nights", `{"scheduledFor":"2026-06-12"}`)
 		if code != http.StatusCreated {
-			t.Fatalf("create night = %d (%s)", code, b)
-		}
-		var n nightResponse
-		if err := json.Unmarshal(b, &n); err != nil {
-			t.Fatalf("decode night: %v", err)
+			t.Fatalf("create night = %d", code)
 		}
 		return n.ID
 	}
 
 	attach := func(t *testing.T, group, nightID, body string) (int, nightResponse) {
 		t.Helper()
-		code, b := do(t, http.MethodPost, "/groups/"+group+"/nights/"+nightID+"/movie", body)
-		var n nightResponse
-		if code == http.StatusOK {
-			if err := json.Unmarshal(b, &n); err != nil {
-				t.Fatalf("decode night: %v", err)
-			}
-		}
-		return code, n
+		return doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+group+"/nights/"+nightID+"/movie", body)
 	}
 
 	t.Run("search returns mapped results", func(t *testing.T) {
@@ -211,22 +189,17 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	t.Run("unconfigured TMDB yields 503", func(t *testing.T) {
 		var nilClient *tmdbClient
-		rec := httptest.NewRecorder()
-		searchMoviesHandler(nilClient).ServeHTTP(rec,
-			httptest.NewRequest(http.MethodGet, "/movies/search?q=dune", nil))
-		if rec.Code != http.StatusServiceUnavailable {
-			t.Errorf("search unconfigured = %d, want 503", rec.Code)
+		if code, _ := doReq(t, searchMoviesHandler(nilClient), http.MethodGet, "/movies/search?q=dune", ""); code != http.StatusServiceUnavailable {
+			t.Errorf("search unconfigured = %d, want 503", code)
 		}
 		// Drive attach through a router so {groupId}/{nightId} path values populate;
 		// with a nil client the handler must 503 after ensureNight passes.
 		night := mkNight(t, seededGroup)
 		m2 := http.NewServeMux()
 		m2.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, nilClient))
-		rec = httptest.NewRecorder()
-		m2.ServeHTTP(rec, httptest.NewRequest(http.MethodPost,
-			"/groups/"+seededGroup+"/nights/"+night+"/movie", bytes.NewBufferString(`{"tmdbId":438631}`)))
-		if rec.Code != http.StatusServiceUnavailable {
-			t.Errorf("attach unconfigured = %d, want 503", rec.Code)
+		if code, _ := doReq(t, m2, http.MethodPost,
+			"/groups/"+seededGroup+"/nights/"+night+"/movie", `{"tmdbId":438631}`); code != http.StatusServiceUnavailable {
+			t.Errorf("attach unconfigured = %d, want 503", code)
 		}
 	})
 }
