@@ -1,0 +1,19 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-18-welcome-first-run.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 1: Add resolveGroupId seam to lib/api.ts",
+      "status": "completed",
+      "description": "**Goal:** Add `resolveGroupId()` — the documented seam for \"which group is active, or null → Welcome\" — returning the seeded group today, with no behavior change anywhere.\n\n**Files:**\n- Modify: `mobile/lib/api.ts` (after the `GROUP_NAME` block, ~line 12)\n\n**Acceptance Criteria:**\n- resolveGroupId(): string | null exported returning GROUP_ID\n- TODO(group-onboarding) comment present\n- no other imports changed (tabs still import GROUP_ID directly)\n- `cd mobile && just check` passes\n\n**Verify:** `cd mobile && just check`\n\n```json:metadata\n{\"files\": [\"mobile/lib/api.ts\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"resolveGroupId(): string | null exported returning GROUP_ID\", \"TODO(group-onboarding) comment present\", \"no other imports changed\", \"just check passes\"], \"modelTier\": \"mechanical\"}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Task 2: Build Welcome marquee screen + register route",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** Create the presentational `app/welcome.tsx` marquee and register it as a headerless route in the root stack, reachable at `/welcome`.\n\n**Files:**\n- Create: `mobile/app/welcome.tsx`\n- Modify: `mobile/app/_layout.tsx` (add a `Stack.Screen` entry)\n\n**Acceptance Criteria:**\n- /welcome renders marquee: night-950 bg, ember top glow, 92px logomark, Movie Night wordmark, HOW IT WORKS card + 3 rules, info Banner, 2 disabled CTAs (Start a group → primary, Enter an invite code ghost)\n- no tagline\n- tokens-only, ember = glow only\n- route registered headerless in app/_layout.tsx\n- `cd mobile && just check` passes\n\n**Verify:** `cd mobile && just check`; manual at /welcome\n\n```json:metadata\n{\"files\": [\"mobile/app/welcome.tsx\", \"mobile/app/_layout.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"/welcome renders marquee: glow, 92px logomark, Movie Night wordmark, HOW IT WORKS + 3 rules, info banner, 2 disabled CTAs\", \"no tagline\", \"tokens-only, ember = glow only\", \"route registered headerless\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-18T03:41:00Z"
+}
