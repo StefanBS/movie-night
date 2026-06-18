@@ -1,10 +1,21 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useRouter } from "expo-router";
+import Constants from "expo-constants";
 
 import { Poster, SectionLabel, Stat, TopBar } from "../../components";
+import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
 import { formatShortDate } from "../../lib/date";
+import { errorMessage } from "../../lib/errors";
 import { buildHistoryMonths, historyStats } from "../../lib/history";
-import type { Night } from "../../lib/nights";
+import { listNights, type Night } from "../../lib/nights";
 import {
   borderWidth,
   colors,
@@ -16,16 +27,62 @@ import {
   textPresets,
 } from "../../theme";
 
+const API_URL = resolveApiBaseUrl({
+  envUrl: process.env.EXPO_PUBLIC_API_URL,
+  hostUri: Constants.expoConfig?.hostUri,
+});
+
 function firstNameOf(name: string): string {
   return name.split(" ")[0];
 }
 
 export default function HistoryScreen() {
   const router = useRouter();
-  // TODO(#39): fetch recorded nights from the nights-list endpoint once it
-  // exists. Until then there is no list endpoint, so the history is empty and the
-  // screen shows its honest empty state. The render path below is ready to wire.
-  const nights: Night[] = [];
+  const [nights, setNights] = useState<Night[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        setNights(await listNights(API_URL, GROUP_ID, controller.signal));
+      } catch (e) {
+        if (!controller.signal.aborted) {
+          setError(errorMessage(e, "failed to load history"));
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => controller.abort();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.screen}>
+        <TopBar kind="tab" title="History" />
+        <ActivityIndicator
+          style={styles.center}
+          size="large"
+          color={colors.accent.base}
+        />
+      </View>
+    );
+  }
+
+  if (error !== null) {
+    return (
+      <View style={styles.screen}>
+        <TopBar kind="tab" title="History" />
+        <View style={styles.body}>
+          <Text style={styles.errorText}>{`Couldn't load history: ${error}`}</Text>
+        </View>
+      </View>
+    );
+  }
 
   if (nights.length === 0) {
     return (
@@ -107,6 +164,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
   empty: { ...textPresets.body, color: colors.text.secondary },
+  center: { marginTop: space[8], alignSelf: "center" },
+  errorText: { ...textPresets.body, color: colors.text.danger },
   content: { paddingHorizontal: space[5], paddingBottom: space[10] },
   stats: {
     flexDirection: "row",
