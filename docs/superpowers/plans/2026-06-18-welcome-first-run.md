@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.card,
     borderRadius: radius.lg,
     padding: space[5],
-    marginTop: space[7],
+    marginTop: space[8],
   },
   cardLabel: {
     fontFamily: fontFamily.monoBold,
