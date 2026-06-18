@@ -1,0 +1,39 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-18-nights-history-list-endpoint.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 1: sqlc queries for recorded nights + attendees",
+      "status": "pending",
+      "description": "**Goal:** Add two set-based queries and regenerate the sqlc layer so the handler has typed ListRecordedNights / ListNightsAttendees methods.\n\n**Files:**\n- Modify: `backend/internal/db/query/nights.sql`\n- Regenerate: `backend/internal/db/*` via `just sqlc`\n\n**Acceptance Criteria:**\n- ListRecordedNights: LEFT JOIN movies, picker_id NOT NULL, newest-first\n- ListNightsAttendees: pick_id + attendees for ANY(night_ids)\n- just sqlc + go build pass\n- joined movie cols generated nullable (pgtype.Int4/pgtype.Text)\n\n**Verify:** `cd backend && just sqlc && go build ./...`\n\n```json:metadata\n{\"files\": [\"backend/internal/db/query/nights.sql\", \"backend/internal/db\"], \"verifyCommand\": \"cd backend && just sqlc && go build ./...\", \"acceptanceCriteria\": [\"ListRecordedNights: LEFT JOIN movies, picker_id NOT NULL, newest-first\", \"ListNightsAttendees: pick_id + attendees for ANY(night_ids)\", \"just sqlc + go build pass\", \"joined movie cols generated nullable\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Task 2: List handler, pure helpers, route + unit tests",
+      "status": "pending",
+      "blockedBy": [0],
+      "description": "**Goal:** Add listNightsHandler and its three pure helpers, register the route, and unit-test the assembly logic.\n\n**Files:**\n- Modify: `backend/nights.go`, `backend/main.go`\n- Test: `backend/nights_test.go`\n\n**Acceptance Criteria:**\n- nightStore gains ListRecordedNights + ListNightsAttendees\n- movieDTOFromCols/groupAttendees/toNightResponses pure + unit-tested\n- handler issues exactly two store calls; skips attendees when no nights\n- route GET /groups/{groupId}/nights registered\n- just check passes\n\n**Verify:** `cd backend && just check`\n\n```json:metadata\n{\"files\": [\"backend/nights.go\", \"backend/main.go\", \"backend/nights_test.go\"], \"verifyCommand\": \"cd backend && just check\", \"acceptanceCriteria\": [\"nightStore gains both methods\", \"3 pure helpers unit-tested\", \"handler issues 2 store calls, skips attendees when empty\", \"route registered\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 3: Integration test (testcontainers)",
+      "status": "pending",
+      "blockedBy": [1],
+      "description": "**Goal:** Prove the endpoint returns recorded nights newest-first, excludes the open night, and carries movie + attendees, against real Postgres.\n\n**Files:**\n- Modify: `backend/nights_integration_test.go`\n\n**Acceptance Criteria:**\n- TestNightsListIntegration seeds 2 recorded + 1 open night, GETs the endpoint\n- asserts 200, newest-first order, open excluded, movie+attendees, empty group → []\n- just test-integration passes\n\n**Verify:** `cd backend && go test -tags=integration -run '^TestNightsListIntegration$' ./...`\n\n```json:metadata\n{\"files\": [\"backend/nights_integration_test.go\"], \"verifyCommand\": \"cd backend && go test -tags=integration -run '^TestNightsListIntegration$' ./...\", \"acceptanceCriteria\": [\"seeds 2 recorded + 1 open night\", \"asserts newest-first, open excluded, movie+attendees\", \"empty group → []\", \"just test-integration passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 4: Mobile listNights client + parser + tests",
+      "status": "pending",
+      "description": "**Goal:** Add the typed listNights client and parseNights validator with tests.\n\n**Files:**\n- Modify: `mobile/lib/nights.ts`\n- Test: `mobile/lib/nights.test.ts`, `mobile/lib/nights.integration.test.ts`\n\n**Acceptance Criteria:**\n- parseNights array-guards + maps parseNight\n- listNights GETs /groups/{groupId}/nights\n- unit tests: array/[]/non-array/bad element\n- integration case parses array over real local server\n- just check passes\n\n**Verify:** `cd mobile && just check`\n\n```json:metadata\n{\"files\": [\"mobile/lib/nights.ts\", \"mobile/lib/nights.test.ts\", \"mobile/lib/nights.integration.test.ts\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"parseNights array-guards + maps parseNight\", \"listNights GETs nights endpoint\", \"unit tests: array/[]/non-array/bad element\", \"integration case parses array\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 5: Wire the History screen to listNights",
+      "status": "pending",
+      "blockedBy": [3],
+      "description": "**Goal:** Replace the History tab's TODO(#39) stub with a real fetch, adding loading and error states.\n\n**Files:**\n- Modify: `mobile/app/(tabs)/history.tsx`\n\n**Acceptance Criteria:**\n- useEffect fetch via listNights with AbortController; nights/loading/error state\n- loading → ActivityIndicator; error → danger text; empty → existing state; loaded → existing list\n- TODO(#39) removed; lib/history.ts unchanged\n- just check passes\n\n**Verify:** `cd mobile && just check`; manual History tab check.\n\n```json:metadata\n{\"files\": [\"mobile/app/(tabs)/history.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"useEffect fetch via listNights with AbortController\", \"loading/error/empty/loaded states\", \"TODO(#39) removed; lib/history.ts unchanged\", \"just check passes\"], \"modelTier\": \"standard\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-18T11:35:00Z"
+}
