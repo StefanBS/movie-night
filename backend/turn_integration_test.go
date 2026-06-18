@@ -3,10 +3,7 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,14 +16,15 @@ import (
 // (2026-05-01). Cleo: one credited pick (2026-04-10, older than Blake's).
 func seedTurnPicks(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
-	ctx := context.Background()
-	sql := `INSERT INTO picks (group_id, picker_id, is_credited, scheduled_for) VALUES
-		($1, 'a0000000-0000-0000-0000-000000000001', false, '2026-05-20'),
-		($1, 'a0000000-0000-0000-0000-000000000002', true,  '2026-05-01'),
-		($1, 'a0000000-0000-0000-0000-000000000003', true,  '2026-04-10')`
-	if _, err := pool.Exec(ctx, sql, seededGroup); err != nil {
-		t.Fatalf("seed picks: %v", err)
-	}
+	execSeed(t, pool, []seedStmt{
+		{
+			sql: `INSERT INTO picks (group_id, picker_id, is_credited, scheduled_for) VALUES
+				($1, 'a0000000-0000-0000-0000-000000000001', false, '2026-05-20'),
+				($1, 'a0000000-0000-0000-0000-000000000002', true,  '2026-05-01'),
+				($1, 'a0000000-0000-0000-0000-000000000003', true,  '2026-04-10')`,
+			args: []any{seededGroup},
+		},
+	})
 }
 
 // seedBaselineGroup seeds a separate group whose ranking is decided by
@@ -37,12 +35,8 @@ func seedTurnPicks(t *testing.T, pool *pgxpool.Pool) {
 // first instead. Uses its own group/users so it cannot disturb the other subtests.
 func seedBaselineGroup(t *testing.T, pool *pgxpool.Pool) string {
 	t.Helper()
-	ctx := context.Background()
 	const group = "33333333-3333-3333-3333-333333333333"
-	stmts := []struct {
-		sql  string
-		args []any
-	}{
+	execSeed(t, pool, []seedStmt{
 		{sql: `INSERT INTO groups (id, name) VALUES ($1, 'Baseline Crew')`, args: []any{group}},
 		{sql: `INSERT INTO users (id, name) VALUES
 			('a0000000-0000-0000-0000-000000000007', 'Pat'),
@@ -52,39 +46,24 @@ func seedBaselineGroup(t *testing.T, pool *pgxpool.Pool) string {
 			($1, 'a0000000-0000-0000-0000-000000000008', 'core', 'active', 0, 2)`, args: []any{group}},
 		{sql: `INSERT INTO picks (group_id, picker_id, is_credited, scheduled_for) VALUES
 			($1, 'a0000000-0000-0000-0000-000000000008', true, '2026-03-01')`, args: []any{group}},
-	}
-	for _, s := range stmts {
-		if _, err := pool.Exec(ctx, s.sql, s.args...); err != nil {
-			t.Fatalf("seed baseline group: %v", err)
-		}
-	}
+	})
 	return group
 }
 
 func TestTurnHandlerIntegration(t *testing.T) {
-	pool := startPostgres(t)
+	pool := freshDB(t)
 	seedFixtures(t, pool)
 	seedTurnPicks(t, pool)
 
 	mux := http.NewServeMux()
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(db.New(pool)))
 
-	get := func(t *testing.T, groupID, present string) (int, []turnResponse) {
-		t.Helper()
+	get := func(groupID, present string) (int, []turnResponse) {
 		path := "/groups/" + groupID + "/turn"
 		if present != "" {
 			path += "?present=" + present
 		}
-		rec := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, path, nil)
-		mux.ServeHTTP(rec, req)
-		var got []turnResponse
-		if rec.Code == http.StatusOK {
-			if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
-				t.Fatalf("decode body: %v", err)
-			}
-		}
-		return rec.Code, got
+		return doJSON[[]turnResponse](t, mux, http.MethodGet, path, "")
 	}
 
 	const (
@@ -94,7 +73,7 @@ func TestTurnHandlerIntegration(t *testing.T) {
 	)
 
 	t.Run("default ranks least-served first; non-credited pick ignored", func(t *testing.T) {
-		code, got := get(t, seededGroup, "")
+		code, got := get(seededGroup, "")
 		if code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", code)
 		}
@@ -125,7 +104,7 @@ func TestTurnHandlerIntegration(t *testing.T) {
 	})
 
 	t.Run("present subset filters the ranking", func(t *testing.T) {
-		code, got := get(t, seededGroup, blake+","+cleo)
+		code, got := get(seededGroup, blake+","+cleo)
 		if code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", code)
 		}
@@ -141,7 +120,7 @@ func TestTurnHandlerIntegration(t *testing.T) {
 	})
 
 	t.Run("present set containing only inactive members returns empty", func(t *testing.T) {
-		code, got := get(t, seededGroup, zed)
+		code, got := get(seededGroup, zed)
 		if code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", code)
 		}
@@ -151,7 +130,7 @@ func TestTurnHandlerIntegration(t *testing.T) {
 	})
 
 	t.Run("malformed present value returns 400", func(t *testing.T) {
-		code, _ := get(t, seededGroup, "not-a-uuid")
+		code, _ := get(seededGroup, "not-a-uuid")
 		if code != http.StatusBadRequest {
 			t.Fatalf("status = %d, want 400", code)
 		}
@@ -159,7 +138,7 @@ func TestTurnHandlerIntegration(t *testing.T) {
 
 	t.Run("baseline_picks counts toward the served order", func(t *testing.T) {
 		group := seedBaselineGroup(t, pool)
-		code, got := get(t, group, "")
+		code, got := get(group, "")
 		if code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", code)
 		}

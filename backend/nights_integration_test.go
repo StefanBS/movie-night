@@ -3,18 +3,15 @@
 package main
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
 func TestNightAttendanceIntegration(t *testing.T) {
-	pool := startPostgres(t)
+	pool := freshDB(t)
 	seedFixtures(t, pool)
 
 	mux := http.NewServeMux()
@@ -37,77 +34,33 @@ func TestNightAttendanceIntegration(t *testing.T) {
 
 	do := func(t *testing.T, method, path, body string) (int, []byte) {
 		t.Helper()
-		rec := httptest.NewRecorder()
-		var r *http.Request
-		if body == "" {
-			r = httptest.NewRequest(method, path, nil)
-		} else {
-			r = httptest.NewRequest(method, path, bytes.NewBufferString(body))
-		}
-		mux.ServeHTTP(rec, r)
-		return rec.Code, rec.Body.Bytes()
-	}
-
-	// clearOpenNight deletes seededGroup's open night (picker_id NULL) so a
-	// subtest starts from a clean slate. A group may have only one open night at
-	// a time (uq_open_night_per_group), so without this the next create would
-	// resume the prior subtest's night instead of making a fresh one. The FK
-	// cascade drops its attendances.
-	clearOpenNight := func(t *testing.T) {
-		t.Helper()
-		if _, err := pool.Exec(context.Background(),
-			"DELETE FROM picks WHERE group_id = $1 AND picker_id IS NULL", seededGroup); err != nil {
-			t.Fatalf("clear open night: %v", err)
-		}
-	}
-
-	// clearAllPicks removes every pick (open and finalized) for a group so a
-	// subtest that asserts "current" or recomputed standings starts from the seed
-	// baseline. The FK cascade drops attendances.
-	clearAllPicks := func(t *testing.T, group string) {
-		t.Helper()
-		if _, err := pool.Exec(context.Background(),
-			"DELETE FROM picks WHERE group_id = $1", group); err != nil {
-			t.Fatalf("clear all picks: %v", err)
-		}
+		return doReq(t, mux, method, path, body)
 	}
 
 	createNight := func(t *testing.T, body string) nightResponse {
 		t.Helper()
-		clearOpenNight(t)
-		code, b := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", body)
+		clearOpenNight(t, pool, seededGroup)
+		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", body)
 		if code != http.StatusCreated {
-			t.Fatalf("create night status = %d, want 201 (body %s)", code, b)
-		}
-		var n nightResponse
-		if err := json.Unmarshal(b, &n); err != nil {
-			t.Fatalf("decode night: %v", err)
+			t.Fatalf("create night status = %d, want 201", code)
 		}
 		return n
 	}
 
 	turn := func(t *testing.T, nightID string) []turnResponse {
 		t.Helper()
-		code, b := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+nightID+"/turn", "")
+		code, got := doJSON[[]turnResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+nightID+"/turn", "")
 		if code != http.StatusOK {
-			t.Fatalf("turn status = %d, want 200 (body %s)", code, b)
-		}
-		var got []turnResponse
-		if err := json.Unmarshal(b, &got); err != nil {
-			t.Fatalf("decode turn: %v", err)
+			t.Fatalf("turn status = %d, want 200", code)
 		}
 		return got
 	}
 
 	recordPick := func(t *testing.T, nightID, pickerID string) nightResponse {
 		t.Helper()
-		code, b := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+nightID+"/pick", `{"pickerId":"`+pickerID+`"}`)
+		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights/"+nightID+"/pick", `{"pickerId":"`+pickerID+`"}`)
 		if code != http.StatusOK {
-			t.Fatalf("record pick status = %d, want 200 (body %s)", code, b)
-		}
-		var n nightResponse
-		if err := json.Unmarshal(b, &n); err != nil {
-			t.Fatalf("decode night: %v", err)
+			t.Fatalf("record pick status = %d, want 200", code)
 		}
 		return n
 	}
@@ -180,7 +133,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	t.Run("create with a non-member initial attendee yields 422", func(t *testing.T) {
 		// Initial-attendee validation only runs when actually creating — so this
 		// must start with no open night, else create would resume and skip it.
-		clearOpenNight(t)
+		clearOpenNight(t, pool, seededGroup)
 		code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-06-12","attendees":["`+unknown+`"]}`)
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("status = %d, want 422", code)
@@ -304,7 +257,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	})
 
 	t.Run("current night resumes a finalized night across sessions", func(t *testing.T) {
-		clearAllPicks(t, seededGroup)
+		clearAllPicks(t, pool, seededGroup)
 		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
 		recordPick(t, n.ID, ada) // finalize it
 		code, b := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
@@ -324,7 +277,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	})
 
 	t.Run("re-recording a different attendee re-attributes standings (correction)", func(t *testing.T) {
-		clearAllPicks(t, seededGroup)
+		clearAllPicks(t, pool, seededGroup)
 		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+blake+`"]}`)
 		recordPick(t, n.ID, ada) // Ada credited → Blake leads
 		if order := names(turn(t, n.ID)); order[0] != "Blake" {
@@ -337,7 +290,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	})
 
 	t.Run("starting a new night after finalizing creates a fresh open night", func(t *testing.T) {
-		clearAllPicks(t, seededGroup)
+		clearAllPicks(t, pool, seededGroup)
 		first := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
 		recordPick(t, first.ID, ada) // finalize → no open night remains
 		code, b := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-06-19","attendees":["`+blake+`"]}`)
@@ -372,7 +325,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 }
 
 func TestNightsListIntegration(t *testing.T) {
-	pool := startPostgres(t)
+	pool := freshDB(t)
 	seedFixtures(t, pool)
 
 	mux := http.NewServeMux()
@@ -388,11 +341,7 @@ func TestNightsListIntegration(t *testing.T) {
 		movieID = "c0000000-0000-0000-0000-0000000000a1"
 	)
 
-	ctx := context.Background()
-	seed := []struct {
-		sql  string
-		args []any
-	}{
+	execSeed(t, pool, []seedStmt{
 		{sql: `INSERT INTO movies (id, tmdb_id, title, release_year, poster_path)
 		        VALUES ($1, 27205, 'Inception', 2010, '/inc.jpg')`, args: []any{movieID}},
 		{sql: `INSERT INTO picks (id, group_id, picker_id, is_credited, scheduled_for, movie_id)
@@ -402,18 +351,11 @@ func TestNightsListIntegration(t *testing.T) {
 		{sql: `INSERT INTO picks (id, group_id, scheduled_for)
 		        VALUES ($1, $2, '2026-07-01')`, args: []any{openOne, seededGroup}},
 		{sql: `INSERT INTO attendances (pick_id, user_id) VALUES ($1, $2), ($1, $3)`, args: []any{night1, ada, blake}},
-	}
-	for _, s := range seed {
-		if _, err := pool.Exec(ctx, s.sql, s.args...); err != nil {
-			t.Fatalf("seed: %v", err)
-		}
-	}
+	})
 
 	do := func(t *testing.T, path string) (int, []byte) {
 		t.Helper()
-		rec := httptest.NewRecorder()
-		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
-		return rec.Code, rec.Body.Bytes()
+		return doReq(t, mux, http.MethodGet, path, "")
 	}
 
 	t.Run("lists recorded nights newest-first, excludes the open night", func(t *testing.T) {

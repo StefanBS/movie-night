@@ -3,18 +3,15 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"math"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
 func TestMembershipChurnIntegration(t *testing.T) {
-	pool := startPostgres(t)
+	pool := freshDB(t)
 	seedFixtures(t, pool)
 	q := db.New(pool)
 
@@ -35,31 +32,14 @@ func TestMembershipChurnIntegration(t *testing.T) {
 
 	do := func(t *testing.T, method, path, body string) (int, memberResponse) {
 		t.Helper()
-		rec := httptest.NewRecorder()
-		var r *http.Request
-		if body == "" {
-			r = httptest.NewRequest(method, path, nil)
-		} else {
-			r = httptest.NewRequest(method, path, bytes.NewBufferString(body))
-		}
-		mux.ServeHTTP(rec, r)
-		var m memberResponse
-		if rec.Code == http.StatusOK || rec.Code == http.StatusCreated {
-			_ = json.Unmarshal(rec.Body.Bytes(), &m)
-		}
-		return rec.Code, m
+		return doJSON[memberResponse](t, mux, method, path, body)
 	}
 
 	getTurn := func(t *testing.T) []turnResponse {
 		t.Helper()
-		rec := httptest.NewRecorder()
-		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/groups/"+seededGroup+"/turn", nil))
-		if rec.Code != http.StatusOK {
-			t.Fatalf("turn status = %d, want 200", rec.Code)
-		}
-		var got []turnResponse
-		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
-			t.Fatalf("decode turn: %v", err)
+		code, got := doJSON[[]turnResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/turn", "")
+		if code != http.StatusOK {
+			t.Fatalf("turn status = %d, want 200", code)
 		}
 		return got
 	}
@@ -93,21 +73,14 @@ func TestMembershipChurnIntegration(t *testing.T) {
 		t.Helper()
 		// Step 1: create (or resume) a night for this date with the picker as attendee.
 		createBody := `{"scheduledFor":"` + date + `","attendees":["` + picker + `"]}`
-		createRec := httptest.NewRecorder()
-		mux.ServeHTTP(createRec, httptest.NewRequest(http.MethodPost, "/groups/"+seededGroup+"/nights", bytes.NewBufferString(createBody)))
-		if createRec.Code != http.StatusCreated && createRec.Code != http.StatusOK {
-			t.Fatalf("create night for %s: status = %d, want 201/200", picker, createRec.Code)
-		}
-		var night nightResponse
-		if err := json.Unmarshal(createRec.Body.Bytes(), &night); err != nil {
-			t.Fatalf("decode night: %v", err)
+		code, night := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", createBody)
+		if code != http.StatusCreated && code != http.StatusOK {
+			t.Fatalf("create night for %s: status = %d, want 201/200", picker, code)
 		}
 		// Step 2: record the pick — closes the night.
 		pickBody := `{"pickerId":"` + picker + `"}`
-		pickRec := httptest.NewRecorder()
-		mux.ServeHTTP(pickRec, httptest.NewRequest(http.MethodPost, "/groups/"+seededGroup+"/nights/"+night.ID+"/pick", bytes.NewBufferString(pickBody)))
-		if pickRec.Code != http.StatusOK {
-			t.Fatalf("record pick for %s: status = %d, want 200", picker, pickRec.Code)
+		if code, _ := doReq(t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights/"+night.ID+"/pick", pickBody); code != http.StatusOK {
+			t.Fatalf("record pick for %s: status = %d, want 200", picker, code)
 		}
 	}
 

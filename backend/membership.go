@@ -77,15 +77,36 @@ func memberDate(ts pgtype.Timestamptz) string {
 	return ts.Time.Format("2006-01-02")
 }
 
-// encodeMember writes a member DTO as JSON with the given status code.
-func encodeMember(w http.ResponseWriter, gid, userID uuid.UUID, name, role, status, joinedOn string, code int) {
-	respondJSON(w, code, memberResponse{
-		ID:       userID.String(),
-		Name:     name,
-		Role:     role,
-		Status:   status,
-		JoinedOn: joinedOn,
-	}, gid, "encode member response")
+// encodeMember writes a member DTO as JSON with the given status code. Callers
+// pass a built memberResponse (see currentMember/updatedMember) so the fields
+// are named at the call site rather than positional.
+func encodeMember(w http.ResponseWriter, gid uuid.UUID, resp memberResponse, code int) {
+	respondJSON(w, code, resp, gid, "encode member response")
+}
+
+// currentMember renders an unchanged membership row as the response DTO — used
+// by the idempotent no-op branches that echo the current state back.
+func currentMember(m db.GetGroupMemberRow) memberResponse {
+	return memberResponse{
+		ID:       m.UserID.String(),
+		Name:     m.Name,
+		Role:     string(m.Role),
+		Status:   string(m.Status),
+		JoinedOn: memberDate(m.JoinedAt),
+	}
+}
+
+// updatedMember renders a membership after a transition. The name comes from the
+// pre-read row m because the transition queries (Deactivate/Reactivate/Promote)
+// return the memberships row, which carries no user name.
+func updatedMember(updated db.Membership, m db.GetGroupMemberRow) memberResponse {
+	return memberResponse{
+		ID:       updated.UserID.String(),
+		Name:     m.Name,
+		Role:     string(updated.Role),
+		Status:   string(updated.Status),
+		JoinedOn: memberDate(updated.JoinedAt),
+	}
 }
 
 // joinMemberHandler serves POST /groups/{groupId}/members: a new person joins
@@ -163,7 +184,13 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 			return
 		}
 
-		encodeMember(w, gid, user.ID, user.Name, string(membership.Role), string(membership.Status), memberDate(membership.JoinedAt), http.StatusCreated)
+		encodeMember(w, gid, memberResponse{
+			ID:       user.ID.String(),
+			Name:     user.Name,
+			Role:     string(membership.Role),
+			Status:   string(membership.Status),
+			JoinedOn: memberDate(membership.JoinedAt),
+		}, http.StatusCreated)
 	}
 }
 
@@ -200,7 +227,7 @@ func deactivateMemberHandler(store memberStore) http.HandlerFunc {
 		}
 		// Idempotent: already inactive → no-op.
 		if m.Status == db.MembershipStatusInactive {
-			encodeMember(w, gid, m.UserID, m.Name, string(m.Role), string(m.Status), memberDate(m.JoinedAt), http.StatusOK)
+			encodeMember(w, gid, currentMember(m), http.StatusOK)
 			return
 		}
 		updated, err := store.DeactivateMembership(r.Context(), db.DeactivateMembershipParams{GroupID: gid, UserID: uid})
@@ -208,7 +235,7 @@ func deactivateMemberHandler(store memberStore) http.HandlerFunc {
 			internalError(w, gid, "deactivate membership", err)
 			return
 		}
-		encodeMember(w, gid, updated.UserID, m.Name, string(updated.Role), string(updated.Status), memberDate(updated.JoinedAt), http.StatusOK)
+		encodeMember(w, gid, updatedMember(updated, m), http.StatusOK)
 	}
 }
 
@@ -230,7 +257,7 @@ func reactivateMemberHandler(store memberStore) http.HandlerFunc {
 		}
 		// Idempotent: already active → no-op.
 		if m.Status == db.MembershipStatusActive {
-			encodeMember(w, gid, m.UserID, m.Name, string(m.Role), string(m.Status), memberDate(m.JoinedAt), http.StatusOK)
+			encodeMember(w, gid, currentMember(m), http.StatusOK)
 			return
 		}
 		// Seed only when this crosses into the rotation (active core). A
@@ -254,7 +281,7 @@ func reactivateMemberHandler(store memberStore) http.HandlerFunc {
 			internalError(w, gid, "reactivate membership", err)
 			return
 		}
-		encodeMember(w, gid, updated.UserID, m.Name, string(updated.Role), string(updated.Status), memberDate(updated.JoinedAt), http.StatusOK)
+		encodeMember(w, gid, updatedMember(updated, m), http.StatusOK)
 	}
 }
 
@@ -276,7 +303,7 @@ func promoteMemberHandler(store memberStore) http.HandlerFunc {
 		}
 		// Idempotent: already active core → no-op.
 		if m.Role == db.MembershipRoleCore && m.Status == db.MembershipStatusActive {
-			encodeMember(w, gid, m.UserID, m.Name, string(m.Role), string(m.Status), memberDate(m.JoinedAt), http.StatusOK)
+			encodeMember(w, gid, currentMember(m), http.StatusOK)
 			return
 		}
 		avg, err := store.AverageServedCount(ctx, gid)
@@ -304,6 +331,6 @@ func promoteMemberHandler(store memberStore) http.HandlerFunc {
 			internalError(w, gid, "promote membership", err)
 			return
 		}
-		encodeMember(w, gid, updated.UserID, m.Name, string(updated.Role), string(updated.Status), memberDate(updated.JoinedAt), http.StatusOK)
+		encodeMember(w, gid, updatedMember(updated, m), http.StatusOK)
 	}
 }
