@@ -370,3 +370,89 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 	})
 }
+
+func TestNightsListIntegration(t *testing.T) {
+	pool := startPostgres(t)
+	seedFixtures(t, pool)
+
+	mux := http.NewServeMux()
+	q := db.New(pool)
+	mux.Handle("GET /groups/{groupId}/nights", listNightsHandler(q))
+
+	const (
+		ada     = "a0000000-0000-0000-0000-000000000001"
+		blake   = "a0000000-0000-0000-0000-000000000002"
+		night1  = "b0000000-0000-0000-0000-0000000000a1" // older, has movie + attendees
+		night2  = "b0000000-0000-0000-0000-0000000000a2" // newer, no movie
+		openOne = "b0000000-0000-0000-0000-0000000000a3" // open (picker NULL) — must be excluded
+		movieID = "c0000000-0000-0000-0000-0000000000a1"
+	)
+
+	ctx := context.Background()
+	seed := []struct {
+		sql  string
+		args []any
+	}{
+		{sql: `INSERT INTO movies (id, tmdb_id, title, release_year, poster_path)
+		        VALUES ($1, 27205, 'Inception', 2010, '/inc.jpg')`, args: []any{movieID}},
+		{sql: `INSERT INTO picks (id, group_id, picker_id, is_credited, scheduled_for, movie_id)
+		        VALUES ($1, $2, $3, true, '2026-05-01', $4)`, args: []any{night1, seededGroup, ada, movieID}},
+		{sql: `INSERT INTO picks (id, group_id, picker_id, is_credited, scheduled_for)
+		        VALUES ($1, $2, $3, true, '2026-06-01')`, args: []any{night2, seededGroup, blake}},
+		{sql: `INSERT INTO picks (id, group_id, scheduled_for)
+		        VALUES ($1, $2, '2026-07-01')`, args: []any{openOne, seededGroup}},
+		{sql: `INSERT INTO attendances (pick_id, user_id) VALUES ($1, $2), ($1, $3)`, args: []any{night1, ada, blake}},
+	}
+	for _, s := range seed {
+		if _, err := pool.Exec(ctx, s.sql, s.args...); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	do := func(t *testing.T, path string) (int, []byte) {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		return rec.Code, rec.Body.Bytes()
+	}
+
+	t.Run("lists recorded nights newest-first, excludes the open night", func(t *testing.T) {
+		code, b := do(t, "/groups/"+seededGroup+"/nights")
+		if code != http.StatusOK {
+			t.Fatalf("want 200, got %d: %s", code, b)
+		}
+		var got []nightResponse
+		if err := json.Unmarshal(b, &got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(got) != 2 {
+			t.Fatalf("want 2 recorded nights, got %d: %s", len(got), b)
+		}
+		if got[0].ID != night2 || got[1].ID != night1 {
+			t.Fatalf("order wrong: %s then %s", got[0].ID, got[1].ID)
+		}
+		if got[0].Movie != nil {
+			t.Fatalf("night2 should have no movie, got %+v", got[0].Movie)
+		}
+		if got[1].Movie == nil || got[1].Movie.Title != "Inception" {
+			t.Fatalf("night1 movie wrong: %+v", got[1].Movie)
+		}
+		if len(got[1].Attendees) != 2 {
+			t.Fatalf("night1 want 2 attendees, got %d", len(got[1].Attendees))
+		}
+	})
+
+	t.Run("empty group returns []", func(t *testing.T) {
+		code, b := do(t, "/groups/"+emptyGroup+"/nights")
+		if code != http.StatusOK {
+			t.Fatalf("want 200, got %d: %s", code, b)
+		}
+		var got []nightResponse
+		if err := json.Unmarshal(b, &got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if len(got) != 0 {
+			t.Fatalf("want empty list, got %d", len(got))
+		}
+	})
+}
