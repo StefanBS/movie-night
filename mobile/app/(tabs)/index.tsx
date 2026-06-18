@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { Settings } from "lucide-react-native";
@@ -114,23 +114,30 @@ export default function TonightScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        setOrder(await fetchTurn(API_URL, GROUP_ID, controller.signal));
-      } catch (e) {
-        if (!controller.signal.aborted) {
-          setError(errorMessage(e, "failed to load tonight"));
+  // Refetch the turn on focus (not just mount): a pick recorded or roster change
+  // made on another tab must show up when the user returns — the tab screen
+  // stays mounted. `loading` only gates the first load, so later focuses refresh
+  // in the background without flashing the spinner.
+  useFocusEffect(
+    useCallback(() => {
+      const controller = new AbortController();
+      (async () => {
+        try {
+          setOrder(await fetchTurn(API_URL, GROUP_ID, controller.signal));
+          setError(null);
+        } catch (e) {
+          if (!controller.signal.aborted) {
+            setError(errorMessage(e, "failed to load tonight"));
+          }
+        } finally {
+          if (!controller.signal.aborted) {
+            setLoading(false);
+          }
         }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, []);
+      })();
+      return () => controller.abort();
+    }, []),
+  );
 
   // The group name is secondary header chrome, fetched independently of the
   // turn. Refetch on focus (not just mount) so a rename on the Settings tab
