@@ -59,3 +59,35 @@ export function daysUntil(iso: string, today: string = todayLocalISO()): number 
   const ms = parseLocalDate(iso).getTime() - parseLocalDate(today).getTime();
   return Math.round(ms / 86_400_000);
 }
+
+// formatWeekdayDate renders a YYYY-MM-DD string as a full "Friday, Jun 19"
+// label, composing the long weekday with the existing short-date formatter.
+export function formatWeekdayDate(iso: string): string {
+  return `${weekday(iso, true)}, ${formatShortDate(iso)}`;
+}
+
+// relativeLabel describes a date relative to today in movie-night terms:
+// "Tonight" / "Tomorrow" / "This Friday" (2-6 days out) / "Next Friday"
+// (7-13 days out) / the full weekday date for anything further out or in the
+// past. `today` defaults to the device's local date.
+export function relativeLabel(iso: string, today: string = todayLocalISO()): string {
+  const n = daysUntil(iso, today);
+  if (n === 0) return "Tonight";
+  if (n === 1) return "Tomorrow";
+  if (n > 1 && n < 7) return `This ${weekday(iso, true)}`;
+  if (n >= 7 && n < 14) return `Next ${weekday(iso, true)}`;
+  return formatWeekdayDate(iso);
+}
+
+// countdownLabel renders a short lowercase countdown: "tonight" / "tomorrow" /
+// "yesterday" / "in N days" / "N days ago". The ±1 cases are named, so the
+// day-count branches only ever render N >= 2 and are always plural. `today`
+// defaults to the device's local date.
+export function countdownLabel(iso: string, today: string = todayLocalISO()): string {
+  const n = daysUntil(iso, today);
+  if (n === 0) return "tonight";
+  if (n === 1) return "tomorrow";
+  if (n === -1) return "yesterday";
+  if (n > 0) return `in ${n} days`;
+  return `${-n} days ago`;
+}
