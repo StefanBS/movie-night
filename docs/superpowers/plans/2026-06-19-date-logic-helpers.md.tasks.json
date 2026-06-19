@@ -1,0 +1,19 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-19-date-logic-helpers.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 1: Date primitives — weekday + daysUntil",
+      "status": "completed",
+      "description": "**Goal:** Add the private `parseLocalDate` helper, weekday name arrays, and the two primitive functions `weekday` and `daysUntil`, with table-driven tests.\n\n**Files:**\n- Modify: `mobile/lib/date.ts` (append after `formatMonthYear`)\n- Test: `mobile/lib/date.test.ts` (append; add `daysUntil`, `weekday` to the import)\n\n**Acceptance Criteria:**\n- weekday(iso) returns short name; weekday(iso, true) returns long name.\n- daysUntil(iso, today) returns whole calendar days across month/year boundaries.\n- daysUntil(iso) defaults today to todayLocalISO().\n- date.test.ts passes.\n\n**Verify:** cd mobile && node --import tsx --test lib/date.test.ts\n\n```json:metadata\n{\"files\": [\"mobile/lib/date.ts\", \"mobile/lib/date.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/date.test.ts\", \"acceptanceCriteria\": [\"weekday returns short/long names\", \"daysUntil returns whole calendar days across month/year boundaries\", \"daysUntil defaults today to todayLocalISO()\", \"date.test.ts passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 1,
+      "subject": "Task 2: Label helpers — formatWeekdayDate + relativeLabel + countdownLabel",
+      "status": "completed",
+      "blockedBy": [0],
+      "description": "**Goal:** Add the three label functions that compose the primitives, with table-driven tests covering every branch and boundary.\n\n**Files:**\n- Modify: `mobile/lib/date.ts` (append after `daysUntil`)\n- Test: `mobile/lib/date.test.ts` (append; add the three names to the import)\n\n**Acceptance Criteria:**\n- formatWeekdayDate('2026-06-19') -> 'Friday, Jun 19'.\n- relativeLabel: Tonight(0)/Tomorrow(1)/This <Weekday>(2-6)/Next <Weekday>(7-13)/full(>=14 or past).\n- countdownLabel: tonight(0)/tomorrow(1)/yesterday(-1)/in N days(>1)/N days ago(<-1).\n- date.test.ts passes.\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/lib/date.ts\", \"mobile/lib/date.test.ts\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"formatWeekdayDate renders 'Friday, Jun 19'\", \"relativeLabel covers Tonight/Tomorrow/This/Next/full with boundaries\", \"countdownLabel covers tonight/tomorrow/yesterday/in N days/N days ago\", \"date.test.ts passes\"], \"modelTier\": \"standard\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-19T13:30:00Z"
+}
