@@ -14,9 +14,9 @@ import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 
 import { TopBar } from "../../components";
-import { WhenStep, WhoStep, PickStep, RecordedStep } from "../../components/night";
+import { WhenStep, WhoStep, PickStep, RecordedStep, ScheduledStep } from "../../components/night";
 import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
-import { todayLocalISO } from "../../lib/date";
+import { daysUntil, todayLocalISO } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { fetchMembers, type Member } from "../../lib/members";
 import {
@@ -179,10 +179,11 @@ export default function NightScreen() {
     [night, attendeeIds, runNightWrite],
   );
 
-  // onAdvanceToPick records the auto-picker (the next-up present core member)
-  // then moves to the pick step. Recording is what credits the turn, so it must
-  // happen — a movie alone does not advance fairness standings.
-  const onAdvanceToPick = useCallback(async () => {
+  // onAdvance records the auto-picker (the next-up present core member) then
+  // branches: future nights land on the Scheduled screen; tonight lands on Pick.
+  // Recording is what credits the turn, so it must happen — a movie alone does
+  // not advance fairness standings.
+  const onAdvance = useCallback(async () => {
     const top = order[0] ?? null;
     if (night === null || top === null) {
       return;
@@ -193,9 +194,9 @@ export default function NightScreen() {
       "failed to record pick",
     );
     if (recorded !== null) {
-      setStep("pick");
+      setStep(daysUntil(recorded.scheduledFor, today) > 0 ? "scheduled" : "pick");
     }
-  }, [night, order, runNightWrite]);
+  }, [night, order, runNightWrite, today]);
 
   // onRecordPicker corrects the night's picker to another present attendee.
   const onRecordPicker = useCallback(
@@ -288,7 +289,7 @@ export default function NightScreen() {
       <TopBar
         kind="title"
         title={title}
-        back={step === "recorded" ? undefined : back}
+        back={step === "recorded" || step === "scheduled" ? undefined : back}
       />
       {actionError !== null ? (
         <Text style={[styles.banner, styles.error]}>{actionError}</Text>
@@ -303,8 +304,9 @@ export default function NightScreen() {
           order={order}
           attendeeIds={attendeeIds}
           busy={busy}
+          future={daysUntil(night.scheduledFor, today) > 0}
           onToggle={onToggle}
-          onNext={onAdvanceToPick}
+          onNext={onAdvance}
         />
       ) : step === "pick" ? (
         <PickStep
@@ -322,6 +324,8 @@ export default function NightScreen() {
           onAttach={onAttach}
           onRecordPicker={onRecordPicker}
         />
+      ) : step === "scheduled" ? (
+        <ScheduledStep night={night} members={members} onDone={() => router.back()} />
       ) : (
         <RecordedStep
           night={night}

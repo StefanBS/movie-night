@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppButton, Avatar, Badge, SectionLabel } from "../";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
-import { formatShortDate } from "../../lib/date";
+import { formatWeekdayDate, relativeLabel } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import type { Night } from "../../lib/nights";
 import type { TurnMember } from "../../lib/turn";
@@ -22,6 +22,7 @@ export function WhoStep({
   order,
   attendeeIds,
   busy,
+  future,
   onToggle,
   onNext,
 }: {
@@ -30,6 +31,7 @@ export function WhoStep({
   order: TurnMember[];
   attendeeIds: Set<string>;
   busy: string | null;
+  future: boolean;
   onToggle: (m: Member) => void;
   onNext: () => void;
 }) {
@@ -38,12 +40,17 @@ export function WhoStep({
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content}>
         <Stepper current={1} />
-        <Text style={styles.heading}>{`Night of ${formatShortDate(night.scheduledFor)}`}</Text>
+        <View style={styles.headingRow}>
+          <Text style={styles.heading} numberOfLines={1}>
+            {formatWeekdayDate(night.scheduledFor)}
+          </Text>
+          <Badge label={relativeLabel(night.scheduledFor)} uppercase={false} />
+        </View>
         <Text style={styles.hint}>
-          {"Tap who made it. Tonight's pick goes to whoever's next up and here."}
+          {future ? "Who's planning to come? The next-up member who's in gets the pick." : "Tap who made it. Tonight's pick goes to whoever's next up and here."}
         </Text>
 
-        <SectionLabel>{"Who's here?"}</SectionLabel>
+        <SectionLabel>{future ? "Who's coming?" : "Who's here?"}</SectionLabel>
         {members.map((m) => {
           const here = attendeeIds.has(m.id);
           const isPicker = picker?.id === m.id;
@@ -79,7 +86,11 @@ export function WhoStep({
       </ScrollView>
       <WizardFooter>
         <AppButton
-          title={picker ? `Next — ${firstNameOf(picker.name)} picks  →` : "Add who's here  →"}
+          title={
+            picker
+              ? `${future ? "Schedule" : "Next"} — ${firstNameOf(picker.name)} picks  →`
+              : "Add who's here  →"
+          }
           fullWidth
           disabled={busy !== null || picker === null}
           onPress={onNext}
@@ -96,11 +107,14 @@ const styles = StyleSheet.create({
     paddingTop: space[3],
     paddingBottom: space[6],
   },
-  heading: {
-    ...textPresets.screenTitle,
-    color: colors.text.primary,
+  headingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space[3],
     marginTop: space[4],
   },
+  heading: { ...textPresets.screenTitle, color: colors.text.primary, flexShrink: 1 },
   hint: { ...textPresets.meta, color: colors.text.secondary },
   attendRow: {
     flexDirection: "row",
