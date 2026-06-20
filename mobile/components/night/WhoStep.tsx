@@ -37,7 +37,7 @@ export function WhoStep({
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Stepper current={0} />
+        <Stepper current={1} />
         <Text style={styles.heading}>{`Night of ${formatShortDate(night.scheduledFor)}`}</Text>
         <Text style={styles.hint}>
           {"Tap who made it. Tonight's pick goes to whoever's next up and here."}

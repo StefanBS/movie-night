@@ -47,7 +47,7 @@ export function PickStep({
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Stepper current={1} />
+        <Stepper current={2} />
 
         <View style={styles.pickerCard}>
           <Avatar name={pickerName} size={44} glow />

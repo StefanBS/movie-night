@@ -13,8 +13,8 @@ import {
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 
-import { AppButton, TopBar } from "../../components";
-import { WhoStep, PickStep, RecordedStep } from "../../components/night";
+import { TopBar } from "../../components";
+import { WhenStep, WhoStep, PickStep, RecordedStep } from "../../components/night";
 import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
 import { todayLocalISO } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
@@ -25,11 +25,13 @@ import {
   createNight,
   getCurrentNight,
   getNightTurn,
+  listNights,
   recordNightPick,
   removeAttendee,
   type Night,
 } from "../../lib/nights";
 import { searchMovies, type Movie } from "../../lib/movies";
+import { nightDates } from "../../lib/calendar";
 import { type TurnMember } from "../../lib/turn";
 import { deriveInitialStep, isResumable, type Step } from "../../lib/nightFlow";
 import {
@@ -54,7 +56,9 @@ export default function NightScreen() {
   // The id with an action in flight: a member id (attendance / pick), "create"
   // while creating, or the movie's tmdbId (as a string) while attaching.
   const [busy, setBusy] = useState<string | null>(null);
-  const [step, setStep] = useState<Step>("who");
+  const [nightDatesSet, setNightDatesSet] = useState<Set<string>>(new Set());
+  const today = todayLocalISO();
+  const [step, setStep] = useState<Step>("when");
   const [movieQuery, setMovieQuery] = useState("");
   const [results, setResults] = useState<Movie[]>([]);
   const [searching, setSearching] = useState(false);
@@ -67,11 +71,13 @@ export default function NightScreen() {
     const controller = new AbortController();
     (async () => {
       try {
-        const [roster, current] = await Promise.all([
+        const [roster, current, allNights] = await Promise.all([
           fetchMembers(API_URL, GROUP_ID, controller.signal),
           getCurrentNight(API_URL, GROUP_ID, controller.signal),
+          listNights(API_URL, GROUP_ID, controller.signal).catch(() => [] as Night[]),
         ]);
         setMembers(roster);
+        setNightDatesSet(nightDates(allNights));
         // Resume only an in-progress night. A night with a movie attached is
         // done, so we leave night === null and show "Start tonight's night",
         // which creates a fresh one — rather than re-opening a finished night.
@@ -141,17 +147,20 @@ export default function NightScreen() {
     [busy, refreshOrder],
   );
 
-  const onCreate = useCallback(async () => {
-    const created = await runNightWrite(
-      "create",
-      () => createNight(API_URL, GROUP_ID, todayLocalISO()),
-      "failed to create night",
-      true,
-    );
-    if (created !== null) {
-      setStep("who");
-    }
-  }, [runNightWrite]);
+  const onCreate = useCallback(
+    async (scheduledFor: string) => {
+      const created = await runNightWrite(
+        "create",
+        () => createNight(API_URL, GROUP_ID, scheduledFor),
+        "failed to create night",
+        true,
+      );
+      if (created !== null) {
+        setStep("who");
+      }
+    },
+    [runNightWrite],
+  );
 
   const onToggle = useCallback(
     (member: Member) => {
@@ -286,14 +295,7 @@ export default function NightScreen() {
       ) : null}
 
       {night === null ? (
-        <View style={styles.start}>
-          <Text style={styles.hint}>{"Start tonight's night to record who's here."}</Text>
-          <AppButton
-            title="Start tonight's night"
-            onPress={onCreate}
-            disabled={busy !== null}
-          />
-        </View>
+        <WhenStep today={today} nightDates={nightDatesSet} busy={busy} onNext={onCreate} />
       ) : step === "who" ? (
         <WhoStep
           night={night}
@@ -337,6 +339,4 @@ const styles = StyleSheet.create({
   center: { marginTop: space[8], textAlign: "center" },
   error: { ...textPresets.body, color: colors.text.danger },
   banner: { paddingVertical: space[2], paddingHorizontal: space[5], textAlign: "center" },
-  start: { marginTop: space[8], gap: space[3], alignItems: "center", paddingHorizontal: space[5] },
-  hint: { ...textPresets.meta, color: colors.text.secondary },
 });

@@ -3,11 +3,11 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { colors, fontFamily, radius, space, textPresets } from "../../theme";
 
-const STEP_LABELS = ["Here", "Pick", "Done"] as const;
+const STEP_LABELS = ["When", "Here", "Pick", "Done"] as const;
 
-// Stepper is the wizard's three-dot progress rail (Here · Pick · Done). Dots
-// before the current step show a check; the current dot is ember; the rest are
-// muted. Tonight-only — "When" is prepended in Phase 3.
+// Stepper is the wizard's four-dot progress rail (When · Here · Pick · Done).
+// Dots before the current step show a check; the current dot is ember; the rest
+// are muted.
 export function Stepper({ current }: { current: number }) {
   return (
     <View style={styles.stepper}>
