@@ -27,6 +27,7 @@ const cases: [string, Night, Step][] = [
   ["tonight + no picker → who", night({}), "who"],
   ["past + picker (no movie) → who", night({ scheduledFor: "2026-06-10", pickerId: "p1" }), "who"],
   ["movie present even with no picker → recorded", night({ movie, pickerId: null }), "recorded"],
+  ["movie present beats a future picker → recorded", night({ scheduledFor: "2026-06-27", pickerId: "p1", movie }), "recorded"],
 ];
 
 for (const [name, n, expected] of cases) {
@@ -38,4 +39,5 @@ for (const [name, n, expected] of cases) {
 test("isResumable: unchanged — open until a movie attaches", () => {
   assert.equal(isResumable(night({})), true);
   assert.equal(isResumable(night({ movie })), false);
+  assert.equal(isResumable(night({ scheduledFor: "2026-06-27", pickerId: "p1" })), true);
 });
