@@ -77,10 +77,15 @@ export default function NightScreen() {
           listNights(API_URL, GROUP_ID, controller.signal).catch(() => [] as Night[]),
         ]);
         setMembers(roster);
+        // Calendar dots come from listNights, which the backend filters to
+        // picker-set nights — so a date dots once its night has a picker (every
+        // recorded night, and a scheduled night past the Who step). A freshly
+        // created, picker-less night is the one gap; surfacing it would need a
+        // backend change, out of scope here.
         setNightDatesSet(nightDates(allNights));
         // Resume only an in-progress night. A night with a movie attached is
-        // done, so we leave night === null and show "Start tonight's night",
-        // which creates a fresh one — rather than re-opening a finished night.
+        // done, so we leave night === null and show the When step, which creates
+        // a fresh night — rather than re-opening a finished one.
         if (current !== null && isResumable(current)) {
           setNight(current);
           setStep(deriveInitialStep(current));
