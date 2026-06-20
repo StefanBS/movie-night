@@ -13,3 +13,4 @@ export { Banner } from "./Banner";
 export { IconButton } from "./IconButton";
 export { TopBar } from "./TopBar";
 export { TabScrollView } from "./TabScrollView";
+export { Calendar } from "./Calendar";
