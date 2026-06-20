@@ -4,6 +4,8 @@ import type { Night } from "./nights";
 // A calendar cell: a day, or null for the blank leading slots before the 1st.
 export type DayCell = { iso: string; day: number } | null;
 
+const pad = (n: number) => String(n).padStart(2, "0");
+
 // monthGrid lays out one month (month: 1–12) as left-to-right, top-to-bottom
 // cells: `firstWeekday` leading blanks (Sun=0) then one cell per day, each
 // carrying its YYYY-MM-DD. Numeric Date args construct local midnight (like
@@ -11,7 +13,6 @@ export type DayCell = { iso: string; day: number } | null;
 export function monthGrid(year: number, month: number): DayCell[] {
   const firstWeekday = new Date(year, month - 1, 1).getDay(); // 0=Sun … 6=Sat
   const daysInMonth = new Date(year, month, 0).getDate(); // day 0 of next month
-  const pad = (n: number) => String(n).padStart(2, "0");
   const cells: DayCell[] = [];
   for (let i = 0; i < firstWeekday; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) {

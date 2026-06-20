@@ -76,7 +76,19 @@ const today = "2026-06-20";
 const dates = new Set(["2026-06-26"]);
 test("dayState: selected", () => {
   const s = dayState("2026-06-22", { selected: "2026-06-22", today, nightDates: dates });
-  assert.equal(s.selected, true);
+  assert.deepEqual(s, { selected: true, today: false, hasNight: false, past: false });
+});
+test("dayState: selected === today — today flag is NOT suppressed by selection", () => {
+  const s = dayState("2026-06-20", { selected: "2026-06-20", today, nightDates: dates });
+  assert.deepEqual(s, { selected: true, today: true, hasNight: false, past: false });
+});
+test("dayState: past night date has both hasNight and past", () => {
+  const s = dayState("2026-06-10", {
+    selected: "",
+    today,
+    nightDates: new Set(["2026-06-10"]),
+  });
+  assert.deepEqual(s, { selected: false, today: false, hasNight: true, past: true });
 });
 test("dayState: today (unselected) is today and not past", () => {
   const s = dayState(today, { selected: "2026-06-22", today, nightDates: dates });
