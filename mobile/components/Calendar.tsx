@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react-native";
 
 import { IconButton } from "./IconButton";
 import { dayState, monthGrid, type YearMonth } from "../lib/calendar";
+import { formatWeekdayDate } from "../lib/date";
 import {
   borderWidth,
   colors,
@@ -62,7 +63,7 @@ export function Calendar({
 
       <View style={styles.weekdays}>
         {WEEKDAY_INITIALS.map((w, i) => (
-          <Text key={i} style={styles.weekday} allowFontScaling={false}>
+          <Text key={`${w}-${i}`} style={styles.weekday} allowFontScaling={false}>
             {w}
           </Text>
         ))}
@@ -79,7 +80,8 @@ export function Calendar({
               key={cell.iso}
               onPress={() => onPick(cell.iso)}
               accessibilityRole="button"
-              accessibilityLabel={cell.iso}
+              accessibilityLabel={formatWeekdayDate(cell.iso)}
+              accessibilityState={{ selected: state.selected }}
               style={({ pressed }) => [styles.cell, pressed && styles.pressed]}
             >
               <View
