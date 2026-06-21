@@ -1,18 +1,21 @@
+import { daysUntil, todayLocalISO } from "./date";
 import type { Night } from "./nights";
 
-// The night wizard's three steps, tonight-only. The prototype's "When" step is
-// Phase 3 (scheduling) and is intentionally absent here.
-export type Step = "who" | "pick" | "recorded";
+// The night wizard's steps. "when" is the entry (date picker); "scheduled" is the
+// terminal for a future night (picker locked, film chosen on the night).
+export type Step = "when" | "who" | "pick" | "recorded" | "scheduled";
 
-// deriveInitialStep maps a resumed night to the step the wizard should open on.
-// An attached movie means the night is recorded, so we open there. Otherwise we
-// always resume at attendance ("who") — even when a picker was already recorded:
-// "pick" is a forward-only transition, not a resume target, so resuming there
-// would skip step 1. Attendance persists and the picker is re-derived from the
-// turn order (re-recorded idempotently on advancing), so re-entering at "who" is
-// non-destructive. The same in-progress night is resumed (no duplicate night).
-export function deriveInitialStep(night: Night): Step {
+// deriveInitialStep maps a resumed night to the step the wizard should open on. A
+// future night whose picker is locked (movie still null) resumes on the Scheduled
+// confirmation; everything else keeps today's behaviour — recorded when a movie is
+// attached, otherwise the non-destructive "who" (the picker is re-derived on
+// advancing; "pick" stays a forward-only transition, never a resume target).
+// `today` is injectable for deterministic tests (mirrors lib/date.ts).
+export function deriveInitialStep(night: Night, today: string = todayLocalISO()): Step {
   if (night.movie !== null) return "recorded";
+  if (night.pickerId !== null && daysUntil(night.scheduledFor, today) > 0) {
+    return "scheduled";
+  }
   return "who";
 }
 

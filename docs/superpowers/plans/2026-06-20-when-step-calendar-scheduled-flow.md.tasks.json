@@ -1,0 +1,45 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-20-when-step-calendar-scheduled-flow.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: lib/calendar.ts — grid & day-state logic",
+      "status": "pending",
+      "description": "**Goal:** The pure functions the Calendar needs — month layout, month navigation, the night-dates selector, and per-day state — fully unit-tested.\n\n**Files:** Create mobile/lib/calendar.ts; Test mobile/lib/calendar.test.ts\n\n**Acceptance Criteria:** monthGrid weekday-offset blanks + zero-padded {iso,day} cells; shiftMonth Dec/Jan rollover; nightDates dedupes to a Set; dayState suppresses hasNight under selection and daysUntil===0 is not past; single-file test passes.\n\n**Verify:** cd mobile && node --import tsx --test lib/calendar.test.ts\n\n```json:metadata\n{\"files\": [\"mobile/lib/calendar.ts\", \"mobile/lib/calendar.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/calendar.test.ts\", \"acceptanceCriteria\": [\"monthGrid returns weekday-offset blanks then zero-padded {iso,day} cells\", \"shiftMonth rolls across Dec/Jan year boundary\", \"nightDates dedupes scheduledFor into a Set\", \"dayState suppresses hasNight under selection and treats daysUntil===0 as not past\", \"single-file test passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: lib/nightFlow.ts — scheduled resume branch",
+      "status": "pending",
+      "description": "**Goal:** Add the when/scheduled step values and resume a future, picker-locked night onto the Scheduled screen, leaving today's behaviour otherwise intact.\n\n**Files:** Modify mobile/lib/nightFlow.ts; Test mobile/lib/nightFlow.test.ts\n\n**Acceptance Criteria:** Step includes when and scheduled; deriveInitialStep returns scheduled only for future+picker else recorded/who; today injectable defaulting to todayLocalISO(); single-file test passes.\n\n**Verify:** cd mobile && node --import tsx --test lib/nightFlow.test.ts\n\n```json:metadata\n{\"files\": [\"mobile/lib/nightFlow.ts\", \"mobile/lib/nightFlow.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/nightFlow.test.ts\", \"acceptanceCriteria\": [\"Step includes when and scheduled\", \"deriveInitialStep returns scheduled only for future+picker, else recorded/who\", \"today is injectable, defaults to todayLocalISO()\", \"single-file test passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: components/Calendar.tsx — month picker",
+      "status": "pending",
+      "blockedBy": [1],
+      "description": "**Goal:** A presentational month calendar that renders monthGrid/dayState output with Spotlight styling and reports taps; no data, no business logic.\n\n**Files:** Create mobile/components/Calendar.tsx; Modify mobile/components/index.ts (export Calendar)\n\n**Acceptance Criteria:** Props value/today/month/nightDates/onPick/onMonth; serif header + IconButton chevrons + mono weekday row + 7-col grid; day visuals match dayState; past days tappable; theme tokens only.\n\n**Verify:** cd mobile && just typecheck && just lint\n\n```json:metadata\n{\"files\": [\"mobile/components/Calendar.tsx\", \"mobile/components/index.ts\"], \"verifyCommand\": \"cd mobile && just typecheck && just lint\", \"acceptanceCriteria\": [\"Props value/today/month/nightDates/onPick/onMonth; serif header + chevrons + weekday row + 7-col grid\", \"day visuals match dayState (selected/today/past/hasNight)\", \"past days tappable; onPick/onMonth fire\", \"theme tokens only\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Extract wizard steps to components/night/",
+      "status": "pending",
+      "description": "**Goal:** Move the three existing step views plus shared Stepper/WizardFooter out of app/night/new.tsx into components/night/, behaviour unchanged (still tonight-only), so the container is lean before the new steps land.\n\n**Files:** Create mobile/components/night/{Stepper,WizardFooter,WhoStep,PickStep,RecordedStep,index}.ts(x); Modify mobile/app/night/new.tsx\n\n**Acceptance Criteria:** five steps/chrome live in components/night/ each with own StyleSheet; new.tsx imports the 3 steps from ../../components/night and defines none of them; tonight flow unchanged; just check passes. MOVE verbatim — only in-body edit is barrel import ../../components → ../.\n\n**Verify:** cd mobile && just check\n\n```json:metadata\n{\"files\": [\"mobile/components/night/Stepper.tsx\", \"mobile/components/night/WizardFooter.tsx\", \"mobile/components/night/WhoStep.tsx\", \"mobile/components/night/PickStep.tsx\", \"mobile/components/night/RecordedStep.tsx\", \"mobile/components/night/index.ts\", \"mobile/app/night/new.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"five steps/chrome live in components/night/ each with own StyleSheet\", \"new.tsx imports steps from ../../components/night and defines none of them\", \"tonight flow unchanged; just check passes\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: When step + Calendar entry-point wiring",
+      "status": "pending",
+      "blockedBy": [3, 4],
+      "description": "**Goal:** Replace the Start-tonight intro with the When step (Tonight chip + Calendar + footer); fetch night dates for dots; create the night for the chosen date and enter the flow. Tonight path works end-to-end.\n\n**Files:** Create mobile/components/night/WhenStep.tsx; Modify Stepper.tsx (4 labels), WhoStep/PickStep (bump current), components/night/index.ts, mobile/app/night/new.tsx\n\n**Acceptance Criteria:** When renders Tonight chip + Calendar + footer (PLANNING/TONIGHT + relativeLabel + Next); dots from listNights, failure degrades to no dots; Next creates the night and advances to Who; Tonight still reaches Recorded; Stepper shows 4 steps, When is 0.\n\n**Verify:** cd mobile && just check (then just start manual smoke)\n\n```json:metadata\n{\"files\": [\"mobile/components/night/WhenStep.tsx\", \"mobile/components/night/Stepper.tsx\", \"mobile/components/night/WhoStep.tsx\", \"mobile/components/night/PickStep.tsx\", \"mobile/components/night/index.ts\", \"mobile/app/night/new.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"When step renders Tonight chip + Calendar + footer (PLANNING/TONIGHT + relativeLabel + Next)\", \"dots from listNights; listNights failure degrades to no dots\", \"Next creates night for selected date and advances to Who; Tonight path still reaches Recorded\", \"Stepper shows 4 steps, When is 0\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: Scheduled branch — date-aware Who + Scheduled screen",
+      "status": "pending",
+      "blockedBy": [5, 2],
+      "description": "**Goal:** Branch the flow on the date — a future night reframes attendance to Who's coming?, locks the picker, skips film search, and lands on the Scheduled ✓ screen; tonight unchanged. Resume a scheduled night onto that screen.\n\n**Files:** Create mobile/components/night/ScheduledStep.tsx; Modify WhoStep.tsx (date-aware), components/night/index.ts, mobile/app/night/new.tsx (branch + render + resume)\n\n**Acceptance Criteria:** future: Who reframed to coming + Schedule CTA + relative badge heading, tonight unchanged; future advance records picker then Scheduled (hero/picker/cluster/Done), tonight reaches Recorded; re-open resumes Scheduled via deriveInitialStep; no repeat chip / add-to-calendar / notify.\n\n**Verify:** cd mobile && just check (then just start manual smoke)\n\n```json:metadata\n{\"files\": [\"mobile/components/night/ScheduledStep.tsx\", \"mobile/components/night/WhoStep.tsx\", \"mobile/components/night/index.ts\", \"mobile/app/night/new.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"future: Who reframed to coming + Schedule CTA + relative badge heading; tonight unchanged\", \"future advance records picker then lands on Scheduled (hero/picker/cluster/Done); tonight reaches Recorded\", \"re-open resumes Scheduled via deriveInitialStep\", \"no repeat chip / add-to-calendar / notify\"], \"modelTier\": \"standard\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-20"
+}

@@ -1,6 +1,4 @@
 import {
-  Fragment,
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -8,19 +6,17 @@ import {
 } from "react";
 import {
   ActivityIndicator,
-  Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 
-import { AppButton, Avatar, Badge, Input, Poster, SectionLabel, TopBar } from "../../components";
+import { TopBar } from "../../components";
+import { WhenStep, WhoStep, PickStep, RecordedStep, ScheduledStep } from "../../components/night";
 import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
-import { formatShortDate, todayLocalISO } from "../../lib/date";
+import { daysUntil, todayLocalISO } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { fetchMembers, type Member } from "../../lib/members";
 import {
@@ -29,342 +25,25 @@ import {
   createNight,
   getCurrentNight,
   getNightTurn,
+  listNights,
   recordNightPick,
   removeAttendee,
   type Night,
 } from "../../lib/nights";
 import { searchMovies, type Movie } from "../../lib/movies";
+import { nightDates } from "../../lib/calendar";
 import { type TurnMember } from "../../lib/turn";
 import { deriveInitialStep, isResumable, type Step } from "../../lib/nightFlow";
 import {
-  borderWidth,
   colors,
-  fontFamily,
-  fontSize,
-  pressedOpacity,
-  radius,
-  shadow,
-  space,
   textPresets,
-  trackPx,
+  space,
 } from "../../theme";
 
 const API_URL = resolveApiBaseUrl({
   envUrl: process.env.EXPO_PUBLIC_API_URL,
   hostUri: Constants.expoConfig?.hostUri,
 });
-
-const STEP_LABELS = ["Here", "Pick", "Done"] as const;
-
-function firstNameOf(name: string): string {
-  return name.split(" ")[0];
-}
-
-// Stepper is the wizard's three-dot progress rail (Here · Pick · Done). Dots
-// before the current step show a check; the current dot is ember; the rest are
-// muted. Tonight-only — "When" is prepended in Phase 3.
-function Stepper({ current }: { current: number }) {
-  return (
-    <View style={styles.stepper}>
-      {STEP_LABELS.map((label, i) => {
-        const on = i === current;
-        const done = i < current;
-        return (
-          <Fragment key={label}>
-            {i > 0 ? (
-              <View style={[styles.stepBar, done && styles.stepBarDone]} />
-            ) : null}
-            <View style={styles.stepItem}>
-              <View style={[styles.stepDot, (on || done) && styles.stepDotActive]}>
-                <Text
-                  style={[styles.stepDotText, (on || done) && styles.stepDotTextActive]}
-                  allowFontScaling={false}
-                >
-                  {done ? "✓" : String(i + 1)}
-                </Text>
-              </View>
-              <Text
-                style={[styles.stepLabel, on && styles.stepLabelActive]}
-                allowFontScaling={false}
-              >
-                {label}
-              </Text>
-            </View>
-          </Fragment>
-        );
-      })}
-    </View>
-  );
-}
-
-// WizardFooter pins a step's action(s) to the bottom, clearing the safe-area
-// inset, with a hairline top edge over the page.
-function WizardFooter({ children }: { children: ReactNode }) {
-  const insets = useSafeAreaInsets();
-  return (
-    <View style={[styles.footer, { paddingBottom: insets.bottom + space[4] }]}>
-      {children}
-    </View>
-  );
-}
-
-// WhoStep — attendance toggles for the full roster. The next-up present core
-// member (order[0]) is spotlighted as the picker; the footer records the pick
-// and advances.
-function WhoStep({
-  night,
-  members,
-  order,
-  attendeeIds,
-  busy,
-  onToggle,
-  onNext,
-}: {
-  night: Night;
-  members: Member[];
-  order: TurnMember[];
-  attendeeIds: Set<string>;
-  busy: string | null;
-  onToggle: (m: Member) => void;
-  onNext: () => void;
-}) {
-  const picker = order[0] ?? null;
-  return (
-    <View style={styles.flex}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Stepper current={0} />
-        <Text style={styles.heading}>{`Night of ${formatShortDate(night.scheduledFor)}`}</Text>
-        <Text style={styles.hint}>
-          {"Tap who made it. Tonight's pick goes to whoever's next up and here."}
-        </Text>
-
-        <SectionLabel>{"Who's here?"}</SectionLabel>
-        {members.map((m) => {
-          const here = attendeeIds.has(m.id);
-          const isPicker = picker?.id === m.id;
-          return (
-            <Pressable
-              key={m.id}
-              onPress={() => onToggle(m)}
-              disabled={busy !== null}
-              style={({ pressed }) => [
-                styles.attendRow,
-                isPicker ? styles.pickerRow : styles.attendDivider,
-                !here && styles.dimmed,
-                pressed && styles.rowPressed,
-              ]}
-            >
-              <Avatar name={m.name} size={40} glow={isPicker} />
-              <View style={styles.rowText}>
-                <Text style={styles.name} numberOfLines={1}>
-                  {m.name}
-                </Text>
-                {isPicker ? <Text style={styles.getsPick}>GETS THE PICK</Text> : null}
-              </View>
-              {busy === m.id ? (
-                <Text style={styles.tag}>…</Text>
-              ) : here ? (
-                <Badge label="✓ In" tone="solid" uppercase={false} />
-              ) : (
-                <Text style={styles.outTag}>OUT</Text>
-              )}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-      <WizardFooter>
-        <AppButton
-          title={picker ? `Next — ${firstNameOf(picker.name)} picks  →` : "Add who's here  →"}
-          fullWidth
-          disabled={busy !== null || picker === null}
-          onPress={onNext}
-        />
-      </WizardFooter>
-    </View>
-  );
-}
-
-// PickStep — the picker spotlight (with a correction reveal over present
-// attendees), then film search. Selecting a result attaches the movie and
-// advances; selection is the action, so this step has no footer CTA.
-function PickStep({
-  night,
-  members,
-  busy,
-  changingPicker,
-  setChangingPicker,
-  movieQuery,
-  setMovieQuery,
-  results,
-  searching,
-  searchError,
-  onSearch,
-  onAttach,
-  onRecordPicker,
-}: {
-  night: Night;
-  members: Member[];
-  busy: string | null;
-  changingPicker: boolean;
-  setChangingPicker: (v: boolean) => void;
-  movieQuery: string;
-  setMovieQuery: (v: string) => void;
-  results: Movie[];
-  searching: boolean;
-  searchError: string | null;
-  onSearch: () => void;
-  onAttach: (tmdbId: number) => void;
-  onRecordPicker: (memberId: string) => void;
-}) {
-  const pickerName = members.find((m) => m.id === night.pickerId)?.name ?? "";
-  return (
-    <View style={styles.flex}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Stepper current={1} />
-
-        <View style={styles.pickerCard}>
-          <Avatar name={pickerName} size={44} glow />
-          <View style={styles.rowText}>
-            <Text style={styles.pickingTag}>{"✦ Picking tonight"}</Text>
-            <Text style={styles.pickerName} numberOfLines={1}>
-              {pickerName}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.changeRow}>
-          <AppButton
-            title={
-              changingPicker
-                ? "Keep this picker"
-                : `Not ${firstNameOf(pickerName)}? Choose who picks`
-            }
-            variant="ghost"
-            onPress={() => setChangingPicker(!changingPicker)}
-            disabled={busy !== null}
-          />
-        </View>
-        {changingPicker
-          ? night.attendees.map((a) => (
-              <Pressable
-                key={a.id}
-                onPress={() => onRecordPicker(a.id)}
-                disabled={busy !== null}
-                style={({ pressed }) => [styles.chooseRow, pressed && styles.rowPressed]}
-              >
-                <Avatar name={a.name} size={32} />
-                <Text style={[styles.name, styles.rowText]} numberOfLines={1}>
-                  {a.name}
-                </Text>
-                {busy === a.id ? (
-                  <Text style={styles.tag}>…</Text>
-                ) : night.pickerId === a.id ? (
-                  <Badge label="Picking" />
-                ) : null}
-              </Pressable>
-            ))
-          : null}
-
-        <SectionLabel>{"Find a film"}</SectionLabel>
-        <Input
-          value={movieQuery}
-          onChangeText={setMovieQuery}
-          placeholder="Search a film title…"
-          onSubmitEditing={onSearch}
-          addonLabel="Search"
-          onAddonPress={onSearch}
-        />
-        {searchError !== null ? (
-          <Text style={[styles.hint, styles.error]}>{searchError}</Text>
-        ) : null}
-        {searching ? (
-          <ActivityIndicator style={styles.searchSpinner} color={colors.accent.base} />
-        ) : null}
-
-        {results.map((mv) => (
-          <Pressable
-            key={mv.tmdbId}
-            onPress={() => onAttach(mv.tmdbId)}
-            disabled={busy !== null}
-            style={({ pressed }) => [styles.resultRow, pressed && styles.rowPressed]}
-          >
-            <Poster uri={mv.posterUrl} title={mv.title} w={42} h={63} />
-            <View style={styles.rowText}>
-              <Text style={styles.resultTitle} numberOfLines={2}>
-                {mv.title}
-              </Text>
-              {mv.releaseYear !== null ? (
-                <Text style={styles.resultYear}>{mv.releaseYear}</Text>
-              ) : null}
-            </View>
-            {busy === String(mv.tmdbId) ? <Text style={styles.tag}>…</Text> : null}
-          </Pressable>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
-// RecordedStep — the finished-night hero: poster, RECORDED badge, title/year,
-// who picked, and the who-watched cluster. Renders nothing if the movie is
-// somehow absent (the container only mounts it when night.movie is set).
-function RecordedStep({
-  night,
-  members,
-  onDone,
-  onChangeMovie,
-}: {
-  night: Night;
-  members: Member[];
-  onDone: () => void;
-  onChangeMovie: () => void;
-}) {
-  if (night.movie === null) {
-    return null;
-  }
-  const movie = night.movie;
-  const pickerName = members.find((m) => m.id === night.pickerId)?.name ?? "";
-  return (
-    <View style={styles.flex}>
-      <ScrollView contentContainerStyle={styles.recordedContent}>
-        <Poster uri={movie.posterUrl} title={movie.title} w={150} h={222} />
-        <View style={styles.recordedBadge}>
-          <Badge label="Recorded ✓" tone="solid" />
-        </View>
-        <Text style={styles.recordedTitle} numberOfLines={3}>
-          {movie.title}
-        </Text>
-        {movie.releaseYear !== null ? (
-          <Text style={styles.recordedYear}>{movie.releaseYear}</Text>
-        ) : null}
-
-        <View style={styles.pickedBy}>
-          <Avatar name={pickerName} size={28} />
-          <Text style={styles.pickedByText}>
-            {"Picked by "}
-            <Text style={styles.pickedByName}>{pickerName}</Text>
-            {` · ${formatShortDate(night.scheduledFor)}`}
-          </Text>
-        </View>
-
-        <SectionLabel>{"Who watched"}</SectionLabel>
-        <View style={styles.watchedCluster}>
-          {night.attendees.map((a, i) => (
-            <View key={a.id} style={[styles.watchedAvatar, i > 0 && styles.watchedOverlap]}>
-              <Avatar name={a.name} size={40} />
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-      <WizardFooter>
-        <AppButton title="Done — back to rotation" fullWidth onPress={onDone} />
-        <View style={styles.changeMovieRow}>
-          <AppButton title="Change movie" variant="ghost" onPress={onChangeMovie} />
-        </View>
-      </WizardFooter>
-    </View>
-  );
-}
 
 export default function NightScreen() {
   const router = useRouter();
@@ -377,7 +56,9 @@ export default function NightScreen() {
   // The id with an action in flight: a member id (attendance / pick), "create"
   // while creating, or the movie's tmdbId (as a string) while attaching.
   const [busy, setBusy] = useState<string | null>(null);
-  const [step, setStep] = useState<Step>("who");
+  const [nightDatesSet, setNightDatesSet] = useState<Set<string>>(new Set());
+  const today = todayLocalISO();
+  const [step, setStep] = useState<Step>("when");
   const [movieQuery, setMovieQuery] = useState("");
   const [results, setResults] = useState<Movie[]>([]);
   const [searching, setSearching] = useState(false);
@@ -390,14 +71,21 @@ export default function NightScreen() {
     const controller = new AbortController();
     (async () => {
       try {
-        const [roster, current] = await Promise.all([
+        const [roster, current, allNights] = await Promise.all([
           fetchMembers(API_URL, GROUP_ID, controller.signal),
           getCurrentNight(API_URL, GROUP_ID, controller.signal),
+          listNights(API_URL, GROUP_ID, controller.signal).catch(() => [] as Night[]),
         ]);
         setMembers(roster);
+        // Calendar dots come from listNights, which the backend filters to
+        // picker-set nights — so a date dots once its night has a picker (every
+        // recorded night, and a scheduled night past the Who step). A freshly
+        // created, picker-less night is the one gap; surfacing it would need a
+        // backend change, out of scope here.
+        setNightDatesSet(nightDates(allNights));
         // Resume only an in-progress night. A night with a movie attached is
-        // done, so we leave night === null and show "Start tonight's night",
-        // which creates a fresh one — rather than re-opening a finished night.
+        // done, so we leave night === null and show the When step, which creates
+        // a fresh night — rather than re-opening a finished one.
         if (current !== null && isResumable(current)) {
           setNight(current);
           setStep(deriveInitialStep(current));
@@ -464,17 +152,20 @@ export default function NightScreen() {
     [busy, refreshOrder],
   );
 
-  const onCreate = useCallback(async () => {
-    const created = await runNightWrite(
-      "create",
-      () => createNight(API_URL, GROUP_ID, todayLocalISO()),
-      "failed to create night",
-      true,
-    );
-    if (created !== null) {
-      setStep("who");
-    }
-  }, [runNightWrite]);
+  const onCreate = useCallback(
+    async (scheduledFor: string) => {
+      const created = await runNightWrite(
+        "create",
+        () => createNight(API_URL, GROUP_ID, scheduledFor),
+        "failed to create night",
+        true,
+      );
+      if (created !== null) {
+        setStep("who");
+      }
+    },
+    [runNightWrite],
+  );
 
   const onToggle = useCallback(
     (member: Member) => {
@@ -493,10 +184,11 @@ export default function NightScreen() {
     [night, attendeeIds, runNightWrite],
   );
 
-  // onAdvanceToPick records the auto-picker (the next-up present core member)
-  // then moves to the pick step. Recording is what credits the turn, so it must
-  // happen — a movie alone does not advance fairness standings.
-  const onAdvanceToPick = useCallback(async () => {
+  // onAdvance records the auto-picker (the next-up present core member) then
+  // branches: future nights land on the Scheduled screen; tonight lands on Pick.
+  // Recording is what credits the turn, so it must happen — a movie alone does
+  // not advance fairness standings.
+  const onAdvance = useCallback(async () => {
     const top = order[0] ?? null;
     if (night === null || top === null) {
       return;
@@ -507,9 +199,9 @@ export default function NightScreen() {
       "failed to record pick",
     );
     if (recorded !== null) {
-      setStep("pick");
+      setStep(daysUntil(recorded.scheduledFor, today) > 0 ? "scheduled" : "pick");
     }
-  }, [night, order, runNightWrite]);
+  }, [night, order, runNightWrite, today]);
 
   // onRecordPicker corrects the night's picker to another present attendee.
   const onRecordPicker = useCallback(
@@ -602,21 +294,14 @@ export default function NightScreen() {
       <TopBar
         kind="title"
         title={title}
-        back={step === "recorded" ? undefined : back}
+        back={step === "recorded" || step === "scheduled" ? undefined : back}
       />
       {actionError !== null ? (
         <Text style={[styles.banner, styles.error]}>{actionError}</Text>
       ) : null}
 
       {night === null ? (
-        <View style={styles.start}>
-          <Text style={styles.hint}>{"Start tonight's night to record who's here."}</Text>
-          <AppButton
-            title="Start tonight's night"
-            onPress={onCreate}
-            disabled={busy !== null}
-          />
-        </View>
+        <WhenStep today={today} nightDates={nightDatesSet} busy={busy} onNext={onCreate} />
       ) : step === "who" ? (
         <WhoStep
           night={night}
@@ -624,8 +309,9 @@ export default function NightScreen() {
           order={order}
           attendeeIds={attendeeIds}
           busy={busy}
+          future={daysUntil(night.scheduledFor, today) > 0}
           onToggle={onToggle}
-          onNext={onAdvanceToPick}
+          onNext={onAdvance}
         />
       ) : step === "pick" ? (
         <PickStep
@@ -643,6 +329,8 @@ export default function NightScreen() {
           onAttach={onAttach}
           onRecordPicker={onRecordPicker}
         />
+      ) : step === "scheduled" ? (
+        <ScheduledStep night={night} members={members} onDone={() => router.back()} />
       ) : (
         <RecordedStep
           night={night}
@@ -657,149 +345,7 @@ export default function NightScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface.page },
-  flex: { flex: 1 },
   center: { marginTop: space[8], textAlign: "center" },
   error: { ...textPresets.body, color: colors.text.danger },
   banner: { paddingVertical: space[2], paddingHorizontal: space[5], textAlign: "center" },
-  content: {
-    paddingHorizontal: space[5],
-    paddingTop: space[3],
-    paddingBottom: space[6],
-  },
-  start: { marginTop: space[8], gap: space[3], alignItems: "center", paddingHorizontal: space[5] },
-  hint: { ...textPresets.meta, color: colors.text.secondary },
-  heading: {
-    ...textPresets.screenTitle,
-    color: colors.text.primary,
-    marginTop: space[4],
-  },
-  footer: {
-    paddingHorizontal: space[5],
-    paddingTop: space[3],
-    borderTopWidth: borderWidth.hairline,
-    borderTopColor: colors.border.hairline,
-    backgroundColor: colors.surface.page,
-    gap: space[2],
-  },
-  stepper: { flexDirection: "row", alignItems: "center", gap: space[2], marginTop: space[2] },
-  stepItem: { flexDirection: "row", alignItems: "center", gap: space[1] },
-  stepBar: { flex: 1, height: 1, backgroundColor: colors.border.hairline },
-  stepBarDone: { backgroundColor: colors.accent.base },
-  stepDot: {
-    width: 18,
-    height: 18,
-    borderRadius: radius.full,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface.subtle,
-  },
-  stepDotActive: { backgroundColor: colors.accent.base },
-  stepDotText: { fontFamily: fontFamily.monoBold, fontSize: 10, color: colors.text.tertiary },
-  stepDotTextActive: { color: colors.text.onAccent },
-  stepLabel: { ...textPresets.tag, color: colors.text.tertiary },
-  stepLabelActive: { color: colors.accent.strong },
-  attendRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space[3],
-    paddingVertical: space[3],
-    paddingHorizontal: space[2],
-  },
-  attendDivider: {
-    borderBottomWidth: borderWidth.hairline,
-    borderBottomColor: colors.border.hairline,
-  },
-  pickerRow: {
-    backgroundColor: colors.surface.spotlight,
-    borderRadius: radius.md,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.accent.base,
-    ...shadow.spotlight,
-  },
-  dimmed: { opacity: 0.5 },
-  rowPressed: { opacity: pressedOpacity },
-  rowText: { flex: 1 },
-  name: { ...textPresets.rowName, color: colors.text.primary },
-  getsPick: { ...textPresets.tag, color: colors.accent.strong, marginTop: space[1] },
-  outTag: { ...textPresets.tag, color: colors.text.tertiary },
-  tag: { ...textPresets.tag, color: colors.text.secondary },
-  pickerCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space[3],
-    paddingVertical: space[3],
-    paddingHorizontal: space[4],
-    marginTop: space[4],
-    backgroundColor: colors.surface.spotlight,
-    borderRadius: radius.md,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.accent.base,
-    ...shadow.spotlight,
-  },
-  pickingTag: { ...textPresets.tag, color: colors.accent.strong },
-  pickerName: { ...textPresets.screenTitle, color: colors.text.primary, marginTop: space[1] },
-  changeRow: { marginTop: space[2], alignItems: "flex-start" },
-  chooseRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space[3],
-    paddingVertical: space[2],
-    paddingHorizontal: space[2],
-    borderBottomWidth: borderWidth.hairline,
-    borderBottomColor: colors.border.hairline,
-  },
-  searchSpinner: { marginTop: space[3] },
-  resultRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space[3],
-    paddingVertical: space[2],
-    borderBottomWidth: borderWidth.hairline,
-    borderBottomColor: colors.border.hairline,
-  },
-  resultTitle: {
-    fontFamily: fontFamily.display,
-    fontSize: 20,
-    lineHeight: 22,
-    color: colors.text.primary,
-  },
-  resultYear: {
-    fontFamily: fontFamily.mono,
-    fontSize: fontSize.caption,
-    color: colors.text.tertiary,
-    marginTop: space[1],
-  },
-  recordedContent: {
-    paddingHorizontal: space[5],
-    paddingTop: space[5],
-    paddingBottom: space[6],
-    alignItems: "center",
-  },
-  recordedBadge: { marginTop: space[5] },
-  recordedTitle: {
-    fontFamily: fontFamily.display,
-    fontSize: 34,
-    lineHeight: 36,
-    letterSpacing: trackPx(34, "display"),
-    color: colors.text.primary,
-    marginTop: space[3],
-    textAlign: "center",
-  },
-  recordedYear: {
-    fontFamily: fontFamily.mono,
-    fontSize: fontSize.sm,
-    color: colors.text.tertiary,
-    marginTop: space[2],
-  },
-  pickedBy: { flexDirection: "row", alignItems: "center", gap: space[2], marginTop: space[5] },
-  pickedByText: { ...textPresets.meta, color: colors.text.secondary },
-  pickedByName: { color: colors.text.primary, fontFamily: fontFamily.sansSemibold },
-  watchedCluster: { flexDirection: "row", justifyContent: "center", paddingTop: space[2] },
-  watchedAvatar: {
-    borderRadius: radius.full,
-    borderWidth: 3,
-    borderColor: colors.surface.page,
-  },
-  watchedOverlap: { marginLeft: -space[2] },
-  changeMovieRow: { alignItems: "center" },
 });
