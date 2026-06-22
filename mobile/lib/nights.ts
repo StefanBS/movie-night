@@ -1,6 +1,7 @@
 import { requestJson, requestJsonOrNull } from "./http";
 import { parseMovie, type Movie } from "./movies";
 import { parseTurn, type TurnMember } from "./turn";
+import { daysUntil, todayLocalISO } from "./date";
 
 export type Attendee = {
   id: string;
@@ -203,4 +204,26 @@ export function attachMovie(
     body: JSON.stringify({ tmdbId }),
     signal,
   });
+}
+
+// nextScheduledNight is the home's named selector: the soonest upcoming planned
+// night — movie still unattached, dated today or later — or null when none is
+// scheduled. Fed by listNights (the backend returns every picker-set night), it
+// drives the home's "Up next" countdown card; null falls back to the whose-turn
+// spotlight. ISO YYYY-MM-DD strings compare chronologically as plain text, so
+// the "soonest" pick needs no Date parsing (like history.ts). `today` is
+// injectable for deterministic tests (mirrors lib/date.ts).
+export function nextScheduledNight(
+  nights: Night[],
+  today: string = todayLocalISO(),
+): Night | null {
+  let soonest: Night | null = null;
+  for (const n of nights) {
+    if (n.movie !== null) continue;
+    if (daysUntil(n.scheduledFor, today) < 0) continue;
+    if (soonest === null || n.scheduledFor < soonest.scheduledFor) {
+      soonest = n;
+    }
+  }
+  return soonest;
 }
