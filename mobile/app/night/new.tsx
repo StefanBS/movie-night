@@ -69,6 +69,10 @@ export default function NightScreen() {
   // backend enforces at most one open night per group, so resume is unambiguous.
   useEffect(() => {
     const controller = new AbortController();
+    // Snapshot the date once so both resume helpers see the same "today" (no
+    // micro-race between two todayLocalISO() reads); this is a mount-only resume,
+    // so it intentionally doesn't depend on the render-scoped `today`.
+    const resumeToday = todayLocalISO();
     (async () => {
       try {
         const [roster, current, allNights] = await Promise.all([
@@ -83,12 +87,13 @@ export default function NightScreen() {
         // created, picker-less night is the one gap; surfacing it would need a
         // backend change, out of scope here.
         setNightDatesSet(nightDates(allNights));
-        // Resume only an in-progress night. A night with a movie attached is
-        // done, so we leave night === null and show the When step, which creates
-        // a fresh night — rather than re-opening a finished one.
-        if (current !== null && isResumable(current)) {
+        // Resume only an in-progress night. A tonight/past night with a movie
+        // attached is done, so we leave night === null and show the When step (a
+        // fresh night) rather than re-opening a finished one; a future night
+        // stays resumable even once a film is pre-picked.
+        if (current !== null && isResumable(current, resumeToday)) {
           setNight(current);
-          setStep(deriveInitialStep(current));
+          setStep(deriveInitialStep(current, resumeToday));
           setOrder(await getNightTurn(API_URL, GROUP_ID, current.id, controller.signal));
         }
       } catch (e) {
@@ -185,9 +190,9 @@ export default function NightScreen() {
   );
 
   // onAdvance records the auto-picker (the next-up present core member) then
-  // branches: future nights land on the Scheduled screen; tonight lands on Pick.
-  // Recording is what credits the turn, so it must happen — a movie alone does
-  // not advance fairness standings.
+  // always advances to Pick, whatever the night's date. Recording is what
+  // credits the turn, so it must happen — a movie alone does not advance
+  // fairness standings.
   const onAdvance = useCallback(async () => {
     const top = order[0] ?? null;
     if (night === null || top === null) {
