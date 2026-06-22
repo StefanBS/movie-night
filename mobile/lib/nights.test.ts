@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseNight, parseNights } from "./nights";
+import { nextScheduledNight, parseNight, parseNights, type Night } from "./nights";
 
 const valid = {
   id: "n1",
@@ -111,8 +111,6 @@ test("parseNights rejects a non-array", () => {
 test("parseNights rejects a malformed element", () => {
   assert.throws(() => parseNights([valid, { id: 5 }]), /id/);
 });
-
-import { nextScheduledNight, type Night } from "./nights";
 
 const TODAY = "2026-06-22";
 const aMovie = { tmdbId: 1, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg" };
