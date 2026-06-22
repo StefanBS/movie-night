@@ -88,7 +88,7 @@ export function WhoStep({
         <AppButton
           title={
             picker
-              ? `${future ? "Schedule" : "Next"} — ${firstNameOf(picker.name)} picks  →`
+              ? `Next — ${firstNameOf(picker.name)} picks  →`
               : "Add who's here  →"
           }
           fullWidth

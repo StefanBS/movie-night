@@ -14,7 +14,7 @@ import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 
 import { TopBar } from "../../components";
-import { WhenStep, WhoStep, PickStep, RecordedStep, ScheduledStep } from "../../components/night";
+import { WhenStep, WhoStep, PickStep, NightView } from "../../components/night";
 import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
 import { daysUntil, todayLocalISO } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
@@ -199,9 +199,9 @@ export default function NightScreen() {
       "failed to record pick",
     );
     if (recorded !== null) {
-      setStep(daysUntil(recorded.scheduledFor, today) > 0 ? "scheduled" : "pick");
+      setStep("pick");
     }
-  }, [night, order, runNightWrite, today]);
+  }, [night, order, runNightWrite]);
 
   // onRecordPicker corrects the night's picker to another present attendee.
   const onRecordPicker = useCallback(
@@ -252,7 +252,7 @@ export default function NightScreen() {
         setResults([]);
         setSearchError(null);
         setMovieQuery("");
-        setStep("recorded");
+        setStep("night");
       } catch (e) {
         setActionError(errorMessage(e, "failed to attach movie"));
       } finally {
@@ -261,6 +261,12 @@ export default function NightScreen() {
     },
     [night, busy],
   );
+
+  // onSkipPick leaves the film unset and goes to the Night terminal — used for a
+  // scheduled night where the film is chosen later (or on the night).
+  const onSkipPick = useCallback(() => {
+    setStep("night");
+  }, []);
 
   if (loading) {
     return (
@@ -287,14 +293,14 @@ export default function NightScreen() {
           },
         }
       : { label: "Cancel", onPress: () => router.back() };
-  const title = step === "pick" ? "The pick" : step === "recorded" ? "Tonight" : "New night";
+  const title = step === "pick" ? "The pick" : step === "night" ? "Night" : "New night";
 
   return (
     <View style={styles.screen}>
       <TopBar
         kind="title"
         title={title}
-        back={step === "recorded" || step === "scheduled" ? undefined : back}
+        back={step === "night" ? undefined : back}
       />
       {actionError !== null ? (
         <Text style={[styles.banner, styles.error]}>{actionError}</Text>
@@ -318,6 +324,7 @@ export default function NightScreen() {
           night={night}
           members={members}
           busy={busy}
+          future={daysUntil(night.scheduledFor, today) > 0}
           changingPicker={changingPicker}
           setChangingPicker={setChangingPicker}
           movieQuery={movieQuery}
@@ -328,15 +335,15 @@ export default function NightScreen() {
           onSearch={onSearch}
           onAttach={onAttach}
           onRecordPicker={onRecordPicker}
+          onSkip={onSkipPick}
         />
-      ) : step === "scheduled" ? (
-        <ScheduledStep night={night} members={members} onDone={() => router.back()} />
       ) : (
-        <RecordedStep
+        <NightView
           night={night}
           members={members}
+          today={today}
           onDone={() => router.back()}
-          onChangeMovie={() => setStep("pick")}
+          onPickFilm={() => setStep("pick")}
         />
       )}
     </View>
