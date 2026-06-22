@@ -4,22 +4,22 @@
     {
       "id": 1,
       "subject": "Task 1: nextScheduledNight selector",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** A pure selector that picks the soonest upcoming planned night (movie unattached, dated today-or-later), or null.\n\n**Files:**\n- Modify: `mobile/lib/nights.ts`\n- Test: `mobile/lib/nights.test.ts`\n\n**Verify:** `cd mobile && node --import tsx --test lib/nights.test.ts`\n\n```json:metadata\n{\"files\": [\"mobile/lib/nights.ts\", \"mobile/lib/nights.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/nights.test.ts\", \"acceptanceCriteria\": [\"null for empty/past/movie-attached\", \"single upcoming planned returned\", \"soonest of several returned\", \"today included\", \"injectable today param\"], \"modelTier\": \"standard\"}\n```"
     },
     {
       "id": 2,
       "subject": "Task 2: UpNextCard component",
-      "status": "pending",
+      "status": "completed",
       "description": "**Goal:** A presentational countdown card for a scheduled night — ember spotlight treatment, countdown pill, serif date, picker row + coming avatars, Start/Edit actions.\n\n**Files:**\n- Create: `mobile/components/UpNextCard.tsx`\n- Modify: `mobile/components/index.ts`\n\n**Verify:** `cd mobile && just typecheck && just lint`\n\n```json:metadata\n{\"files\": [\"mobile/components/UpNextCard.tsx\", \"mobile/components/index.ts\"], \"verifyCommand\": \"cd mobile && just typecheck && just lint\", \"acceptanceCriteria\": [\"tag + solid-ember countdown pill\", \"serif weekday+date\", \"picker row + up to 4 overlapping avatars\", \"Start (primary) + Edit (secondary)\", \"theme tokens only, no hardcoded values\"], \"modelTier\": \"standard\"}\n```"
     },
     {
       "id": 3,
       "subject": "Task 3: Wire the home to lead with the card",
-      "status": "pending",
+      "status": "completed",
       "blockedBy": [1, 2],
       "description": "**Goal:** Fetch nights alongside the turn, derive `nextScheduledNight`, and render the `UpNextCard` (planned state) or the existing `SpotlightHero` (fallback).\n\n**Files:**\n- Modify: `mobile/app/(tabs)/index.tsx`\n\n**Verify:** `cd mobile && just check`\n\n```json:metadata\n{\"files\": [\"mobile/app/(tabs)/index.tsx\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"listNights fetched with turn via Promise.all, loading gates both\", \"nights failure degrades to spotlight\", \"card + Plan another night when scheduled\", \"spotlight + skip + See full rotation when none\", \"On deck in both states\"], \"modelTier\": \"standard\"}\n```"
     }
   ],
-  "lastUpdated": "2026-06-22"
+  "lastUpdated": "2026-06-22T20:00:00Z"
 }
