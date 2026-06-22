@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseNight, parseNights } from "./nights";
+import { nextScheduledNight, parseNight, parseNights, type Night } from "./nights";
 
 const valid = {
   id: "n1",
@@ -110,4 +110,51 @@ test("parseNights rejects a non-array", () => {
 
 test("parseNights rejects a malformed element", () => {
   assert.throws(() => parseNights([valid, { id: 5 }]), /id/);
+});
+
+const TODAY = "2026-06-22";
+const aMovie = { tmdbId: 1, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg" };
+
+function night(id: string, scheduledFor: string, opts: Partial<Night> = {}): Night {
+  return { id, scheduledFor, pickerId: "u1", movie: null, attendees: [], ...opts };
+}
+
+test("nextScheduledNight returns null for no nights", () => {
+  assert.equal(nextScheduledNight([], TODAY), null);
+});
+
+test("nextScheduledNight ignores past nights", () => {
+  assert.equal(nextScheduledNight([night("n1", "2026-06-20")], TODAY), null);
+});
+
+test("nextScheduledNight ignores future nights with a movie attached", () => {
+  assert.equal(nextScheduledNight([night("n1", "2026-06-26", { movie: aMovie })], TODAY), null);
+});
+
+test("nextScheduledNight returns a single upcoming planned night", () => {
+  assert.equal(nextScheduledNight([night("n1", "2026-06-26")], TODAY)?.id, "n1");
+});
+
+test("nextScheduledNight returns the soonest of several planned nights", () => {
+  const n = nextScheduledNight(
+    [night("far", "2026-07-10"), night("soon", "2026-06-26"), night("mid", "2026-06-30")],
+    TODAY,
+  );
+  assert.equal(n?.id, "soon");
+});
+
+test("nextScheduledNight includes a night scheduled for today", () => {
+  assert.equal(nextScheduledNight([night("n1", TODAY)], TODAY)?.id, "n1");
+});
+
+test("nextScheduledNight skips past/recorded and picks the soonest upcoming planned", () => {
+  const n = nextScheduledNight(
+    [
+      night("past", "2026-06-10", { movie: aMovie }),
+      night("recorded-future", "2026-06-28", { movie: aMovie }),
+      night("planned", "2026-07-01"),
+    ],
+    TODAY,
+  );
+  assert.equal(n?.id, "planned");
 });

@@ -12,11 +12,14 @@ import {
   SectionLabel,
   TabScrollView,
   TopBar,
+  UpNextCard,
 } from "../../components";
 import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import { fetchGroup } from "../../lib/group";
 import { fetchTurn, pickerMeta, picksLabel, type TurnMember } from "../../lib/turn";
+import { listNights, nextScheduledNight, type Night } from "../../lib/nights";
+import { todayLocalISO } from "../../lib/date";
 import {
   borderWidth,
   colors,
@@ -110,20 +113,28 @@ function OnDeck({ members }: { members: TurnMember[] }) {
 export default function TonightScreen() {
   const router = useRouter();
   const [order, setOrder] = useState<TurnMember[]>([]);
+  const [nights, setNights] = useState<Night[]>([]);
   const [groupName, setGroupName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Refetch the turn on focus (not just mount): a pick recorded or roster change
-  // made on another tab must show up when the user returns — the tab screen
-  // stays mounted. `loading` only gates the first load, so later focuses refresh
-  // in the background without flashing the spinner.
+  // Refetch the turn AND the planned nights on focus (not just mount): a pick
+  // recorded, a roster change, or a night planned on another tab must show up
+  // when the user returns — the tab screen stays mounted. `loading` gates only
+  // the first load (both fetches together, so the card never flashes in after
+  // the spotlight); later focuses refresh in the background. A nights failure
+  // degrades to the spotlight — the turn fetch owns the screen's error state.
   useFocusEffect(
     useCallback(() => {
       const controller = new AbortController();
       (async () => {
         try {
-          setOrder(await fetchTurn(API_URL, GROUP_ID, controller.signal));
+          const [turn, planned] = await Promise.all([
+            fetchTurn(API_URL, GROUP_ID, controller.signal),
+            listNights(API_URL, GROUP_ID, controller.signal).catch(() => [] as Night[]),
+          ]);
+          setOrder(turn);
+          setNights(planned);
           setError(null);
         } catch (e) {
           if (!controller.signal.aborted) {
@@ -170,6 +181,7 @@ export default function TonightScreen() {
   const picker = order[0] ?? null;
   const onDeck = order.slice(1, 4);
   const firstName = picker ? picker.name.split(" ")[0] : "";
+  const scheduled = nextScheduledNight(nights, todayLocalISO());
 
   return (
     <View style={styles.screen}>
@@ -190,29 +202,49 @@ export default function TonightScreen() {
         </View>
       ) : (
         <TabScrollView contentContainerStyle={styles.content}>
-          <SpotlightHero member={picker} />
-          <View style={styles.planRow}>
-            <AppButton
-              title="Plan a night  →"
-              fullWidth
-              onPress={() => router.navigate("/night/new")}
-            />
-          </View>
-          <View style={styles.skipRow}>
-            <AppButton
-              title={`${firstName} can't make it — skip turn`}
-              variant="ghost"
-              onPress={() => {}}
-            />
-          </View>
-          {onDeck.length > 0 ? <OnDeck members={onDeck} /> : null}
-          <View style={styles.rotationRow}>
-            <AppButton
-              title="See full rotation  →"
-              variant="ghost"
-              onPress={() => router.navigate("/rotation")}
-            />
-          </View>
+          {scheduled !== null ? (
+            <>
+              <UpNextCard
+                night={scheduled}
+                onStart={() => router.navigate("/night/new")}
+                onEdit={() => {}}
+              />
+              {onDeck.length > 0 ? <OnDeck members={onDeck} /> : null}
+              <View style={styles.rotationRow}>
+                <AppButton
+                  title="Plan another night  →"
+                  variant="ghost"
+                  onPress={() => router.navigate("/night/new")}
+                />
+              </View>
+            </>
+          ) : (
+            <>
+              <SpotlightHero member={picker} />
+              <View style={styles.planRow}>
+                <AppButton
+                  title="Plan a night  →"
+                  fullWidth
+                  onPress={() => router.navigate("/night/new")}
+                />
+              </View>
+              <View style={styles.skipRow}>
+                <AppButton
+                  title={`${firstName} can't make it — skip turn`}
+                  variant="ghost"
+                  onPress={() => {}}
+                />
+              </View>
+              {onDeck.length > 0 ? <OnDeck members={onDeck} /> : null}
+              <View style={styles.rotationRow}>
+                <AppButton
+                  title="See full rotation  →"
+                  variant="ghost"
+                  onPress={() => router.navigate("/rotation")}
+                />
+              </View>
+            </>
+          )}
         </TabScrollView>
       )}
     </View>
