@@ -101,9 +101,7 @@ export function UpNextCard({
 const styles = StyleSheet.create({
   card: {
     borderRadius: radius.xl,
-    paddingTop: space[5],
-    paddingBottom: space[5],
-    paddingHorizontal: space[5],
+    padding: space[5],
     backgroundColor: colors.surface.dark,
     overflow: "hidden",
     ...shadow.spotlight,
