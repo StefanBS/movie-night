@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 
 import { AppButton, Avatar, Badge, Input, Poster, SectionLabel } from "../";
 import { Stepper } from "./Stepper";
+import { WizardFooter } from "./WizardFooter";
 import type { Member } from "../../lib/members";
 import type { Movie } from "../../lib/movies";
 import type { Night } from "../../lib/nights";
@@ -18,6 +19,7 @@ export function PickStep({
   night,
   members,
   busy,
+  future = false,
   changingPicker,
   setChangingPicker,
   movieQuery,
@@ -28,10 +30,12 @@ export function PickStep({
   onSearch,
   onAttach,
   onRecordPicker,
+  onSkip,
 }: {
   night: Night;
   members: Member[];
   busy: string | null;
+  future?: boolean;
   changingPicker: boolean;
   setChangingPicker: (v: boolean) => void;
   movieQuery: string;
@@ -42,6 +46,7 @@ export function PickStep({
   onSearch: () => void;
   onAttach: (tmdbId: number) => void;
   onRecordPicker: (memberId: string) => void;
+  onSkip?: () => void;
 }) {
   const pickerName = members.find((m) => m.id === night.pickerId)?.name ?? "";
   return (
@@ -52,7 +57,7 @@ export function PickStep({
         <View style={styles.pickerCard}>
           <Avatar name={pickerName} size={44} glow />
           <View style={styles.rowText}>
-            <Text style={styles.pickingTag}>{"✦ Picking tonight"}</Text>
+            <Text style={styles.pickingTag}>{future ? "✦ Picking ahead" : "✦ Picking tonight"}</Text>
             <Text style={styles.pickerName} numberOfLines={1}>
               {pickerName}
             </Text>
@@ -128,6 +133,16 @@ export function PickStep({
           </Pressable>
         ))}
       </ScrollView>
+      {onSkip ? (
+        <WizardFooter>
+          <AppButton
+            title={future ? "Decide on the night  →" : "Skip for now  →"}
+            variant="ghost"
+            onPress={onSkip}
+            disabled={busy !== null}
+          />
+        </WizardFooter>
+      ) : null}
     </View>
   );
 }
