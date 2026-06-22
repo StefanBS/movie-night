@@ -125,7 +125,9 @@ export function getCurrentNight(
   return requestJsonOrNull(`${baseUrl}/groups/${groupId}/nights/current`, parseNight, { signal });
 }
 
-// listNights loads the group's recorded nights (picker set), newest first.
+// listNights loads the group's picker-set nights, newest first — both recorded
+// past nights (History) and future planned nights (the nextScheduledNight
+// selector below). The backend filters out picker-less nights.
 export function listNights(
   baseUrl: string,
   groupId: string,
