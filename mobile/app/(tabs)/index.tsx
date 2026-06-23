@@ -46,7 +46,7 @@ const HALO_OFFSET = (AVATAR - HALO) / 2; // center the halo on the avatar
 function SpotlightHero({ member }: { member: TurnMember }) {
   return (
     <View style={styles.hero}>
-      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Svg style={[StyleSheet.absoluteFill, styles.noPointer]}>
         <Defs>
           <RadialGradient id="heroWash" cx="50%" cy="0%" rx="80%" ry="60%">
             <Stop offset="0" stopColor={colors.accent.base} stopOpacity={0.26} />
@@ -61,7 +61,7 @@ function SpotlightHero({ member }: { member: TurnMember }) {
       </Text>
 
       <View style={styles.avatarWrap}>
-        <Svg width={HALO} height={HALO} style={styles.halo} pointerEvents="none">
+        <Svg width={HALO} height={HALO} style={[styles.halo, styles.noPointer]}>
           <Defs>
             <RadialGradient id="avatarHalo" cx="50%" cy="50%" rx="50%" ry="50%">
               <Stop offset="0" stopColor={colors.accent.base} stopOpacity={0.45} />
@@ -182,6 +182,12 @@ export default function TonightScreen() {
   const onDeck = order.slice(1, 4);
   const firstName = picker ? picker.name.split(" ")[0] : "";
   const scheduled = nextScheduledNight(nights, todayLocalISO());
+  const openScheduled = () => {
+    if (scheduled === null) {
+      return;
+    }
+    router.navigate({ pathname: "/night/[id]", params: { id: scheduled.id } });
+  };
 
   return (
     <View style={styles.screen}>
@@ -206,8 +212,8 @@ export default function TonightScreen() {
             <>
               <UpNextCard
                 night={scheduled}
-                onStart={() => router.navigate("/night/new")}
-                onEdit={() => {}}
+                onStart={openScheduled}
+                onEdit={openScheduled}
               />
               {onDeck.length > 0 ? <OnDeck members={onDeck} /> : null}
               <View style={styles.rotationRow}>
@@ -284,6 +290,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   halo: { position: "absolute", top: HALO_OFFSET, left: HALO_OFFSET },
+  noPointer: { pointerEvents: "none" },
   heroName: {
     ...textPresets.screenTitle,
     color: colors.text.primary,

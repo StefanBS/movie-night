@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useState,
 } from "react";
 import {
@@ -14,25 +13,18 @@ import { useRouter } from "expo-router";
 import Constants from "expo-constants";
 
 import { TopBar } from "../../components";
-import { WhenStep, WhoStep, PickStep, NightView } from "../../components/night";
+import { WhenStep, ExistingNightEditor } from "../../components/night";
 import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
-import { daysUntil, todayLocalISO } from "../../lib/date";
+import { todayLocalISO } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { fetchMembers, type Member } from "../../lib/members";
 import {
-  addAttendee,
-  attachMovie,
   createNight,
   getCurrentNight,
-  getNightTurn,
   listNights,
-  recordNightPick,
-  removeAttendee,
   type Night,
 } from "../../lib/nights";
-import { searchMovies, type Movie } from "../../lib/movies";
 import { nightDates } from "../../lib/calendar";
-import { type TurnMember } from "../../lib/turn";
 import { deriveInitialStep, isResumable, type Step } from "../../lib/nightFlow";
 import {
   colors,
@@ -49,29 +41,16 @@ export default function NightScreen() {
   const router = useRouter();
   const [members, setMembers] = useState<Member[]>([]);
   const [night, setNight] = useState<Night | null>(null);
-  const [order, setOrder] = useState<TurnMember[]>([]);
+  const [resumeStep, setResumeStep] = useState<Exclude<Step, "when">>("who");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  // The id with an action in flight: a member id (attendance / pick), "create"
-  // while creating, or the movie's tmdbId (as a string) while attaching.
-  const [busy, setBusy] = useState<string | null>(null);
   const [nightDatesSet, setNightDatesSet] = useState<Set<string>>(new Set());
+  const [createBusy, setCreateBusy] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
   const today = todayLocalISO();
-  const [step, setStep] = useState<Step>("when");
-  const [movieQuery, setMovieQuery] = useState("");
-  const [results, setResults] = useState<Movie[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [changingPicker, setChangingPicker] = useState(false);
 
-  // Resume the group's open night (if any) and land on the right step. The
-  // backend enforces at most one open night per group, so resume is unambiguous.
   useEffect(() => {
     const controller = new AbortController();
-    // Snapshot the date once so both resume helpers see the same "today" (no
-    // micro-race between two todayLocalISO() reads); this is a mount-only resume,
-    // so it intentionally doesn't depend on the render-scoped `today`.
     const resumeToday = todayLocalISO();
     (async () => {
       try {
@@ -81,20 +60,10 @@ export default function NightScreen() {
           listNights(API_URL, GROUP_ID, controller.signal).catch(() => [] as Night[]),
         ]);
         setMembers(roster);
-        // Calendar dots come from listNights, which the backend filters to
-        // picker-set nights — so a date dots once its night has a picker (every
-        // recorded night, and a scheduled night past the Who step). A freshly
-        // created, picker-less night is the one gap; surfacing it would need a
-        // backend change, out of scope here.
         setNightDatesSet(nightDates(allNights));
-        // Resume only an in-progress night. A tonight/past night with a movie
-        // attached is done, so we leave night === null and show the When step (a
-        // fresh night) rather than re-opening a finished one; a future night
-        // stays resumable even once a film is pre-picked.
         if (current !== null && isResumable(current, resumeToday)) {
           setNight(current);
-          setStep(deriveInitialStep(current, resumeToday));
-          setOrder(await getNightTurn(API_URL, GROUP_ID, current.id, controller.signal));
+          setResumeStep(deriveInitialStep(current, resumeToday));
         }
       } catch (e) {
         if (!controller.signal.aborted) {
@@ -109,169 +78,22 @@ export default function NightScreen() {
     return () => controller.abort();
   }, []);
 
-  const attendeeIds = useMemo(
-    () => new Set((night?.attendees ?? []).map((a) => a.id)),
-    [night],
-  );
-
-  const refreshOrder = useCallback(async (nightId: string) => {
-    setOrder(await getNightTurn(API_URL, GROUP_ID, nightId));
-  }, []);
-
-  // runNightWrite is the shared envelope for write actions: guard against a
-  // concurrent action, mark busyKey in flight, run the write, adopt the returned
-  // night, then refresh the pick order — reporting a refresh failure on its own
-  // so a successful write is never shown as failed. Returns the updated night,
-  // or null on failure, so callers can advance the step only on success.
-  const runNightWrite = useCallback(
-    async (
-      busyKey: string,
-      write: () => Promise<Night>,
-      fallback: string,
-      clearOrder = false,
-    ): Promise<Night | null> => {
-      if (busy !== null) {
-        return null;
-      }
-      setBusy(busyKey);
-      setActionError(null);
-      try {
-        const updated = await write();
-        setNight(updated);
-        if (clearOrder) {
-          setOrder([]);
-        }
-        try {
-          await refreshOrder(updated.id);
-        } catch (e) {
-          setActionError(errorMessage(e, "failed to load pick order"));
-        }
-        return updated;
-      } catch (e) {
-        setActionError(errorMessage(e, fallback));
-        return null;
-      } finally {
-        setBusy(null);
-      }
-    },
-    [busy, refreshOrder],
-  );
-
-  const onCreate = useCallback(
-    async (scheduledFor: string) => {
-      const created = await runNightWrite(
-        "create",
-        () => createNight(API_URL, GROUP_ID, scheduledFor),
-        "failed to create night",
-        true,
-      );
-      if (created !== null) {
-        setStep("who");
-      }
-    },
-    [runNightWrite],
-  );
-
-  const onToggle = useCallback(
-    (member: Member) => {
-      if (night === null) {
-        return;
-      }
-      return runNightWrite(
-        member.id,
-        () =>
-          attendeeIds.has(member.id)
-            ? removeAttendee(API_URL, GROUP_ID, night.id, member.id)
-            : addAttendee(API_URL, GROUP_ID, night.id, member.id),
-        "failed to update attendance",
-      );
-    },
-    [night, attendeeIds, runNightWrite],
-  );
-
-  // onAdvance records the auto-picker (the next-up present core member) then
-  // always advances to Pick, whatever the night's date. Recording is what
-  // credits the turn, so it must happen — a movie alone does not advance
-  // fairness standings.
-  const onAdvance = useCallback(async () => {
-    const top = order[0] ?? null;
-    if (night === null || top === null) {
+  const onCreate = useCallback(async (scheduledFor: string) => {
+    if (createBusy !== null) {
       return;
     }
-    const recorded = await runNightWrite(
-      top.id,
-      () => recordNightPick(API_URL, GROUP_ID, night.id, top.id),
-      "failed to record pick",
-    );
-    if (recorded !== null) {
-      setStep("pick");
-    }
-  }, [night, order, runNightWrite]);
-
-  // onRecordPicker corrects the night's picker to another present attendee.
-  const onRecordPicker = useCallback(
-    async (memberId: string) => {
-      if (night === null) {
-        return;
-      }
-      const recorded = await runNightWrite(
-        memberId,
-        () => recordNightPick(API_URL, GROUP_ID, night.id, memberId),
-        "failed to record pick",
-      );
-      if (recorded !== null) {
-        setChangingPicker(false);
-      }
-    },
-    [night, runNightWrite],
-  );
-
-  const onSearch = useCallback(async () => {
-    const q = movieQuery.trim();
-    if (q === "" || busy !== null || searching) {
-      return;
-    }
-    setSearching(true);
-    setSearchError(null);
+    setCreateBusy("create");
+    setCreateError(null);
     try {
-      setResults(await searchMovies(API_URL, q));
+      const created = await createNight(API_URL, GROUP_ID, scheduledFor);
+      setNight(created);
+      setResumeStep("who");
     } catch (e) {
-      setSearchError(errorMessage(e, "search failed"));
+      setCreateError(errorMessage(e, "failed to create night"));
     } finally {
-      setSearching(false);
+      setCreateBusy(null);
     }
-  }, [movieQuery, busy, searching]);
-
-  // onAttach sets (or changes) the movie, then advances to Recorded. Bypasses
-  // runNightWrite because it advances the step and clears search state on success.
-  const onAttach = useCallback(
-    async (tmdbId: number) => {
-      if (night === null || busy !== null) {
-        return;
-      }
-      setBusy(String(tmdbId));
-      setActionError(null);
-      try {
-        const updated = await attachMovie(API_URL, GROUP_ID, night.id, tmdbId);
-        setNight(updated);
-        setResults([]);
-        setSearchError(null);
-        setMovieQuery("");
-        setStep("night");
-      } catch (e) {
-        setActionError(errorMessage(e, "failed to attach movie"));
-      } finally {
-        setBusy(null);
-      }
-    },
-    [night, busy],
-  );
-
-  // onSkipPick leaves the film unset and goes to the Night terminal — used for a
-  // scheduled night where the film is chosen later (or on the night).
-  const onSkipPick = useCallback(() => {
-    setStep("night");
-  }, []);
+  }, [createBusy]);
 
   if (loading) {
     return (
@@ -288,69 +110,31 @@ export default function NightScreen() {
     );
   }
 
-  const back =
-    step === "pick"
-      ? {
-          label: "Here",
-          onPress: () => {
-            setChangingPicker(false);
-            setStep("who");
-          },
-        }
-      : { label: "Cancel", onPress: () => router.back() };
-  const title = step === "pick" ? "The pick" : step === "night" ? "Night" : "New night";
+  if (night !== null) {
+    return (
+      <ExistingNightEditor
+        key={night.id}
+        night={night}
+        members={members}
+        today={today}
+        initialStep={resumeStep}
+        onDone={() => router.back()}
+        onCancel={() => router.back()}
+      />
+    );
+  }
 
   return (
     <View style={styles.screen}>
       <TopBar
         kind="title"
-        title={title}
-        back={step === "night" ? undefined : back}
+        title="New night"
+        back={{ label: "Cancel", onPress: () => router.back() }}
       />
-      {actionError !== null ? (
-        <Text style={[styles.banner, styles.error]}>{actionError}</Text>
+      {createError !== null ? (
+        <Text style={[styles.banner, styles.error]}>{createError}</Text>
       ) : null}
-
-      {night === null ? (
-        <WhenStep today={today} nightDates={nightDatesSet} busy={busy} onNext={onCreate} />
-      ) : step === "who" ? (
-        <WhoStep
-          night={night}
-          members={members}
-          order={order}
-          attendeeIds={attendeeIds}
-          busy={busy}
-          future={daysUntil(night.scheduledFor, today) > 0}
-          onToggle={onToggle}
-          onNext={onAdvance}
-        />
-      ) : step === "pick" ? (
-        <PickStep
-          night={night}
-          members={members}
-          busy={busy}
-          future={daysUntil(night.scheduledFor, today) > 0}
-          changingPicker={changingPicker}
-          setChangingPicker={setChangingPicker}
-          movieQuery={movieQuery}
-          setMovieQuery={setMovieQuery}
-          results={results}
-          searching={searching}
-          searchError={searchError}
-          onSearch={onSearch}
-          onAttach={onAttach}
-          onRecordPicker={onRecordPicker}
-          onSkip={onSkipPick}
-        />
-      ) : (
-        <NightView
-          night={night}
-          members={members}
-          today={today}
-          onDone={() => router.back()}
-          onPickFilm={() => setStep("pick")}
-        />
-      )}
+      <WhenStep today={today} nightDates={nightDatesSet} busy={createBusy} onNext={onCreate} />
     </View>
   );
 }

@@ -4,6 +4,8 @@
 // 4px base grid.
 // ============================================================
 
+import { Platform, type ViewStyle } from "react-native";
+
 // Spacing — 4px grid
 export const space = {
   1: 4,
@@ -32,42 +34,69 @@ export const borderWidth = {
   regular: 1.5,
 } as const;
 
-// Shadows — RN needs platform-split style props, not CSS box-shadow.
-// Each preset is an object you spread into a style. iOS uses shadow*,
-// Android uses elevation. The signature ember "spotlight" can't be a
-// true glow in RN — approximate with an ember shadowColor + border.
+// Shadows — iOS/Android use shadow* + elevation; web uses boxShadow (RN Web
+// deprecates shadow* style props). Each preset is an object you spread into a
+// style. The signature ember "spotlight" can't be a true glow in RN —
+// approximate with an ember shadowColor + border.
+type ShadowPreset = {
+  shadowColor: string;
+  shadowOffset: { width: number; height: number };
+  shadowOpacity: number;
+  shadowRadius: number;
+  elevation: number;
+};
+
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace("#", "");
+  const r = Number.parseInt(h.slice(0, 2), 16);
+  const g = Number.parseInt(h.slice(2, 4), 16);
+  const b = Number.parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function platformShadow(preset: ShadowPreset): ViewStyle {
+  if (Platform.OS === "web") {
+    const color = hexToRgba(preset.shadowColor, preset.shadowOpacity);
+    const { width, height } = preset.shadowOffset;
+    return {
+      boxShadow: `${width}px ${height}px ${preset.shadowRadius}px 0px ${color}`,
+    };
+  }
+  return preset;
+}
+
 export const shadow = {
   none: {},
-  sm: {
+  sm: platformShadow({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.3,
     shadowRadius: 2,
     elevation: 1,
-  },
-  md: {
+  }),
+  md: platformShadow({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.42,
     shadowRadius: 18,
     elevation: 6,
-  },
-  lg: {
+  }),
+  lg: platformShadow({
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.55,
     shadowRadius: 44,
     elevation: 12,
-  },
+  }),
   // Spotlight — the ember glow on the active ("next up") element.
   // Pair with a 1px ember border on the same view for the ring.
-  spotlight: {
+  spotlight: platformShadow({
     shadowColor: "#F68B36",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.32,
     shadowRadius: 26,
     elevation: 8,
-  },
+  }),
 } as const;
 
 // Motion — for react-native Animated / Reanimated easings
