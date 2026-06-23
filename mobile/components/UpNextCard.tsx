@@ -38,7 +38,7 @@ export function UpNextCard({
   const coming = night.attendees.slice(0, MAX_AVATARS);
   return (
     <View style={styles.card}>
-      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Svg style={[StyleSheet.absoluteFill, styles.noPointer]}>
         <Defs>
           <RadialGradient id="upNextWash" cx="50%" cy="0%" rx="80%" ry="55%">
             <Stop offset="0" stopColor={colors.accent.base} stopOpacity={0.22} />
@@ -112,6 +112,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     ...shadow.spotlight,
   },
+  noPointer: { pointerEvents: "none" },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",

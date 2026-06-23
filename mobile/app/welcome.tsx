@@ -26,7 +26,7 @@ const RULES = [
 // ember (the disabled CTAs are not at ember rest).
 function EmberGlow() {
   return (
-    <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+    <Svg style={[StyleSheet.absoluteFill, styles.noPointer]}>
       <Defs>
         <RadialGradient id="welcomeWash" cx="50%" cy="0%" rx="80%" ry="55%">
           <Stop offset="0" stopColor={colors.accent.base} stopOpacity={0.22} />
@@ -129,4 +129,5 @@ const styles = StyleSheet.create({
   ruleGap: { marginTop: space[3] },
   banner: { alignSelf: "stretch", marginTop: space[6] },
   actions: { alignSelf: "stretch", marginTop: space[6], gap: space[3] },
+  noPointer: { pointerEvents: "none" },
 });

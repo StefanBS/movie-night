@@ -11,7 +11,10 @@ export type Step = "when" | "who" | "pick" | "night";
 // the unified Night terminal; a film-less tonight/past night resumes on "who"
 // (the picker is re-derived on advancing; "pick" stays forward-only). `today` is
 // injectable for deterministic tests (mirrors lib/date.ts).
-export function deriveInitialStep(night: Night, today: string = todayLocalISO()): Step {
+export function deriveInitialStep(
+  night: Night,
+  today: string = todayLocalISO(),
+): Exclude<Step, "when"> {
   if (night.movie !== null) return "night";
   if (night.pickerId !== null && daysUntil(night.scheduledFor, today) > 0) return "night";
   return "who";
