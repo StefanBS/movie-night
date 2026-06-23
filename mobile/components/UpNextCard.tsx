@@ -71,9 +71,15 @@ export function UpNextCard({
             <Text style={styles.pickerName} numberOfLines={1}>
               {`${picker.name}'s pick`}
             </Text>
-            <Text style={styles.pickerMeta} allowFontScaling={false}>
-              {"Chooses the film that night"}
-            </Text>
+            {night.movie !== null ? (
+              <Text style={styles.pickerFilm} numberOfLines={1}>
+                {night.movie.title}
+              </Text>
+            ) : (
+              <Text style={styles.pickerMeta} allowFontScaling={false}>
+                {"Chooses the film that night"}
+              </Text>
+            )}
           </View>
           <View style={styles.avatars}>
             {coming.map((a, i) => (
@@ -154,6 +160,12 @@ const styles = StyleSheet.create({
     letterSpacing: trackPx(fontSize.caption, "caption"),
     color: colors.text.secondary,
     textTransform: "uppercase",
+    marginTop: space[1],
+  },
+  pickerFilm: {
+    fontFamily: fontFamily.sansSemibold,
+    fontSize: fontSize.sm,
+    color: colors.text.primary,
     marginTop: space[1],
   },
   avatars: { flexDirection: "row", alignItems: "center" },

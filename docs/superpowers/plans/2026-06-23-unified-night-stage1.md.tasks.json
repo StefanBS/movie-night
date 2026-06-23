@@ -1,0 +1,37 @@
+{
+  "planPath": "docs/superpowers/plans/2026-06-23-unified-night-stage1.md",
+  "tasks": [
+    {
+      "id": 4,
+      "subject": "Task 1: Widen nextScheduledNight for pre-picked films",
+      "status": "completed",
+      "description": "**Goal:** A future night with a film attached still counts as the next scheduled night; only a past night, or today's night once it has a film, is excluded.\n\n**Files:**\n- Modify: `mobile/lib/nights.ts`\n- Test: `mobile/lib/nights.test.ts`\n\n**Verify:** `cd mobile && node --import tsx --test lib/nights.test.ts`\n\n```json:metadata\n{\"files\": [\"mobile/lib/nights.ts\", \"mobile/lib/nights.test.ts\"], \"verifyCommand\": \"cd mobile && node --import tsx --test lib/nights.test.ts\", \"acceptanceCriteria\": [\"strictly-future counts with or without film\", \"today counts only when film-less\", \"past excluded; soonest returned; empty null\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 2: NightView — unified adaptive night terminal",
+      "status": "completed",
+      "description": "**Goal:** One presentational component rendering any night — film hero when set, date hero + countdown when not — with picker, attendees, Done + film action. Replaces ScheduledStep/RecordedStep.\n\n**Files:**\n- Create: `mobile/components/night/NightView.tsx`\n- Modify: `mobile/components/night/index.ts`\n\n**Verify:** `cd mobile && just typecheck && just lint`\n\n```json:metadata\n{\"files\": [\"mobile/components/night/NightView.tsx\", \"mobile/components/night/index.ts\"], \"verifyCommand\": \"cd mobile && just typecheck && just lint\", \"acceptanceCriteria\": [\"film hero + Scheduled/Recorded badge by date\", \"date hero when no film\", \"countdown for future; picker+attendees; Done + film action\", \"theme tokens only\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 3: Make PickStep skippable and date-aware",
+      "status": "completed",
+      "description": "**Goal:** PickStep can be entered for a future night with a skip and date-appropriate copy, without changing tonight behavior.\n\n**Files:**\n- Modify: `mobile/components/night/PickStep.tsx`\n\n**Verify:** `cd mobile && just typecheck && just lint`\n\n```json:metadata\n{\"files\": [\"mobile/components/night/PickStep.tsx\"], \"verifyCommand\": \"cd mobile && just typecheck && just lint\", \"acceptanceCriteria\": [\"optional future + onSkip props\", \"date-aware picking tag\", \"skip footer only when onSkip provided\", \"unchanged when neither prop passed\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 4: UpNextCard surfaces a pre-picked film",
+      "status": "completed",
+      "description": "**Goal:** When a scheduled night already has a film, the home card shows the film title instead of \"Chooses the film that night\".\n\n**Files:**\n- Modify: `mobile/components/UpNextCard.tsx`\n\n**Verify:** `cd mobile && just typecheck && just lint`\n\n```json:metadata\n{\"files\": [\"mobile/components/UpNextCard.tsx\"], \"verifyCommand\": \"cd mobile && just typecheck && just lint\", \"acceptanceCriteria\": [\"film title shown when movie set (sans)\", \"existing tag when movie null\", \"theme tokens only\"], \"modelTier\": \"standard\"}\n```"
+    },
+    {
+      "id": 8,
+      "subject": "Task 5: Flip wizard to Pick-always + unified NightView terminal",
+      "status": "completed",
+      "blockedBy": [5, 6],
+      "description": "**Goal:** Collapse the two terminal steps to one `\"night\"` step rendering NightView; Who always → Pick; Pick can skip; date-first helpers keep a future night-with-film scheduled and resumable.\n\n**Files:**\n- Modify: `mobile/lib/nightFlow.ts`, `mobile/lib/nightFlow.test.ts`, `mobile/app/night/new.tsx`, `mobile/components/night/WhoStep.tsx`, `mobile/components/night/index.ts`\n- Delete: `mobile/components/night/ScheduledStep.tsx`, `mobile/components/night/RecordedStep.tsx`\n\n**Verify:** `cd mobile && just check`\n\n```json:metadata\n{\"files\": [\"mobile/lib/nightFlow.ts\", \"mobile/lib/nightFlow.test.ts\", \"mobile/app/night/new.tsx\", \"mobile/components/night/WhoStep.tsx\", \"mobile/components/night/index.ts\"], \"verifyCommand\": \"cd mobile && just check\", \"acceptanceCriteria\": [\"Step union + date-first deriveInitialStep/isResumable\", \"onAdvance->pick, onAttach->night, skip->night, film action->pick\", \"uniform Who footer\", \"old terminals deleted + unexported\"], \"modelTier\": \"standard\"}\n```"
+    }
+  ],
+  "lastUpdated": "2026-06-23T00:40:00Z"
+}

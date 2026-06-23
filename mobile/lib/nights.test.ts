@@ -127,8 +127,12 @@ test("nextScheduledNight ignores past nights", () => {
   assert.equal(nextScheduledNight([night("n1", "2026-06-20")], TODAY), null);
 });
 
-test("nextScheduledNight ignores future nights with a movie attached", () => {
-  assert.equal(nextScheduledNight([night("n1", "2026-06-26", { movie: aMovie })], TODAY), null);
+test("nextScheduledNight includes a future night with a movie attached", () => {
+  assert.equal(nextScheduledNight([night("n1", "2026-06-26", { movie: aMovie })], TODAY)?.id, "n1");
+});
+
+test("nextScheduledNight excludes today's night once it has a movie", () => {
+  assert.equal(nextScheduledNight([night("n1", TODAY, { movie: aMovie })], TODAY), null);
 });
 
 test("nextScheduledNight returns a single upcoming planned night", () => {
@@ -147,14 +151,14 @@ test("nextScheduledNight includes a night scheduled for today", () => {
   assert.equal(nextScheduledNight([night("n1", TODAY)], TODAY)?.id, "n1");
 });
 
-test("nextScheduledNight skips past/recorded and picks the soonest upcoming planned", () => {
+test("nextScheduledNight skips past, keeps future with or without a film, soonest first", () => {
   const n = nextScheduledNight(
     [
-      night("past", "2026-06-10", { movie: aMovie }),
-      night("recorded-future", "2026-06-28", { movie: aMovie }),
-      night("planned", "2026-07-01"),
+      night("past", "2026-06-10", { movie: aMovie }),     // excluded: past
+      night("planned", "2026-07-01"),                      // future, no film
+      night("prepicked", "2026-06-28", { movie: aMovie }), // future, film → included, sooner
     ],
     TODAY,
   );
-  assert.equal(n?.id, "planned");
+  assert.equal(n?.id, "prepicked");
 });

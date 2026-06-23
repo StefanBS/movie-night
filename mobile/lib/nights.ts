@@ -208,21 +208,22 @@ export function attachMovie(
   });
 }
 
-// nextScheduledNight is the home's named selector: the soonest upcoming planned
-// night — movie still unattached, dated today or later — or null when none is
-// scheduled. Fed by listNights (the backend returns every picker-set night), it
-// drives the home's "Up next" countdown card; null falls back to the whose-turn
-// spotlight. ISO YYYY-MM-DD strings compare chronologically as plain text, so
-// the "soonest" pick needs no Date parsing (like history.ts). `today` is
-// injectable for deterministic tests (mirrors lib/date.ts).
+// nextScheduledNight is the home's named selector: the soonest upcoming night,
+// or null when none. "Upcoming" = strictly future (with or without a film yet —
+// a film can be pre-picked for a scheduled night), or today while still
+// film-less; today's night once a film is attached is recorded (done) and drops
+// out. Fed by listNights; drives the "Up next" card, with the spotlight as the
+// null fallback. ISO YYYY-MM-DD compares chronologically as text (like
+// history.ts). `today` is injectable for deterministic tests (mirrors date.ts).
 export function nextScheduledNight(
   nights: Night[],
   today: string = todayLocalISO(),
 ): Night | null {
   let soonest: Night | null = null;
   for (const n of nights) {
-    if (n.movie !== null) continue;
-    if (daysUntil(n.scheduledFor, today) < 0) continue;
+    const d = daysUntil(n.scheduledFor, today);
+    if (d < 0) continue; // already past
+    if (d === 0 && n.movie !== null) continue; // tonight, already recorded → done
     if (soonest === null || n.scheduledFor < soonest.scheduledFor) {
       soonest = n;
     }
