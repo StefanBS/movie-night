@@ -15,24 +15,28 @@ documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Stack
 
-- **Expo SDK 56**
+- **Expo SDK 57**
 - **[expo-router](https://docs.expo.dev/router/introduction/)** — file-based navigation (`app/`)
-- **React Native 0.86** / **React 19.2**
+- **[expo-dev-client](https://docs.expo.dev/develop/development-builds/introduction/)** — local development builds (not Expo Go)
+- **React Native** / **React** — versions pinned by the Expo SDK 57 set
 - **TypeScript 6.0**
 
 Expo APIs are version-specific — read the
-[SDK 56 docs](https://docs.expo.dev/versions/v56.0.0/) before changing native or
+[SDK 57 docs](https://docs.expo.dev/versions/v57.0.0/) before changing native or
 Expo code (see [`AGENTS.md`](AGENTS.md)).
 
 ## Prerequisites
 
-- **Node.js 22+** and **npm**
+- **Node.js 22+** and **npm** (use 22.13+ if `expo-doctor` requires it)
 - **[just](https://github.com/casey/just)** (optional) — wraps the `npm`/`npx` recipes
-- A run target — **Expo Go** (physical phone), **iOS Simulator**, **Android
-  Emulator**, or **web**. Expo Go must support SDK 56; if the store build lags,
-  install the SDK 56 build from [`expo.dev/go`](https://expo.dev/go?sdkVersion=56)
-  or via [Expo Orbit](https://docs.expo.dev/build/orbit/).
+- For Android device/emulator builds:
+  - Android SDK (`ANDROID_HOME`, e.g. `~/Android/Sdk`)
+  - JDK **21** with a real `JAVA_HOME` (Android Studio’s bundled JBR works; avoid empty distro stubs under `/usr/lib/jvm`)
+  - `adb` and a device or emulator (`adb devices` shows `device`)
 - The [backend](../backend) running and reachable
+
+Native `android/` / `ios/` folders are **generated** (gitignored). First install or
+SDK upgrades use `just android` / `just android-clean`.
 
 ## Install
 
@@ -57,13 +61,34 @@ EXPO_PUBLIC_API_URL=http://localhost:8080
 
 ## Run
 
+**First time / after native or SDK changes** (build + install the development client):
+
 ```bash
-just start        # or: npm start
+just android        # = npx expo run:android
 ```
 
-Press `i` / `a` / `w` for an iOS simulator / Android emulator / web target, or
-scan the QR with Expo Go. Launch directly with `just android` / `just ios` /
-`just web`.
+**Day-to-day JS** (client already installed):
+
+```bash
+just start          # or: npm start
+# or: just start-clean   # cleared Metro cache
+```
+
+Open the installed **Movie Night / mobile** app on the phone (not Expo Go) and
+connect to the Metro bundler. Use `just ios` (macOS) or `just web` for those targets.
+
+### Optional: EAS development build
+
+If you cannot use a local Android toolchain, an EAS development profile is
+configured in `eas.json`. Install EAS CLI (`npm install --global eas-cli` or
+`npx eas-cli@latest`), then:
+
+```bash
+eas build --platform android --profile development
+```
+
+Install the resulting APK, then use `just start` as usual. Prefer local
+`just android` when possible.
 
 ## Connecting to the backend
 
@@ -81,7 +106,7 @@ A failed request shows an inline error; an empty group shows "No members yet."
 
 **"Couldn't load turn order: Network request failed" on a physical phone** —
 usually a stale Metro bundle serving old code that falls back to `localhost`.
-Restart with a cleared cache and re-scan the QR (don't reopen a recent entry):
+Restart with a cleared cache and reload in the dev client / restart Metro:
 
 ```bash
 just start-clean    # = npx expo start -c
@@ -93,6 +118,24 @@ If it persists, confirm the backend is reachable from the phone:
 - Backend bound to `0.0.0.0:8080`, not loopback.
 - `http://<dev-machine-lan-ip>:8080` responds from the phone's browser.
 - Firewall allows port 8080.
+
+**`JAVA_HOME is set to an invalid directory`** — point `JAVA_HOME` at a real JDK
+21 home that contains `bin/java` (and ideally `bin/javac`). On this machine’s
+typical layout: `export JAVA_HOME=$HOME/.local/opt/android-studio/jbr`.
+
+**`NDK ... did not have a source.properties file`** — incomplete NDK install
+(often after a disk-full failure). Remove the broken directory and rebuild:
+
+```bash
+rm -rf "$ANDROID_HOME/ndk/<version>"
+just android-clean
+```
+
+**Corrupt / stale `android/` after an SDK bump:**
+
+```bash
+just android-clean
+```
 
 ## Quality checks
 
