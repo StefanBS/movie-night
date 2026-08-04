@@ -1,7 +1,7 @@
 # Expo 57 + local development builds — design
 
 **Date:** 2026-08-04  
-**Status:** Approved, awaiting implementation plan  
+**Status:** Implemented  
 **Branch:** `feat/expo-57-dev-client`
 
 ## Problem
