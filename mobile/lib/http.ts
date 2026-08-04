@@ -32,6 +32,13 @@ export async function requestJson<T>(
   return parse(await res.json());
 }
 
+export async function requestNoContent(url: string, init?: RequestInit): Promise<void> {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    throw await errorFor(res);
+  }
+}
+
 // requestJsonOrNull is requestJson for endpoints that signal "no resource" with
 // a 404 (e.g. a group's current night before one exists) — that case returns
 // null instead of throwing; any other non-2xx still rejects.

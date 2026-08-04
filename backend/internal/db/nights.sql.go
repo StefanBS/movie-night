@@ -54,6 +54,21 @@ func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (Pick,
 	return i, err
 }
 
+const deleteNight = `-- name: DeleteNight :exec
+DELETE FROM picks
+WHERE id = $1 AND group_id = $2
+`
+
+type DeleteNightParams struct {
+	NightID uuid.UUID `json:"night_id"`
+	GroupID uuid.UUID `json:"group_id"`
+}
+
+func (q *Queries) DeleteNight(ctx context.Context, arg DeleteNightParams) error {
+	_, err := q.db.Exec(ctx, deleteNight, arg.NightID, arg.GroupID)
+	return err
+}
+
 const getCurrentNight = `-- name: GetCurrentNight :one
 SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 FROM picks
@@ -311,6 +326,34 @@ func (q *Queries) SetNightPicker(ctx context.Context, arg SetNightPickerParams) 
 		arg.NightID,
 		arg.GroupID,
 	)
+	var i Pick
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.PickerID,
+		&i.IsCredited,
+		&i.ScheduledFor,
+		&i.CreatedAt,
+		&i.MovieID,
+	)
+	return i, err
+}
+
+const updateNightDate = `-- name: UpdateNightDate :one
+UPDATE picks
+SET scheduled_for = $1
+WHERE id = $2 AND group_id = $3
+RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+`
+
+type UpdateNightDateParams struct {
+	ScheduledFor pgtype.Date `json:"scheduled_for"`
+	NightID      uuid.UUID   `json:"night_id"`
+	GroupID      uuid.UUID   `json:"group_id"`
+}
+
+func (q *Queries) UpdateNightDate(ctx context.Context, arg UpdateNightDateParams) (Pick, error) {
+	row := q.db.QueryRow(ctx, updateNightDate, arg.ScheduledFor, arg.NightID, arg.GroupID)
 	var i Pick
 	err := row.Scan(
 		&i.ID,

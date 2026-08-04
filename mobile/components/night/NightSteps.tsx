@@ -36,6 +36,7 @@ export function NightSteps({
   onSkipPick,
   onDone,
   onPickFilm,
+  onClearFilm,
 }: {
   night: Night;
   members: Member[];
@@ -61,6 +62,7 @@ export function NightSteps({
   onSkipPick: () => void;
   onDone: () => void;
   onPickFilm: () => void;
+  onClearFilm?: () => void;
 }) {
   return (
     <>
@@ -103,6 +105,7 @@ export function NightSteps({
           today={today}
           onDone={onDone}
           onPickFilm={onPickFilm}
+          onClearFilm={onClearFilm}
         />
       )}
     </>

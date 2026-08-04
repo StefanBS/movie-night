@@ -32,12 +32,14 @@ export function NightView({
   today,
   onDone,
   onPickFilm,
+  onClearFilm,
 }: {
   night: Night;
   members: Member[];
   today: string;
   onDone: () => void;
   onPickFilm: () => void;
+  onClearFilm?: () => void;
 }) {
   const future = daysUntil(night.scheduledFor, today) > 0;
   const movie = night.movie;
@@ -110,6 +112,9 @@ export function NightView({
             variant="ghost"
             onPress={onPickFilm}
           />
+          {movie !== null && onClearFilm !== undefined ? (
+            <AppButton title="Clear film" variant="danger" onPress={onClearFilm} />
+          ) : null}
         </View>
       </WizardFooter>
     </View>

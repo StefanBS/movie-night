@@ -98,6 +98,8 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `POST` | `/groups/{groupId}/nights` | Start or resume the group's one open night. Body `{"scheduledFor","attendees"}`. |
 | `GET` | `/groups/{groupId}/nights/current` | Latest night; `404` if none. |
 | `GET` | `/groups/{groupId}/nights/{nightId}` | A night and its attendees. |
+| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Change the date. Body `{"scheduledFor"}`. |
+| `DELETE` | `/groups/{groupId}/nights/{nightId}` | Cancel/delete the night; `204`. Idempotent. |
 | `GET` | `/groups/{groupId}/nights/{nightId}/turn` | Least-served ranking over the night's attendees. |
 | `POST` | `/groups/{groupId}/nights/{nightId}/attendees` | Mark present. Body `{"userId"}`. |
 | `DELETE` | `/groups/{groupId}/nights/{nightId}/attendees/{userId}` | Remove an attendee; idempotent. |
@@ -109,6 +111,7 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 |--------|------|-------------|
 | `GET` | `/movies/search?q=…` | TMDB search proxy; `400` empty query, `502` upstream failure. |
 | `POST` | `/groups/{groupId}/nights/{nightId}/movie` | Attach a movie by `{"tmdbId"}`; re-fetches canonical title/year from TMDB and returns the night. Repeatable. |
+| `DELETE` | `/groups/{groupId}/nights/{nightId}/movie` | Detach the film; returns the night with `movie` null. Idempotent. |
 
 ## Testing
 

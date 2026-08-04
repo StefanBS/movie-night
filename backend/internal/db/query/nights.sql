@@ -59,6 +59,16 @@ LEFT JOIN movies m ON m.id = p.movie_id
 WHERE p.group_id = sqlc.arg(group_id) AND p.picker_id IS NOT NULL
 ORDER BY p.scheduled_for DESC, p.created_at DESC;
 
+-- name: UpdateNightDate :one
+UPDATE picks
+SET scheduled_for = sqlc.arg(scheduled_for)
+WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
+RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id;
+
+-- name: DeleteNight :exec
+DELETE FROM picks
+WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
+
 -- name: ListNightsAttendees :many
 SELECT a.pick_id, u.id, u.name, m.role
 FROM attendances a
