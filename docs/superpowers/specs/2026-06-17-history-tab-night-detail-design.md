@@ -16,9 +16,8 @@ detail screen (`app/night/[id].tsx`). Wire only the **existing** backend API.
   `GET /nights/{id}` exist. History therefore shows an **honest empty state**
   this phase; the full render path is built behind a loud seam so #39 only has
   to supply the array.
-- **No reactions yet** (→ #40). The `Night` model is left unchanged — no
-  reaction field, no glyph rendered anywhere this phase. The issue's "reaction
-  glyph renders only when present" is satisfied by there being nothing present.
+- **No reactions.** Night reactions (loved/liked/okay) were dropped — the `Night`
+  model has no reaction field and History does not render glyphs or a "Loved" stat.
 - **Picker name** resolves from `night.attendees` (the picker is always a
   present attendee), so this feature needs **no members fetch** anywhere.
 - Follow the parent spec / CLAUDE.md: import all tokens from `theme/`, never
@@ -43,7 +42,7 @@ No logic in the flow changes — it is a file move plus one navigation string.
 ### `lib/history.ts` — pure logic (the testable substance)
 
 ```ts
-type HistoryStats = { nights: number; films: number; loved: number };
+type HistoryStats = { nights: number; films: number };
 type HistoryMonth = { label: string; nights: Night[] };
 
 historyStats(nights: Night[]): HistoryStats
@@ -51,9 +50,8 @@ buildHistoryMonths(nights: Night[]): HistoryMonth[]
 ```
 
 - `historyStats`: `nights` = `nights.length`; `films` = count of distinct
-  `movie.tmdbId` among nights that have a movie; `loved` = `0` with a
-  `// TODO(#40): count nights whose reaction === "loved"` comment (reactions do
-  not exist yet).
+  `movie.tmdbId` among nights that have a movie. (Reactions / a "Loved" count
+  were dropped — closed #40.)
 - `buildHistoryMonths`: group nights by the month of `scheduledFor`, newest
   month first, nights within a month newest first. Month label via the existing
   `formatMonthYear` ("Jun 2026") — no new date code. Empty input → `[]`.
@@ -67,13 +65,12 @@ always empty, so the empty state is what renders live.
 
 - `nights.length === 0` → honest empty state (`"No nights yet — start one."`),
   mirroring the club-tab empty pattern (`TopBar kind="tab"` + centered body text).
-- Otherwise → `TopBar kind="tab" title="History"`, a stat strip of three `Stat`
-  cells (Nights / Films / Loved, "Loved" `accent`) styled like the member
-  profile's `StatsCard`, then per-month sections (`SectionLabel` label + rows).
+- Otherwise → `TopBar kind="tab" title="History"`, a stat strip of two `Stat`
+  cells (Nights / Films) styled like the member profile's `StatsCard`, then
+  per-month sections (`SectionLabel` label + rows).
 - **Row** (inline; not reused, so no new component): `Poster` (small) + serif
   title + year + picker first name + `formatShortDate(scheduledFor)`, pressable
-  → `router.push({ pathname: "/night/[id]", params: { id } })`. No reaction
-  glyph this phase (`// TODO(#40)`).
+  → `router.push({ pathname: "/night/[id]", params: { id } })`. No reaction glyph.
 
 ### `app/night/[id].tsx` — night detail (fully live)
 
@@ -82,8 +79,7 @@ always empty, so the empty state is what renders live.
 - States: loading spinner, error text, not-found (null night) honest message.
 - `TopBar kind="title"` with a back action; `ScrollView` body.
 - Sections mirror `RecordedStep`'s visual vocabulary (consistency, not shared code):
-  - **Editorial header**: large `Poster` + serif title + year. Reaction omitted
-    (`// TODO(#40)`).
+  - **Editorial header**: large `Poster` + serif title + year. No reaction badge.
   - **"The pick"** spotlight row: ember `surface.spotlight` card + ember border +
     `shadow.spotlight`, picker `Avatar` (glow) + name + `formatShortDate`.
   - **"Who watched"**: `SectionLabel` + attendee list (`Avatar` + name; guests
@@ -99,7 +95,7 @@ always empty, so the empty state is what renders live.
 ## Testing
 
 - `lib/history.test.ts` — table-driven, no mocks: `historyStats` (counts, film
-  dedup by `tmdbId`, nights without a movie, `loved === 0`) and
+  dedup by `tmdbId`, nights without a movie) and
   `buildHistoryMonths` (single month, multi-month ordering, within-month order,
   empty input).
 - Screens: `just check` (lint + typecheck + test). Night detail is reachable by
@@ -108,7 +104,7 @@ always empty, so the empty state is what renders live.
 ## Out of scope (visible seams)
 
 - Nights-list endpoint + History data wiring → #39.
-- Reactions (model field, glyphs, real "Loved" count) → #40.
+- Reactions were dropped (closed #40) — not a future seam.
 
 ## Build order
 

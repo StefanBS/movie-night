@@ -69,8 +69,8 @@ the scheduled night *is* "next up"), with the same top ember wash as
 
 Props: `{ night: Night; onStart: () => void; onEdit: () => void }`.
 
-**Recurrence is omitted.** The prototype's `↻ Repeat` row is Phase 4
-(#48/#49) and has no backing data on the `Night` model yet.
+**Recurrence is omitted.** Recurring nights were dropped (closed #48/#49); there
+is no repeat row on this card.
 
 ### Home wiring — `app/(tabs)/index.tsx`
 
@@ -102,5 +102,5 @@ Props: `{ night: Night; onStart: () => void; onEdit: () => void }`.
 ## Out of scope
 
 - Edit/cancel flow (#47).
-- Recurrence row + data (#48/#49).
+- Recurrence (dropped — closed #48/#49).
 - Targeting a specific night by id from "Start the night" (deferred to #47).

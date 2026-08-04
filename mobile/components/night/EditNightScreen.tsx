@@ -46,8 +46,8 @@ function firstName(name: string): string {
 }
 
 // EditNightScreen is the scheduling edit flow from the home Up-next card:
-// change the date, toggle who's coming, and cancel the night. Repeat and
-// reminders route to deferred screens (#48–#51).
+// change the date, toggle who's coming, and cancel the night. Reminders
+// route to the deferred #50 screen.
 export function EditNightScreen({
   night,
   members,
@@ -58,7 +58,6 @@ export function EditNightScreen({
   onBack,
   onSaved,
   onCancelled,
-  onRepeat,
   onReminders,
 }: {
   night: Night;
@@ -70,7 +69,6 @@ export function EditNightScreen({
   onBack: () => void;
   onSaved: () => void;
   onCancelled: () => void;
-  onRepeat: () => void;
   onReminders: () => void;
 }) {
   const [mode, setMode] = useState<"main" | "date">("main");
@@ -225,14 +223,6 @@ export function EditNightScreen({
                 value={formatShortDate(draftDate)}
                 right={<ChevronRight size={18} color={colors.text.tertiary} />}
                 onPress={() => setMode("date")}
-              />
-            </View>
-            <View style={styles.divider}>
-              <SettingsRow
-                label="Repeat"
-                value="Every week"
-                right={<ChevronRight size={18} color={colors.text.tertiary} />}
-                onPress={onRepeat}
               />
             </View>
             <SettingsRow

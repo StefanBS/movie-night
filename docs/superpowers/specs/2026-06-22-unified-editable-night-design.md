@@ -52,7 +52,8 @@ Clear film (detach), change date, cancel/delete a night. New backend endpoints (
 
 ## Out of scope
 
-- Recurrence / reminders / calendar export (Phases 4–5; #48–#51).
+- Reminders / calendar export (Phase 5; #50–#51). Recurrence and night reactions
+  were dropped (closed #48/#49, #40).
 - History showing future planned nights as "Untitled night" — a pre-existing artifact of #45's `listNights` usage, untouched here.
 
 ## Testing

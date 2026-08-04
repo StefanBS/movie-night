@@ -26,8 +26,8 @@ hardcoded `TODAY` constant, but the app must compute against **device today**.
 
 ## Non-goals
 
-- **`upcomingDates`** (weekly-recurrence preview) — that's #49 (Phase 4). Not
-  ported here.
+- **`upcomingDates`** (weekly-recurrence preview) — recurring nights were dropped
+  (closed #48/#49). Not ported.
 - No new file: these live in the existing `mobile/lib/date.ts`.
 - No screen wiring — consumers are #44–#46.
 - `fmtDate`/`monthLabel` from the prototype are already ported

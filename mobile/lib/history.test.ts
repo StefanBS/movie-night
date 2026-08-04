@@ -17,22 +17,22 @@ function night(id: string, scheduledFor: string, tmdbId: number | null): Night {
   };
 }
 
-test("historyStats counts nights, distinct films, and zero loved", () => {
+test("historyStats counts nights and distinct films", () => {
   const nights = [
     night("a", "2026-06-12", 10),
     night("b", "2026-05-30", 20),
     night("c", "2026-05-02", 10), // same film as a → not a distinct film
   ];
-  assert.deepEqual(historyStats(nights), { nights: 3, films: 2, loved: 0 });
+  assert.deepEqual(historyStats(nights), { nights: 3, films: 2 });
 });
 
 test("historyStats counts a movie-less night but not as a film", () => {
   const nights = [night("a", "2026-06-12", 10), night("b", "2026-06-01", null)];
-  assert.deepEqual(historyStats(nights), { nights: 2, films: 1, loved: 0 });
+  assert.deepEqual(historyStats(nights), { nights: 2, films: 1 });
 });
 
 test("historyStats on an empty list is all zeros", () => {
-  assert.deepEqual(historyStats([]), { nights: 0, films: 0, loved: 0 });
+  assert.deepEqual(historyStats([]), { nights: 0, films: 0 });
 });
 
 test("buildHistoryMonths groups by month, newest first within and across", () => {

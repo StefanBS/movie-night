@@ -12,7 +12,8 @@
 - Name the weekday+date formatter `formatWeekdayDate` (follow the file's `format*` convention, not the prototype's `fmtWeekdayDate`).
 - `countdownLabel` uses polished grammar: add `yesterday`; `±1` are special-cased so day-count branches are always plural.
 - `relativeLabel` is ported faithfully (Tonight / Tomorrow / This <Weekday> / Next <Weekday> / full).
-- Scope is exactly these five functions — `upcomingDates` is out (that's #49).
+- Scope is exactly these five functions — `upcomingDates` is out (recurring
+  nights later dropped — closed #48/#49).
 - Inject "today" as an optional ISO string defaulting to `todayLocalISO()`.
 
 ---

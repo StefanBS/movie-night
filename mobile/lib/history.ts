@@ -1,13 +1,12 @@
 import { formatMonthYear } from "./date";
 import type { Night } from "./nights";
 
-export type HistoryStats = { nights: number; films: number; loved: number };
+export type HistoryStats = { nights: number; films: number };
 export type HistoryMonth = { label: string; nights: Night[] };
 
 // historyStats summarizes recorded nights for the History stat strip. `films`
 // counts distinct movies (by tmdbId), so a film watched twice counts once and a
-// movie-less night counts toward `nights` only. `loved` is 0 until reactions
-// land — the Night model has no reaction field yet.
+// movie-less night counts toward `nights` only.
 export function historyStats(nights: Night[]): HistoryStats {
   const tmdbIds = new Set<number>();
   for (const n of nights) {
@@ -18,7 +17,6 @@ export function historyStats(nights: Night[]): HistoryStats {
   return {
     nights: nights.length,
     films: tmdbIds.size,
-    loved: 0, // TODO(#40): count nights whose reaction === "loved"
   };
 }
 

@@ -205,5 +205,5 @@ footer.
 
 - The **When** step and **Scheduled** future-night branch (Phase 3 scheduling).
 - Skip-turn (#42) and any turn/endpoint changes.
-- Reactions / who-loved-it (#40) and history (#36).
+- Reactions / who-loved-it (dropped — closed #40) and history (#36).
 - Any new shared `components/` primitive or backend change.
