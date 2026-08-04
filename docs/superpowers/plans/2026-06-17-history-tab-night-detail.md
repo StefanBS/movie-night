@@ -10,8 +10,10 @@
 
 **User decisions (already made):**
 - History data this phase: "Always empty until #39" — no fetch; honest empty state shows live, full render path built behind the seam.
-- Reactions: "No model change yet" — `Night` is untouched; no reaction glyph rendered anywhere; marked `// TODO(#40)`.
-- Stat definitions: "Nights, distinct films, loved-count" — `nights` = count, `films` = distinct `tmdbId`, `loved` = 0 until #40.
+- Reactions: deferred at the time of this plan; later **dropped** (closed #40) — no reaction field, glyph, or Loved stat in the product.
+- Stat definitions: "Nights, distinct films" — `nights` = count, `films` = distinct `tmdbId`. (A third "Loved" count was planned via #40 and later dropped.)
+
+> **Later product decision:** night reactions (#40) and recurring nights (#48/#49) were closed as not planned. Inline `TODO(#40)` snippets below are historical plan text.
 
 ---
 

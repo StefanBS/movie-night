@@ -38,7 +38,6 @@ export default function RootLayout() {
         {/* These render their own TopBar (kind="title"); hide the Stack header. */}
         <Stack.Screen name="night/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="night/edit/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="night/edit/repeat" options={{ headerShown: false }} />
         <Stack.Screen name="night/edit/reminders" options={{ headerShown: false }} />
         <Stack.Screen name="night/new" options={{ headerShown: false }} />
         <Stack.Screen name="welcome" options={{ headerShown: false }} />

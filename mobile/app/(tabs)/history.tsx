@@ -122,10 +122,6 @@ export default function HistoryScreen() {
           <View style={styles.statCell}>
             <Stat value={stats.films} label="Films" />
           </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statCell}>
-            <Stat value={stats.loved} label="Loved" accent />
-          </View>
         </View>
 
         {months.map((month) => (
@@ -159,7 +155,6 @@ export default function HistoryScreen() {
                       {formatShortDate(n.scheduledFor)}
                     </Text>
                   </View>
-                  {/* TODO(#40): reaction glyph renders here when present */}
                 </Pressable>
               );
             })}

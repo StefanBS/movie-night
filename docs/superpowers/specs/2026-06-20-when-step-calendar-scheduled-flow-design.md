@@ -278,9 +278,9 @@ Port of `NightScheduledScreen`, **trimmed to in-scope elements**:
   `night.attendees`.
 - `WizardFooter`: a single primary **"Done"** → `router.back()`.
 
-**Dropped from the prototype** (deferred phases): the **repeat chip** (recurrence,
-Phase 4 #48/#49) and the **"Add to calendar" / "Notify the group"** ghost buttons
-(native follow-ons, Phase 5 #50/#51).
+**Dropped from the prototype:** the **repeat chip** (recurring nights were
+dropped — closed #48/#49) and the **"Add to calendar" / "Notify the group"** ghost
+buttons (native follow-ons, Phase 5 #50/#51).
 
 ## Edge & error states
 
@@ -324,5 +324,5 @@ Phase 4 #48/#49) and the **"Add to calendar" / "Notify the group"** ghost button
 
 - Home "Up next" countdown card + `nextScheduledNight` selector (#46).
 - Edit / cancel a scheduled night (#47).
-- Recurrence/repeat (#48/#49), reminders (#50), calendar export (#51).
+- Reminders (#50), calendar export (#51). Recurrence was dropped (closed #48/#49).
 - Any backend, endpoint, or shared-primitive change beyond `components/Calendar.tsx`.

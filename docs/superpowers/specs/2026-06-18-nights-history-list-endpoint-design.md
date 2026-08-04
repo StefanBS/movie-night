@@ -2,7 +2,7 @@
 
 Date: 2026-06-18
 Issue: #39 (Backend P2.1) · Epic #28 · Phase 2 (backend)
-Related: #36 (History tab — the consumer), #40 (reactions — deferred), #19 (single-night movie round-trip — tech debt)
+Related: #36 (History tab — the consumer), #19 (single-night movie round-trip — tech debt)
 
 ## Goal
 
@@ -26,8 +26,8 @@ and wire the History screen to fetch from it.
   defensively, but the contract is sorted.
 - **Empty group:** `200` with `[]` (not `404`).
 - **Invalid `groupId`:** `400` (via the existing `pathUUID` helper).
-- **No `reaction` field** — reactions are #40; the `Night` model has none yet
-  (`historyStats` hardcodes `loved: 0` with a `TODO(#40)`).
+- **No `reaction` field** — night reactions were dropped (closed #40); the
+  `Night` model has none.
 - **No pagination** — single-group learning-project scale; returns all recorded
   nights. Revisit if/when history grows.
 
@@ -185,7 +185,7 @@ gates.
 
 ## Out of scope (later issues)
 
-- Reactions / `loved` count (#40).
+- Reactions / `loved` count — dropped (closed #40).
 - Pagination / windowing.
 - Refactoring the single-night `GetMovie` round-trip (#19) — the list avoids it
   by joining, but the existing single-night path is untouched here.

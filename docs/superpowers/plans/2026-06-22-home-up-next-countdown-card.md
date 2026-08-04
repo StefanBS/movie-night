@@ -12,7 +12,7 @@
 - Edit button is a UI-only no-op placeholder until #47 (matches the existing UI-only skip-turn button).
 - `UpNextCard` is extracted to its own component file (not inlined like `SpotlightHero`).
 - Start the night → `/night/new` (reuse the existing resume path).
-- Recurrence/repeat row omitted (Phase 4, #48/#49 — no backing data).
+- Recurrence/repeat row omitted (recurring nights later dropped — closed #48/#49).
 
 ---
 
@@ -187,7 +187,8 @@ const MAX_AVATARS = 4; // overlapping "coming" faces shown on the picker row
 // calendar, the home leads with this countdown card instead of the whose-turn
 // hero. It reuses the rationed-ember treatment (surface.dark + a bonfire wash +
 // shadow.spotlight) — the scheduled night *is* "next up". Recurrence is deferred
-// (#48/#49), so there is no repeat row yet; Edit is wired in #47.
+// shadow.spotlight) — the scheduled night *is* "next up". Recurrence was later
+// dropped (closed #48/#49); Edit is wired in #47.
 export function UpNextCard({
   night,
   onStart,
@@ -555,7 +556,7 @@ git commit -m "Home leads with the Up next countdown card when a night is schedu
 - `UpNextCard` (ember spotlight, countdown pill, serif date, picker row + ≤4 avatars, Start/Edit, no repeat row) → Task 2. ✓
 - Home wiring (Promise.all fetch, graceful nights degradation, card-or-spotlight, planned-state chrome, On deck in both) → Task 3. ✓
 - Start → `/night/new`; Edit → no-op (#47) → Task 3 render. ✓
-- Out of scope (Edit flow #47, recurrence #48/#49, by-id targeting) → not implemented. ✓
+- Out of scope (Edit flow #47, recurrence later dropped #48/#49, by-id targeting) → not implemented. ✓
 
 **Placeholder scan:** No TBD/TODO/"handle edge cases" — every code step shows the full content. ✓
 

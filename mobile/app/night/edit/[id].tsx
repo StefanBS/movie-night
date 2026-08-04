@@ -62,8 +62,8 @@ export default function NightEditRoute() {
   );
 
   // Gated on "no night yet", not on loading: the editor holds unsaved drafts, so
-  // the refocus refetch (pushing to Repeat/Reminders and back) must not unmount
-  // it. A failed refresh leaves the last-known-good night on screen.
+  // the refocus refetch (pushing to Reminders and back) must not unmount it. A
+  // failed refresh leaves the last-known-good night on screen.
   if (night === null && loading) {
     return (
       <View style={styles.screen}>
@@ -119,9 +119,6 @@ export default function NightEditRoute() {
       onBack={() => router.back()}
       onSaved={() => router.back()}
       onCancelled={() => router.replace("/")}
-      onRepeat={() =>
-        router.push({ pathname: "/night/edit/repeat", params: { id: night.id } })
-      }
       onReminders={() =>
         router.push({ pathname: "/night/edit/reminders", params: { id: night.id } })
       }

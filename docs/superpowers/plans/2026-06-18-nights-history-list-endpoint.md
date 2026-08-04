@@ -11,7 +11,7 @@
 **User decisions (already made):**
 - History = recorded nights only: `picker_id IS NOT NULL` (excludes the open/planned night).
 - Set-based, two queries (LEFT JOIN movies inline, attendees over the id set) — avoid N+1.
-- Reactions / `loved` are #40 — no `reaction` field here.
+- Reactions / `loved` are out — night reactions were later dropped (closed #40).
 - No pagination — return all recorded nights (single-group scale).
 - Include the `history.tsx` wiring in this issue (complete the slice).
 

@@ -9,9 +9,10 @@ Epic: #28 · Phase 1 issues: #29–#38
 Reorganize the Movie Night mobile app from three ad-hoc screens
 (`index`/`night`/`manage`) into the coherent four-tab **Spotlight** app described in
 `design_handoff_app_redesign/`, **wired only to the existing Go backend API**.
-Scheduling (Phase 3), recurrence (Phase 4), and native notifications/calendar
-(Phase 5) are out of scope. Backend additions (Phase 2) are out of scope; screens
-that need them ship with honest stubs that point at their Phase 2 issue.
+Scheduling (Phase 3) and native notifications/calendar (Phase 5) are out of
+scope. Recurrence and night reactions were later dropped (closed #48/#49, #40).
+Backend additions (Phase 2) are out of scope; screens that need them ship with
+honest stubs that point at their Phase 2 issue.
 
 ## Context / starting point
 
@@ -22,8 +23,9 @@ that need them ship with honest stubs that point at their Phase 2 issue.
   Current endpoints: `GET /groups/{id}/members`, `GET /groups/{id}/turn`,
   member join/deactivate/reactivate/promote, nights create/current/detail/turn,
   attendees add/remove, pick, `GET /movies/search`, night movie attach.
-- **No backend endpoint for:** a nights history *list*, reactions, group settings,
-  or skip-turn. These gate History, Settings, and the skip control.
+- **No backend endpoint for:** a nights history *list*, group settings, or
+  skip-turn. These gate History, Settings, and the skip control. (Night
+  reactions were later dropped — closed #40.)
 
 ## Architecture
 
@@ -112,5 +114,6 @@ its issues and ticks the epic checklist.
 
 ## Non-goals
 
-Backend changes, scheduling, recurrence, notifications, calendar export, and any
-redraw of the brand logomark.
+Backend changes, scheduling, notifications, calendar export, and any redraw of
+the brand logomark. Recurrence and night reactions are not in scope (later
+dropped — closed #48/#49, #40).
