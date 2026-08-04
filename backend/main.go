@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
@@ -47,8 +48,8 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
+		// uuid.Nil: this route is not group-scoped (see logScope).
+		respondJSON(w, http.StatusOK, map[string]string{"status": "ok"}, uuid.Nil, "encode healthz")
 	})
 	mux.Handle("GET /groups/{groupId}", getGroupHandler(queries))
 	mux.Handle("PATCH /groups/{groupId}", renameGroupHandler(queries))

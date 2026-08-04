@@ -1,13 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
@@ -112,10 +112,8 @@ func searchMoviesHandler(client *tmdbClient) http.HandlerFunc {
 			writeJSONError(w, http.StatusBadGateway, "movie search failed")
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(toMovieResults(results)); err != nil {
-			log.Printf("encode movie results: %v", err) //#nosec G706 -- only an error value, no user input
-		}
+		// uuid.Nil: this route is not group-scoped (see logScope).
+		respondJSON(w, http.StatusOK, toMovieResults(results), uuid.Nil, "encode movie results")
 	}
 }
 
@@ -123,14 +121,10 @@ func searchMoviesHandler(client *tmdbClient) http.HandlerFunc {
 // The body carries only {tmdbId}; the backend re-fetches canonical title/year from
 // TMDB (source of truth), caches the movie, and sets it on the night. Repeatable:
 // attaching a different movie is the correction path. It reuses the night plumbing
-// (ensureNight/writeNightDTO over nightStore) from nights.go.
+// (loadNight/writeNightDTO over nightStore) from nights.go.
 func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
-		if !ok {
-			return
-		}
-		nightID, ok := pathUUID(w, r, "nightId", "invalid night id")
+		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
@@ -142,7 +136,9 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		if !ensureNight(w, r, store, gid, nightID) {
+		// Existence check only — an unknown night must 404 before we call TMDB;
+		// SetNightMovie below hands back the row for the response.
+		if _, ok := loadNight(w, r, store, gid, nightID); !ok {
 			return
 		}
 		if client == nil {
@@ -169,15 +165,16 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			internalError(w, gid, "upsert movie", err)
 			return
 		}
-		if _, err := store.SetNightMovie(r.Context(), db.SetNightMovieParams{
+		night, err := store.SetNightMovie(r.Context(), db.SetNightMovieParams{
 			MovieID: pgtype.UUID{Bytes: cached.ID, Valid: true},
 			NightID: nightID,
 			GroupID: gid,
-		}); err != nil {
+		})
+		if err != nil {
 			internalError(w, gid, "set night movie", err)
 			return
 		}
-		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
+		writeNightDTO(w, r, store, gid, night, http.StatusOK)
 	}
 }
 
@@ -186,24 +183,22 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 // with movie null.
 func clearNightMovieHandler(store nightStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
-		nightID, ok := pathUUID(w, r, "nightId", "invalid night id")
-		if !ok {
+		// Existence check only — ClearNightMovie hands back the cleared night.
+		if _, ok := loadNight(w, r, store, gid, nightID); !ok {
 			return
 		}
-		if !ensureNight(w, r, store, gid, nightID) {
-			return
-		}
-		if _, err := store.ClearNightMovie(r.Context(), db.ClearNightMovieParams{
+		night, err := store.ClearNightMovie(r.Context(), db.ClearNightMovieParams{
 			NightID: nightID,
 			GroupID: gid,
-		}); err != nil {
+		})
+		if err != nil {
 			internalError(w, gid, "clear night movie", err)
 			return
 		}
-		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
+		writeNightDTO(w, r, store, gid, night, http.StatusOK)
 	}
 }

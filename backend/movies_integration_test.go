@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -59,11 +58,6 @@ func TestMovieAttachIntegration(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, client))
 	mux.Handle("GET /movies/search", searchMoviesHandler(client))
 
-	do := func(t *testing.T, method, path, body string) (int, []byte) {
-		t.Helper()
-		return doReq(t, mux, method, path, body)
-	}
-
 	// mkNight clears the group's picks (one open night per group) and creates a
 	// fresh attendee-less night, returning its id. Attaching a movie needs only a
 	// night to exist — no picker or attendee.
@@ -79,17 +73,13 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	attach := func(t *testing.T, group, nightID, body string) (int, nightResponse) {
 		t.Helper()
-		return doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+group+"/nights/"+nightID+"/movie", body)
+		return attachMovie(t, mux, group, nightID, body)
 	}
 
 	t.Run("search returns mapped results", func(t *testing.T) {
-		code, b := do(t, http.MethodGet, "/movies/search?q=dune", "")
+		code, got := doJSON[[]movieDTO](t, mux, http.MethodGet, "/movies/search?q=dune", "")
 		if code != http.StatusOK {
-			t.Fatalf("search status = %d, want 200 (%s)", code, b)
-		}
-		var got []movieDTO
-		if err := json.Unmarshal(b, &got); err != nil {
-			t.Fatalf("decode results: %v", err)
+			t.Fatalf("search status = %d, want 200", code)
 		}
 		if len(got) != 2 || got[0].TMDBID != 438631 || got[0].Title != "Dune" ||
 			got[0].ReleaseYear == nil || *got[0].ReleaseYear != 2021 {
@@ -181,8 +171,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 		if code, _ := attach(t, seededGroup, night, `{"tmdbId":0}`); code != http.StatusBadRequest {
 			t.Errorf("non-positive tmdbId status = %d, want 400", code)
 		}
-		missing := "b0000000-0000-0000-0000-0000000000ee"
-		if code, _ := attach(t, seededGroup, missing, `{"tmdbId":438631}`); code != http.StatusNotFound {
+		if code, _ := attach(t, seededGroup, unknownNight, `{"tmdbId":438631}`); code != http.StatusNotFound {
 			t.Errorf("unknown-night status = %d, want 404", code)
 		}
 	})
@@ -193,7 +182,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 			t.Errorf("search unconfigured = %d, want 503", code)
 		}
 		// Drive attach through a router so {groupId}/{nightId} path values populate;
-		// with a nil client the handler must 503 after ensureNight passes.
+		// with a nil client the handler must 503 after loadNight passes.
 		night := mkNight(t, seededGroup)
 		m2 := http.NewServeMux()
 		m2.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, nilClient))

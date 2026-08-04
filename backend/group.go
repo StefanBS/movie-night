@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -37,12 +35,12 @@ type groupResponse struct {
 	CreatedOn string `json:"createdOn"`
 }
 
-// toGroupResponse maps a groups row to the DTO, reusing memberDate to render the
-// timestamptz as a calendar date.
+// toGroupResponse maps a groups row to the DTO, rendering the timestamptz as a
+// calendar date in the shared wire format.
 func toGroupResponse(g db.Group) groupResponse {
 	return groupResponse{
 		Name:      g.Name,
-		CreatedOn: memberDate(g.CreatedAt),
+		CreatedOn: formatTimestampDate(g.CreatedAt),
 	}
 }
 
@@ -64,11 +62,7 @@ func getGroupHandler(store groupStore) http.HandlerFunc {
 		}
 		g, err := store.GetGroup(r.Context(), gid)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeJSONError(w, http.StatusNotFound, "group not found")
-				return
-			}
-			internalError(w, gid, "get group", err)
+			storeError(w, gid, "get group", err, http.StatusNotFound, "group not found")
 			return
 		}
 		respondJSON(w, http.StatusOK, toGroupResponse(g), gid, "encode group response")
@@ -94,11 +88,7 @@ func renameGroupHandler(store groupStore) http.HandlerFunc {
 		}
 		g, err := store.RenameGroup(r.Context(), db.RenameGroupParams{ID: gid, Name: name})
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeJSONError(w, http.StatusNotFound, "group not found")
-				return
-			}
-			internalError(w, gid, "rename group", err)
+			storeError(w, gid, "rename group", err, http.StatusNotFound, "group not found")
 			return
 		}
 		respondJSON(w, http.StatusOK, toGroupResponse(g), gid, "encode group response")

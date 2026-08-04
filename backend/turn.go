@@ -25,13 +25,8 @@ type turnResponse struct {
 // list of member UUIDs present tonight. Blank input (or blank segments) yields
 // nil, which the handler passes as a NULL present-set (rank all active core).
 func parsePresent(raw string) ([]uuid.UUID, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return nil, nil
-	}
-	parts := strings.Split(raw, ",")
-	ids := make([]uuid.UUID, 0, len(parts))
-	for _, p := range parts {
+	var ids []uuid.UUID
+	for p := range strings.SplitSeq(raw, ",") {
 		p = strings.TrimSpace(p)
 		if p == "" {
 			continue
@@ -42,9 +37,7 @@ func parsePresent(raw string) ([]uuid.UUID, error) {
 		}
 		ids = append(ids, id)
 	}
-	if len(ids) == 0 {
-		return nil, nil
-	}
+	// A blank param leaves ids nil, which is the "rank all active core" signal.
 	return ids, nil
 }
 
@@ -60,7 +53,7 @@ func toTurnResponses(rows []db.RankGroupTurnRow) []turnResponse {
 			ServedCount: r.ServedCount,
 		}
 		if r.LastPickedOn.Valid {
-			s := r.LastPickedOn.Time.Format("2006-01-02")
+			s := formatDate(r.LastPickedOn)
 			resp.LastPickedOn = &s
 		}
 		out = append(out, resp)

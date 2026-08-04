@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -47,19 +46,30 @@ func parseAttendeeIDs(raw []string) ([]uuid.UUID, error) {
 	return ids, nil
 }
 
+// parseScheduledFor parses the wire scheduledFor into a DATE param, naming the
+// field in the error. Shared by create and the date-edit PATCH so the two paths
+// can't disagree on the accepted format. Pure.
+func parseScheduledFor(raw string) (pgtype.Date, error) {
+	d, err := parseDate(raw)
+	if err != nil {
+		return pgtype.Date{}, fmt.Errorf("invalid scheduledFor")
+	}
+	return d, nil
+}
+
 // validateCreateNightRequest validates a decoded body: scheduledFor must be an
 // ISO (YYYY-MM-DD) date and every attendee must be a UUID. Pure — no DB, no clock.
 func validateCreateNightRequest(req createNightRequest) (parsedCreateNight, error) {
-	t, err := time.Parse("2006-01-02", req.ScheduledFor)
+	scheduledFor, err := parseScheduledFor(req.ScheduledFor)
 	if err != nil {
-		return parsedCreateNight{}, fmt.Errorf("invalid scheduledFor")
+		return parsedCreateNight{}, err
 	}
 	attendees, err := parseAttendeeIDs(req.Attendees)
 	if err != nil {
 		return parsedCreateNight{}, err
 	}
 	return parsedCreateNight{
-		ScheduledFor: pgtype.Date{Time: t, Valid: true},
+		ScheduledFor: scheduledFor,
 		Attendees:    attendees,
 	}, nil
 }
@@ -91,24 +101,37 @@ func pickerIDPtr(u pgtype.UUID) *string {
 	return &s
 }
 
-// toNightResponse maps a night row + attendee rows to the night DTO. Attendees
-// is always non-nil so an empty list encodes as [] rather than null.
+// toAttendee builds the attendee DTO. The single-night query and the grouped
+// history query return different row types carrying the same three fields, so
+// both funnel through here and their JSON cannot drift apart.
+func toAttendee(id uuid.UUID, name string, role db.MembershipRole) attendee {
+	return attendee{ID: id.String(), Name: name, Role: string(role)}
+}
+
+// newNightResponse assembles the night DTO from its parts. The detail path and
+// the history-list path read different row shapes but both build through here,
+// so a new field is added once. Attendees is normalized to non-nil so an empty
+// list encodes as [] rather than null.
+func newNightResponse(id uuid.UUID, scheduledFor pgtype.Date, pickerID pgtype.UUID, movie *movieDTO, atts []attendee) nightResponse {
+	if atts == nil {
+		atts = []attendee{}
+	}
+	return nightResponse{
+		ID:           id.String(),
+		ScheduledFor: formatDate(scheduledFor),
+		PickerID:     pickerIDPtr(pickerID),
+		Movie:        movie,
+		Attendees:    atts,
+	}
+}
+
+// toNightResponse maps a night row + attendee rows to the night DTO.
 func toNightResponse(p db.Pick, rows []db.ListNightAttendeesRow, movie *db.Movie) nightResponse {
 	attendees := make([]attendee, 0, len(rows))
 	for _, r := range rows {
-		attendees = append(attendees, attendee{
-			ID:   r.ID.String(),
-			Name: r.Name,
-			Role: string(r.Role),
-		})
+		attendees = append(attendees, toAttendee(r.ID, r.Name, r.Role))
 	}
-	return nightResponse{
-		ID:           p.ID.String(),
-		ScheduledFor: p.ScheduledFor.Time.Format("2006-01-02"),
-		PickerID:     pickerIDPtr(p.PickerID),
-		Movie:        movieDTOPtr(movie),
-		Attendees:    attendees,
-	}
+	return newNightResponse(p.ID, p.ScheduledFor, p.PickerID, movieDTOPtr(movie), attendees)
 }
 
 // movieDTOFromCols builds the movie DTO from the nullable LEFT JOIN columns of a
@@ -128,34 +151,21 @@ func movieDTOFromCols(row db.ListRecordedNightsRow) *movieDTO {
 // groupAttendees buckets attendee rows by their night (pick_id), preserving the
 // query's role-then-name order within each night.
 func groupAttendees(rows []db.ListNightsAttendeesRow) map[uuid.UUID][]attendee {
-	byNight := make(map[uuid.UUID][]attendee)
+	byNight := make(map[uuid.UUID][]attendee, len(rows))
 	for _, r := range rows {
-		byNight[r.PickID] = append(byNight[r.PickID], attendee{
-			ID:   r.ID.String(),
-			Name: r.Name,
-			Role: string(r.Role),
-		})
+		byNight[r.PickID] = append(byNight[r.PickID], toAttendee(r.ID, r.Name, r.Role))
 	}
 	return byNight
 }
 
 // toNightResponses assembles the ordered history list from recorded-night rows
-// and the attendees grouped by night. Attendees default to a non-nil empty slice
-// so a night with none encodes as [] rather than null.
+// and the attendees grouped by night. A nil byNight (no night had attendees) is
+// fine: reads from a nil map yield the zero value, which newNightResponse
+// normalizes to [].
 func toNightResponses(rows []db.ListRecordedNightsRow, byNight map[uuid.UUID][]attendee) []nightResponse {
 	out := make([]nightResponse, 0, len(rows))
 	for _, row := range rows {
-		atts := byNight[row.ID]
-		if atts == nil {
-			atts = []attendee{}
-		}
-		out = append(out, nightResponse{
-			ID:           row.ID.String(),
-			ScheduledFor: row.ScheduledFor.Time.Format("2006-01-02"),
-			PickerID:     pickerIDPtr(row.PickerID),
-			Movie:        movieDTOFromCols(row),
-			Attendees:    atts,
-		})
+		out = append(out, newNightResponse(row.ID, row.ScheduledFor, row.PickerID, movieDTOFromCols(row), byNight[row.ID]))
 	}
 	return out
 }
@@ -175,12 +185,12 @@ func listNightsHandler(store nightStore) http.HandlerFunc {
 			internalError(w, gid, "list recorded nights", err)
 			return
 		}
-		ids := make([]uuid.UUID, 0, len(rows))
-		for _, row := range rows {
-			ids = append(ids, row.ID)
-		}
-		byNight := map[uuid.UUID][]attendee{}
-		if len(ids) > 0 {
+		var byNight map[uuid.UUID][]attendee
+		if len(rows) > 0 {
+			ids := make([]uuid.UUID, 0, len(rows))
+			for _, row := range rows {
+				ids = append(ids, row.ID)
+			}
 			attRows, err := store.ListNightsAttendees(ctx, db.ListNightsAttendeesParams{GroupID: gid, NightIds: ids})
 			if err != nil {
 				internalError(w, gid, "list nights attendees", err)
@@ -244,11 +254,7 @@ type updateNightDateRequest struct {
 
 // validateUpdateNightDateRequest parses scheduledFor as YYYY-MM-DD. Pure.
 func validateUpdateNightDateRequest(req updateNightDateRequest) (pgtype.Date, error) {
-	t, err := time.Parse("2006-01-02", req.ScheduledFor)
-	if err != nil {
-		return pgtype.Date{}, fmt.Errorf("invalid scheduledFor")
-	}
-	return pgtype.Date{Time: t, Valid: true}, nil
+	return parseScheduledFor(req.ScheduledFor)
 }
 
 // creditedForRole derives is_credited from the picker's role: a core pick moves
@@ -257,33 +263,25 @@ func creditedForRole(role db.MembershipRole) bool {
 	return role == db.MembershipRoleCore
 }
 
-// ensureNight confirms a night exists in this group, mapping a miss to 404 and
-// any other error to 500. ok=false means a response was already written.
-func ensureNight(w http.ResponseWriter, r *http.Request, store nightStore, gid, nightID uuid.UUID) bool {
-	if _, err := store.GetNight(r.Context(), db.GetNightParams{NightID: nightID, GroupID: gid}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			writeJSONError(w, http.StatusNotFound, "night not found")
-			return false
-		}
-		internalError(w, gid, "get night", err)
-		return false
-	}
-	return true
-}
-
-// writeNightDTO loads the night + its attendees and encodes the DTO with the
-// given status. Used by create/add/remove/detail so the client always gets the
-// current attendee list back.
-func writeNightDTO(w http.ResponseWriter, r *http.Request, store nightStore, gid, nightID uuid.UUID, code int) {
+// loadNight fetches a night scoped to its group, mapping a miss to 404 and any
+// other error to 500. It hands back the row so a caller that needs the night
+// itself — not just proof it exists — does not read it a second time. ok=false
+// means a response was already written.
+func loadNight(w http.ResponseWriter, r *http.Request, store nightStore, gid, nightID uuid.UUID) (db.Pick, bool) {
 	night, err := store.GetNight(r.Context(), db.GetNightParams{NightID: nightID, GroupID: gid})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			writeJSONError(w, http.StatusNotFound, "night not found")
-			return
-		}
-		internalError(w, gid, "get night", err)
-		return
+		storeError(w, gid, "get night", err, http.StatusNotFound, "night not found")
+		return db.Pick{}, false
 	}
+	return night, true
+}
+
+// writeNightDTO encodes an ALREADY-LOADED night plus its attendees (and its
+// attached movie, if any) with the given status, so the client always gets the
+// current night back. Taking the row rather than an id is what lets the write
+// handlers pass on what their RETURNING clause already gave them: no endpoint
+// reads the same picks row twice.
+func writeNightDTO(w http.ResponseWriter, r *http.Request, store nightStore, gid uuid.UUID, night db.Pick, code int) {
 	var movie *db.Movie
 	if night.MovieID.Valid {
 		m, err := store.GetMovie(r.Context(), uuid.UUID(night.MovieID.Bytes))
@@ -293,12 +291,30 @@ func writeNightDTO(w http.ResponseWriter, r *http.Request, store nightStore, gid
 		}
 		movie = &m
 	}
-	rows, err := store.ListNightAttendees(r.Context(), db.ListNightAttendeesParams{GroupID: gid, NightID: nightID})
+	rows, err := store.ListNightAttendees(r.Context(), db.ListNightAttendeesParams{GroupID: gid, NightID: night.ID})
 	if err != nil {
 		internalError(w, gid, "list night attendees", err)
 		return
 	}
 	respondJSON(w, code, toNightResponse(night, rows, movie), gid, "encode night response")
+}
+
+// resumeOpenNight writes the group's already-open night (200) when there is one.
+// handled=false means there is none and nothing was written, so the caller
+// should go ahead and create it. Both the pre-check and the lost-race recovery
+// in createNightHandler go through here, so "resume, never a second open night"
+// is stated once.
+func resumeOpenNight(w http.ResponseWriter, r *http.Request, store nightStore, gid uuid.UUID) (handled bool) {
+	existing, err := store.GetOpenNight(r.Context(), gid)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false
+		}
+		internalError(w, gid, "get open night", err)
+		return true
+	}
+	writeNightDTO(w, r, store, gid, existing, http.StatusOK)
+	return true
 }
 
 // requireMember validates that uid has a membership in the group (active OR
@@ -309,11 +325,7 @@ func writeNightDTO(w http.ResponseWriter, r *http.Request, store nightStore, gid
 // was already written.
 func requireMember(w http.ResponseWriter, r *http.Request, store nightStore, gid, uid uuid.UUID) bool {
 	if _, err := store.GetGroupMember(r.Context(), db.GetGroupMemberParams{GroupID: gid, UserID: uid}); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			writeJSONError(w, http.StatusUnprocessableEntity, "attendee is not a member of this group")
-			return false
-		}
-		internalError(w, gid, "get group member", err)
+		storeError(w, gid, "get group member", err, http.StatusUnprocessableEntity, "attendee is not a member of this group")
 		return false
 	}
 	return true
@@ -347,11 +359,7 @@ func createNightHandler(store nightStore) http.HandlerFunc {
 		}
 		ctx := r.Context()
 		// Resume the open night if one exists — at most one per group.
-		if existing, err := store.GetOpenNight(ctx, gid); err == nil {
-			writeNightDTO(w, r, store, gid, existing.ID, http.StatusOK)
-			return
-		} else if !errors.Is(err, pgx.ErrNoRows) {
-			internalError(w, gid, "get open night", err)
+		if resumeOpenNight(w, r, store, gid) {
 			return
 		}
 		for _, uid := range parsed.Attendees {
@@ -366,12 +374,12 @@ func createNightHandler(store nightStore) http.HandlerFunc {
 			// idempotent outcome as the pre-check above, never a 500.
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-				existing, gerr := store.GetOpenNight(ctx, gid)
-				if gerr != nil {
-					internalError(w, gid, "get open night", gerr)
-					return
+				// The winner having already been finalized between our failed
+				// insert and this read is genuinely unexpected — a 500, not a
+				// silent no-response.
+				if !resumeOpenNight(w, r, store, gid) {
+					internalError(w, gid, "get open night", err)
 				}
-				writeNightDTO(w, r, store, gid, existing.ID, http.StatusOK)
 				return
 			}
 			internalError(w, gid, "create night", err)
@@ -383,18 +391,14 @@ func createNightHandler(store nightStore) http.HandlerFunc {
 				return
 			}
 		}
-		writeNightDTO(w, r, store, gid, night.ID, http.StatusCreated)
+		writeNightDTO(w, r, store, gid, night, http.StatusCreated)
 	}
 }
 
 // addAttendeeHandler serves POST /groups/{groupId}/nights/{nightId}/attendees.
 func addAttendeeHandler(store nightStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
-		if !ok {
-			return
-		}
-		nightID, ok := pathUUID(w, r, "nightId", "invalid night id")
+		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
@@ -406,7 +410,8 @@ func addAttendeeHandler(store nightStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		if !ensureNight(w, r, store, gid, nightID) {
+		night, ok := loadNight(w, r, store, gid, nightID)
+		if !ok {
 			return
 		}
 		if !requireMember(w, r, store, gid, uid) {
@@ -416,7 +421,7 @@ func addAttendeeHandler(store nightStore) http.HandlerFunc {
 			internalError(w, gid, "add attendee", err)
 			return
 		}
-		writeNightDTO(w, r, store, gid, nightID, http.StatusCreated)
+		writeNightDTO(w, r, store, gid, night, http.StatusCreated)
 	}
 }
 
@@ -424,11 +429,7 @@ func addAttendeeHandler(store nightStore) http.HandlerFunc {
 // Idempotent: removing a non-attendee still returns 200 with the current night.
 func removeAttendeeHandler(store nightStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
-		if !ok {
-			return
-		}
-		nightID, ok := pathUUID(w, r, "nightId", "invalid night id")
+		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
@@ -436,29 +437,30 @@ func removeAttendeeHandler(store nightStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		if !ensureNight(w, r, store, gid, nightID) {
+		night, ok := loadNight(w, r, store, gid, nightID)
+		if !ok {
 			return
 		}
 		if err := store.RemoveAttendee(r.Context(), db.RemoveAttendeeParams{PickID: nightID, UserID: uid}); err != nil {
 			internalError(w, gid, "remove attendee", err)
 			return
 		}
-		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
+		writeNightDTO(w, r, store, gid, night, http.StatusOK)
 	}
 }
 
 // nightDetailHandler serves GET /groups/{groupId}/nights/{nightId}.
 func nightDetailHandler(store nightStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
-		nightID, ok := pathUUID(w, r, "nightId", "invalid night id")
+		night, ok := loadNight(w, r, store, gid, nightID)
 		if !ok {
 			return
 		}
-		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
+		writeNightDTO(w, r, store, gid, night, http.StatusOK)
 	}
 }
 
@@ -474,14 +476,10 @@ func currentNightHandler(store nightStore) http.HandlerFunc {
 		}
 		night, err := store.GetCurrentNight(r.Context(), gid)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				writeJSONError(w, http.StatusNotFound, "no current night")
-				return
-			}
-			internalError(w, gid, "get current night", err)
+			storeError(w, gid, "get current night", err, http.StatusNotFound, "no current night")
 			return
 		}
-		writeNightDTO(w, r, store, gid, night.ID, http.StatusOK)
+		writeNightDTO(w, r, store, gid, night, http.StatusOK)
 	}
 }
 
@@ -490,16 +488,12 @@ func currentNightHandler(store nightStore) http.HandlerFunc {
 // IDs as a non-nil present set (empty present = rank nobody).
 func nightTurnHandler(store nightStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
-		if !ok {
-			return
-		}
-		nightID, ok := pathUUID(w, r, "nightId", "invalid night id")
+		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
 		ctx := r.Context()
-		if !ensureNight(w, r, store, gid, nightID) {
+		if _, ok := loadNight(w, r, store, gid, nightID); !ok {
 			return
 		}
 		rows, err := store.ListNightAttendees(ctx, db.ListNightAttendeesParams{GroupID: gid, NightID: nightID})
@@ -523,11 +517,7 @@ func nightTurnHandler(store nightStore) http.HandlerFunc {
 // read, so re-recording simply re-attributes — there is no stored counter to fix.
 func recordNightPickHandler(store nightStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
-		if !ok {
-			return
-		}
-		nightID, ok := pathUUID(w, r, "nightId", "invalid night id")
+		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
@@ -539,7 +529,9 @@ func recordNightPickHandler(store nightStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		if !ensureNight(w, r, store, gid, nightID) {
+		// Existence check only — the 404 must precede the 422 below, and
+		// SetNightPicker hands back the post-write row for the response.
+		if _, ok := loadNight(w, r, store, gid, nightID); !ok {
 			return
 		}
 		rows, err := store.ListNightAttendees(r.Context(), db.ListNightAttendeesParams{GroupID: gid, NightID: nightID})
@@ -559,16 +551,17 @@ func recordNightPickHandler(store nightStore) http.HandlerFunc {
 			writeJSONError(w, http.StatusUnprocessableEntity, "picker is not an attendee of this night")
 			return
 		}
-		if _, err := store.SetNightPicker(r.Context(), db.SetNightPickerParams{
+		night, err := store.SetNightPicker(r.Context(), db.SetNightPickerParams{
 			NightID:    nightID,
 			GroupID:    gid,
 			PickerID:   pgtype.UUID{Bytes: pickerID, Valid: true},
 			IsCredited: creditedForRole(role),
-		}); err != nil {
+		})
+		if err != nil {
 			internalError(w, gid, "set night picker", err)
 			return
 		}
-		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
+		writeNightDTO(w, r, store, gid, night, http.StatusOK)
 	}
 }
 
@@ -576,11 +569,7 @@ func recordNightPickHandler(store nightStore) http.HandlerFunc {
 // {"scheduledFor":"YYYY-MM-DD"} moves the night to a new date.
 func updateNightDateHandler(store nightStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
-		if !ok {
-			return
-		}
-		nightID, ok := pathUUID(w, r, "nightId", "invalid night id")
+		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
@@ -593,18 +582,20 @@ func updateNightDateHandler(store nightStore) http.HandlerFunc {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		if !ensureNight(w, r, store, gid, nightID) {
+		// Existence check only — UpdateNightDate hands back the moved night.
+		if _, ok := loadNight(w, r, store, gid, nightID); !ok {
 			return
 		}
-		if _, err := store.UpdateNightDate(r.Context(), db.UpdateNightDateParams{
+		night, err := store.UpdateNightDate(r.Context(), db.UpdateNightDateParams{
 			NightID:      nightID,
 			GroupID:      gid,
 			ScheduledFor: scheduledFor,
-		}); err != nil {
+		})
+		if err != nil {
 			internalError(w, gid, "update night date", err)
 			return
 		}
-		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
+		writeNightDTO(w, r, store, gid, night, http.StatusOK)
 	}
 }
 
@@ -613,11 +604,7 @@ func updateNightDateHandler(store nightStore) http.HandlerFunc {
 // missing night still returns 204.
 func deleteNightHandler(store nightStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
-		if !ok {
-			return
-		}
-		nightID, ok := pathUUID(w, r, "nightId", "invalid night id")
+		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}

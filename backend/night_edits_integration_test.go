@@ -26,8 +26,6 @@ func TestNightEditsIntegration(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, client))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/movie", clearNightMovieHandler(q))
 
-	const ada = "a0000000-0000-0000-0000-000000000001"
-
 	do := func(t *testing.T, method, path, body string) (int, []byte) {
 		t.Helper()
 		return doReq(t, mux, method, path, body)

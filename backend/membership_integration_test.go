@@ -24,12 +24,6 @@ func TestMembershipChurnIntegration(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(q))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
 
-	const (
-		ada     = "a0000000-0000-0000-0000-000000000001"
-		cleo    = "a0000000-0000-0000-0000-000000000003"
-		frankie = "a0000000-0000-0000-0000-000000000006"
-	)
-
 	do := func(t *testing.T, method, path, body string) (int, memberResponse) {
 		t.Helper()
 		return doJSON[memberResponse](t, mux, method, path, body)
@@ -88,7 +82,7 @@ func TestMembershipChurnIntegration(t *testing.T) {
 	// Ada 2 credited, Blake 1, Cleo 1.
 	recordPick(t, ada, "2026-05-01")
 	recordPick(t, ada, "2026-05-08")
-	recordPick(t, "a0000000-0000-0000-0000-000000000002", "2026-05-15") // Blake
+	recordPick(t, blake, "2026-05-15")
 	recordPick(t, cleo, "2026-05-22")
 
 	t.Run("join lands the new member at the average", func(t *testing.T) {
@@ -189,7 +183,7 @@ func TestMembershipChurnIntegration(t *testing.T) {
 
 	t.Run("bad targets and input", func(t *testing.T) {
 		// Unknown but well-formed userId → 404.
-		code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/members/a0000000-0000-0000-0000-0000000000ff/deactivate", "")
+		code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/members/"+unknownUser+"/deactivate", "")
 		if code != http.StatusNotFound {
 			t.Errorf("unknown user deactivate: status = %d, want 404", code)
 		}

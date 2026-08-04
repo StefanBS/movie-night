@@ -3,7 +3,6 @@
 package main
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -23,14 +22,6 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/attendees", addAttendeeHandler(q))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/attendees/{userId}", removeAttendeeHandler(q))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(q))
-
-	const (
-		ada     = "a0000000-0000-0000-0000-000000000001"
-		blake   = "a0000000-0000-0000-0000-000000000002"
-		frankie = "a0000000-0000-0000-0000-000000000006" // active guest
-		unknown = "a0000000-0000-0000-0000-0000000000ff"
-		zed     = "a0000000-0000-0000-0000-000000000009" // inactive core
-	)
 
 	do := func(t *testing.T, method, path, body string) (int, []byte) {
 		t.Helper()
@@ -125,7 +116,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 
 	t.Run("add non-member yields 422", func(t *testing.T) {
 		n := createNight(t, `{"scheduledFor":"2026-06-12"}`)
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/attendees", `{"userId":"`+unknown+`"}`); code != http.StatusUnprocessableEntity {
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/attendees", `{"userId":"`+unknownUser+`"}`); code != http.StatusUnprocessableEntity {
 			t.Fatalf("status = %d, want 422", code)
 		}
 	})
@@ -134,7 +125,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		// Initial-attendee validation only runs when actually creating — so this
 		// must start with no open night, else create would resume and skip it.
 		clearOpenNight(t, pool, seededGroup)
-		code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-06-12","attendees":["`+unknown+`"]}`)
+		code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-06-12","attendees":["`+unknownUser+`"]}`)
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("status = %d, want 422", code)
 		}
@@ -144,13 +135,9 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		first := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
 		// A second create must NOT open a new night (uq_open_night_per_group). It
 		// returns the already-open night with 200, and the new body is ignored.
-		code, b := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-07-01","attendees":["`+blake+`"]}`)
+		code, got := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-07-01","attendees":["`+blake+`"]}`)
 		if code != http.StatusOK {
-			t.Fatalf("repeat create status = %d, want 200 (body %s)", code, b)
-		}
-		var got nightResponse
-		if err := json.Unmarshal(b, &got); err != nil {
-			t.Fatalf("decode night: %v", err)
+			t.Fatalf("repeat create status = %d, want 200", code)
 		}
 		if got.ID != first.ID {
 			t.Errorf("repeat create id = %s, want the open night %s", got.ID, first.ID)
@@ -176,11 +163,10 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	})
 
 	t.Run("unknown night yields 404", func(t *testing.T) {
-		missing := "b0000000-0000-0000-0000-0000000000ee"
-		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+missing, ""); code != http.StatusNotFound {
+		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+unknownNight, ""); code != http.StatusNotFound {
 			t.Fatalf("detail status = %d, want 404", code)
 		}
-		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+missing+"/turn", ""); code != http.StatusNotFound {
+		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+unknownNight+"/turn", ""); code != http.StatusNotFound {
 			t.Fatalf("turn status = %d, want 404", code)
 		}
 	})
@@ -219,8 +205,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	})
 
 	t.Run("recording on an unknown night yields 404; malformed picker yields 400", func(t *testing.T) {
-		missing := "b0000000-0000-0000-0000-0000000000ee"
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+missing+"/pick", `{"pickerId":"`+ada+`"}`); code != http.StatusNotFound {
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+unknownNight+"/pick", `{"pickerId":"`+ada+`"}`); code != http.StatusNotFound {
 			t.Errorf("unknown-night status = %d, want 404", code)
 		}
 		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
@@ -231,13 +216,9 @@ func TestNightAttendanceIntegration(t *testing.T) {
 
 	t.Run("current night resumes the latest planned night", func(t *testing.T) {
 		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
-		code, b := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
+		code, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
 		if code != http.StatusOK {
-			t.Fatalf("current status = %d, want 200 (body %s)", code, b)
-		}
-		var got nightResponse
-		if err := json.Unmarshal(b, &got); err != nil {
-			t.Fatalf("decode current: %v", err)
+			t.Fatalf("current status = %d, want 200", code)
 		}
 		// Only one night is open per group (uq_open_night_per_group), so current
 		// must be exactly the night we just created.
@@ -260,13 +241,9 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		clearAllPicks(t, pool, seededGroup)
 		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
 		recordPick(t, n.ID, ada) // finalize it
-		code, b := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
+		code, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
 		if code != http.StatusOK {
-			t.Fatalf("current status = %d, want 200 (finalized night must still resume) (body %s)", code, b)
-		}
-		var got nightResponse
-		if err := json.Unmarshal(b, &got); err != nil {
-			t.Fatalf("decode current: %v", err)
+			t.Fatalf("current status = %d, want 200 (finalized night must still resume)", code)
 		}
 		if got.ID != n.ID {
 			t.Errorf("current id = %s, want the finalized night %s", got.ID, n.ID)
@@ -293,22 +270,14 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		clearAllPicks(t, pool, seededGroup)
 		first := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
 		recordPick(t, first.ID, ada) // finalize → no open night remains
-		code, b := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-06-19","attendees":["`+blake+`"]}`)
+		code, second := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-06-19","attendees":["`+blake+`"]}`)
 		if code != http.StatusCreated {
-			t.Fatalf("start-next status = %d, want 201 (body %s)", code, b)
-		}
-		var second nightResponse
-		if err := json.Unmarshal(b, &second); err != nil {
-			t.Fatalf("decode second night: %v", err)
+			t.Fatalf("start-next status = %d, want 201", code)
 		}
 		if second.ID == first.ID {
 			t.Fatal("start-next returned the finalized night; want a brand-new open night")
 		}
-		_, cb := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
-		var cur nightResponse
-		if err := json.Unmarshal(cb, &cur); err != nil {
-			t.Fatalf("decode current: %v", err)
-		}
+		_, cur := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
 		if cur.ID != second.ID {
 			t.Errorf("current id = %s, want the new open night %s", cur.ID, second.ID)
 		}
@@ -333,8 +302,6 @@ func TestNightsListIntegration(t *testing.T) {
 	mux.Handle("GET /groups/{groupId}/nights", listNightsHandler(q))
 
 	const (
-		ada     = "a0000000-0000-0000-0000-000000000001"
-		blake   = "a0000000-0000-0000-0000-000000000002"
 		night1  = "b0000000-0000-0000-0000-0000000000a1" // older, has movie + attendees
 		night2  = "b0000000-0000-0000-0000-0000000000a2" // newer, no movie
 		openOne = "b0000000-0000-0000-0000-0000000000a3" // open (picker NULL) — must be excluded
@@ -353,22 +320,18 @@ func TestNightsListIntegration(t *testing.T) {
 		{sql: `INSERT INTO attendances (pick_id, user_id) VALUES ($1, $2), ($1, $3)`, args: []any{night1, ada, blake}},
 	})
 
-	do := func(t *testing.T, path string) (int, []byte) {
+	do := func(t *testing.T, path string) (int, []nightResponse) {
 		t.Helper()
-		return doReq(t, mux, http.MethodGet, path, "")
+		return doJSON[[]nightResponse](t, mux, http.MethodGet, path, "")
 	}
 
 	t.Run("lists recorded nights newest-first, excludes the open night", func(t *testing.T) {
-		code, b := do(t, "/groups/"+seededGroup+"/nights")
+		code, got := do(t, "/groups/"+seededGroup+"/nights")
 		if code != http.StatusOK {
-			t.Fatalf("want 200, got %d: %s", code, b)
-		}
-		var got []nightResponse
-		if err := json.Unmarshal(b, &got); err != nil {
-			t.Fatalf("decode: %v", err)
+			t.Fatalf("want 200, got %d", code)
 		}
 		if len(got) != 2 {
-			t.Fatalf("want 2 recorded nights, got %d: %s", len(got), b)
+			t.Fatalf("want 2 recorded nights, got %d", len(got))
 		}
 		if got[0].ID != night2 || got[1].ID != night1 {
 			t.Fatalf("order wrong: %s then %s", got[0].ID, got[1].ID)
@@ -385,13 +348,9 @@ func TestNightsListIntegration(t *testing.T) {
 	})
 
 	t.Run("empty group returns []", func(t *testing.T) {
-		code, b := do(t, "/groups/"+emptyGroup+"/nights")
+		code, got := do(t, "/groups/"+emptyGroup+"/nights")
 		if code != http.StatusOK {
-			t.Fatalf("want 200, got %d: %s", code, b)
-		}
-		var got []nightResponse
-		if err := json.Unmarshal(b, &got); err != nil {
-			t.Fatalf("decode: %v", err)
+			t.Fatalf("want 200, got %d", code)
 		}
 		if len(got) != 0 {
 			t.Fatalf("want empty list, got %d", len(got))
