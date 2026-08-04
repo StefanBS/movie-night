@@ -9,6 +9,7 @@ ignoreUntil = 2026-09-01T00:00:00Z
 # uuid@7.0.3 — pulled transitively by expo > @expo/config-plugins > xcode.
 # Build-time only (iOS prebuild project generation); never in the JS bundle that
 # runs on-device, so the insecure-randomness issue is not reachable in our app.
-# Fix is uuid 7 -> 11 (major API change) which would break xcode@3.0.1; blocked
-# on the deliberate Expo SDK 54 pin (see mobile/AGENTS.md).
-reason = "transitive build-time xcode dep, not runtime-reachable, blocked on Expo SDK 54 pin"
+# Fix is uuid 7 -> 11 (major API change) which would break xcode@3.0.1; still
+# present on Expo SDK 57 (expo > @expo/config-plugins > xcode). Re-review when the
+# advisory is fixed upstream or this dependency path changes.
+reason = "transitive build-time xcode dep (Expo SDK 57), not runtime-reachable; re-review on upstream fix or path change"

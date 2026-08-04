@@ -21,8 +21,8 @@ updates:
       mobile:
         patterns:
           - "*"
-    # Hold majors that are coupled to Expo SDK 56 / the Node 22 runtime:
-    #   - eslint 10 breaks eslint-config-expo@56's bundled eslint-plugin-react
+    # Hold majors that are coupled to eslint-config-expo (SDK 57) / the Node 22 runtime:
+    #   - eslint majors can break eslint-config-expo's bundled plugins — bump with the SDK
     #   - @types/node must track the Node 22 runtime major (see CLAUDE.md)
     # Bump these deliberately alongside an SDK / runtime change, not via a routine PR.
     ignore:
