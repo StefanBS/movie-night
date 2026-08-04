@@ -24,7 +24,7 @@ const MAX_AVATARS = 4; // overlapping "coming" faces shown on the picker row
 // calendar, the home leads with this countdown card instead of the whose-turn
 // hero. It reuses the rationed-ember treatment (surface.dark + a bonfire wash +
 // shadow.spotlight) — the scheduled night *is* "next up". Recurrence is deferred
-// (#48/#49), so there is no repeat row yet; Edit is wired in #47.
+// (#48/#49), so there is no repeat row yet; Edit routes to /night/edit/[id].
 export function UpNextCard({
   night,
   onStart,

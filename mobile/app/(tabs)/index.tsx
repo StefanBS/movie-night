@@ -188,6 +188,12 @@ export default function TonightScreen() {
     }
     router.navigate({ pathname: "/night/[id]", params: { id: scheduled.id } });
   };
+  const openEdit = () => {
+    if (scheduled === null) {
+      return;
+    }
+    router.navigate({ pathname: "/night/edit/[id]", params: { id: scheduled.id } });
+  };
 
   return (
     <View style={styles.screen}>
@@ -213,7 +219,7 @@ export default function TonightScreen() {
               <UpNextCard
                 night={scheduled}
                 onStart={openScheduled}
-                onEdit={openScheduled}
+                onEdit={openEdit}
               />
               {onDeck.length > 0 ? <OnDeck members={onDeck} /> : null}
               <View style={styles.rotationRow}>

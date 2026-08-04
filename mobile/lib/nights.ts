@@ -1,4 +1,4 @@
-import { requestJson, requestJsonOrNull } from "./http";
+import { requestJson, requestJsonOrNull, requestNoContent } from "./http";
 import { parseMovie, type Movie } from "./movies";
 import { parseTurn, type TurnMember } from "./turn";
 import { daysUntil, todayLocalISO } from "./date";
@@ -204,6 +204,45 @@ export function attachMovie(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tmdbId }),
+    signal,
+  });
+}
+
+export function detachMovie(
+  baseUrl: string,
+  groupId: string,
+  nightId: string,
+  signal?: AbortSignal,
+): Promise<Night> {
+  return fetchNight(`${baseUrl}/groups/${groupId}/nights/${nightId}/movie`, {
+    method: "DELETE",
+    signal,
+  });
+}
+
+export function updateNightDate(
+  baseUrl: string,
+  groupId: string,
+  nightId: string,
+  scheduledFor: string,
+  signal?: AbortSignal,
+): Promise<Night> {
+  return fetchNight(`${baseUrl}/groups/${groupId}/nights/${nightId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scheduledFor }),
+    signal,
+  });
+}
+
+export function deleteNight(
+  baseUrl: string,
+  groupId: string,
+  nightId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  return requestNoContent(`${baseUrl}/groups/${groupId}/nights/${nightId}`, {
+    method: "DELETE",
     signal,
   });
 }

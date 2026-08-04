@@ -220,6 +220,9 @@ type nightStore interface {
 	GetMovie(ctx context.Context, id uuid.UUID) (db.Movie, error)
 	UpsertMovie(ctx context.Context, arg db.UpsertMovieParams) (db.Movie, error)
 	SetNightMovie(ctx context.Context, arg db.SetNightMovieParams) (db.Pick, error)
+	ClearNightMovie(ctx context.Context, arg db.ClearNightMovieParams) (db.Pick, error)
+	UpdateNightDate(ctx context.Context, arg db.UpdateNightDateParams) (db.Pick, error)
+	DeleteNight(ctx context.Context, arg db.DeleteNightParams) error
 	ListRecordedNights(ctx context.Context, groupID uuid.UUID) ([]db.ListRecordedNightsRow, error)
 	ListNightsAttendees(ctx context.Context, arg db.ListNightsAttendeesParams) ([]db.ListNightsAttendeesRow, error)
 }
@@ -232,6 +235,20 @@ type attendeeRequest struct {
 // recordPickRequest is the JSON body of POST .../nights/{nightId}/pick.
 type recordPickRequest struct {
 	PickerID string `json:"pickerId"`
+}
+
+// updateNightDateRequest is the JSON body of PATCH .../nights/{nightId}.
+type updateNightDateRequest struct {
+	ScheduledFor string `json:"scheduledFor"`
+}
+
+// validateUpdateNightDateRequest parses scheduledFor as YYYY-MM-DD. Pure.
+func validateUpdateNightDateRequest(req updateNightDateRequest) (pgtype.Date, error) {
+	t, err := time.Parse("2006-01-02", req.ScheduledFor)
+	if err != nil {
+		return pgtype.Date{}, fmt.Errorf("invalid scheduledFor")
+	}
+	return pgtype.Date{Time: t, Valid: true}, nil
 }
 
 // creditedForRole derives is_credited from the picker's role: a core pick moves
@@ -552,5 +569,65 @@ func recordNightPickHandler(store nightStore) http.HandlerFunc {
 			return
 		}
 		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
+	}
+}
+
+// updateNightDateHandler serves PATCH /groups/{groupId}/nights/{nightId}. Body
+// {"scheduledFor":"YYYY-MM-DD"} moves the night to a new date.
+func updateNightDateHandler(store nightStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		if !ok {
+			return
+		}
+		nightID, ok := pathUUID(w, r, "nightId", "invalid night id")
+		if !ok {
+			return
+		}
+		req, ok := decodeJSON[updateNightDateRequest](w, r)
+		if !ok {
+			return
+		}
+		scheduledFor, err := validateUpdateNightDateRequest(req)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		if !ensureNight(w, r, store, gid, nightID) {
+			return
+		}
+		if _, err := store.UpdateNightDate(r.Context(), db.UpdateNightDateParams{
+			NightID:      nightID,
+			GroupID:      gid,
+			ScheduledFor: scheduledFor,
+		}); err != nil {
+			internalError(w, gid, "update night date", err)
+			return
+		}
+		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
+	}
+}
+
+// deleteNightHandler serves DELETE /groups/{groupId}/nights/{nightId}. It
+// removes the night and its attendances (CASCADE). Idempotent: deleting a
+// missing night still returns 204.
+func deleteNightHandler(store nightStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		if !ok {
+			return
+		}
+		nightID, ok := pathUUID(w, r, "nightId", "invalid night id")
+		if !ok {
+			return
+		}
+		if err := store.DeleteNight(r.Context(), db.DeleteNightParams{
+			NightID: nightID,
+			GroupID: gid,
+		}); err != nil {
+			internalError(w, gid, "delete night", err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }

@@ -62,6 +62,36 @@ func TestNightCreateRequestValidation(t *testing.T) {
 	}
 }
 
+func TestUpdateNightDateRequestValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		req     updateNightDateRequest
+		wantErr bool
+		want    string
+	}{
+		{name: "valid", req: updateNightDateRequest{ScheduledFor: "2026-07-04"}, want: "2026-07-04"},
+		{name: "bad date", req: updateNightDateRequest{ScheduledFor: "nope"}, wantErr: true},
+		{name: "empty date", req: updateNightDateRequest{ScheduledFor: ""}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := validateUpdateNightDateRequest(tt.req)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !got.Valid || got.Time.Format("2006-01-02") != tt.want {
+				t.Fatalf("date = %+v, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestPresentIDsIsNonNilWhenEmpty(t *testing.T) {
 	// An attendee-less night must rank NOBODY, so present must be empty-non-nil
 	// (encodes as SQL '{}'), never nil (which RankGroupTurn treats as "rank all").

@@ -16,3 +16,9 @@ UPDATE picks
 SET movie_id = sqlc.arg(movie_id)
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
 RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id;
+
+-- name: ClearNightMovie :one
+UPDATE picks
+SET movie_id = NULL
+WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
+RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id;

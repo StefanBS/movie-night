@@ -16,6 +16,7 @@ import type { Member } from "../../lib/members";
 import {
   addAttendee,
   attachMovie,
+  detachMovie,
   getNightTurn,
   recordNightPick,
   removeAttendee,
@@ -216,6 +217,20 @@ export function ExistingNightEditor({
     setStep(pickReturnStep);
   }, [pickReturnStep]);
 
+  const onClearFilm = useCallback(async () => {
+    if (busy !== null || nightState.movie === null) {
+      return;
+    }
+    const updated = await runNightWrite(
+      "clear-film",
+      () => detachMovie(API_URL, GROUP_ID, nightState.id),
+      "failed to clear film",
+    );
+    if (updated !== null) {
+      setStep("night");
+    }
+  }, [nightState.id, nightState.movie, busy, runNightWrite]);
+
   const title = step === "pick" ? "The pick" : "Night";
   const back =
     step === "pick"
@@ -257,6 +272,7 @@ export function ExistingNightEditor({
         onSkipPick={onSkipPick}
         onDone={onDone}
         onPickFilm={onPickFilm}
+        onClearFilm={onClearFilm}
       />
     </View>
   );

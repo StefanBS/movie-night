@@ -180,3 +180,30 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
 	}
 }
+
+// clearNightMovieHandler serves DELETE /groups/{groupId}/nights/{nightId}/movie.
+// Idempotent: clearing when no movie is attached still returns the night DTO
+// with movie null.
+func clearNightMovieHandler(store nightStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		if !ok {
+			return
+		}
+		nightID, ok := pathUUID(w, r, "nightId", "invalid night id")
+		if !ok {
+			return
+		}
+		if !ensureNight(w, r, store, gid, nightID) {
+			return
+		}
+		if _, err := store.ClearNightMovie(r.Context(), db.ClearNightMovieParams{
+			NightID: nightID,
+			GroupID: gid,
+		}); err != nil {
+			internalError(w, gid, "clear night movie", err)
+			return
+		}
+		writeNightDTO(w, r, store, gid, nightID, http.StatusOK)
+	}
+}

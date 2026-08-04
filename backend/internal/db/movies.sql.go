@@ -12,6 +12,33 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const clearNightMovie = `-- name: ClearNightMovie :one
+UPDATE picks
+SET movie_id = NULL
+WHERE id = $1 AND group_id = $2
+RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+`
+
+type ClearNightMovieParams struct {
+	NightID uuid.UUID `json:"night_id"`
+	GroupID uuid.UUID `json:"group_id"`
+}
+
+func (q *Queries) ClearNightMovie(ctx context.Context, arg ClearNightMovieParams) (Pick, error) {
+	row := q.db.QueryRow(ctx, clearNightMovie, arg.NightID, arg.GroupID)
+	var i Pick
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.PickerID,
+		&i.IsCredited,
+		&i.ScheduledFor,
+		&i.CreatedAt,
+		&i.MovieID,
+	)
+	return i, err
+}
+
 const getMovie = `-- name: GetMovie :one
 SELECT id, tmdb_id, title, release_year, cached_at, poster_path
 FROM movies
