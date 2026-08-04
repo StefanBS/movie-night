@@ -6,7 +6,7 @@ default:
 install:
     npm install
 
-# Start the Metro dev server
+# Start the Metro dev server (connects to the installed dev client when present)
 start:
     npm start
 
@@ -14,11 +14,21 @@ start:
 start-clean:
     npx expo start -c
 
-# Launch directly on the Android emulator / device
+# Build/install the Android development client and start Metro
+# Requires ANDROID_HOME, a JDK 21 (Android Studio JBR is fine), and adb device/emulator
 android:
     npm run android
 
-# Launch directly on the iOS simulator (macOS only)
+# Regenerate the Android native project (CNG; android/ is gitignored)
+prebuild:
+    npx expo prebuild --platform android
+
+# Delete android/ and rebuild from scratch (use after SDK bumps or corrupt native/NDK installs)
+android-clean:
+    rm -rf android
+    npm run android
+
+# Launch on the iOS simulator (macOS only)
 ios:
     npm run ios
 
