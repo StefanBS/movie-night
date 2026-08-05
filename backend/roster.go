@@ -29,7 +29,7 @@ func toMemberResponses(rows []db.ListGroupMembersRow) []memberResponse {
 			Name:     r.Name,
 			Role:     string(r.Role),
 			Status:   string(r.Status),
-			JoinedOn: memberDate(r.JoinedAt),
+			JoinedOn: formatTimestampDate(r.JoinedAt),
 		})
 	}
 	return out

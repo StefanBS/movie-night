@@ -66,12 +66,6 @@ func TestTurnHandlerIntegration(t *testing.T) {
 		return doJSON[[]turnResponse](t, mux, http.MethodGet, path, "")
 	}
 
-	const (
-		blake = "a0000000-0000-0000-0000-000000000002"
-		cleo  = "a0000000-0000-0000-0000-000000000003"
-		zed   = "a0000000-0000-0000-0000-000000000009" // inactive
-	)
-
 	t.Run("default ranks least-served first; non-credited pick ignored", func(t *testing.T) {
 		code, got := get(seededGroup, "")
 		if code != http.StatusOK {

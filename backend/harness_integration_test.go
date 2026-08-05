@@ -32,6 +32,21 @@ const (
 	emptyGroup  = "22222222-2222-2222-2222-222222222222"
 )
 
+// The users seedFixtures inserts, named here rather than in each test file so
+// the ids and the roles/statuses they stand for are declared next to the insert
+// that creates them.
+const (
+	ada     = "a0000000-0000-0000-0000-000000000001" // active core
+	blake   = "a0000000-0000-0000-0000-000000000002" // active core
+	cleo    = "a0000000-0000-0000-0000-000000000003" // active core
+	frankie = "a0000000-0000-0000-0000-000000000006" // active guest
+	zed     = "a0000000-0000-0000-0000-000000000009" // inactive core
+
+	// Ids that are deliberately never seeded, for the 404/422 paths.
+	unknownUser  = "a0000000-0000-0000-0000-0000000000ff"
+	unknownNight = "b0000000-0000-0000-0000-0000000000ee"
+)
+
 // testPool is the connection pool to the one Postgres container shared by all
 // integration tests. It is brought up once in TestMain and reset per test by
 // freshDB. The tests run sequentially (none call t.Parallel), so a single shared
