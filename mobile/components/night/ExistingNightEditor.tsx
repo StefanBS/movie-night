@@ -5,11 +5,11 @@ import {
   useState,
 } from "react";
 import { View, StyleSheet } from "react-native";
-import Constants from "expo-constants";
 
 import { TopBar } from "../";
 import { NightSteps } from "./NightSteps";
-import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
+import { API_URL } from "../../apiUrl";
+import { GROUP_ID } from "../../lib/api";
 import { daysUntil } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import type { Member } from "../../lib/members";
@@ -26,11 +26,6 @@ import { searchMovies, type Movie } from "../../lib/movies";
 import type { Step } from "../../lib/nightFlow";
 import type { TurnMember } from "../../lib/turn";
 import { colors } from "../../theme";
-
-const API_URL = resolveApiBaseUrl({
-  envUrl: process.env.EXPO_PUBLIC_API_URL,
-  hostUri: Constants.expoConfig?.hostUri,
-});
 
 // ExistingNightEditor is the Who → Pick → Night wizard for a night that
 // already exists. Mount with key={night.id} when the loaded night changes.
@@ -91,7 +86,6 @@ export function ExistingNightEditor({
       busyKey: string,
       write: () => Promise<Night>,
       fallback: string,
-      clearOrder = false,
     ): Promise<Night | null> => {
       if (busy !== null) {
         return null;
@@ -101,9 +95,6 @@ export function ExistingNightEditor({
       try {
         const updated = await write();
         setNightState(updated);
-        if (clearOrder) {
-          setOrder([]);
-        }
         try {
           await refreshOrder(updated.id);
         } catch (e) {
@@ -232,17 +223,17 @@ export function ExistingNightEditor({
   }, [nightState.id, nightState.movie, busy, runNightWrite]);
 
   const title = step === "pick" ? "The pick" : "Night";
+  // The Night step is the only one that can be back-less: it is the wizard's
+  // resting state, so it shows a back target only when the caller asked for one.
   const back =
     step === "pick"
       ? {
           label: pickReturnStep === "night" ? "Night" : "Here",
           onPress: onBackFromPick,
         }
-      : step === "night" && showBackOnNight
+      : step !== "night" || showBackOnNight
         ? { label: cancelLabel, onPress: onCancel }
-        : step !== "night"
-          ? { label: cancelLabel, onPress: onCancel }
-          : undefined;
+        : undefined;
 
   return (
     <View style={styles.screen}>

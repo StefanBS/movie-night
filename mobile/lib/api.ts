@@ -3,16 +3,10 @@ const BACKEND_PORT = 8080;
 
 // GROUP_ID is the seeded "Friday Film Club" group shared across the backend
 // seed, this app, and the backend integration test (the shared contract).
+// TODO(group-onboarding): the app is single-group until group create/join
+// exists. That work replaces this constant with the persisted/selected group,
+// and routes to /welcome when none is resolved (see app/welcome.tsx).
 export const GROUP_ID = "11111111-1111-1111-1111-111111111111";
-
-// resolveGroupId returns the active group, or null when none is resolved (which
-// is when the Welcome / first-run screen is shown). Until group create/join
-// exists, it always returns the seeded group.
-// TODO(group-onboarding): read the persisted/selected group here; a null result
-// routes the app to /welcome (no redirect is wired yet — see app/welcome.tsx).
-export function resolveGroupId(): string | null {
-  return GROUP_ID;
-}
 
 function isLoopbackHost(host: string): boolean {
   return host === "localhost" || host === "127.0.0.1";

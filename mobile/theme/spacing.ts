@@ -99,14 +99,5 @@ export const shadow = {
   }),
 } as const;
 
-// Motion — for react-native Animated / Reanimated easings
-export const motion = {
-  durationFast: 130,
-  durationBase: 220,
-  // bezier control points — feed to Easing.bezier(...)
-  easeStandard: [0.2, 0, 0, 1] as const,
-  easeOut: [0.16, 1, 0.3, 1] as const,
-} as const;
-
 // Interaction
 export const pressedOpacity = 0.72;

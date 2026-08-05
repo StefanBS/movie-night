@@ -1,10 +1,11 @@
 import { useCallback, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import Constants from "expo-constants";
 
 import { AppButton, Avatar, Badge, SectionLabel, Stat, TopBar } from "../../components";
-import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
+import { API_URL } from "../../apiUrl";
+import { firstName } from "../../lib/avatar";
+import { GROUP_ID } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import {
   fetchMembers,
@@ -23,11 +24,6 @@ import {
   space,
   textPresets,
 } from "../../theme";
-
-const API_URL = resolveApiBaseUrl({
-  envUrl: process.env.EXPO_PUBLIC_API_URL,
-  hostUri: Constants.expoConfig?.hostUri,
-});
 
 const ACTION_LABEL: Record<MemberAction, string> = {
   deactivate: "Deactivate",
@@ -129,7 +125,7 @@ export default function MemberProfileScreen() {
 
             <StatsCard profile={profile} />
 
-            <SectionLabel>{`${member.name.split(" ")[0]}'s picks`}</SectionLabel>
+            <SectionLabel>{`${firstName(member.name)}'s picks`}</SectionLabel>
             <View style={styles.placeholder}>
               <Text style={styles.placeholderText}>
                 {"Their picks will appear here once night history lands."}
@@ -192,5 +188,5 @@ const styles = StyleSheet.create({
     gap: space[2],
   },
   empty: { ...textPresets.body, color: colors.text.secondary },
-  error: { ...textPresets.body, color: colors.accent.strong, textAlign: "center", paddingHorizontal: space[5] },
+  error: { ...textPresets.body, color: colors.text.danger, textAlign: "center", paddingHorizontal: space[5] },
 });

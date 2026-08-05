@@ -10,11 +10,11 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import Constants from "expo-constants";
 
 import { TopBar } from "../../components";
 import { WhenStep, ExistingNightEditor } from "../../components/night";
-import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
+import { API_URL } from "../../apiUrl";
+import { GROUP_ID } from "../../lib/api";
 import { todayLocalISO } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { fetchMembers, type Member } from "../../lib/members";
@@ -31,11 +31,6 @@ import {
   textPresets,
   space,
 } from "../../theme";
-
-const API_URL = resolveApiBaseUrl({
-  envUrl: process.env.EXPO_PUBLIC_API_URL,
-  hostUri: Constants.expoConfig?.hostUri,
-});
 
 export default function NightScreen() {
   const router = useRouter();

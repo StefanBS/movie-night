@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import Constants from "expo-constants";
 import { Check } from "lucide-react-native";
 
 import { AppButton, Input, SectionLabel, TopBar } from "../../components";
-import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
+import { API_URL } from "../../apiUrl";
+import { GROUP_ID } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import { joinMember } from "../../lib/members";
 import {
@@ -17,11 +17,6 @@ import {
   space,
   textPresets,
 } from "../../theme";
-
-const API_URL = resolveApiBaseUrl({
-  envUrl: process.env.EXPO_PUBLIC_API_URL,
-  hostUri: Constants.expoConfig?.hostUri,
-});
 
 type Role = "core" | "guest";
 

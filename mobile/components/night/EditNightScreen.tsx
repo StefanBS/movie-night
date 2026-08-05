@@ -13,7 +13,8 @@ import {
   TopBar,
 } from "../";
 import { WizardFooter } from "./WizardFooter";
-import { shiftMonth, type YearMonth } from "../../lib/calendar";
+import { firstName } from "../../lib/avatar";
+import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
 import {
   countdownLabel,
   formatShortDate,
@@ -40,10 +41,6 @@ import {
   textPresets,
   trackPx,
 } from "../../theme";
-
-function firstName(name: string): string {
-  return name.split(" ")[0];
-}
 
 // EditNightScreen is the scheduling edit flow from the home Up-next card:
 // change the date, toggle who's coming, and cancel the night. Reminders
@@ -76,10 +73,9 @@ export function EditNightScreen({
   const [draftAttendees, setDraftAttendees] = useState(
     () => new Set(night.attendees.map((a) => a.id)),
   );
-  const [month, setMonth] = useState<YearMonth>(() => {
-    const [year, m] = night.scheduledFor.split("-").map(Number);
-    return { year, month: m };
-  });
+  const [month, setMonth] = useState<YearMonth>(() =>
+    yearMonthOf(night.scheduledFor),
+  );
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 

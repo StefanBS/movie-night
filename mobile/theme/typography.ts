@@ -20,14 +20,8 @@ export const fontFamily = {
   monoBold: "SpaceMono-Bold",
 } as const;
 
-// Numeric weights — only meaningful if you load variable/weighted faces.
-// With named static faces above, prefer switching fontFamily over fontWeight.
-export const fontWeight = {
-  regular: "400",
-  medium: "500",
-  semibold: "600",
-  bold: "700",
-} as const;
+// Weight is carried by the named static faces above — switch fontFamily rather
+// than setting a numeric fontWeight, which those faces do not respond to.
 
 // Type scale (px) — RN fontSize is unitless px
 export const fontSize = {

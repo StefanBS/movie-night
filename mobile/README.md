@@ -5,8 +5,6 @@ Expo / React Native app for the Movie Night [backend](../backend). Three
 
 - **Whose turn?** (`app/index.tsx`) — least-served standings; element 0 is
   flagged "Next up".
-- **Manage members** (`app/manage.tsx`) — join members and run churn transitions
-  (deactivate / reactivate / promote).
 - **Tonight** (`app/night.tsx`) — track attendees, attach a movie (TMDB), record
   the pick.
 
@@ -181,7 +179,6 @@ mobile/
 ├── app/               # expo-router screens (entry = expo-router/entry)
 │   ├── _layout.tsx    # root Stack + font loading + Spotlight theming
 │   ├── index.tsx      # "Whose turn?" — turn standings
-│   ├── manage.tsx     # "Manage members" — join + churn transitions
 │   └── night.tsx      # "Tonight" — attendees, movie attach, record pick
 ├── lib/               # framework-free logic + its tests (unit + integration)
 │   ├── api.ts         # resolveApiBaseUrl + GROUP_ID — picks the backend URL

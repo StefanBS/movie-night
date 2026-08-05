@@ -7,7 +7,6 @@ import {
   addAttendee,
   removeAttendee,
   getNightTurn,
-  getNight,
   getCurrentNight,
   listNights,
   recordNightPick,
@@ -167,26 +166,6 @@ test("throws when the 2xx payload fails validation", async () => {
   });
   try {
     await assert.rejects(createNight(server.url, GROUP, "2026-06-12", []), /id/);
-  } finally {
-    await server.close();
-  }
-});
-
-test("getNight fetches the night by id and parses it", async () => {
-  let path = "";
-  let method = "";
-  const server = await startServer((req, res) => {
-    path = req.url ?? "";
-    method = req.method ?? "";
-    res.statusCode = 200;
-    res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify(night));
-  });
-  try {
-    const got = await getNight(server.url, GROUP, NIGHT);
-    assert.equal(method, "GET");
-    assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}`);
-    assert.deepEqual(got, night);
   } finally {
     await server.close();
   }

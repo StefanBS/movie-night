@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import Constants from "expo-constants";
 
 import { AppButton, Badge, MemberRow, TopBar } from "../components";
-import { GROUP_ID, resolveApiBaseUrl } from "../lib/api";
+import { API_URL } from "../apiUrl";
+import { firstName } from "../lib/avatar";
+import { GROUP_ID } from "../lib/api";
 import { errorMessage } from "../lib/errors";
 import { fetchTurn, pickerMeta, type TurnMember } from "../lib/turn";
 import {
@@ -14,11 +15,6 @@ import {
   space,
   textPresets,
 } from "../theme";
-
-const API_URL = resolveApiBaseUrl({
-  envUrl: process.env.EXPO_PUBLIC_API_URL,
-  hostUri: Constants.expoConfig?.hostUri,
-});
 
 // The fairness rule, stated plainly — the same logic the backend's turn query
 // implements (fewest picks first, ties broken by who picked longest ago).
@@ -74,7 +70,7 @@ export default function RotationScreen() {
     return () => controller.abort();
   }, []);
 
-  const firstName = order.length > 0 ? order[0].name.split(" ")[0] : "";
+  const leadFirstName = order.length > 0 ? firstName(order[0].name) : "";
 
   return (
     <View style={styles.screen}>
@@ -108,7 +104,7 @@ export default function RotationScreen() {
           <View style={styles.skipRow}>
             {/* UI only — the skip-turn endpoint is tracked separately (#42). */}
             <AppButton
-              title={`Skip ${firstName}'s turn`}
+              title={`Skip ${leadFirstName}'s turn`}
               variant="secondary"
               onPress={() => {}}
             />

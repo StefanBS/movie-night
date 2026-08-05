@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppButton, Calendar } from "../";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
-import { shiftMonth, type YearMonth } from "../../lib/calendar";
+import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
 import { daysUntil, relativeLabel } from "../../lib/date";
 import {
   borderWidth,
@@ -33,17 +33,13 @@ export function WhenStep({
   onNext: (iso: string) => void;
 }) {
   const [selected, setSelected] = useState(today);
-  const [month, setMonth] = useState<YearMonth>(() => {
-    const [year, m] = today.split("-").map(Number);
-    return { year, month: m };
-  });
+  const [month, setMonth] = useState<YearMonth>(() => yearMonthOf(today));
   const isToday = selected === today;
   const future = daysUntil(selected, today) > 0;
 
   const pickToday = () => {
     setSelected(today);
-    const [year, m] = today.split("-").map(Number);
-    setMonth({ year, month: m });
+    setMonth(yearMonthOf(today));
   };
 
   return (
