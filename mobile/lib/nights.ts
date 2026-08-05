@@ -93,15 +93,6 @@ export function createNight(
   });
 }
 
-export function getNight(
-  baseUrl: string,
-  groupId: string,
-  nightId: string,
-  signal?: AbortSignal,
-): Promise<Night> {
-  return fetchNight(`${baseUrl}/groups/${groupId}/nights/${nightId}`, { signal });
-}
-
 // getNightOrNull loads a single night by id, or null when the backend has no
 // such night (it returns 404 in that case) — so the detail screen can show an
 // honest "not found" state instead of a generic error.

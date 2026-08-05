@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import Constants from "expo-constants";
 import { ChevronRight, Plus } from "lucide-react-native";
 
 import {
@@ -12,17 +11,13 @@ import {
   TabScrollView,
   TopBar,
 } from "../../components";
-import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
+import { API_URL } from "../../apiUrl";
+import { GROUP_ID } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import { fetchMembers, type Member } from "../../lib/members";
 import { fetchTurn, pickerMeta, type TurnMember } from "../../lib/turn";
 import { buildClubSections, clubSummary } from "../../lib/club";
-import { colors, space, textPresets } from "../../theme";
-
-const API_URL = resolveApiBaseUrl({
-  envUrl: process.env.EXPO_PUBLIC_API_URL,
-  hostUri: Constants.expoConfig?.hostUri,
-});
+import { borderWidth, colors, space, textPresets } from "../../theme";
 
 export default function ClubScreen() {
   const router = useRouter();
@@ -162,10 +157,10 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: space[5] },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
   divider: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: borderWidth.hairline,
     borderBottomColor: colors.border.hairline,
   },
   dimmed: { opacity: 0.55 },
   empty: { ...textPresets.body, color: colors.text.secondary },
-  error: { ...textPresets.body, color: colors.accent.strong, textAlign: "center", paddingHorizontal: space[5] },
+  error: { ...textPresets.body, color: colors.text.danger, textAlign: "center", paddingHorizontal: space[5] },
 });

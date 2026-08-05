@@ -7,7 +7,6 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import Constants from "expo-constants";
 
 import {
   Poster,
@@ -16,7 +15,9 @@ import {
   TabScrollView,
   TopBar,
 } from "../../components";
-import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
+import { API_URL } from "../../apiUrl";
+import { firstName } from "../../lib/avatar";
+import { GROUP_ID } from "../../lib/api";
 import { formatShortDate } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { buildHistoryMonths, historyStats } from "../../lib/history";
@@ -31,15 +32,6 @@ import {
   space,
   textPresets,
 } from "../../theme";
-
-const API_URL = resolveApiBaseUrl({
-  envUrl: process.env.EXPO_PUBLIC_API_URL,
-  hostUri: Constants.expoConfig?.hostUri,
-});
-
-function firstNameOf(name: string): string {
-  return name.split(" ")[0];
-}
 
 export default function HistoryScreen() {
   const router = useRouter();
@@ -151,7 +143,7 @@ export default function HistoryScreen() {
                       {n.movie ? n.movie.title : "Untitled night"}
                     </Text>
                     <Text style={styles.rowMeta} numberOfLines={1}>
-                      {picker !== null ? `${firstNameOf(picker.name)} · ` : ""}
+                      {picker !== null ? `${firstName(picker.name)} · ` : ""}
                       {formatShortDate(n.scheduledFor)}
                     </Text>
                   </View>

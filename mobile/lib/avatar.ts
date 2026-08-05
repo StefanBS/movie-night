@@ -12,6 +12,14 @@ export function avatarTint(name: string): string {
   return avatarTints[hash];
 }
 
+// firstName returns the leading word of a name — the app's informal address in
+// "Alex picks" / "Skip Alex's turn" labels. Like initials it tolerates an empty
+// or whitespace-only name, returning "" so a caller renders a bare label rather
+// than a stray possessive.
+export function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? "";
+}
+
 // initials returns a 1–2 letter uppercase monogram: the first letter of the first
 // two whitespace-separated words. Empty / whitespace-only names render "?".
 export function initials(name: string): string {

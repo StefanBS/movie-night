@@ -3,7 +3,6 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { Settings } from "lucide-react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import Constants from "expo-constants";
 
 import {
   AppButton,
@@ -14,7 +13,9 @@ import {
   TopBar,
   UpNextCard,
 } from "../../components";
-import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
+import { API_URL } from "../../apiUrl";
+import { firstName } from "../../lib/avatar";
+import { GROUP_ID } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import { fetchGroup } from "../../lib/group";
 import { fetchTurn, pickerMeta, picksLabel, type TurnMember } from "../../lib/turn";
@@ -30,11 +31,6 @@ import {
   space,
   textPresets,
 } from "../../theme";
-
-const API_URL = resolveApiBaseUrl({
-  envUrl: process.env.EXPO_PUBLIC_API_URL,
-  hostUri: Constants.expoConfig?.hostUri,
-});
 
 const AVATAR = 64; // hero avatar diameter
 const HALO = 96; // radial bloom box behind the hero avatar
@@ -180,7 +176,7 @@ export default function TonightScreen() {
 
   const picker = order[0] ?? null;
   const onDeck = order.slice(1, 4);
-  const firstName = picker ? picker.name.split(" ")[0] : "";
+  const pickerFirstName = picker ? firstName(picker.name) : "";
   const scheduled = nextScheduledNight(nights, todayLocalISO());
   const openScheduled = () => {
     if (scheduled === null) {
@@ -242,7 +238,7 @@ export default function TonightScreen() {
               </View>
               <View style={styles.skipRow}>
                 <AppButton
-                  title={`${firstName} can't make it — skip turn`}
+                  title={`${pickerFirstName} can't make it — skip turn`}
                   variant="ghost"
                   onPress={() => {}}
                 />

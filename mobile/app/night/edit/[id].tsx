@@ -6,28 +6,24 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import Constants from "expo-constants";
 
 import { TopBar } from "../../../components";
 import { EditNightScreen } from "../../../components/night/EditNightScreen";
-import { GROUP_ID, resolveApiBaseUrl } from "../../../lib/api";
+import { API_URL } from "../../../apiUrl";
+import { GROUP_ID } from "../../../lib/api";
+import { nightDates } from "../../../lib/calendar";
 import { todayLocalISO } from "../../../lib/date";
 import { errorMessage } from "../../../lib/errors";
 import { fetchMembers, type Member } from "../../../lib/members";
 import { getNightOrNull, listNights, type Night } from "../../../lib/nights";
 import { colors, space, textPresets } from "../../../theme";
 
-const API_URL = resolveApiBaseUrl({
-  envUrl: process.env.EXPO_PUBLIC_API_URL,
-  hostUri: Constants.expoConfig?.hostUri,
-});
-
 export default function NightEditRoute() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [night, setNight] = useState<Night | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const [nightDates, setNightDates] = useState<Set<string>>(new Set());
+  const [nightDatesSet, setNightDatesSet] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const today = todayLocalISO();
@@ -45,7 +41,7 @@ export default function NightEditRoute() {
           ]);
           setNight(n);
           setMembers(roster);
-          setNightDates(new Set(planned.map((p) => p.scheduledFor)));
+          setNightDatesSet(nightDates(planned));
           setError(null);
         } catch (e) {
           if (!controller.signal.aborted) {
@@ -113,7 +109,7 @@ export default function NightEditRoute() {
       night={night}
       members={members}
       today={today}
-      nightDates={nightDates}
+      nightDates={nightDatesSet}
       apiUrl={API_URL}
       groupId={GROUP_ID}
       onBack={() => router.back()}

@@ -3,14 +3,11 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { AppButton, Avatar, Badge, Input, Poster, SectionLabel } from "../";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
+import { firstName } from "../../lib/avatar";
 import type { Member } from "../../lib/members";
 import type { Movie } from "../../lib/movies";
 import type { Night } from "../../lib/nights";
 import { borderWidth, colors, fontFamily, fontSize, pressedOpacity, radius, shadow, space, textPresets } from "../../theme";
-
-function firstNameOf(name: string): string {
-  return name.split(" ")[0];
-}
 
 // PickStep — the picker spotlight (with a correction reveal over present
 // attendees), then film search. Selecting a result attaches the movie and
@@ -69,7 +66,7 @@ export function PickStep({
             title={
               changingPicker
                 ? "Keep this picker"
-                : `Not ${firstNameOf(pickerName)}? Choose who picks`
+                : `Not ${firstName(pickerName)}? Choose who picks`
             }
             variant="ghost"
             onPress={() => setChangingPicker(!changingPicker)}

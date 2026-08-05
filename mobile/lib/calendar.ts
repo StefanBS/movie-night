@@ -1,4 +1,3 @@
-import { daysUntil } from "./date";
 import type { Night } from "./nights";
 
 // A calendar cell: a day, or null for the blank leading slots before the 1st.
@@ -24,6 +23,15 @@ export function monthGrid(year: number, month: number): DayCell[] {
 // YearMonth is the calendar's displayed month, kept as plain numbers (month 1–12)
 // rather than a Date so it stays timezone-clean and trivially serializable.
 export type YearMonth = { year: number; month: number };
+
+// yearMonthOf reads the displayed month out of a YYYY-MM-DD string. It splits
+// the ISO text by hand rather than letting Date parse it (which would treat it
+// as UTC and can land on the previous month west of Greenwich) — the same
+// timezone-safety rule lib/date.ts follows.
+export function yearMonthOf(iso: string): YearMonth {
+  const [year, month] = iso.split("-").map(Number);
+  return { year, month };
+}
 
 // shiftMonth rolls the displayed month by ±1, carrying the year across the
 // Dec↔Jan boundary.
@@ -58,6 +66,10 @@ export function dayState(
     selected,
     today: iso === opts.today,
     hasNight: opts.nightDates.has(iso) && !selected,
-    past: daysUntil(iso, opts.today) < 0,
+    // Both sides are zero-padded YYYY-MM-DD, so a string compare orders them
+    // exactly like calendar days — and avoids parsing two Dates per cell, on a
+    // grid that re-renders on every tap. Same fixed-width ISO ordering that
+    // lib/history.ts and lib/nights.ts already sort on.
+    past: iso < opts.today,
   };
 }

@@ -34,7 +34,6 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="manage" options={{ title: "Manage members" }} />
         {/* These render their own TopBar (kind="title"); hide the Stack header. */}
         <Stack.Screen name="night/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="night/edit/[id]" options={{ headerShown: false }} />

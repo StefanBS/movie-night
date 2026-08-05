@@ -3,15 +3,12 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppButton, Avatar, Badge, SectionLabel } from "../";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
+import { firstName } from "../../lib/avatar";
 import { formatWeekdayDate, relativeLabel } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import type { Night } from "../../lib/nights";
 import type { TurnMember } from "../../lib/turn";
 import { borderWidth, colors, pressedOpacity, radius, shadow, space, textPresets } from "../../theme";
-
-function firstNameOf(name: string): string {
-  return name.split(" ")[0];
-}
 
 // WhoStep — attendance toggles for the full roster. The next-up present core
 // member (order[0]) is spotlighted as the picker; the footer records the pick
@@ -88,7 +85,7 @@ export function WhoStep({
         <AppButton
           title={
             picker
-              ? `Next — ${firstNameOf(picker.name)} picks  →`
+              ? `Next — ${firstName(picker.name)} picks  →`
               : "Add who's here  →"
           }
           fullWidth

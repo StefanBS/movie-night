@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import Constants from "expo-constants";
 import { ChevronRight } from "lucide-react-native";
 
 import {
@@ -10,7 +9,8 @@ import {
   TabScrollView,
   TopBar,
 } from "../../components";
-import { GROUP_ID, resolveApiBaseUrl } from "../../lib/api";
+import { API_URL } from "../../apiUrl";
+import { GROUP_ID } from "../../lib/api";
 import { formatMonthYear } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { fetchGroup, renameGroup, type Group } from "../../lib/group";
@@ -24,11 +24,6 @@ import {
   textPresets,
   trackPx,
 } from "../../theme";
-
-const API_URL = resolveApiBaseUrl({
-  envUrl: process.env.EXPO_PUBLIC_API_URL,
-  hostUri: Constants.expoConfig?.hostUri,
-});
 
 export default function SettingsScreen() {
   const [group, setGroup] = useState<Group | null>(null);
