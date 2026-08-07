@@ -50,6 +50,12 @@ jobs:
       - name: Test
         run: just test
 
+      # Guards against deps drifting off the Expo SDK compatibility matrix —
+      # invisible to lint/typecheck/test, since none of them touch the native
+      # layer. See the Expo holds in .github/dependabot.yml.
+      - name: Dependency matrix
+        run: just check-deps
+
   audit:
     runs-on: ubuntu-latest
     permissions:

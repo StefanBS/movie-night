@@ -48,8 +48,15 @@ typecheck:
 test:
     npm test
 
-# Run everything CI runs: lint, type-check, tests
-check: lint typecheck test
+# Verify every dep matches the Expo SDK compatibility matrix
+# (bundledNativeModules.json). Catches drift off the matrix — which lint,
+# typecheck and tests can't see, because none of them touch the native layer.
+# Fix with `npx expo install --fix`.
+check-deps:
+    npx expo install --check
+
+# Run everything CI runs: lint, type-check, tests, dep matrix
+check: lint typecheck test check-deps
 
 # Scan npm dependencies for known vulnerabilities (ignores in osv-scanner.toml)
 audit:
