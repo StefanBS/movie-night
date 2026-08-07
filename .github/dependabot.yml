@@ -31,6 +31,69 @@ updates:
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
 
+      # @types/react must track the React major, and React is itself pinned by
+      # the SDK matrix below — so hold the major, but let minors/patches flow.
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+
+      # --- Expo SDK matrix ------------------------------------------------
+      #
+      # Expo owns the versions below, not semver. The authority is the SDK's
+      # bundledNativeModules.json (`npx expo install --check`, gated by
+      # `just check-deps`) — Dependabot has no view of that matrix, so an
+      # unconstrained bump silently walks the app off it.
+      #
+      # It also breaks the lockfile. Several of these are *optional peers* of
+      # expo-modules-core; bumping one out of its peer range makes npm nest a
+      # second copy of a native module, and Dependabot's in-place lockfile edit
+      # doesn't record the reshaped tree — so `npm ci` fails with "out of sync".
+      # That is what broke #71 (June) and #99.
+      #
+      # The matrix is not uniformly strict, so neither is this list. Mirror it
+      # per package rather than holding everything: a blanket hold fights the
+      # matrix on the packages it deliberately leaves patch-flexible, and leaves
+      # `just check-deps` demanding patches no bot is allowed to propose.
+      #
+      # Re-derive both tiers after an SDK bump by diffing mobile/package.json
+      # against bundledNativeModules.json. Move anything held here with the SDK:
+      # `npx expo install --fix`, then regenerate the lockfile from scratch
+      # rather than patching it.
+      #
+      # Deliberately explicit rather than a `react-native-*` wildcard — that
+      # would also swallow react-native-svg-transformer, which Expo does not
+      # govern, freezing it forever.
+
+      # Tier 1 — matrix pins an EXACT version (react 19.2.3, react-native
+      # 0.86.2, react-native-svg 15.15.4, ...). Any bump is drift, so hold all
+      # of it: react-native-svg 15.15.4 -> 15.15.5, a patch, is how #99 broke.
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-svg"
+      - dependency-name: "react-native-worklets"
+
+      # Tier 2 — matrix pins a `~` RANGE (expo-router ~57.0.11, screens
+      # ~4.26.0, ...), i.e. patches are in-matrix by construction, and
+      # `expo install --check` actively demands the newest one: when Expo ships
+      # a patch, `just check-deps` goes red until someone bumps it. So let
+      # Dependabot propose patches and hold minor/major for the SDK bump.
+      # (babel-preset-expo isn't in the matrix, but is SDK-published and
+      # versioned with it, so it follows the same rule.)
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "expo-*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "babel-preset-expo"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "eslint-config-expo"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "react-native-safe-area-context"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "react-native-screens"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "react-native-web"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
