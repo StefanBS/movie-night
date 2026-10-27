@@ -39,23 +39,23 @@ SET role = 'core', status = 'active', left_at = NULL,
 WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id)
 RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at;
 
--- name: AverageServedCount :one
-SELECT COALESCE(AVG(m.baseline_picks + COALESCE(p.cnt, 0)), 0)::float8 AS avg_served
-FROM memberships m
-LEFT JOIN (
-  SELECT picker_id, COUNT(*) FILTER (WHERE is_credited) AS cnt
-  FROM picks pk
-  WHERE pk.group_id = sqlc.arg(group_id)
-  GROUP BY picker_id
-) p ON p.picker_id = m.user_id
-WHERE m.group_id = sqlc.arg(group_id) AND m.status = 'active' AND m.role = 'core';
-
--- name: MemberCreditedCount :one
-SELECT COALESCE(COUNT(*) FILTER (WHERE is_credited), 0)::int AS credited_count
-FROM picks
-WHERE group_id = sqlc.arg(group_id) AND picker_id = sqlc.arg(user_id);
-
--- name: MaxRotationPosition :one
-SELECT COALESCE(MAX(rotation_position), 0)::int AS max_position
-FROM memberships
-WHERE group_id = sqlc.arg(group_id);
+-- name: RotationSeedInputs :one
+-- Everything a member entering the rotation is seeded from, read at one point
+-- in time: the active-core average served-count, the credited picks user_id
+-- already has (0 for a user with no picks), and the highest rotation slot.
+SELECT
+  (SELECT COALESCE(AVG(m.baseline_picks + COALESCE(p.cnt, 0)), 0)
+     FROM memberships m
+     LEFT JOIN (
+       SELECT picker_id, COUNT(*) FILTER (WHERE is_credited) AS cnt
+       FROM picks pk
+       WHERE pk.group_id = sqlc.arg(group_id)
+       GROUP BY picker_id
+     ) p ON p.picker_id = m.user_id
+    WHERE m.group_id = sqlc.arg(group_id) AND m.status = 'active' AND m.role = 'core')::float8 AS avg_served,
+  (SELECT COUNT(*) FILTER (WHERE c.is_credited)
+     FROM picks c
+    WHERE c.group_id = sqlc.arg(group_id) AND c.picker_id = sqlc.arg(user_id))::int AS credited_count,
+  (SELECT COALESCE(MAX(r.rotation_position), 0)
+     FROM memberships r
+    WHERE r.group_id = sqlc.arg(group_id))::int AS max_position;
