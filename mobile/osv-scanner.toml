@@ -11,8 +11,9 @@ ignoreUntil = 2027-01-31T00:00:00Z
 # (route/query parsing), but impact is a hang on malformed percent-encoding in a
 # URL handed to our own app. Fix is 0.5.0, which is ESM-only: query-string@7
 # `require()`s it as a function, so an override breaks routing. Still present on
-# expo-router 58.
-reason = "fix (0.5.0) is ESM-only and breaks query-string@7 under expo-router; local DoS only"
+# expo-router 58. Mitigated on native: app/+native-intent.tsx drops incoming
+# links with malformed percent-encoding or over 2KB (lib/deepLink.ts).
+reason = "fix (0.5.0) is ESM-only and breaks query-string@7; native deep links guarded by lib/deepLink.ts"
 
 [[IgnoredVulns]]
 id = "GHSA-5p2g-fcmc-qvqq"
