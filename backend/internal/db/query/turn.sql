@@ -1,4 +1,6 @@
 -- name: RankGroupTurn :many
+-- exclude_night (nullable) drops that night's own pick from the counts, so
+-- ranking a night reflects standings as if it were still undecided.
 SELECT u.id, u.name, m.role,
        (m.baseline_picks + COALESCE(p.credited_count, 0))::int AS served_count,
        p.last_picked_on
@@ -10,6 +12,7 @@ LEFT JOIN (
          (MAX(scheduled_for) FILTER (WHERE is_credited))::date AS last_picked_on
   FROM picks
   WHERE picks.group_id = sqlc.arg(group_id)
+    AND (sqlc.narg(exclude_night)::uuid IS NULL OR picks.id <> sqlc.narg(exclude_night)::uuid)
   GROUP BY picker_id
 ) p ON p.picker_id = m.user_id
 WHERE m.group_id = sqlc.arg(group_id)

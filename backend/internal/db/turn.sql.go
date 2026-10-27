@@ -24,18 +24,20 @@ LEFT JOIN (
          (MAX(scheduled_for) FILTER (WHERE is_credited))::date AS last_picked_on
   FROM picks
   WHERE picks.group_id = $1
+    AND ($2::uuid IS NULL OR picks.id <> $2::uuid)
   GROUP BY picker_id
 ) p ON p.picker_id = m.user_id
 WHERE m.group_id = $1
   AND m.status = 'active'
   AND m.role = 'core'
-  AND ($2::uuid[] IS NULL OR u.id = ANY($2::uuid[]))
+  AND ($3::uuid[] IS NULL OR u.id = ANY($3::uuid[]))
 ORDER BY served_count ASC, last_picked_on ASC NULLS FIRST, m.rotation_position ASC
 `
 
 type RankGroupTurnParams struct {
-	GroupID uuid.UUID   `json:"group_id"`
-	Present []uuid.UUID `json:"present"`
+	GroupID      uuid.UUID   `json:"group_id"`
+	ExcludeNight pgtype.UUID `json:"exclude_night"`
+	Present      []uuid.UUID `json:"present"`
 }
 
 type RankGroupTurnRow struct {
@@ -46,8 +48,10 @@ type RankGroupTurnRow struct {
 	LastPickedOn pgtype.Date    `json:"last_picked_on"`
 }
 
+// exclude_night (nullable) drops that night's own pick from the counts, so
+// ranking a night reflects standings as if it were still undecided.
 func (q *Queries) RankGroupTurn(ctx context.Context, arg RankGroupTurnParams) ([]RankGroupTurnRow, error) {
-	rows, err := q.db.Query(ctx, rankGroupTurn, arg.GroupID, arg.Present)
+	rows, err := q.db.Query(ctx, rankGroupTurn, arg.GroupID, arg.ExcludeNight, arg.Present)
 	if err != nil {
 		return nil, err
 	}
