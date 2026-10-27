@@ -45,14 +45,6 @@ func posterURLPtr(p pgtype.Text) *string {
 	return posterURL(p.String)
 }
 
-// movieDTOPtr maps a cached movie row to the DTO; nil renders "movie" as null.
-func movieDTOPtr(m *db.Movie) *movieDTO {
-	if m == nil {
-		return nil
-	}
-	return &movieDTO{TMDBID: m.TmdbID, Title: m.Title, ReleaseYear: releaseYearPtr(m.ReleaseYear), PosterURL: posterURLPtr(m.PosterPath)}
-}
-
 // movieRequest is the JSON body of POST .../nights/{nightId}/movie. Only the
 // tmdbId is sent; the backend re-fetches canonical title/year from TMDB.
 type movieRequest struct {
@@ -155,7 +147,7 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			writeJSONError(w, http.StatusBadGateway, "movie lookup failed")
 			return
 		}
-		cached, err := store.UpsertMovie(r.Context(), db.UpsertMovieParams{
+		movieID, err := store.UpsertMovie(r.Context(), db.UpsertMovieParams{
 			TmdbID:      movie.TMDBID,
 			Title:       movie.Title,
 			ReleaseYear: int4Ptr(movie.ReleaseYear),
@@ -166,7 +158,7 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			return
 		}
 		night, err := store.SetNightMovie(r.Context(), db.SetNightMovieParams{
-			MovieID: pgtype.UUID{Bytes: cached.ID, Valid: true},
+			MovieID: pgtype.UUID{Bytes: movieID, Valid: true},
 			NightID: nightID,
 			GroupID: gid,
 		})
@@ -174,7 +166,7 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			internalError(w, gid, "set night movie", err)
 			return
 		}
-		writeNightDTO(w, r, store, gid, night, http.StatusOK)
+		writeNightDTO(w, r, store, gid, nightRow(night), http.StatusOK)
 	}
 }
 
@@ -197,6 +189,6 @@ func clearNightMovieHandler(store nightStore) http.HandlerFunc {
 			storeError(w, gid, "clear night movie", err, http.StatusNotFound, "night not found")
 			return
 		}
-		writeNightDTO(w, r, store, gid, night, http.StatusOK)
+		writeNightDTO(w, r, store, gid, nightRow(night), http.StatusOK)
 	}
 }

@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"maps"
+	"strings"
 	"testing"
 	"time"
 
@@ -139,18 +141,15 @@ func TestToNightResponse(t *testing.T) {
 	nightID := uuid.MustParse("b0000000-0000-0000-0000-0000000000aa")
 	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
 
-	mkPick := func() db.Pick {
-		p := db.Pick{ID: nightID}
-		p.ScheduledFor.Time = mustDate(t, "2026-06-12")
-		p.ScheduledFor.Valid = true
-		return p
+	mkNight := func() nightRow {
+		return nightRow{ID: nightID, ScheduledFor: pgtype.Date{Time: mustDate(t, "2026-06-12"), Valid: true}}
 	}
 
 	t.Run("maps pick and attendees", func(t *testing.T) {
 		rows := []db.ListNightAttendeesRow{
 			{ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
 		}
-		got := toNightResponse(mkPick(), rows, nil)
+		got := toNightResponse(mkNight(), rows)
 		if got.ID != nightID.String() {
 			t.Errorf("ID = %q", got.ID)
 		}
@@ -163,7 +162,7 @@ func TestToNightResponse(t *testing.T) {
 	})
 
 	t.Run("nil rows yields non-nil empty attendees slice", func(t *testing.T) {
-		got := toNightResponse(mkPick(), nil, nil)
+		got := toNightResponse(mkNight(), nil)
 		if got.Attendees == nil {
 			t.Errorf("Attendees must be non-nil even when rows is nil")
 		}
@@ -173,22 +172,24 @@ func TestToNightResponse(t *testing.T) {
 	})
 
 	t.Run("pickerId is the picker's uuid", func(t *testing.T) {
-		p := mkPick()
-		p.PickerID = ada
-		if got := toNightResponse(p, nil, nil); got.PickerID != ada.String() {
+		n := mkNight()
+		n.PickerID = ada
+		if got := toNightResponse(n, nil); got.PickerID != ada.String() {
 			t.Errorf("PickerID = %q, want %s", got.PickerID, ada)
 		}
 	})
 
 	t.Run("movie is null when unset and populated when set", func(t *testing.T) {
-		none := toNightResponse(mkPick(), nil, nil)
+		none := toNightResponse(mkNight(), nil)
 		if none.Movie != nil {
 			t.Errorf("Movie = %v, want nil", none.Movie)
 		}
-		m := db.Movie{TmdbID: 438631, Title: "Dune"}
-		m.ReleaseYear = pgtype.Int4{Int32: 2021, Valid: true}
-		m.PosterPath = pgtype.Text{String: "/dune.jpg", Valid: true}
-		got := toNightResponse(mkPick(), nil, &m)
+		n := mkNight()
+		n.MovieTmdbID = pgtype.Int4{Int32: 438631, Valid: true}
+		n.MovieTitle = pgtype.Text{String: "Dune", Valid: true}
+		n.MovieReleaseYear = pgtype.Int4{Int32: 2021, Valid: true}
+		n.MoviePosterPath = pgtype.Text{String: "/dune.jpg", Valid: true}
+		got := toNightResponse(n, nil)
 		if got.Movie == nil || got.Movie.TMDBID != 438631 || got.Movie.Title != "Dune" ||
 			got.Movie.ReleaseYear == nil || *got.Movie.ReleaseYear != 2021 {
 			t.Errorf("Movie = %+v", got.Movie)
@@ -196,8 +197,10 @@ func TestToNightResponse(t *testing.T) {
 		if got.Movie.PosterURL == nil || *got.Movie.PosterURL != "https://image.tmdb.org/t/p/w342/dune.jpg" {
 			t.Errorf("Movie poster = %v, want built w342 url", got.Movie.PosterURL)
 		}
-		noYear := db.Movie{TmdbID: 841, Title: "Dune"} // ReleaseYear zero value → Valid false
-		got2 := toNightResponse(mkPick(), nil, &noYear)
+		noYear := mkNight() // release year and poster zero values → Valid false
+		noYear.MovieTmdbID = pgtype.Int4{Int32: 841, Valid: true}
+		noYear.MovieTitle = pgtype.Text{String: "Dune", Valid: true}
+		got2 := toNightResponse(noYear, nil)
 		if got2.Movie == nil || got2.Movie.ReleaseYear != nil {
 			t.Errorf("Movie release year = %+v, want nil", got2.Movie)
 		}
@@ -236,8 +239,71 @@ func TestCreditedForRole(t *testing.T) {
 	}
 }
 
+func TestAttendeeRoles(t *testing.T) {
+	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
+	blake := uuid.MustParse("a0000000-0000-0000-0000-000000000002")
+	stranger := uuid.MustParse("a0000000-0000-0000-0000-0000000000ff")
+	members := []db.FilterGroupMembersRow{
+		{UserID: ada, Role: db.MembershipRoleCore},
+		{UserID: blake, Role: db.MembershipRoleGuest},
+	}
+
+	tests := []struct {
+		name      string
+		attendees []uuid.UUID
+		members   []db.FilterGroupMembersRow
+		wantRoles map[uuid.UUID]db.MembershipRole
+		wantBad   uuid.UUID // the id the error must name; uuid.Nil = no error
+	}{
+		{
+			name:      "every attendee is a member",
+			attendees: []uuid.UUID{ada, blake},
+			members:   members,
+			wantRoles: map[uuid.UUID]db.MembershipRole{ada: db.MembershipRoleCore, blake: db.MembershipRoleGuest},
+		},
+		{
+			name:      "a non-member is named",
+			attendees: []uuid.UUID{ada, stranger, blake},
+			members:   members,
+			wantBad:   stranger,
+		},
+		{
+			name:      "the first missing attendee in request order is named",
+			attendees: []uuid.UUID{blake, ada},
+			members:   members[:1],
+			wantBad:   blake,
+		},
+		{
+			name:      "no attendees passes trivially",
+			attendees: []uuid.UUID{},
+			members:   nil,
+			wantRoles: map[uuid.UUID]db.MembershipRole{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			roles, err := attendeeRoles(tt.attendees, tt.members)
+			if tt.wantBad != uuid.Nil {
+				if !errors.Is(err, errNotMember) {
+					t.Fatalf("err = %v, want errNotMember", err)
+				}
+				if !strings.Contains(err.Error(), tt.wantBad.String()) {
+					t.Fatalf("err = %q, want it to name %s", err, tt.wantBad)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected err: %v", err)
+			}
+			if !maps.Equal(roles, tt.wantRoles) {
+				t.Fatalf("roles = %v, want %v", roles, tt.wantRoles)
+			}
+		})
+	}
+}
+
 func TestMovieDTOFromCols(t *testing.T) {
-	base := db.ListNightsRow{
+	base := nightRow{
 		ID:           uuid.MustParse("b0000000-0000-0000-0000-0000000000aa"),
 		ScheduledFor: pgtype.Date{Time: mustDate(t, "2026-05-01"), Valid: true},
 	}

@@ -4,21 +4,38 @@ VALUES (sqlc.arg(tmdb_id), sqlc.arg(title), sqlc.arg(release_year), sqlc.arg(pos
 ON CONFLICT (tmdb_id) DO UPDATE
     SET title = excluded.title, release_year = excluded.release_year,
         poster_path = excluded.poster_path, cached_at = now()
-RETURNING id, tmdb_id, title, release_year, cached_at, poster_path;
-
--- name: GetMovie :one
-SELECT id, tmdb_id, title, release_year, cached_at, poster_path
-FROM movies
-WHERE id = sqlc.arg(id);
+RETURNING id;
 
 -- name: SetNightMovie :one
-UPDATE picks
-SET movie_id = sqlc.arg(movie_id)
-WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
-RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id;
+-- The movie must be written by an earlier statement (UpsertMovie): the outer
+-- SELECT sees movies as they were when this statement began.
+WITH p AS (
+  UPDATE picks
+  SET movie_id = sqlc.arg(movie_id)
+  WHERE picks.id = sqlc.arg(night_id) AND picks.group_id = sqlc.arg(group_id)
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+)
+SELECT
+  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  m.tmdb_id      AS movie_tmdb_id,
+  m.title        AS movie_title,
+  m.release_year AS movie_release_year,
+  m.poster_path  AS movie_poster_path
+FROM p
+LEFT JOIN movies m ON m.id = p.movie_id;
 
 -- name: ClearNightMovie :one
-UPDATE picks
-SET movie_id = NULL
-WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
-RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id;
+WITH p AS (
+  UPDATE picks
+  SET movie_id = NULL
+  WHERE picks.id = sqlc.arg(night_id) AND picks.group_id = sqlc.arg(group_id)
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+)
+SELECT
+  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  m.tmdb_id      AS movie_tmdb_id,
+  m.title        AS movie_title,
+  m.release_year AS movie_release_year,
+  m.poster_path  AS movie_poster_path
+FROM p
+LEFT JOIN movies m ON m.id = p.movie_id;
