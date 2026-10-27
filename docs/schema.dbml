@@ -45,6 +45,16 @@ Table users {
   Note: 'Every human — core member or guest. Repeated guests are recurring rows (ADR-0004).'
 }
 
+Table devices {
+  id           uuid         [pk, default: `gen_random_uuid()`]
+  user_id      uuid         [not null]
+  token_hash   bytea        [not null, unique, note: 'SHA-256 of the bearer token; the raw token lives only on the device']
+  created_at   timestamptz  [not null, default: `now()`]
+  last_seen_at timestamptz  [not null, default: `now()`]
+
+  Note: 'An install and the identity it claimed (ADR-0009). Deleted on release.'
+}
+
 Table groups {
   id         uuid         [pk, default: `gen_random_uuid()`]
   name       varchar      [not null]
@@ -154,6 +164,8 @@ Table watchlist_items {
 // delete rules: memberships/attendances/reviews/watchlist cascade with their
 // parent; picks restrict on movie (keep history) and on picker (people are
 // deactivated, never deleted — ADR-0006).
+
+Ref: devices.user_id > users.id [delete: cascade]
 
 Ref: memberships.group_id > groups.id [delete: cascade]
 Ref: memberships.user_id  > users.id  [delete: cascade]

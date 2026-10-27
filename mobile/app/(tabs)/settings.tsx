@@ -9,6 +9,7 @@ import {
   TabScrollView,
   TopBar,
 } from "../../components";
+import { useIdentity } from "../../components/IdentityProvider";
 import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
 import { formatMonthYear } from "../../lib/date";
@@ -26,6 +27,7 @@ import {
 } from "../../theme";
 
 export default function SettingsScreen() {
+  const identity = useIdentity();
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +140,21 @@ export default function SettingsScreen() {
               onPress={startEdit}
             />
           </View>
+        ) : null}
+
+        <SectionLabel>You</SectionLabel>
+        <View style={styles.card}>
+          <View style={styles.divider}>
+            <SettingsRow label={identity.state.identity?.name ?? ""} value="On this phone" />
+          </View>
+          <SettingsRow
+            label="Not you? Switch"
+            disabled={identity.state.busy}
+            onPress={() => void identity.session.release()}
+          />
+        </View>
+        {identity.state.actionError !== null ? (
+          <Text style={styles.errorText}>{identity.state.actionError}</Text>
         ) : null}
 
         <SectionLabel>Notifications</SectionLabel>

@@ -3,6 +3,7 @@ import { useFonts } from "expo-font";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
+import { IdentityProvider } from "../components/IdentityProvider";
 import { colors } from "../theme";
 
 export default function RootLayout() {
@@ -26,24 +27,26 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.surface.dark },
-          headerTintColor: colors.text.primary,
-          contentStyle: { backgroundColor: colors.surface.page },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        {/* These render their own TopBar (kind="title"); hide the Stack header. */}
-        <Stack.Screen name="night/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="night/edit/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="night/edit/reminders" options={{ headerShown: false }} />
-        <Stack.Screen name="night/new" options={{ headerShown: false }} />
-        <Stack.Screen name="welcome" options={{ headerShown: false }} />
-        <Stack.Screen name="rotation" options={{ headerShown: false }} />
-        <Stack.Screen name="member/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="member/new" options={{ headerShown: false }} />
-      </Stack>
+      <IdentityProvider>
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: colors.surface.dark },
+            headerTintColor: colors.text.primary,
+            contentStyle: { backgroundColor: colors.surface.page },
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          {/* These render their own TopBar (kind="title"); hide the Stack header. */}
+          <Stack.Screen name="night/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="night/edit/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="night/edit/reminders" options={{ headerShown: false }} />
+          <Stack.Screen name="night/new" options={{ headerShown: false }} />
+          <Stack.Screen name="welcome" options={{ headerShown: false }} />
+          <Stack.Screen name="rotation" options={{ headerShown: false }} />
+          <Stack.Screen name="member/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="member/new" options={{ headerShown: false }} />
+        </Stack>
+      </IdentityProvider>
     </SafeAreaProvider>
   );
 }

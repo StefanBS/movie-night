@@ -40,15 +40,17 @@ export async function requestNoContent(url: string, init?: RequestInit): Promise
 }
 
 // requestJsonOrNull is requestJson for endpoints that signal "no resource" with
-// a 404 (e.g. a group's current night before one exists) — that case returns
-// null instead of throwing; any other non-2xx still rejects.
+// a status — a 404 by default (e.g. a deleted night), a 401 for an identity
+// token the backend no longer knows. That status returns null instead of
+// throwing; any other non-2xx still rejects.
 export async function requestJsonOrNull<T>(
   url: string,
   parse: (raw: unknown) => T,
   init?: RequestInit,
+  nullStatus = 404,
 ): Promise<T | null> {
   const res = await fetch(url, init);
-  if (res.status === 404) {
+  if (res.status === nullStatus) {
     return null;
   }
   if (!res.ok) {
