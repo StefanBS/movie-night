@@ -12,25 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const averageServedCount = `-- name: AverageServedCount :one
-SELECT COALESCE(AVG(m.baseline_picks + COALESCE(p.cnt, 0)), 0)::float8 AS avg_served
-FROM memberships m
-LEFT JOIN (
-  SELECT picker_id, COUNT(*) FILTER (WHERE is_credited) AS cnt
-  FROM picks pk
-  WHERE pk.group_id = $1
-  GROUP BY picker_id
-) p ON p.picker_id = m.user_id
-WHERE m.group_id = $1 AND m.status = 'active' AND m.role = 'core'
-`
-
-func (q *Queries) AverageServedCount(ctx context.Context, groupID uuid.UUID) (float64, error) {
-	row := q.db.QueryRow(ctx, averageServedCount, groupID)
-	var avg_served float64
-	err := row.Scan(&avg_served)
-	return avg_served, err
-}
-
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (name) VALUES ($1)
 RETURNING id, name, letterboxd_user, created_at
@@ -189,37 +170,6 @@ func (q *Queries) InsertMembership(ctx context.Context, arg InsertMembershipPara
 	return i, err
 }
 
-const maxRotationPosition = `-- name: MaxRotationPosition :one
-SELECT COALESCE(MAX(rotation_position), 0)::int AS max_position
-FROM memberships
-WHERE group_id = $1
-`
-
-func (q *Queries) MaxRotationPosition(ctx context.Context, groupID uuid.UUID) (int32, error) {
-	row := q.db.QueryRow(ctx, maxRotationPosition, groupID)
-	var max_position int32
-	err := row.Scan(&max_position)
-	return max_position, err
-}
-
-const memberCreditedCount = `-- name: MemberCreditedCount :one
-SELECT COALESCE(COUNT(*) FILTER (WHERE is_credited), 0)::int AS credited_count
-FROM picks
-WHERE group_id = $1 AND picker_id = $2
-`
-
-type MemberCreditedCountParams struct {
-	GroupID uuid.UUID `json:"group_id"`
-	UserID  uuid.UUID `json:"user_id"`
-}
-
-func (q *Queries) MemberCreditedCount(ctx context.Context, arg MemberCreditedCountParams) (int32, error) {
-	row := q.db.QueryRow(ctx, memberCreditedCount, arg.GroupID, arg.UserID)
-	var credited_count int32
-	err := row.Scan(&credited_count)
-	return credited_count, err
-}
-
 const promoteMembership = `-- name: PromoteMembership :one
 UPDATE memberships
 SET role = 'core', status = 'active', left_at = NULL,
@@ -284,5 +234,45 @@ func (q *Queries) ReactivateMembership(ctx context.Context, arg ReactivateMember
 		&i.JoinedAt,
 		&i.LeftAt,
 	)
+	return i, err
+}
+
+const rotationSeedInputs = `-- name: RotationSeedInputs :one
+SELECT
+  (SELECT COALESCE(AVG(m.baseline_picks + COALESCE(p.cnt, 0)), 0)
+     FROM memberships m
+     LEFT JOIN (
+       SELECT picker_id, COUNT(*) FILTER (WHERE is_credited) AS cnt
+       FROM picks pk
+       WHERE pk.group_id = $1
+       GROUP BY picker_id
+     ) p ON p.picker_id = m.user_id
+    WHERE m.group_id = $1 AND m.status = 'active' AND m.role = 'core')::float8 AS avg_served,
+  (SELECT COUNT(*) FILTER (WHERE c.is_credited)
+     FROM picks c
+    WHERE c.group_id = $1 AND c.picker_id = $2)::int AS credited_count,
+  (SELECT COALESCE(MAX(r.rotation_position), 0)
+     FROM memberships r
+    WHERE r.group_id = $1)::int AS max_position
+`
+
+type RotationSeedInputsParams struct {
+	GroupID uuid.UUID `json:"group_id"`
+	UserID  uuid.UUID `json:"user_id"`
+}
+
+type RotationSeedInputsRow struct {
+	AvgServed     float64 `json:"avg_served"`
+	CreditedCount int32   `json:"credited_count"`
+	MaxPosition   int32   `json:"max_position"`
+}
+
+// Everything a member entering the rotation is seeded from, read at one point
+// in time: the active-core average served-count, the credited picks user_id
+// already has (0 for a user with no picks), and the highest rotation slot.
+func (q *Queries) RotationSeedInputs(ctx context.Context, arg RotationSeedInputsParams) (RotationSeedInputsRow, error) {
+	row := q.db.QueryRow(ctx, rotationSeedInputs, arg.GroupID, arg.UserID)
+	var i RotationSeedInputsRow
+	err := row.Scan(&i.AvgServed, &i.CreditedCount, &i.MaxPosition)
 	return i, err
 }

@@ -58,9 +58,7 @@ type memberStore interface {
 	DeactivateMembership(ctx context.Context, arg db.DeactivateMembershipParams) (db.Membership, error)
 	ReactivateMembership(ctx context.Context, arg db.ReactivateMembershipParams) (db.Membership, error)
 	PromoteMembership(ctx context.Context, arg db.PromoteMembershipParams) (db.Membership, error)
-	AverageServedCount(ctx context.Context, groupID uuid.UUID) (float64, error)
-	MemberCreditedCount(ctx context.Context, arg db.MemberCreditedCountParams) (int32, error)
-	MaxRotationPosition(ctx context.Context, groupID uuid.UUID) (int32, error)
+	RotationSeedInputs(ctx context.Context, arg db.RotationSeedInputsParams) (db.RotationSeedInputsRow, error)
 }
 
 // currentMember renders an unchanged membership row as the response DTO — used
@@ -118,7 +116,7 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 			// Read-then-write without a transaction is deliberate. Two distinct
 			// concerns, both acceptable for this single-group, admin-driven app:
 			//
-			//   Consistency: under simultaneous joins the avg/maxPos reads can go
+			//   Consistency: under simultaneous joins the seed read can go
 			//   stale, but rotation_position is only an ORDER BY tiebreak (no
 			//   uniqueness constraint) so a collision just falls back to name order,
 			//   and the seed drifts at most ±1 — within fairness tolerance. A plain
@@ -131,18 +129,12 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 			//   memberships — and a retried join just creates a fresh user. withTx
 			//   (tx.go, introduced for the Night edit) would fix this cheaply; not
 			//   yet adopted here.
-			avg, err := store.AverageServedCount(ctx, gid)
-			if err != nil {
-				internalError(w, gid, "average served", err)
+			//
+			// The user doesn't exist yet, so seed against uuid.Nil: no picks are
+			// credited to it, which is exactly a brand-new joiner's history.
+			if baseline, position, ok = rotationSeed(w, r, store, gid, uuid.Nil); !ok {
 				return
 			}
-			maxPos, err := store.MaxRotationPosition(ctx, gid)
-			if err != nil {
-				internalError(w, gid, "max rotation position", err)
-				return
-			}
-			baseline = seedBaseline(avg, 0)
-			position = maxPos + 1
 		}
 
 		user, err := store.CreateUser(ctx, name)
@@ -185,24 +177,20 @@ func loadMember(w http.ResponseWriter, r *http.Request, store memberStore, gid, 
 	return m, true
 }
 
-// rotationBaseline computes the baseline_picks that lands a member entering the
-// rotation on the current active-core average, discounting the credited picks
-// they already have. Reactivate and promote are both "crosses into the rotation"
-// transitions, so the fairness rule lives here rather than being spelled out at
-// each. ok=false means a response was already written.
-func rotationBaseline(w http.ResponseWriter, r *http.Request, store memberStore, gid, uid uuid.UUID) (int32, bool) {
-	ctx := r.Context()
-	avg, err := store.AverageServedCount(ctx, gid)
+// rotationSeed computes where a member entering the rotation lands: the
+// baseline_picks that puts them on the current active-core average (discounting
+// the credited picks they already have) and the next rotation slot. Join,
+// reactivate and promote are all "crosses into the rotation" transitions, so the
+// fairness rule lives here rather than being spelled out at each; reactivate
+// keeps its slot and ignores the position. One query reads every input at a
+// single point in time. ok=false means a response was already written.
+func rotationSeed(w http.ResponseWriter, r *http.Request, store memberStore, gid, uid uuid.UUID) (baseline, position int32, ok bool) {
+	in, err := store.RotationSeedInputs(r.Context(), db.RotationSeedInputsParams{GroupID: gid, UserID: uid})
 	if err != nil {
-		internalError(w, gid, "average served", err)
-		return 0, false
+		internalError(w, gid, "rotation seed inputs", err)
+		return 0, 0, false
 	}
-	credited, err := store.MemberCreditedCount(ctx, db.MemberCreditedCountParams{GroupID: gid, UserID: uid})
-	if err != nil {
-		internalError(w, gid, "member credited count", err)
-		return 0, false
-	}
-	return seedBaseline(avg, credited), true
+	return seedBaseline(in.AvgServed, in.CreditedCount), in.MaxPosition + 1, true
 }
 
 // deactivateMemberHandler serves POST /groups/{groupId}/members/{userId}/deactivate.
@@ -250,7 +238,7 @@ func reactivateMemberHandler(store memberStore) http.HandlerFunc {
 		// reactivated guest stays out of the rotation, so its baseline is kept.
 		baseline := m.BaselinePicks
 		if m.Role == db.MembershipRoleCore {
-			if baseline, ok = rotationBaseline(w, r, store, gid, uid); !ok {
+			if baseline, _, ok = rotationSeed(w, r, store, gid, uid); !ok {
 				return
 			}
 		}
@@ -280,20 +268,15 @@ func promoteMemberHandler(store memberStore) http.HandlerFunc {
 			respondJSON(w, http.StatusOK, currentMember(m), gid, "encode member response")
 			return
 		}
-		baseline, ok := rotationBaseline(w, r, store, gid, uid)
+		baseline, position, ok := rotationSeed(w, r, store, gid, uid)
 		if !ok {
-			return
-		}
-		maxPos, err := store.MaxRotationPosition(ctx, gid)
-		if err != nil {
-			internalError(w, gid, "max rotation position", err)
 			return
 		}
 		updated, err := store.PromoteMembership(ctx, db.PromoteMembershipParams{
 			GroupID:          gid,
 			UserID:           uid,
 			BaselinePicks:    baseline,
-			RotationPosition: maxPos + 1,
+			RotationPosition: position,
 		})
 		if err != nil {
 			internalError(w, gid, "promote membership", err)
