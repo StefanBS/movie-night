@@ -13,14 +13,14 @@ documented in [`CLAUDE.md`](CLAUDE.md).
 
 ## Stack
 
-- **Expo SDK 57**
+- **Expo SDK 58**
 - **[expo-router](https://docs.expo.dev/router/introduction/)** — file-based navigation (`app/`)
 - **[expo-dev-client](https://docs.expo.dev/develop/development-builds/introduction/)** — local development builds (not Expo Go)
-- **React Native** / **React** — versions pinned by the Expo SDK 57 set
+- **React Native** / **React** — versions pinned by the Expo SDK 58 set
 - **TypeScript 6.0**
 
 Expo APIs are version-specific — read the
-[SDK 57 docs](https://docs.expo.dev/versions/v57.0.0/) before changing native or
+[SDK 58 docs](https://docs.expo.dev/versions/v58.0.0/) before changing native or
 Expo code (see [`AGENTS.md`](AGENTS.md)).
 
 ## Prerequisites

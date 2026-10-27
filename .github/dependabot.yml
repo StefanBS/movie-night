@@ -21,7 +21,7 @@ updates:
       mobile:
         patterns:
           - "*"
-    # Hold majors that are coupled to eslint-config-expo (SDK 57) / the Node 22 runtime:
+    # Hold majors that are coupled to eslint-config-expo (SDK 58) / the Node 22 runtime:
     #   - eslint majors can break eslint-config-expo's bundled plugins — bump with the SDK
     #   - @types/node must track the Node 22 runtime major (see CLAUDE.md)
     # Bump these deliberately alongside an SDK / runtime change, not via a routine PR.
@@ -30,7 +30,7 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
-      # The SDK targets a TypeScript major (SDK 57 = TS 6); move it with the SDK.
+      # The SDK targets a TypeScript major (SDK 58 = TS 6); move it with the SDK.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
       # Load-bearing direct devDep, pinned to the major eslint-config-expo
@@ -70,8 +70,8 @@ updates:
       # would also swallow react-native-svg-transformer, which Expo does not
       # govern, freezing it forever.
 
-      # Tier 1 — matrix pins an EXACT version (react 19.2.3, react-native
-      # 0.86.2, react-native-svg 15.15.4, ...). Any bump is drift, so hold all
+      # Tier 1 — matrix pins an EXACT version (react 19.3.0, react-native
+      # 0.88.0, react-native-svg 15.16.0, ...). Any bump is drift, so hold all
       # of it: react-native-svg 15.15.4 -> 15.15.5, a patch, is how #99 broke.
       - dependency-name: "react"
       - dependency-name: "react-dom"
@@ -83,8 +83,8 @@ updates:
       # is how #130 broke.
       - dependency-name: "react-native-reanimated"
 
-      # Tier 2 — matrix pins a `~` RANGE (expo-router ~57.0.11, screens
-      # ~4.26.0, ...), i.e. patches are in-matrix by construction, and
+      # Tier 2 — matrix pins a `~` RANGE (expo-router ~58.0.27, screens
+      # ~4.30.0, ...), i.e. patches are in-matrix by construction, and
       # `expo install --check` actively demands the newest one: when Expo ships
       # a patch, `just check-deps` goes red until someone bumps it. So let
       # Dependabot propose patches and hold minor/major for the SDK bump.
