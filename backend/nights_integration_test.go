@@ -4,10 +4,17 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
+
+// nightBody builds a create-night body: the picker plus the other attendees.
+func nightBody(date, picker string, others ...string) string {
+	ids := append([]string{picker}, others...)
+	return `{"scheduledFor":"` + date + `","pickerId":"` + picker + `","attendees":["` + strings.Join(ids, `","`) + `"]}`
+}
 
 func TestNightAttendanceIntegration(t *testing.T) {
 	pool := freshDB(t)
@@ -16,13 +23,21 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	mux := http.NewServeMux()
 	q := db.New(pool)
 	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(q))
-	mux.Handle("GET /groups/{groupId}/nights/current", currentNightHandler(q))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}/turn", nightTurnHandler(q))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/attendees", addAttendeeHandler(q))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/attendees/{userId}", removeAttendeeHandler(q))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(q))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
+
+	// run starts every subtest from the seed baseline: no nights, so dates never
+	// collide (one night per date) and standings come from baseline alone.
+	run := func(name string, f func(t *testing.T)) {
+		t.Run(name, func(t *testing.T) {
+			clearAllPicks(t, pool, seededGroup)
+			f(t)
+		})
+	}
 
 	do := func(t *testing.T, method, path, body string) (int, []byte) {
 		t.Helper()
@@ -31,7 +46,6 @@ func TestNightAttendanceIntegration(t *testing.T) {
 
 	createNight := func(t *testing.T, body string) nightResponse {
 		t.Helper()
-		clearOpenNight(t, pool, seededGroup)
 		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", body)
 		if code != http.StatusCreated {
 			t.Fatalf("create night status = %d, want 201", code)
@@ -76,19 +90,29 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		return out
 	}
 
-	t.Run("pick order ranks attendees and excludes absent core", func(t *testing.T) {
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+blake+`"]}`)
+	run("create returns the night with its picker and attendees", func(t *testing.T) {
+		n := createNight(t, nightBody("2026-06-12", ada, blake))
+		if n.PickerID != ada {
+			t.Errorf("pickerId = %q, want %s", n.PickerID, ada)
+		}
 		if len(n.Attendees) != 2 {
 			t.Fatalf("attendees = %+v, want 2", n.Attendees)
 		}
-		got := names(turn(t, n.ID))
-		if len(got) != 2 || got[0] != "Ada" || got[1] != "Blake" {
+		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, ""); code != http.StatusOK {
+			t.Errorf("detail status = %d, want 200", code)
+		}
+	})
+
+	run("pick order ranks attendees and excludes absent core", func(t *testing.T) {
+		n := createNight(t, nightBody("2026-06-12", ada, blake))
+		// The night's own pick (Ada) is ignored, so the order is the baseline one.
+		if got := names(turn(t, n.ID)); len(got) != 2 || got[0] != "Ada" || got[1] != "Blake" {
 			t.Fatalf("order = %v, want [Ada Blake]", got)
 		}
 	})
 
-	t.Run("guest attendee is recorded but absent from the pick order", func(t *testing.T) {
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+frankie+`"]}`)
+	run("guest attendee is recorded but absent from the pick order", func(t *testing.T) {
+		n := createNight(t, nightBody("2026-06-12", ada, frankie))
 		var sawGuest bool
 		for _, a := range n.Attendees {
 			if a.Name == "Frankie" && a.Role == "guest" {
@@ -103,8 +127,20 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("add then remove attendee changes the order", func(t *testing.T) {
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
+	run("inactive member can attend but is absent from the pick order", func(t *testing.T) {
+		n := createNight(t, nightBody("2026-06-12", ada, zed))
+		if len(n.Attendees) != 2 {
+			t.Fatalf("attendees = %+v, want 2 (Ada + Zed)", n.Attendees)
+		}
+		// Zed is inactive core: recorded as present, but RankGroupTurn filters to
+		// active core, so the order is Ada only.
+		if got := names(turn(t, n.ID)); len(got) != 1 || got[0] != "Ada" {
+			t.Fatalf("order = %v, want [Ada]", got)
+		}
+	})
+
+	run("add then remove attendee changes the order", func(t *testing.T) {
+		n := createNight(t, nightBody("2026-06-12", ada))
 		if code, b := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/attendees", `{"userId":"`+blake+`"}`); code != http.StatusCreated {
 			t.Fatalf("add status = %d, want 201 (body %s)", code, b)
 		}
@@ -119,62 +155,53 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("empty night ranks nobody", func(t *testing.T) {
-		n := createNight(t, `{"scheduledFor":"2026-06-12"}`)
-		if got := turn(t, n.ID); len(got) != 0 {
-			t.Fatalf("order = %+v, want []", got)
+	run("removing the picker yields 409 and keeps them attending", func(t *testing.T) {
+		n := createNight(t, nightBody("2026-06-12", ada, blake))
+		if code, _ := do(t, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID+"/attendees/"+ada, ""); code != http.StatusConflict {
+			t.Fatalf("remove picker status = %d, want 409", code)
+		}
+		_, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, "")
+		if len(got.Attendees) != 2 {
+			t.Fatalf("attendees = %+v, want both still attending", got.Attendees)
+		}
+		// Changing the picker first frees Ada to leave.
+		recordPick(t, n.ID, blake)
+		if code, _ := do(t, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID+"/attendees/"+ada, ""); code != http.StatusOK {
+			t.Fatalf("remove former picker status = %d, want 200", code)
 		}
 	})
 
-	t.Run("add non-member yields 422", func(t *testing.T) {
-		n := createNight(t, `{"scheduledFor":"2026-06-12"}`)
+	run("add non-member yields 422", func(t *testing.T) {
+		n := createNight(t, nightBody("2026-06-12", ada))
 		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/attendees", `{"userId":"`+unknownUser+`"}`); code != http.StatusUnprocessableEntity {
 			t.Fatalf("status = %d, want 422", code)
 		}
 	})
 
-	t.Run("create with a non-member initial attendee yields 422", func(t *testing.T) {
-		// Initial-attendee validation only runs when actually creating — so this
-		// must start with no open night, else create would resume and skip it.
-		clearOpenNight(t, pool, seededGroup)
-		code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-06-12","attendees":["`+unknownUser+`"]}`)
-		if code != http.StatusUnprocessableEntity {
+	run("create with a non-member attendee yields 422 and creates nothing", func(t *testing.T) {
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-06-12", ada, unknownUser)); code != http.StatusUnprocessableEntity {
+			t.Fatalf("status = %d, want 422", code)
+		}
+		// The date is still free: nothing was written before the 422.
+		createNight(t, nightBody("2026-06-12", ada))
+	})
+
+	run("create with a picker who is not attending yields 422", func(t *testing.T) {
+		body := `{"scheduledFor":"2026-06-12","pickerId":"` + blake + `","attendees":["` + ada + `"]}`
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", body); code != http.StatusUnprocessableEntity {
 			t.Fatalf("status = %d, want 422", code)
 		}
 	})
 
-	t.Run("creating a night when one is open resumes it (idempotent)", func(t *testing.T) {
-		first := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
-		// A second create must NOT open a new night (uq_open_night_per_group). It
-		// returns the already-open night with 200, and the new body is ignored.
-		code, got := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-07-01","attendees":["`+blake+`"]}`)
-		if code != http.StatusOK {
-			t.Fatalf("repeat create status = %d, want 200", code)
+	run("a second night on the same date yields 409", func(t *testing.T) {
+		createNight(t, nightBody("2026-06-12", ada))
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-06-12", blake)); code != http.StatusConflict {
+			t.Fatalf("same-date status = %d, want 409", code)
 		}
-		if got.ID != first.ID {
-			t.Errorf("repeat create id = %s, want the open night %s", got.ID, first.ID)
-		}
-		if got.ScheduledFor != "2026-06-12" {
-			t.Errorf("scheduledFor = %s, want 2026-06-12 (resumed, not overwritten)", got.ScheduledFor)
-		}
-		if len(got.Attendees) != 1 || got.Attendees[0].Name != "Ada" {
-			t.Errorf("attendees = %+v, want [Ada] (resumed, body's Blake ignored)", got.Attendees)
-		}
+		createNight(t, nightBody("2026-06-19", blake))
 	})
 
-	t.Run("inactive member can attend but is absent from the pick order", func(t *testing.T) {
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+zed+`"]}`)
-		if len(n.Attendees) != 2 {
-			t.Fatalf("attendees = %+v, want 2 (Ada + Zed)", n.Attendees)
-		}
-		// Zed is inactive core: recorded as present, but RankGroupTurn filters to
-		// active core, so the order is Ada only.
-		if got := names(turn(t, n.ID)); len(got) != 1 || got[0] != "Ada" {
-			t.Fatalf("order = %v, want [Ada]", got)
-		}
-	})
-
-	t.Run("unknown night yields 404", func(t *testing.T) {
+	run("unknown night yields 404", func(t *testing.T) {
 		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+unknownNight, ""); code != http.StatusNotFound {
 			t.Fatalf("detail status = %d, want 404", code)
 		}
@@ -183,129 +210,68 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("recording a core picker finalizes the night and credits them", func(t *testing.T) {
-		clearAllPicks(t, pool, seededGroup)
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+blake+`"]}`)
-		got := recordPick(t, n.ID, ada)
-		if got.PickerID == nil || *got.PickerID != ada {
-			t.Fatalf("pickerId = %v, want %s", got.PickerID, ada)
-		}
-		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, ""); code != http.StatusOK {
-			t.Errorf("detail of finalized night = %d, want 200", code)
-		}
+	run("creating with a core picker credits them", func(t *testing.T) {
+		createNight(t, nightBody("2026-06-12", ada, blake))
 		if order := names(groupTurn(t)); len(order) != 3 || order[0] != "Blake" || order[2] != "Ada" {
-			t.Fatalf("post-pick group order = %v, want Blake first and Ada last (Ada credited)", order)
+			t.Fatalf("group order = %v, want Blake first and Ada last (Ada credited)", order)
 		}
 	})
 
-	t.Run("a night's order ignores its own pick", func(t *testing.T) {
-		clearAllPicks(t, pool, seededGroup)
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+blake+`"]}`)
-		ranked := turn(t, n.ID)
-		before := names(ranked)
-		recordPick(t, n.ID, ranked[0].ID)
-		// Re-ranking this night must not count the pick just recorded on it, or
-		// its picker would sink and a re-advance would hand the pick to someone else.
-		if after := names(turn(t, n.ID)); len(after) != 2 || after[0] != before[0] || after[1] != before[1] {
-			t.Fatalf("order after recording %s = %v, want unchanged %v", before[0], after, before)
-		}
-	})
-
-	t.Run("a night's order still counts other nights' picks", func(t *testing.T) {
-		clearAllPicks(t, pool, seededGroup)
-		earlier := createNight(t, `{"scheduledFor":"2026-06-05","attendees":["`+ada+`","`+blake+`"]}`)
-		recordPick(t, earlier.ID, ada)
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+blake+`"]}`)
-		if order := names(turn(t, n.ID)); len(order) != 2 || order[0] != "Blake" {
-			t.Fatalf("order = %v, want Blake first (Ada credited on an earlier night)", order)
-		}
-	})
-
-	t.Run("a pick on an upcoming night counts toward standings immediately", func(t *testing.T) {
-		clearAllPicks(t, pool, seededGroup)
-		// Later subtests resume the latest-dated night, so don't leave this one behind.
-		t.Cleanup(func() { clearAllPicks(t, pool, seededGroup) })
-		n := createNight(t, `{"scheduledFor":"2099-01-02","attendees":["`+ada+`"]}`)
-		recordPick(t, n.ID, ada)
-		if order := names(groupTurn(t)); len(order) != 3 || order[2] != "Ada" {
-			t.Fatalf("group order = %v, want Ada last (planning ahead claims the turn)", order)
-		}
-	})
-
-	t.Run("recording a guest picker does not move standings", func(t *testing.T) {
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+frankie+`"]}`)
-		before := names(turn(t, n.ID))
-		got := recordPick(t, n.ID, frankie)
-		if got.PickerID == nil || *got.PickerID != frankie {
-			t.Fatalf("pickerId = %v, want %s", got.PickerID, frankie)
-		}
-		if after := names(turn(t, n.ID)); len(after) != len(before) || after[0] != "Ada" {
+	run("creating with a guest picker does not move standings", func(t *testing.T) {
+		before := names(groupTurn(t))
+		createNight(t, nightBody("2026-06-12", frankie, ada))
+		if after := names(groupTurn(t)); strings.Join(after, ",") != strings.Join(before, ",") {
 			t.Fatalf("guest pick changed the order: before %v after %v", before, after)
 		}
 	})
 
-	t.Run("recording a non-attendee yields 422", func(t *testing.T) {
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
+	run("recording a non-attendee yields 422", func(t *testing.T) {
+		n := createNight(t, nightBody("2026-06-12", ada))
 		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/pick", `{"pickerId":"`+blake+`"}`); code != http.StatusUnprocessableEntity {
 			t.Fatalf("status = %d, want 422 (Blake is not an attendee)", code)
 		}
 	})
 
-	t.Run("recording on an unknown night yields 404; malformed picker yields 400", func(t *testing.T) {
+	run("recording on an unknown night yields 404; malformed picker yields 400", func(t *testing.T) {
 		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+unknownNight+"/pick", `{"pickerId":"`+ada+`"}`); code != http.StatusNotFound {
 			t.Errorf("unknown-night status = %d, want 404", code)
 		}
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
+		n := createNight(t, nightBody("2026-06-12", ada))
 		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/pick", `{"pickerId":"nope"}`); code != http.StatusBadRequest {
 			t.Errorf("malformed-picker status = %d, want 400", code)
 		}
 	})
 
-	t.Run("current night resumes the latest planned night", func(t *testing.T) {
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
-		code, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
-		if code != http.StatusOK {
-			t.Fatalf("current status = %d, want 200", code)
-		}
-		// Only one night is open per group (uq_open_night_per_group), so current
-		// must be exactly the night we just created.
-		if got.ID != n.ID {
-			t.Errorf("current id = %s, want the just-created night %s", got.ID, n.ID)
-		}
-		if len(got.Attendees) != 1 || got.Attendees[0].Name != "Ada" {
-			t.Errorf("current attendees = %+v, want [Ada]", got.Attendees)
+	run("a night's order ignores its own pick", func(t *testing.T) {
+		n := createNight(t, nightBody("2026-06-12", ada, blake))
+		before := names(turn(t, n.ID))
+		// Re-recording (a correction) must not reshuffle the order the picker is
+		// chosen from, or a re-advance would hand the pick to someone else.
+		recordPick(t, n.ID, blake)
+		if after := names(turn(t, n.ID)); strings.Join(after, ",") != strings.Join(before, ",") {
+			t.Fatalf("order after correcting to Blake = %v, want unchanged %v", after, before)
 		}
 	})
 
-	t.Run("current night is 404 when the group has no planned night", func(t *testing.T) {
-		// emptyGroup has no nights at all.
-		if code, _ := do(t, http.MethodGet, "/groups/"+emptyGroup+"/nights/current", ""); code != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", code)
+	run("a night's order still counts other nights' picks", func(t *testing.T) {
+		createNight(t, nightBody("2026-06-05", ada, blake))
+		n := createNight(t, nightBody("2026-06-12", blake, ada))
+		if order := names(turn(t, n.ID)); len(order) != 2 || order[0] != "Blake" {
+			t.Fatalf("order = %v, want Blake first (Ada credited on an earlier night)", order)
 		}
 	})
 
-	t.Run("current night resumes a finalized night across sessions", func(t *testing.T) {
-		clearAllPicks(t, pool, seededGroup)
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
-		recordPick(t, n.ID, ada) // finalize it
-		code, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
-		if code != http.StatusOK {
-			t.Fatalf("current status = %d, want 200 (finalized night must still resume)", code)
-		}
-		if got.ID != n.ID {
-			t.Errorf("current id = %s, want the finalized night %s", got.ID, n.ID)
-		}
-		if got.PickerID == nil || *got.PickerID != ada {
-			t.Errorf("current pickerId = %v, want %s", got.PickerID, ada)
+	run("a pick on an upcoming night counts toward standings immediately", func(t *testing.T) {
+		createNight(t, nightBody("2099-01-02", ada))
+		if order := names(groupTurn(t)); len(order) != 3 || order[2] != "Ada" {
+			t.Fatalf("group order = %v, want Ada last (planning ahead claims the turn)", order)
 		}
 	})
 
-	t.Run("re-recording a different attendee re-attributes standings (correction)", func(t *testing.T) {
-		clearAllPicks(t, pool, seededGroup)
-		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+blake+`"]}`)
-		recordPick(t, n.ID, ada) // Ada credited → Blake, Cleo lead the group
+	run("re-recording a different attendee re-attributes standings (correction)", func(t *testing.T) {
+		n := createNight(t, nightBody("2026-06-12", ada, blake))
 		if order := names(groupTurn(t)); order[2] != "Ada" {
-			t.Fatalf("after recording Ada, group order = %v, want Ada last", order)
+			t.Fatalf("after creating with Ada, group order = %v, want Ada last", order)
 		}
 		recordPick(t, n.ID, blake) // correction: now Blake credited instead
 		if order := names(groupTurn(t)); order[0] != "Ada" || order[2] != "Blake" {
@@ -313,29 +279,15 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("starting a new night after finalizing creates a fresh open night", func(t *testing.T) {
-		clearAllPicks(t, pool, seededGroup)
-		first := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
-		recordPick(t, first.ID, ada) // finalize → no open night remains
-		code, second := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-06-19","attendees":["`+blake+`"]}`)
-		if code != http.StatusCreated {
-			t.Fatalf("start-next status = %d, want 201", code)
-		}
-		if second.ID == first.ID {
-			t.Fatal("start-next returned the finalized night; want a brand-new open night")
-		}
-		_, cur := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/current", "")
-		if cur.ID != second.ID {
-			t.Errorf("current id = %s, want the new open night %s", cur.ID, second.ID)
-		}
-	})
-
-	t.Run("malformed ids yield 400", func(t *testing.T) {
-		if code, _ := do(t, http.MethodPost, "/groups/not-a-uuid/nights", `{"scheduledFor":"2026-06-12"}`); code != http.StatusBadRequest {
+	run("malformed input yields 400", func(t *testing.T) {
+		if code, _ := do(t, http.MethodPost, "/groups/not-a-uuid/nights", nightBody("2026-06-12", ada)); code != http.StatusBadRequest {
 			t.Fatalf("bad group status = %d, want 400", code)
 		}
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"nope"}`); code != http.StatusBadRequest {
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("nope", ada)); code != http.StatusBadRequest {
 			t.Fatalf("bad date status = %d, want 400", code)
+		}
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`); code != http.StatusBadRequest {
+			t.Fatalf("missing picker status = %d, want 400", code)
 		}
 	})
 }
@@ -349,10 +301,10 @@ func TestNightsListIntegration(t *testing.T) {
 	mux.Handle("GET /groups/{groupId}/nights", listNightsHandler(q))
 
 	const (
-		night1  = "b0000000-0000-0000-0000-0000000000a1" // older, has movie + attendees
-		night2  = "b0000000-0000-0000-0000-0000000000a2" // newer, no movie
-		openOne = "b0000000-0000-0000-0000-0000000000a3" // open (picker NULL) — must be excluded
-		movieID = "c0000000-0000-0000-0000-0000000000a1"
+		night1   = "b0000000-0000-0000-0000-0000000000a1" // older, has movie + attendees
+		night2   = "b0000000-0000-0000-0000-0000000000a2" // newer, no movie
+		upcoming = "b0000000-0000-0000-0000-0000000000a3" // dated in the future — still listed
+		movieID  = "c0000000-0000-0000-0000-0000000000a1"
 	)
 
 	execSeed(t, pool, []seedStmt{
@@ -362,8 +314,8 @@ func TestNightsListIntegration(t *testing.T) {
 		        VALUES ($1, $2, $3, true, '2026-05-01', $4)`, args: []any{night1, seededGroup, ada, movieID}},
 		{sql: `INSERT INTO picks (id, group_id, picker_id, is_credited, scheduled_for)
 		        VALUES ($1, $2, $3, true, '2026-06-01')`, args: []any{night2, seededGroup, blake}},
-		{sql: `INSERT INTO picks (id, group_id, scheduled_for)
-		        VALUES ($1, $2, '2026-07-01')`, args: []any{openOne, seededGroup}},
+		{sql: `INSERT INTO picks (id, group_id, picker_id, is_credited, scheduled_for)
+		        VALUES ($1, $2, $3, true, '2099-07-01')`, args: []any{upcoming, seededGroup, cleo}},
 		{sql: `INSERT INTO attendances (pick_id, user_id) VALUES ($1, $2), ($1, $3)`, args: []any{night1, ada, blake}},
 	})
 
@@ -372,25 +324,25 @@ func TestNightsListIntegration(t *testing.T) {
 		return doJSON[[]nightResponse](t, mux, http.MethodGet, path, "")
 	}
 
-	t.Run("lists recorded nights newest-first, excludes the open night", func(t *testing.T) {
+	t.Run("lists every night newest-first, upcoming included", func(t *testing.T) {
 		code, got := do(t, "/groups/"+seededGroup+"/nights")
 		if code != http.StatusOK {
 			t.Fatalf("want 200, got %d", code)
 		}
-		if len(got) != 2 {
-			t.Fatalf("want 2 recorded nights, got %d", len(got))
+		if len(got) != 3 {
+			t.Fatalf("want 3 nights, got %d", len(got))
 		}
-		if got[0].ID != night2 || got[1].ID != night1 {
-			t.Fatalf("order wrong: %s then %s", got[0].ID, got[1].ID)
+		if got[0].ID != upcoming || got[1].ID != night2 || got[2].ID != night1 {
+			t.Fatalf("order wrong: %s, %s, %s", got[0].ID, got[1].ID, got[2].ID)
 		}
-		if got[0].Movie != nil {
-			t.Fatalf("night2 should have no movie, got %+v", got[0].Movie)
+		if got[1].Movie != nil {
+			t.Fatalf("night2 should have no movie, got %+v", got[1].Movie)
 		}
-		if got[1].Movie == nil || got[1].Movie.Title != "Inception" {
-			t.Fatalf("night1 movie wrong: %+v", got[1].Movie)
+		if got[2].Movie == nil || got[2].Movie.Title != "Inception" {
+			t.Fatalf("night1 movie wrong: %+v", got[2].Movie)
 		}
-		if len(got[1].Attendees) != 2 {
-			t.Fatalf("night1 want 2 attendees, got %d", len(got[1].Attendees))
+		if len(got[2].Attendees) != 2 {
+			t.Fatalf("night1 want 2 attendees, got %d", len(got[2].Attendees))
 		}
 	})
 

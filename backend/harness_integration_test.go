@@ -180,19 +180,8 @@ func seedFixtures(t *testing.T, pool *pgxpool.Pool) {
 	})
 }
 
-// clearOpenNight deletes a group's open night (picker_id NULL) so the next
-// create starts fresh instead of resuming it (at most one open night per group,
-// uq_open_night_per_group). The FK cascade drops its attendances.
-func clearOpenNight(t *testing.T, pool *pgxpool.Pool, group string) {
-	t.Helper()
-	if _, err := pool.Exec(context.Background(),
-		"DELETE FROM picks WHERE group_id = $1 AND picker_id IS NULL", group); err != nil {
-		t.Fatalf("clear open night: %v", err)
-	}
-}
-
-// clearAllPicks removes every pick (open and finalized) for a group so a subtest
-// that asserts "current" or recomputed standings starts from the seed baseline.
+// clearAllPicks removes every night for a group so a subtest that asserts
+// recomputed standings (or reuses a date) starts from the seed baseline.
 // The FK cascade drops attendances.
 func clearAllPicks(t *testing.T, pool *pgxpool.Pool, group string) {
 	t.Helper()

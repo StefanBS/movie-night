@@ -29,19 +29,46 @@ func (q *Queries) AddAttendee(ctx context.Context, arg AddAttendeeParams) error 
 }
 
 const createNight = `-- name: CreateNight :one
-INSERT INTO picks (group_id, scheduled_for)
-VALUES ($1, $2)
-RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+WITH night AS (
+  INSERT INTO picks (group_id, scheduled_for, picker_id, is_credited)
+  VALUES ($1, $2, $3, $4)
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+), attended AS (
+  INSERT INTO attendances (pick_id, user_id)
+  SELECT night.id, unnest($5::uuid[]) FROM night
+)
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id FROM night
 `
 
 type CreateNightParams struct {
 	GroupID      uuid.UUID   `json:"group_id"`
 	ScheduledFor pgtype.Date `json:"scheduled_for"`
+	PickerID     uuid.UUID   `json:"picker_id"`
+	IsCredited   bool        `json:"is_credited"`
+	Attendees    []uuid.UUID `json:"attendees"`
 }
 
-func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (Pick, error) {
-	row := q.db.QueryRow(ctx, createNight, arg.GroupID, arg.ScheduledFor)
-	var i Pick
+type CreateNightRow struct {
+	ID           uuid.UUID          `json:"id"`
+	GroupID      uuid.UUID          `json:"group_id"`
+	PickerID     uuid.UUID          `json:"picker_id"`
+	IsCredited   bool               `json:"is_credited"`
+	ScheduledFor pgtype.Date        `json:"scheduled_for"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	MovieID      pgtype.UUID        `json:"movie_id"`
+}
+
+// Inserts the night and its attendees in one statement, so a night never exists
+// without the attendees its picker is drawn from. Attendees must be deduped.
+func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (CreateNightRow, error) {
+	row := q.db.QueryRow(ctx, createNight,
+		arg.GroupID,
+		arg.ScheduledFor,
+		arg.PickerID,
+		arg.IsCredited,
+		arg.Attendees,
+	)
+	var i CreateNightRow
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
@@ -69,29 +96,6 @@ func (q *Queries) DeleteNight(ctx context.Context, arg DeleteNightParams) error 
 	return err
 }
 
-const getCurrentNight = `-- name: GetCurrentNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
-FROM picks
-WHERE group_id = $1
-ORDER BY scheduled_for DESC, created_at DESC
-LIMIT 1
-`
-
-func (q *Queries) GetCurrentNight(ctx context.Context, groupID uuid.UUID) (Pick, error) {
-	row := q.db.QueryRow(ctx, getCurrentNight, groupID)
-	var i Pick
-	err := row.Scan(
-		&i.ID,
-		&i.GroupID,
-		&i.PickerID,
-		&i.IsCredited,
-		&i.ScheduledFor,
-		&i.CreatedAt,
-		&i.MovieID,
-	)
-	return i, err
-}
-
 const getNight = `-- name: GetNight :one
 SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 FROM picks
@@ -105,29 +109,6 @@ type GetNightParams struct {
 
 func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (Pick, error) {
 	row := q.db.QueryRow(ctx, getNight, arg.NightID, arg.GroupID)
-	var i Pick
-	err := row.Scan(
-		&i.ID,
-		&i.GroupID,
-		&i.PickerID,
-		&i.IsCredited,
-		&i.ScheduledFor,
-		&i.CreatedAt,
-		&i.MovieID,
-	)
-	return i, err
-}
-
-const getOpenNight = `-- name: GetOpenNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
-FROM picks
-WHERE group_id = $1 AND picker_id IS NULL
-ORDER BY scheduled_for DESC, created_at DESC
-LIMIT 1
-`
-
-func (q *Queries) GetOpenNight(ctx context.Context, groupID uuid.UUID) (Pick, error) {
-	row := q.db.QueryRow(ctx, getOpenNight, groupID)
 	var i Pick
 	err := row.Scan(
 		&i.ID,
@@ -173,6 +154,65 @@ func (q *Queries) ListNightAttendees(ctx context.Context, arg ListNightAttendees
 	for rows.Next() {
 		var i ListNightAttendeesRow
 		if err := rows.Scan(&i.ID, &i.Name, &i.Role); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNights = `-- name: ListNights :many
+SELECT
+  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at, p.movie_id,
+  m.tmdb_id      AS movie_tmdb_id,
+  m.title        AS movie_title,
+  m.release_year AS movie_release_year,
+  m.poster_path  AS movie_poster_path
+FROM picks p
+LEFT JOIN movies m ON m.id = p.movie_id
+WHERE p.group_id = $1
+ORDER BY p.scheduled_for DESC
+`
+
+type ListNightsRow struct {
+	ID               uuid.UUID          `json:"id"`
+	GroupID          uuid.UUID          `json:"group_id"`
+	PickerID         uuid.UUID          `json:"picker_id"`
+	IsCredited       bool               `json:"is_credited"`
+	ScheduledFor     pgtype.Date        `json:"scheduled_for"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	MovieID          pgtype.UUID        `json:"movie_id"`
+	MovieTmdbID      pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle       pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath  pgtype.Text        `json:"movie_poster_path"`
+}
+
+func (q *Queries) ListNights(ctx context.Context, groupID uuid.UUID) ([]ListNightsRow, error) {
+	rows, err := q.db.Query(ctx, listNights, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListNightsRow
+	for rows.Next() {
+		var i ListNightsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.GroupID,
+			&i.PickerID,
+			&i.IsCredited,
+			&i.ScheduledFor,
+			&i.CreatedAt,
+			&i.MovieID,
+			&i.MovieTmdbID,
+			&i.MovieTitle,
+			&i.MovieReleaseYear,
+			&i.MoviePosterPath,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -231,65 +271,6 @@ func (q *Queries) ListNightsAttendees(ctx context.Context, arg ListNightsAttende
 	return items, nil
 }
 
-const listRecordedNights = `-- name: ListRecordedNights :many
-SELECT
-  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at, p.movie_id,
-  m.tmdb_id      AS movie_tmdb_id,
-  m.title        AS movie_title,
-  m.release_year AS movie_release_year,
-  m.poster_path  AS movie_poster_path
-FROM picks p
-LEFT JOIN movies m ON m.id = p.movie_id
-WHERE p.group_id = $1 AND p.picker_id IS NOT NULL
-ORDER BY p.scheduled_for DESC, p.created_at DESC
-`
-
-type ListRecordedNightsRow struct {
-	ID               uuid.UUID          `json:"id"`
-	GroupID          uuid.UUID          `json:"group_id"`
-	PickerID         pgtype.UUID        `json:"picker_id"`
-	IsCredited       bool               `json:"is_credited"`
-	ScheduledFor     pgtype.Date        `json:"scheduled_for"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	MovieID          pgtype.UUID        `json:"movie_id"`
-	MovieTmdbID      pgtype.Int4        `json:"movie_tmdb_id"`
-	MovieTitle       pgtype.Text        `json:"movie_title"`
-	MovieReleaseYear pgtype.Int4        `json:"movie_release_year"`
-	MoviePosterPath  pgtype.Text        `json:"movie_poster_path"`
-}
-
-func (q *Queries) ListRecordedNights(ctx context.Context, groupID uuid.UUID) ([]ListRecordedNightsRow, error) {
-	rows, err := q.db.Query(ctx, listRecordedNights, groupID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListRecordedNightsRow
-	for rows.Next() {
-		var i ListRecordedNightsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.GroupID,
-			&i.PickerID,
-			&i.IsCredited,
-			&i.ScheduledFor,
-			&i.CreatedAt,
-			&i.MovieID,
-			&i.MovieTmdbID,
-			&i.MovieTitle,
-			&i.MovieReleaseYear,
-			&i.MoviePosterPath,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const removeAttendee = `-- name: RemoveAttendee :exec
 DELETE FROM attendances
 WHERE pick_id = $1 AND user_id = $2
@@ -313,10 +294,10 @@ RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie
 `
 
 type SetNightPickerParams struct {
-	PickerID   pgtype.UUID `json:"picker_id"`
-	IsCredited bool        `json:"is_credited"`
-	NightID    uuid.UUID   `json:"night_id"`
-	GroupID    uuid.UUID   `json:"group_id"`
+	PickerID   uuid.UUID `json:"picker_id"`
+	IsCredited bool      `json:"is_credited"`
+	NightID    uuid.UUID `json:"night_id"`
+	GroupID    uuid.UUID `json:"group_id"`
 }
 
 func (q *Queries) SetNightPicker(ctx context.Context, arg SetNightPickerParams) (Pick, error) {

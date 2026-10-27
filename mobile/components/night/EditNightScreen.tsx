@@ -233,11 +233,15 @@ export function EditNightScreen({
           <View>
             {coreMembers.map((m, i) => {
               const here = draftAttendees.has(m.id);
+              // The picker is always an attendee; change the picker (from the
+              // Night) before taking them off the night.
+              const isPicker = m.id === night.pickerId;
               return (
                 <Pressable
                   key={m.id}
                   onPress={() => toggleAttendee(m.id)}
-                  disabled={busy}
+                  disabled={busy || isPicker}
+                  accessibilityHint={isPicker ? "Change the picker first" : undefined}
                   style={({ pressed }) => [
                     styles.attendRow,
                     i < coreMembers.length - 1 && styles.attendDivider,
@@ -246,9 +250,16 @@ export function EditNightScreen({
                   ]}
                 >
                   <Avatar name={m.name} size={40} />
-                  <Text style={styles.memberName} numberOfLines={1}>
-                    {m.name}
-                  </Text>
+                  <View style={styles.memberText}>
+                    <Text style={styles.memberName} numberOfLines={1}>
+                      {m.name}
+                    </Text>
+                    {isPicker ? (
+                      <Text style={styles.pickerHint} allowFontScaling={false}>
+                        PICKER · CHANGE THE PICKER FIRST
+                      </Text>
+                    ) : null}
+                  </View>
                   {here ? (
                     <Badge label="✓ In" tone="solid" uppercase={false} />
                   ) : (
@@ -347,7 +358,9 @@ const styles = StyleSheet.create({
   },
   dimmed: { opacity: 0.5 },
   rowPressed: { opacity: pressedOpacity },
-  memberName: { ...textPresets.rowName, color: colors.text.primary, flex: 1 },
+  memberText: { flex: 1 },
+  memberName: { ...textPresets.rowName, color: colors.text.primary },
+  pickerHint: { ...textPresets.tag, color: colors.text.tertiary, marginTop: space[1] },
   outTag: { ...textPresets.tag, color: colors.text.tertiary },
   calendarCard: {
     padding: space[4],

@@ -21,6 +21,7 @@ import { GROUP_ID } from "../../lib/api";
 import { formatShortDate } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { buildHistoryMonths, historyStats } from "../../lib/history";
+import { historyNights } from "../../lib/nightLifecycle";
 import { listNights, type Night } from "../../lib/nights";
 import {
   borderWidth,
@@ -46,7 +47,7 @@ export default function HistoryScreen() {
       const controller = new AbortController();
       (async () => {
         try {
-          setNights(await listNights(API_URL, GROUP_ID, controller.signal));
+          setNights(historyNights(await listNights(API_URL, GROUP_ID, controller.signal)));
           setError(null);
         } catch (e) {
           if (!controller.signal.aborted) {

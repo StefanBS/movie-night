@@ -11,10 +11,10 @@ import { TopBar } from "../../../components";
 import { EditNightScreen } from "../../../components/night/EditNightScreen";
 import { API_URL } from "../../../apiUrl";
 import { GROUP_ID } from "../../../lib/api";
-import { nightDates } from "../../../lib/calendar";
 import { todayLocalISO } from "../../../lib/date";
 import { errorMessage } from "../../../lib/errors";
 import { fetchMembers, type Member } from "../../../lib/members";
+import { nightDates } from "../../../lib/nightLifecycle";
 import { getNightOrNull, listNights, type Night } from "../../../lib/nights";
 import { colors, space, textPresets } from "../../../theme";
 

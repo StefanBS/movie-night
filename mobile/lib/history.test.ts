@@ -8,7 +8,7 @@ function night(id: string, scheduledFor: string, tmdbId: number | null): Night {
   return {
     id,
     scheduledFor,
-    pickerId: null,
+    pickerId: "u1",
     movie:
       tmdbId === null
         ? null

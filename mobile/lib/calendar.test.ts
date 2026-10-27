@@ -1,8 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { dayState, monthGrid, nightDates, shiftMonth } from "./calendar";
-import type { Night } from "./nights";
+import { dayState, monthGrid, shiftMonth } from "./calendar";
 
 // monthGrid — built from local-time Date components, so timezone-independent.
 test("monthGrid: a month starting on Sunday has no leading blanks", () => {
@@ -51,24 +50,6 @@ test("shiftMonth: December +1 rolls to next January", () => {
 });
 test("shiftMonth: January -1 rolls to previous December", () => {
   assert.deepEqual(shiftMonth({ year: 2026, month: 1 }, -1), { year: 2025, month: 12 });
-});
-
-// nightDates
-const night = (scheduledFor: string): Night => ({
-  id: scheduledFor,
-  scheduledFor,
-  pickerId: null,
-  movie: null,
-  attendees: [],
-});
-test("nightDates: empty list → empty set", () => {
-  assert.equal(nightDates([]).size, 0);
-});
-test("nightDates: collapses duplicate dates and keeps distinct ones", () => {
-  const set = nightDates([night("2026-06-19"), night("2026-06-19"), night("2026-06-26")]);
-  assert.equal(set.size, 2);
-  assert.ok(set.has("2026-06-19"));
-  assert.ok(set.has("2026-06-26"));
 });
 
 // dayState

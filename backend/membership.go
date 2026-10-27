@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -198,7 +197,7 @@ func rotationBaseline(w http.ResponseWriter, r *http.Request, store memberStore,
 		internalError(w, gid, "average served", err)
 		return 0, false
 	}
-	credited, err := store.MemberCreditedCount(ctx, db.MemberCreditedCountParams{GroupID: gid, UserID: pgtype.UUID{Bytes: uid, Valid: true}})
+	credited, err := store.MemberCreditedCount(ctx, db.MemberCreditedCountParams{GroupID: gid, UserID: uid})
 	if err != nil {
 		internalError(w, gid, "member credited count", err)
 		return 0, false

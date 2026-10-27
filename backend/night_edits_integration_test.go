@@ -22,7 +22,6 @@ func TestNightEditsIntegration(t *testing.T) {
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightDateHandler(q))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(q))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(q))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, client))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/movie", clearNightMovieHandler(q))
 
@@ -33,16 +32,10 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	mkNight := func(t *testing.T) nightResponse {
 		t.Helper()
-		clearOpenNight(t, pool, seededGroup)
-		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights",
-			`{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`)
+		clearAllPicks(t, pool, seededGroup)
+		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-06-12", ada))
 		if code != http.StatusCreated {
 			t.Fatalf("create night = %d", code)
-		}
-		code, n = doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/pick",
-			`{"pickerId":"`+ada+`"}`)
-		if code != http.StatusOK {
-			t.Fatalf("record pick = %d", code)
 		}
 		return n
 	}
@@ -56,6 +49,16 @@ func TestNightEditsIntegration(t *testing.T) {
 		}
 		if got.ScheduledFor != "2026-07-04" {
 			t.Fatalf("scheduledFor = %q, want 2026-07-04", got.ScheduledFor)
+		}
+	})
+
+	t.Run("PATCH onto another night's date yields 409", func(t *testing.T) {
+		n := mkNight(t)
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-07-04", blake)); code != http.StatusCreated {
+			t.Fatalf("create second night = %d, want 201", code)
+		}
+		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{"scheduledFor":"2026-07-04"}`); code != http.StatusConflict {
+			t.Fatalf("patch status = %d, want 409", code)
 		}
 	})
 

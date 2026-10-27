@@ -5,7 +5,8 @@ import { AppButton, Calendar } from "../";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
 import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
-import { daysUntil, relativeLabel } from "../../lib/date";
+import { relativeLabel } from "../../lib/date";
+import { nightTiming } from "../../lib/nightLifecycle";
 import {
   borderWidth,
   colors,
@@ -20,22 +21,24 @@ import {
 // WhenStep is the wizard's first step: a "Tonight" chip + the Calendar, with a
 // sticky footer that names the plan (TONIGHT/PLANNING) and its relative date. It
 // owns its own selection/month — it is just a date picker that reports the chosen
-// date on "Next".
+// date on "Next". `initial` restores the selection when the user comes back.
 export function WhenStep({
   today,
+  initial = today,
   nightDates,
   busy,
   onNext,
 }: {
   today: string;
+  initial?: string;
   nightDates: Set<string>;
   busy: string | null;
   onNext: (iso: string) => void;
 }) {
-  const [selected, setSelected] = useState(today);
-  const [month, setMonth] = useState<YearMonth>(() => yearMonthOf(today));
+  const [selected, setSelected] = useState(initial);
+  const [month, setMonth] = useState<YearMonth>(() => yearMonthOf(initial));
   const isToday = selected === today;
-  const future = daysUntil(selected, today) > 0;
+  const future = nightTiming(selected, today) === "upcoming";
 
   const pickToday = () => {
     setSelected(today);

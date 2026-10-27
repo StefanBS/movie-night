@@ -1,11 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { nextScheduledNight, parseNight, parseNights, type Night } from "./nights";
+import { parseNight, parseNights } from "./nights";
 
 const valid = {
   id: "n1",
   scheduledFor: "2026-06-12",
+  pickerId: "u1",
   movie: null,
   attendees: [
     { id: "u1", name: "Ada", role: "core" },
@@ -22,7 +23,7 @@ test("parses a valid night with attendees", () => {
 });
 
 test("parses a night with no attendees", () => {
-  const n = parseNight({ id: "n1", scheduledFor: "2026-06-12", attendees: [] });
+  const n = parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId: "u1", attendees: [] });
   assert.deepEqual(n.attendees, []);
 });
 
@@ -34,7 +35,7 @@ test("rejects a bad attendee role", () => {
 });
 
 test("rejects non-array attendees", () => {
-  assert.throws(() => parseNight({ id: "n1", scheduledFor: "2026-06-12", attendees: {} }), /attendees/);
+  assert.throws(() => parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId: "u1", attendees: {} }), /attendees/);
 });
 
 test("rejects a non-object", () => {
@@ -42,7 +43,7 @@ test("rejects a non-object", () => {
 });
 
 test("rejects a non-string id", () => {
-  assert.throws(() => parseNight({ id: 42, scheduledFor: "2026-06-12", attendees: [] }), /id/);
+  assert.throws(() => parseNight({ id: 42, scheduledFor: "2026-06-12", pickerId: "u1", attendees: [] }), /id/);
 });
 
 test("rejects a non-string scheduledFor", () => {
@@ -59,21 +60,13 @@ test("parseNight reads a set pickerId", () => {
   assert.equal(n.pickerId, "u1");
 });
 
-test("parseNight accepts a null pickerId", () => {
-  const n = parseNight({
-    id: "n1",
-    scheduledFor: "2026-06-12",
-    pickerId: null,
-    attendees: [],
-  });
-  assert.equal(n.pickerId, null);
-});
-
-test("parseNight rejects a non-string, non-null pickerId", () => {
-  assert.throws(
-    () => parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId: 7, attendees: [] }),
-    /pickerId/,
-  );
+test("parseNight rejects a missing or null pickerId (every Night has a picker)", () => {
+  for (const pickerId of [undefined, null, 7]) {
+    assert.throws(
+      () => parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId, attendees: [] }),
+      /pickerId/,
+    );
+  }
 });
 
 test("parseNight reads an attached movie", () => {
@@ -94,7 +87,7 @@ test("parseNight rejects a bad movie shape", () => {
 });
 
 test("parseNights parses an array of nights", () => {
-  const ns = parseNights([valid, { id: "n2", scheduledFor: "2026-07-01", attendees: [] }]);
+  const ns = parseNights([valid, { id: "n2", scheduledFor: "2026-07-01", pickerId: "u2", attendees: [] }]);
   assert.equal(ns.length, 2);
   assert.equal(ns[0].id, "n1");
   assert.equal(ns[1].id, "n2");
@@ -110,55 +103,4 @@ test("parseNights rejects a non-array", () => {
 
 test("parseNights rejects a malformed element", () => {
   assert.throws(() => parseNights([valid, { id: 5 }]), /id/);
-});
-
-const TODAY = "2026-06-22";
-const aMovie = { tmdbId: 1, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg" };
-
-function night(id: string, scheduledFor: string, opts: Partial<Night> = {}): Night {
-  return { id, scheduledFor, pickerId: "u1", movie: null, attendees: [], ...opts };
-}
-
-test("nextScheduledNight returns null for no nights", () => {
-  assert.equal(nextScheduledNight([], TODAY), null);
-});
-
-test("nextScheduledNight ignores past nights", () => {
-  assert.equal(nextScheduledNight([night("n1", "2026-06-20")], TODAY), null);
-});
-
-test("nextScheduledNight includes a future night with a movie attached", () => {
-  assert.equal(nextScheduledNight([night("n1", "2026-06-26", { movie: aMovie })], TODAY)?.id, "n1");
-});
-
-test("nextScheduledNight excludes today's night once it has a movie", () => {
-  assert.equal(nextScheduledNight([night("n1", TODAY, { movie: aMovie })], TODAY), null);
-});
-
-test("nextScheduledNight returns a single upcoming planned night", () => {
-  assert.equal(nextScheduledNight([night("n1", "2026-06-26")], TODAY)?.id, "n1");
-});
-
-test("nextScheduledNight returns the soonest of several planned nights", () => {
-  const n = nextScheduledNight(
-    [night("far", "2026-07-10"), night("soon", "2026-06-26"), night("mid", "2026-06-30")],
-    TODAY,
-  );
-  assert.equal(n?.id, "soon");
-});
-
-test("nextScheduledNight includes a night scheduled for today", () => {
-  assert.equal(nextScheduledNight([night("n1", TODAY)], TODAY)?.id, "n1");
-});
-
-test("nextScheduledNight skips past, keeps future with or without a film, soonest first", () => {
-  const n = nextScheduledNight(
-    [
-      night("past", "2026-06-10", { movie: aMovie }),     // excluded: past
-      night("planned", "2026-07-01"),                      // future, no film
-      night("prepicked", "2026-06-28", { movie: aMovie }), // future, film → included, sooner
-    ],
-    TODAY,
-  );
-  assert.equal(n?.id, "prepicked");
 });

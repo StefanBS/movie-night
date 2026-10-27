@@ -132,7 +132,7 @@ type Movie struct {
 type Pick struct {
 	ID           uuid.UUID          `json:"id"`
 	GroupID      uuid.UUID          `json:"group_id"`
-	PickerID     pgtype.UUID        `json:"picker_id"`
+	PickerID     uuid.UUID          `json:"picker_id"`
 	IsCredited   bool               `json:"is_credited"`
 	ScheduledFor pgtype.Date        `json:"scheduled_for"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`

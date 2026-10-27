@@ -3,8 +3,9 @@ import { Clock } from "lucide-react-native";
 
 import { AppButton, Avatar, Badge, Poster, SectionLabel } from "../";
 import { WizardFooter } from "./WizardFooter";
-import { countdownLabel, daysUntil, formatShortDate, weekday } from "../../lib/date";
+import { countdownLabel, formatShortDate, weekday } from "../../lib/date";
 import type { Member } from "../../lib/members";
+import { nightTiming } from "../../lib/nightLifecycle";
 import type { Night } from "../../lib/nights";
 import {
   borderWidth,
@@ -23,9 +24,9 @@ import {
 // with a date hero + countdown ("Scheduled ✓"); a tonight/past night with a
 // film leads with the film poster ("Recorded ✓"). The film shows when set, with
 // a "Change film" action; when unset, "Choose the film now". The picker and
-// attendees render; editing the film re-enters PickStep. Replaces ScheduledStep
-// + RecordedStep. `today` is passed in (mirrors lib/date.ts) for deterministic
-// date framing.
+// attendees render; editing the film re-enters PickStep, and "Edit night" (when
+// onEdit is given) is the explicit way to change the date or who's coming.
+// `today` is passed in (mirrors lib/date.ts) for deterministic date framing.
 export function NightView({
   night,
   members,
@@ -33,6 +34,7 @@ export function NightView({
   onDone,
   onPickFilm,
   onClearFilm,
+  onEdit,
 }: {
   night: Night;
   members: Member[];
@@ -40,8 +42,9 @@ export function NightView({
   onDone: () => void;
   onPickFilm: () => void;
   onClearFilm?: () => void;
+  onEdit?: () => void;
 }) {
-  const future = daysUntil(night.scheduledFor, today) > 0;
+  const future = nightTiming(night.scheduledFor, today) === "upcoming";
   const movie = night.movie;
   const pickerName = members.find((m) => m.id === night.pickerId)?.name ?? "";
   return (
@@ -62,7 +65,7 @@ export function NightView({
           </View>
         ) : (
           <View style={styles.dateHero}>
-            <Badge label="Scheduled ✓" tone="solid" />
+            <Badge label={future ? "Scheduled ✓" : "Recorded ✓"} tone="solid" />
             <Text style={styles.heroWeekday} allowFontScaling={false}>
               {weekday(night.scheduledFor, true)}
             </Text>
@@ -76,7 +79,7 @@ export function NightView({
           <View style={styles.countdownRow}>
             <Clock size={13} color={colors.accent.strong} />
             <Text style={styles.countdown} allowFontScaling={false}>
-              {countdownLabel(night.scheduledFor)}
+              {countdownLabel(night.scheduledFor, today)}
             </Text>
           </View>
         ) : null}
@@ -114,6 +117,9 @@ export function NightView({
           />
           {movie !== null && onClearFilm !== undefined ? (
             <AppButton title="Clear film" variant="danger" onPress={onClearFilm} />
+          ) : null}
+          {onEdit !== undefined ? (
+            <AppButton title="Edit night" variant="ghost" onPress={onEdit} />
           ) : null}
         </View>
       </WizardFooter>
