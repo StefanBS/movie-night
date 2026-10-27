@@ -196,12 +196,21 @@ func clearAllPicks(t *testing.T, pool *pgxpool.Pool, group string) {
 // plumbing lives. Every integration test builds its own mux and passes it in.
 func doReq(t *testing.T, mux http.Handler, method, path, body string) (int, []byte) {
 	t.Helper()
+	return doReqAuth(t, mux, method, path, body, "")
+}
+
+// doReqAuth is doReq with an Authorization header, sent when non-empty.
+func doReqAuth(t *testing.T, mux http.Handler, method, path, body, authorization string) (int, []byte) {
+	t.Helper()
 	rec := httptest.NewRecorder()
 	var r *http.Request
 	if body == "" {
 		r = httptest.NewRequest(method, path, nil)
 	} else {
 		r = httptest.NewRequest(method, path, bytes.NewBufferString(body))
+	}
+	if authorization != "" {
+		r.Header.Set("Authorization", authorization)
 	}
 	mux.ServeHTTP(rec, r)
 	return rec.Code, rec.Body.Bytes()

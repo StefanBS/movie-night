@@ -51,6 +51,9 @@ func main() {
 		// uuid.Nil: this route is not group-scoped (see logScope).
 		respondJSON(w, http.StatusOK, map[string]string{"status": "ok"}, uuid.Nil, "encode healthz")
 	})
+	mux.Handle("POST /identity", claimIdentityHandler(queries))
+	mux.Handle("GET /identity", getIdentityHandler(queries))
+	mux.Handle("DELETE /identity", releaseIdentityHandler(queries))
 	mux.Handle("GET /groups/{groupId}", getGroupHandler(queries))
 	mux.Handle("PATCH /groups/{groupId}", renameGroupHandler(queries))
 	mux.Handle("GET /groups/{groupId}/members", membersHandler(queries))

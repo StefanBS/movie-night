@@ -91,6 +91,14 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `POST` | `/groups/{groupId}/members/{userId}/reactivate` | Restore; re-seeds if it re-enters the rotation. |
 | `POST` | `/groups/{groupId}/members/{userId}/promote` | Guest → active core. |
 
+**Identity** ([ADR-0009](../docs/adr/0009-claimed-identity-device-tokens.md)) — the person an install acts as. `GET`/`DELETE` take `Authorization: Bearer <token>` and return `401` without a valid one; the other routes are unauthenticated.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/identity` | Claim an active member (core or guest); `201` `{"token","identity":{"id","name"}}`. Body `{"groupId","userId"}`; `404` if not a member, `422` if inactive. |
+| `GET` | `/identity` | The bearer's identity `{"id","name"}`. |
+| `DELETE` | `/identity` | Release the identity, revoking the token; `204`. Idempotent. |
+
 **Night lifecycle** ([ADR-0008](../docs/adr/0008-night-always-has-a-picker.md)) — each returns the night `{"id","scheduledFor","pickerId","movie","attendees"}`. Every night has a picker, who is always an attendee; at most one night per group per date.
 
 | Method | Path | Description |

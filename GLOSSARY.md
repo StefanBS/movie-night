@@ -16,6 +16,10 @@ _Avoid_: regular, full member
 A person who attends and may pick, but is not in the rotation and is never owed a turn.
 _Avoid_: visitor, plus-one
 
+**Identity**:
+The person an install of the app acts as: any core member or guest with an active membership, claimed once from the group's roster and kept until released. An identity is the person, not their seat in one group; it survives the membership going inactive. One person may have several installs; an install has exactly one identity at a time.
+_Avoid_: account, login, user, "me" (in prose)
+
 ## Nights
 
 **Night**:

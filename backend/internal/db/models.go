@@ -102,6 +102,14 @@ type Attendance struct {
 	UserID uuid.UUID `json:"user_id"`
 }
 
+type Device struct {
+	ID         uuid.UUID          `json:"id"`
+	UserID     uuid.UUID          `json:"user_id"`
+	TokenHash  []byte             `json:"token_hash"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	LastSeenAt pgtype.Timestamptz `json:"last_seen_at"`
+}
+
 type Group struct {
 	ID        uuid.UUID          `json:"id"`
 	Name      string             `json:"name"`

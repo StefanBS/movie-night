@@ -19,6 +19,7 @@ new record that supersedes the old one rather than editing history.
 - [ADR-0006](0006-membership-churn-handling.md) — Handle core-membership churn by deactivating, seeding, and crediting · *Accepted*
 - [ADR-0007](0007-tmdb-proxy-source-of-truth.md) — Proxy TMDB through the backend; the server is the source of truth on attach · *Accepted*
 - [ADR-0008](0008-night-always-has-a-picker.md) — A Night always has a picker; unfinished plans live on the client · *Accepted*
+- [ADR-0009](0009-claimed-identity-device-tokens.md) — An install claims its identity from the roster and holds a device token · *Accepted*
 
 Open and deferred decisions are tracked in [backlog.md](backlog.md).
 
@@ -37,4 +38,6 @@ schema definition.
 - **attendances** — who was present at a given night (linked to that night's pick).
 - **movies** — metadata cached from TMDB.
 - **reviews** — a person's rating/notes for a given night's pick.
+- **devices** — an install's claimed identity: the person and a hash of its bearer
+  token ([ADR-0009](0009-claimed-identity-device-tokens.md)).
 - **watchlist_items** — a person's saved films, seeded by Letterboxd CSV import.
