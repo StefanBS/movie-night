@@ -9,6 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	// Embeds the IANA zone database so devices' time zones (ADR-0010) resolve
+	// even on a host or image without /usr/share/zoneinfo.
+	_ "time/tzdata"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -54,6 +57,8 @@ func main() {
 	mux.Handle("POST /identity", claimIdentityHandler(queries))
 	mux.Handle("GET /identity", getIdentityHandler(queries))
 	mux.Handle("DELETE /identity", releaseIdentityHandler(queries))
+	mux.Handle("PUT /identity/push", registerPushHandler(queries))
+	mux.Handle("PUT /identity/preferences", setPreferencesHandler(queries))
 	mux.Handle("GET /groups/{groupId}", getGroupHandler(queries))
 	mux.Handle("PATCH /groups/{groupId}", renameGroupHandler(queries))
 	mux.Handle("GET /groups/{groupId}/members", membersHandler(queries))

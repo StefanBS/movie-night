@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, StyleSheet, Text, View } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 
 import {
@@ -7,6 +7,7 @@ import {
   SectionLabel,
   SettingsRow,
   TabScrollView,
+  Toggle,
   TopBar,
 } from "../../components";
 import { useIdentity } from "../../components/IdentityProvider";
@@ -159,11 +160,29 @@ export default function SettingsScreen() {
 
         <SectionLabel>Notifications</SectionLabel>
         <View style={styles.card}>
-          <SettingsRow
-            label="Reminders & nudges"
-            disabled
-            right={<ChevronRight size={18} color={colors.text.tertiary} />}
-          />
+          {identity.state.notifications === "denied" ? (
+            // The OS permission is off; only system settings can turn it back on.
+            <SettingsRow
+              label="Reminders & nudges"
+              value="Off in system settings"
+              right={<ChevronRight size={18} color={colors.text.tertiary} />}
+              onPress={() => void Linking.openSettings()}
+            />
+          ) : identity.state.notifications === "unavailable" ? (
+            <SettingsRow label="Reminders & nudges" value="Not on this device" />
+          ) : (
+            <SettingsRow
+              label="Reminders & nudges"
+              right={
+                <Toggle
+                  label="Reminders & nudges"
+                  value={!(identity.state.identity?.remindersMuted ?? false)}
+                  disabled={identity.state.busy}
+                  onChange={(on) => void identity.session.setRemindersMuted(!on)}
+                />
+              }
+            />
+          )}
         </View>
 
         <SectionLabel>Danger zone</SectionLabel>

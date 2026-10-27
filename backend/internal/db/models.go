@@ -150,6 +150,8 @@ type Device struct {
 	TokenHash  []byte             `json:"token_hash"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	LastSeenAt pgtype.Timestamptz `json:"last_seen_at"`
+	PushToken  pgtype.Text        `json:"push_token"`
+	TimeZone   pgtype.Text        `json:"time_zone"`
 }
 
 type Group struct {
@@ -197,4 +199,5 @@ type User struct {
 	Name           string             `json:"name"`
 	LetterboxdUser pgtype.Text        `json:"letterboxd_user"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	RemindersMuted bool               `json:"reminders_muted"`
 }

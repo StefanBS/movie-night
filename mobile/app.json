@@ -31,7 +31,14 @@
       "expo-router",
       "expo-status-bar",
       "expo-font",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#F68B36",
+          "defaultChannel": "reminders"
+        }
+      ]
     ],
     "extra": {
       "router": {},

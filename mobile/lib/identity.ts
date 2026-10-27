@@ -6,11 +6,16 @@ import { createSessionCore, type Session } from "./session";
 // The Identity module (GLOSSARY: Identity; ADR-0009). An install claims the
 // person it acts as from the group's roster and keeps the bearer token the
 // backend returns; GET /identity turns that token back into the person on every
-// launch. Releasing deletes the token on both sides and starts over.
+// launch. Releasing deletes the token on both sides and starts over. Once
+// claimed, the install registers for reminders (ADR-0010): it asks for
+// notification permission if it never has, then sends its push token and time
+// zone, on every launch so both stay current.
 
+// Identity is the person, with their one personal reminder setting.
 export type Identity = {
   id: string;
   name: string;
+  remindersMuted: boolean;
 };
 
 export type Claim = {
@@ -23,14 +28,17 @@ export function parseIdentity(raw: unknown): Identity {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("identity: expected an object");
   }
-  const { id, name } = raw as Record<string, unknown>;
+  const { id, name, remindersMuted } = raw as Record<string, unknown>;
   if (typeof id !== "string") {
     throw new Error("identity: id must be a string");
   }
   if (typeof name !== "string") {
     throw new Error("identity: name must be a string");
   }
-  return { id, name };
+  if (typeof remindersMuted !== "boolean") {
+    throw new Error("identity: remindersMuted must be a boolean");
+  }
+  return { id, name, remindersMuted };
 }
 
 // parseClaim validates the claim response: the token plus the identity.
@@ -89,6 +97,55 @@ export function releaseIdentity(
   });
 }
 
+// registerPush points this install's reminders at its Expo push token and the
+// time zone its reminder slots follow.
+export function registerPush(
+  baseUrl: string,
+  token: string,
+  push: { pushToken: string; timeZone: string },
+  signal?: AbortSignal,
+): Promise<void> {
+  return requestNoContent(`${baseUrl}/identity/push`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(push),
+    signal,
+  });
+}
+
+// setRemindersMuted mutes or unmutes every reminder to the identity, on all of
+// their devices, and returns the updated identity.
+export function setRemindersMuted(
+  baseUrl: string,
+  token: string,
+  remindersMuted: boolean,
+  signal?: AbortSignal,
+): Promise<Identity> {
+  return requestJson(`${baseUrl}/identity/preferences`, parseIdentity, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ remindersMuted }),
+    signal,
+  });
+}
+
+// NotificationAccess is where this install stands on receiving reminders:
+// "denied" when the OS permission is off, "unavailable" when it can't get a
+// push token (web, a build without push credentials, offline), "unknown"
+// until registration has run.
+export type NotificationAccess = "unknown" | "granted" | "denied" | "unavailable";
+
+// PushDevice is the device's side of push (pushDevice.ts in the app).
+export type PushDevice = {
+  // access asks for notification permission if it was never asked, and
+  // returns where it stands.
+  access(): Promise<"granted" | "denied" | "unavailable">;
+  // pushToken returns the install's Expo push token; rejects when it can't.
+  pushToken(): Promise<string>;
+  // timeZone is the device's IANA time zone, e.g. "Europe/Madrid".
+  timeZone(): string;
+};
+
 // TokenStorage is where the install keeps its token across launches (the
 // device keychain in the app — see identityToken.ts).
 export type TokenStorage = {
@@ -110,6 +167,7 @@ export type IdentitySessionState = {
   members: Member[];
   busy: boolean;
   actionError: string | null;
+  notifications: NotificationAccess;
 };
 
 export type IdentitySession = Session<IdentitySessionState> & {
@@ -121,16 +179,20 @@ export type IdentitySession = Session<IdentitySessionState> & {
   joinAndClaim(name: string): Promise<void>;
   // release gives the identity up and returns to the roster.
   release(): Promise<void>;
+  // setRemindersMuted mutes or unmutes reminders for the identity.
+  setRemindersMuted(muted: boolean): Promise<void>;
 };
 
 export function createIdentitySession({
   baseUrl,
   groupId,
   storage,
+  push,
 }: {
   baseUrl: string;
   groupId: string;
   storage: TokenStorage;
+  push: PushDevice;
 }): IdentitySession {
   const core = createSessionCore<IdentitySessionState>({
     status: "loading",
@@ -139,7 +201,23 @@ export function createIdentitySession({
     members: [],
     busy: false,
     actionError: null,
+    notifications: "unknown",
   });
+
+  // syncPush registers a claimed install for reminders. It never fails the
+  // claim or the launch: any failure just leaves reminders unavailable here.
+  const syncPush = async (token: string) => {
+    try {
+      const access = await push.access();
+      if (access === "granted") {
+        const pushToken = await push.pushToken();
+        await core.track((signal) => registerPush(baseUrl, token, { pushToken, timeZone: push.timeZone() }, signal));
+      }
+      core.set({ notifications: access });
+    } catch {
+      core.set({ notifications: "unavailable" });
+    }
+  };
 
   const showRoster = async () => {
     const members = await core.track((signal) => fetchMembers(baseUrl, groupId, signal));
@@ -159,6 +237,7 @@ export function createIdentitySession({
         const identity = await core.track((signal) => fetchIdentity(baseUrl, token, signal));
         if (identity !== null) {
           core.set({ status: "claimed", identity });
+          await syncPush(token);
           return;
         }
         await storage.remove(); // the backend no longer knows it
@@ -188,6 +267,7 @@ export function createIdentitySession({
     const claim = await core.track((signal) => claimIdentity(baseUrl, groupId, userId, signal));
     await storage.set(claim.token);
     core.set({ status: "claimed", identity: claim.identity, members: [] });
+    await syncPush(claim.token);
   };
 
   return {
@@ -211,6 +291,15 @@ export function createIdentitySession({
           await storage.remove();
         }
         await showRoster();
+      }),
+    setRemindersMuted: (muted) =>
+      act("couldn't change reminders", async () => {
+        const token = await storage.get();
+        if (token === null) {
+          return;
+        }
+        const identity = await core.track((signal) => setRemindersMuted(baseUrl, token, muted, signal));
+        core.set({ identity });
       }),
   };
 }

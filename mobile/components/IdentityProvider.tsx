@@ -2,6 +2,7 @@ import { createContext, ReactNode, useContext, useEffect } from "react";
 
 import { API_URL } from "../apiUrl";
 import { identityToken } from "../identityToken";
+import { pushDevice } from "../pushDevice";
 import { GROUP_ID } from "../lib/api";
 import { createIdentitySession, type IdentitySession, type IdentitySessionState } from "../lib/identity";
 import { ClaimIdentityScreen } from "./ClaimIdentityScreen";
@@ -19,7 +20,7 @@ const IdentityContext = createContext<IdentityContextValue | null>(null);
 // the claim screen in place of `children`.
 export function IdentityProvider({ children }: { children: ReactNode }) {
   const [session, state] = useSession(() =>
-    createIdentitySession({ baseUrl: API_URL, groupId: GROUP_ID, storage: identityToken }),
+    createIdentitySession({ baseUrl: API_URL, groupId: GROUP_ID, storage: identityToken, push: pushDevice }),
   );
 
   useEffect(() => {
