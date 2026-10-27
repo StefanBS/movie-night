@@ -26,7 +26,7 @@ const TABS: { name: string; label: string; Icon: ComponentType<IconProps> }[] = 
   { name: "settings", label: "Settings", Icon: Settings },
 ];
 
-function SpotlightTabBar({ state, navigation }: BottomTabBarProps) {
+function SpotlightTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   // The bar is absolutely positioned, so it overlays screen content. Report its
   // real measured height up the tree so screens can read useBottomTabBarHeight()
@@ -47,13 +47,13 @@ function SpotlightTabBar({ state, navigation }: BottomTabBarProps) {
           const focused = state.index === index;
           const color = focused ? colors.accent.strong : colors.text.tertiary;
           const onPress = () => {
-            const event = navigation.emit({
+            const event = emitter.emit({
               type: "tabPress",
               target: route.key,
               canPreventDefault: true,
             });
             if (!focused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
+              navigateToTab(route.key);
             }
           };
           return (
