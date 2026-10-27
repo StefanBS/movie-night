@@ -88,6 +88,21 @@ eas build --platform android --profile development
 Install the resulting APK, then use `just start` as usual. Prefer local
 `just android` when possible.
 
+### Android push (reminders)
+
+Reminders ([ADR-0010](../docs/adr/0010-server-push-reminders.md)) need a
+Firebase project, its `google-services.json` in the app, and its FCM V1
+service-account key uploaded to EAS. Until then, Settings → "Reminders &
+nudges" shows "Not on this device". A wizard walks through every step, then
+rebuilds the client and can send a test push:
+
+```bash
+bash scripts/setup-android-push.sh
+```
+
+Commit the `google-services.json` and `app.json` changes it makes. Never commit
+the service-account key.
+
 ## Connecting to the backend
 
 The app fetches the seeded group `11111111-1111-1111-1111-111111111111`

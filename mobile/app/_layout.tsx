@@ -1,11 +1,16 @@
+import { Platform } from "react-native";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
 import { IdentityProvider } from "../components/IdentityProvider";
+import { ReminderTaps } from "../components/ReminderTaps";
 import { ToastProvider } from "../components/Toast";
+import { showRemindersInForeground } from "../pushDevice";
 import { colors } from "../theme";
+
+showRemindersInForeground();
 
 export default function RootLayout() {
   // Brand faces for the Spotlight theme. The keys must match the fontFamily
@@ -47,6 +52,7 @@ export default function RootLayout() {
             <Stack.Screen name="member/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="member/new" options={{ headerShown: false }} />
           </Stack>
+          {Platform.OS !== "web" ? <ReminderTaps /> : null}
         </IdentityProvider>
       </ToastProvider>
     </SafeAreaProvider>

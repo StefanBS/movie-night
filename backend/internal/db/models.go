@@ -138,6 +138,48 @@ func (ns NullReminderAudience) Value() (driver.Value, error) {
 	return string(ns.ReminderAudience), nil
 }
 
+type ReminderSlot string
+
+const (
+	ReminderSlotNightBefore ReminderSlot = "night_before"
+	ReminderSlotMorningOf   ReminderSlot = "morning_of"
+)
+
+func (e *ReminderSlot) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ReminderSlot(s)
+	case string:
+		*e = ReminderSlot(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ReminderSlot: %T", src)
+	}
+	return nil
+}
+
+type NullReminderSlot struct {
+	ReminderSlot ReminderSlot `json:"reminder_slot"`
+	Valid        bool         `json:"valid"` // Valid is true if ReminderSlot is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullReminderSlot) Scan(value interface{}) error {
+	if value == nil {
+		ns.ReminderSlot, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ReminderSlot.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullReminderSlot) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ReminderSlot), nil
+}
+
 type Attendance struct {
 	ID     uuid.UUID `json:"id"`
 	PickID uuid.UUID `json:"pick_id"`
@@ -192,6 +234,13 @@ type Pick struct {
 	RemindNightBefore bool               `json:"remind_night_before"`
 	RemindMorningOf   bool               `json:"remind_morning_of"`
 	RemindAudience    ReminderAudience   `json:"remind_audience"`
+}
+
+type RemindersSent struct {
+	NightID uuid.UUID          `json:"night_id"`
+	UserID  uuid.UUID          `json:"user_id"`
+	Slot    ReminderSlot       `json:"slot"`
+	SentAt  pgtype.Timestamptz `json:"sent_at"`
 }
 
 type User struct {

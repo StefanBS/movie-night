@@ -43,6 +43,11 @@ CORS_ALLOWED_ORIGINS=http://localhost:8081
 # and movie attach return 503. https://www.themoviedb.org/settings/api
 TMDB_READ_TOKEN=
 
+# Expo access token for sending reminders (ADR-0010). Optional — only needed
+# once push security is enabled for the project in EAS. Reminders go out from
+# the API process every minute either way.
+EXPO_ACCESS_TOKEN=
+
 # Podman only — route docker compose + testcontainers to the rootless socket.
 DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
 TESTCONTAINERS_RYUK_DISABLED=true
