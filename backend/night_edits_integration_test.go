@@ -5,6 +5,7 @@ package main
 import (
 	"net/http"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
@@ -22,6 +23,7 @@ func TestNightEditsIntegration(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(q))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
+	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(q))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(q))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, client))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/movie", clearNightMovieHandler(q))
@@ -114,10 +116,13 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("PATCH with a non-member attendee yields 422 and changes nothing", func(t *testing.T) {
 		n := mkNight(t)
-		code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		code, body := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			`{"scheduledFor":"2026-07-04","attendees":["`+ada+`","`+unknownUser+`"]}`)
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("patch status = %d, want 422", code)
+		}
+		if !strings.Contains(string(body), unknownUser) {
+			t.Fatalf("body = %s, want it to name %s", body, unknownUser)
 		}
 		unchanged(t, n)
 	})
@@ -163,6 +168,31 @@ func TestNightEditsIntegration(t *testing.T) {
 		}
 		if got.ScheduledFor != "2026-07-04" || !slices.Equal(attendeeIDs(got), []string{ada, cleo}) {
 			t.Fatalf("night = %+v, want 2026-07-04 with [Ada Cleo]", got)
+		}
+	})
+
+	// Every night response reads the movie through its own query's LEFT JOIN, so
+	// each write path is checked to carry an attached film through.
+	t.Run("an attached movie comes back from every night response", func(t *testing.T) {
+		n := mkNight(t)
+		if code, _ := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":438631}`); code != http.StatusOK {
+			t.Fatalf("attach status = %d, want 200", code)
+		}
+		base := "/groups/" + seededGroup + "/nights/" + n.ID
+		for _, step := range []struct{ name, method, path, body string }{
+			{"detail", http.MethodGet, base, ""},
+			{"edit attendees", http.MethodPatch, base, `{"attendees":["` + ada + `","` + blake + `"]}`},
+			{"edit date", http.MethodPatch, base, `{"scheduledFor":"2026-07-04"}`},
+			{"record pick", http.MethodPost, base + "/pick", `{"pickerId":"` + blake + `"}`},
+		} {
+			code, got := doJSON[nightResponse](t, mux, step.method, step.path, step.body)
+			if code != http.StatusOK {
+				t.Fatalf("%s status = %d, want 200", step.name, code)
+			}
+			if got.Movie == nil || got.Movie.TMDBID != 438631 || got.Movie.Title != "Dune" ||
+				got.Movie.ReleaseYear == nil || *got.Movie.ReleaseYear != 2021 || got.Movie.PosterURL == nil {
+				t.Fatalf("%s movie = %+v, want Dune (2021) with a poster", step.name, got.Movie)
+			}
 		}
 	})
 

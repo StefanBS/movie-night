@@ -155,8 +155,12 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	})
 
 	run("create with a non-member attendee yields 422 and creates nothing", func(t *testing.T) {
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-06-12", ada, unknownUser)); code != http.StatusUnprocessableEntity {
+		code, body := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-06-12", ada, unknownUser))
+		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("status = %d, want 422", code)
+		}
+		if !strings.Contains(string(body), unknownUser) {
+			t.Fatalf("body = %s, want it to name %s", body, unknownUser)
 		}
 		// The date is still free: nothing was written before the 422.
 		createNight(t, nightBody("2026-06-12", ada))

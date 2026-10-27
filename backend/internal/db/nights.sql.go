@@ -38,7 +38,14 @@ WITH night AS (
   INSERT INTO attendances (pick_id, user_id)
   SELECT night.id, unnest($5::uuid[]) FROM night
 )
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id FROM night
+SELECT
+  night.id, night.group_id, night.picker_id, night.is_credited, night.scheduled_for, night.created_at,
+  m.tmdb_id      AS movie_tmdb_id,
+  m.title        AS movie_title,
+  m.release_year AS movie_release_year,
+  m.poster_path  AS movie_poster_path
+FROM night
+LEFT JOIN movies m ON m.id = night.movie_id
 `
 
 type CreateNightParams struct {
@@ -50,13 +57,16 @@ type CreateNightParams struct {
 }
 
 type CreateNightRow struct {
-	ID           uuid.UUID          `json:"id"`
-	GroupID      uuid.UUID          `json:"group_id"`
-	PickerID     uuid.UUID          `json:"picker_id"`
-	IsCredited   bool               `json:"is_credited"`
-	ScheduledFor pgtype.Date        `json:"scheduled_for"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	MovieID      pgtype.UUID        `json:"movie_id"`
+	ID               uuid.UUID          `json:"id"`
+	GroupID          uuid.UUID          `json:"group_id"`
+	PickerID         uuid.UUID          `json:"picker_id"`
+	IsCredited       bool               `json:"is_credited"`
+	ScheduledFor     pgtype.Date        `json:"scheduled_for"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	MovieTmdbID      pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle       pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath  pgtype.Text        `json:"movie_poster_path"`
 }
 
 // Inserts the night and its attendees in one statement, so a night never exists
@@ -77,7 +87,10 @@ func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (Creat
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
-		&i.MovieID,
+		&i.MovieTmdbID,
+		&i.MovieTitle,
+		&i.MovieReleaseYear,
+		&i.MoviePosterPath,
 	)
 	return i, err
 }
@@ -98,9 +111,15 @@ func (q *Queries) DeleteNight(ctx context.Context, arg DeleteNightParams) error 
 }
 
 const getNight = `-- name: GetNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
-FROM picks
-WHERE id = $1 AND group_id = $2
+SELECT
+  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  m.tmdb_id      AS movie_tmdb_id,
+  m.title        AS movie_title,
+  m.release_year AS movie_release_year,
+  m.poster_path  AS movie_poster_path
+FROM picks p
+LEFT JOIN movies m ON m.id = p.movie_id
+WHERE p.id = $1 AND p.group_id = $2
 `
 
 type GetNightParams struct {
@@ -108,9 +127,24 @@ type GetNightParams struct {
 	GroupID uuid.UUID `json:"group_id"`
 }
 
-func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (Pick, error) {
+type GetNightRow struct {
+	ID               uuid.UUID          `json:"id"`
+	GroupID          uuid.UUID          `json:"group_id"`
+	PickerID         uuid.UUID          `json:"picker_id"`
+	IsCredited       bool               `json:"is_credited"`
+	ScheduledFor     pgtype.Date        `json:"scheduled_for"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	MovieTmdbID      pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle       pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath  pgtype.Text        `json:"movie_poster_path"`
+}
+
+// Every night query returns this same shape (the night plus its movie's LEFT
+// JOIN columns), so one mapper builds every night response.
+func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (GetNightRow, error) {
 	row := q.db.QueryRow(ctx, getNight, arg.NightID, arg.GroupID)
-	var i Pick
+	var i GetNightRow
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
@@ -118,16 +152,25 @@ func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (Pick, error
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
-		&i.MovieID,
+		&i.MovieTmdbID,
+		&i.MovieTitle,
+		&i.MovieReleaseYear,
+		&i.MoviePosterPath,
 	)
 	return i, err
 }
 
 const getNightForUpdate = `-- name: GetNightForUpdate :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
-FROM picks
-WHERE id = $1 AND group_id = $2
-FOR UPDATE
+SELECT
+  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  m.tmdb_id      AS movie_tmdb_id,
+  m.title        AS movie_title,
+  m.release_year AS movie_release_year,
+  m.poster_path  AS movie_poster_path
+FROM picks p
+LEFT JOIN movies m ON m.id = p.movie_id
+WHERE p.id = $1 AND p.group_id = $2
+FOR UPDATE OF p
 `
 
 type GetNightForUpdateParams struct {
@@ -135,11 +178,24 @@ type GetNightForUpdateParams struct {
 	GroupID uuid.UUID `json:"group_id"`
 }
 
+type GetNightForUpdateRow struct {
+	ID               uuid.UUID          `json:"id"`
+	GroupID          uuid.UUID          `json:"group_id"`
+	PickerID         uuid.UUID          `json:"picker_id"`
+	IsCredited       bool               `json:"is_credited"`
+	ScheduledFor     pgtype.Date        `json:"scheduled_for"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	MovieTmdbID      pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle       pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath  pgtype.Text        `json:"movie_poster_path"`
+}
+
 // Locks the night row for the rest of the edit transaction, so a concurrent
 // record-pick cannot move the picker between the picker check and the write.
-func (q *Queries) GetNightForUpdate(ctx context.Context, arg GetNightForUpdateParams) (Pick, error) {
+func (q *Queries) GetNightForUpdate(ctx context.Context, arg GetNightForUpdateParams) (GetNightForUpdateRow, error) {
 	row := q.db.QueryRow(ctx, getNightForUpdate, arg.NightID, arg.GroupID)
-	var i Pick
+	var i GetNightForUpdateRow
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
@@ -147,7 +203,10 @@ func (q *Queries) GetNightForUpdate(ctx context.Context, arg GetNightForUpdatePa
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
-		&i.MovieID,
+		&i.MovieTmdbID,
+		&i.MovieTitle,
+		&i.MovieReleaseYear,
+		&i.MoviePosterPath,
 	)
 	return i, err
 }
@@ -196,7 +255,7 @@ func (q *Queries) ListNightAttendees(ctx context.Context, arg ListNightAttendees
 
 const listNights = `-- name: ListNights :many
 SELECT
-  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at, p.movie_id,
+  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -214,7 +273,6 @@ type ListNightsRow struct {
 	IsCredited       bool               `json:"is_credited"`
 	ScheduledFor     pgtype.Date        `json:"scheduled_for"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	MovieID          pgtype.UUID        `json:"movie_id"`
 	MovieTmdbID      pgtype.Int4        `json:"movie_tmdb_id"`
 	MovieTitle       pgtype.Text        `json:"movie_title"`
 	MovieReleaseYear pgtype.Int4        `json:"movie_release_year"`
@@ -237,7 +295,6 @@ func (q *Queries) ListNights(ctx context.Context, groupID uuid.UUID) ([]ListNigh
 			&i.IsCredited,
 			&i.ScheduledFor,
 			&i.CreatedAt,
-			&i.MovieID,
 			&i.MovieTmdbID,
 			&i.MovieTitle,
 			&i.MovieReleaseYear,
@@ -317,10 +374,20 @@ func (q *Queries) RemoveAttendeesNotIn(ctx context.Context, arg RemoveAttendeesN
 }
 
 const setNightPicker = `-- name: SetNightPicker :one
-UPDATE picks
-SET picker_id = $1, is_credited = $2
-WHERE id = $3 AND group_id = $4
-RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+WITH p AS (
+  UPDATE picks
+  SET picker_id = $1, is_credited = $2
+  WHERE picks.id = $3 AND picks.group_id = $4
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+)
+SELECT
+  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  m.tmdb_id      AS movie_tmdb_id,
+  m.title        AS movie_title,
+  m.release_year AS movie_release_year,
+  m.poster_path  AS movie_poster_path
+FROM p
+LEFT JOIN movies m ON m.id = p.movie_id
 `
 
 type SetNightPickerParams struct {
@@ -330,14 +397,27 @@ type SetNightPickerParams struct {
 	GroupID    uuid.UUID `json:"group_id"`
 }
 
-func (q *Queries) SetNightPicker(ctx context.Context, arg SetNightPickerParams) (Pick, error) {
+type SetNightPickerRow struct {
+	ID               uuid.UUID          `json:"id"`
+	GroupID          uuid.UUID          `json:"group_id"`
+	PickerID         uuid.UUID          `json:"picker_id"`
+	IsCredited       bool               `json:"is_credited"`
+	ScheduledFor     pgtype.Date        `json:"scheduled_for"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	MovieTmdbID      pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle       pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath  pgtype.Text        `json:"movie_poster_path"`
+}
+
+func (q *Queries) SetNightPicker(ctx context.Context, arg SetNightPickerParams) (SetNightPickerRow, error) {
 	row := q.db.QueryRow(ctx, setNightPicker,
 		arg.PickerID,
 		arg.IsCredited,
 		arg.NightID,
 		arg.GroupID,
 	)
-	var i Pick
+	var i SetNightPickerRow
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
@@ -345,16 +425,29 @@ func (q *Queries) SetNightPicker(ctx context.Context, arg SetNightPickerParams) 
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
-		&i.MovieID,
+		&i.MovieTmdbID,
+		&i.MovieTitle,
+		&i.MovieReleaseYear,
+		&i.MoviePosterPath,
 	)
 	return i, err
 }
 
 const updateNightDate = `-- name: UpdateNightDate :one
-UPDATE picks
-SET scheduled_for = $1
-WHERE id = $2 AND group_id = $3
-RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+WITH p AS (
+  UPDATE picks
+  SET scheduled_for = $1
+  WHERE picks.id = $2 AND picks.group_id = $3
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+)
+SELECT
+  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  m.tmdb_id      AS movie_tmdb_id,
+  m.title        AS movie_title,
+  m.release_year AS movie_release_year,
+  m.poster_path  AS movie_poster_path
+FROM p
+LEFT JOIN movies m ON m.id = p.movie_id
 `
 
 type UpdateNightDateParams struct {
@@ -363,9 +456,22 @@ type UpdateNightDateParams struct {
 	GroupID      uuid.UUID   `json:"group_id"`
 }
 
-func (q *Queries) UpdateNightDate(ctx context.Context, arg UpdateNightDateParams) (Pick, error) {
+type UpdateNightDateRow struct {
+	ID               uuid.UUID          `json:"id"`
+	GroupID          uuid.UUID          `json:"group_id"`
+	PickerID         uuid.UUID          `json:"picker_id"`
+	IsCredited       bool               `json:"is_credited"`
+	ScheduledFor     pgtype.Date        `json:"scheduled_for"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	MovieTmdbID      pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle       pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath  pgtype.Text        `json:"movie_poster_path"`
+}
+
+func (q *Queries) UpdateNightDate(ctx context.Context, arg UpdateNightDateParams) (UpdateNightDateRow, error) {
 	row := q.db.QueryRow(ctx, updateNightDate, arg.ScheduledFor, arg.NightID, arg.GroupID)
-	var i Pick
+	var i UpdateNightDateRow
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
@@ -373,7 +479,10 @@ func (q *Queries) UpdateNightDate(ctx context.Context, arg UpdateNightDateParams
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
-		&i.MovieID,
+		&i.MovieTmdbID,
+		&i.MovieTitle,
+		&i.MovieReleaseYear,
+		&i.MoviePosterPath,
 	)
 	return i, err
 }
