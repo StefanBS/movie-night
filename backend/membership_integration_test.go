@@ -21,7 +21,6 @@ func TestMembershipChurnIntegration(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/members/{userId}/reactivate", reactivateMemberHandler(q))
 	mux.Handle("POST /groups/{groupId}/members/{userId}/promote", promoteMemberHandler(q))
 	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(q))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(q))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
 
 	do := func(t *testing.T, method, path, body string) (int, memberResponse) {
@@ -65,16 +64,9 @@ func TestMembershipChurnIntegration(t *testing.T) {
 
 	recordPick := func(t *testing.T, picker, date string) {
 		t.Helper()
-		// Step 1: create (or resume) a night for this date with the picker as attendee.
-		createBody := `{"scheduledFor":"` + date + `","attendees":["` + picker + `"]}`
-		code, night := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", createBody)
-		if code != http.StatusCreated && code != http.StatusOK {
-			t.Fatalf("create night for %s: status = %d, want 201/200", picker, code)
-		}
-		// Step 2: record the pick — closes the night.
-		pickBody := `{"pickerId":"` + picker + `"}`
-		if code, _ := doReq(t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights/"+night.ID+"/pick", pickBody); code != http.StatusOK {
-			t.Fatalf("record pick for %s: status = %d, want 200", picker, code)
+		// A night is created with its picker, which credits them.
+		if code, _ := doReq(t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody(date, picker)); code != http.StatusCreated {
+			t.Fatalf("create night for %s: status = %d, want 201", picker, code)
 		}
 	}
 

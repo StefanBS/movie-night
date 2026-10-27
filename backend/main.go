@@ -61,7 +61,6 @@ func main() {
 	mux.Handle("POST /groups/{groupId}/members/{userId}/promote", promoteMemberHandler(queries))
 	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(queries))
 	mux.Handle("GET /groups/{groupId}/nights", listNightsHandler(queries))
-	mux.Handle("GET /groups/{groupId}/nights/current", currentNightHandler(queries))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(queries))
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightDateHandler(queries))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(queries))

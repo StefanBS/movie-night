@@ -171,8 +171,8 @@ WHERE group_id = $1 AND picker_id = $2
 `
 
 type MemberCreditedCountParams struct {
-	GroupID uuid.UUID   `json:"group_id"`
-	UserID  pgtype.UUID `json:"user_id"`
+	GroupID uuid.UUID `json:"group_id"`
+	UserID  uuid.UUID `json:"user_id"`
 }
 
 func (q *Queries) MemberCreditedCount(ctx context.Context, arg MemberCreditedCountParams) (int32, error) {

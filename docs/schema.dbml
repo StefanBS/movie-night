@@ -90,18 +90,18 @@ Table movies {
 Table picks {
   id            uuid         [pk, default: `gen_random_uuid()`]
   group_id      uuid         [not null]
-  picker_id     uuid         [null, note: 'The person who chose. NULL for a free pick / nobody-owed-present night (ADR-0005)']
+  picker_id     uuid         [not null, note: 'The attendee who chose. Every night has one (ADR-0008); a free/guest pick is just uncredited']
   movie_id      uuid         [null, note: 'Attached after planning; NULL on a planned night with no movie yet (set via POST .../nights/{id}/movie)']
   is_credited   boolean      [not null, default: true, note: 'TRUE only for normal core picks; guest/free picks are FALSE so they never affect standings (ADR-0006)']
   scheduled_for date         [not null]
   created_at    timestamptz  [not null, default: `now()`]
 
   Indexes {
-    (group_id, scheduled_for) [name: 'ix_pick_group_date']
+    (group_id, scheduled_for) [unique, name: 'uq_night_per_group_date', note: 'At most one night per group per date']
     (picker_id, is_credited)  [name: 'ix_pick_picker_credited', note: 'Drives the least-served count']
   }
 
-  Note: 'One movie night. The current picker is derived from credited picks + attendance, not stored.'
+  Note: 'One movie night, created with its picker. Whose turn is NEXT is derived from credited picks + attendance, not stored.'
 }
 
 Table attendances {
@@ -152,14 +152,14 @@ Table watchlist_items {
 // References
 // ---------------------------------------------------------------------------
 // delete rules: memberships/attendances/reviews/watchlist cascade with their
-// parent; picks restrict on movie (keep history) and set null on picker
-// (a departed picker's nights survive as free picks).
+// parent; picks restrict on movie (keep history) and on picker (people are
+// deactivated, never deleted — ADR-0006).
 
 Ref: memberships.group_id > groups.id [delete: cascade]
 Ref: memberships.user_id  > users.id  [delete: cascade]
 
 Ref: picks.group_id > groups.id [delete: cascade]
-Ref: picks.picker_id > users.id [delete: set null]
+Ref: picks.picker_id > users.id [delete: restrict]
 Ref: picks.movie_id  > movies.id [delete: restrict]
 
 Ref: attendances.pick_id > picks.id [delete: cascade]

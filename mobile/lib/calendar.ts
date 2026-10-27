@@ -1,5 +1,3 @@
-import type { Night } from "./nights";
-
 // A calendar cell: a day, or null for the blank leading slots before the 1st.
 export type DayCell = { iso: string; day: number } | null;
 
@@ -40,12 +38,6 @@ export function shiftMonth({ year, month }: YearMonth, dir: -1 | 1): YearMonth {
   if (m < 1) return { year: year - 1, month: 12 };
   if (m > 12) return { year: year + 1, month: 1 };
   return { year, month: m };
-}
-
-// nightDates is the named selector: the set of dates that already have a night,
-// for the calendar dots. (A Night maps to exactly one scheduledFor.)
-export function nightDates(nights: Night[]): Set<string> {
-  return new Set(nights.map((n) => n.scheduledFor));
 }
 
 export type DayState = {

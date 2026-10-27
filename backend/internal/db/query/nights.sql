@@ -1,26 +1,20 @@
 -- name: CreateNight :one
-INSERT INTO picks (group_id, scheduled_for)
-VALUES (sqlc.arg(group_id), sqlc.arg(scheduled_for))
-RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id;
+-- Inserts the night and its attendees in one statement, so a night never exists
+-- without the attendees its picker is drawn from. Attendees must be deduped.
+WITH night AS (
+  INSERT INTO picks (group_id, scheduled_for, picker_id, is_credited)
+  VALUES (sqlc.arg(group_id), sqlc.arg(scheduled_for), sqlc.arg(picker_id), sqlc.arg(is_credited))
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+), attended AS (
+  INSERT INTO attendances (pick_id, user_id)
+  SELECT night.id, unnest(sqlc.arg(attendees)::uuid[]) FROM night
+)
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id FROM night;
 
 -- name: GetNight :one
 SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 FROM picks
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
-
--- name: GetCurrentNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
-FROM picks
-WHERE group_id = sqlc.arg(group_id)
-ORDER BY scheduled_for DESC, created_at DESC
-LIMIT 1;
-
--- name: GetOpenNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
-FROM picks
-WHERE group_id = sqlc.arg(group_id) AND picker_id IS NULL
-ORDER BY scheduled_for DESC, created_at DESC
-LIMIT 1;
 
 -- name: AddAttendee :exec
 INSERT INTO attendances (pick_id, user_id)
@@ -47,7 +41,7 @@ SET picker_id = sqlc.arg(picker_id), is_credited = sqlc.arg(is_credited)
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
 RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id;
 
--- name: ListRecordedNights :many
+-- name: ListNights :many
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at, p.movie_id,
   m.tmdb_id      AS movie_tmdb_id,
@@ -56,8 +50,8 @@ SELECT
   m.poster_path  AS movie_poster_path
 FROM picks p
 LEFT JOIN movies m ON m.id = p.movie_id
-WHERE p.group_id = sqlc.arg(group_id) AND p.picker_id IS NOT NULL
-ORDER BY p.scheduled_for DESC, p.created_at DESC;
+WHERE p.group_id = sqlc.arg(group_id)
+ORDER BY p.scheduled_for DESC;
 
 -- name: UpdateNightDate :one
 UPDATE picks

@@ -53,22 +53,23 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	q := db.New(pool)
 	mux := http.NewServeMux()
-	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(q))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, client))
 	mux.Handle("GET /movies/search", searchMoviesHandler(client))
 
-	// mkNight clears the group's picks (one open night per group) and creates a
-	// fresh attendee-less night, returning its id. Attaching a movie needs only a
-	// night to exist — no picker or attendee.
+	// mkNight clears the group's picks and inserts a fresh night, returning its
+	// id. Attaching a movie needs only a night to exist, so it is seeded directly
+	// rather than through create — emptyGroup has no members to pick.
 	mkNight := func(t *testing.T, group string) string {
 		t.Helper()
 		clearAllPicks(t, pool, group)
-		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+group+"/nights", `{"scheduledFor":"2026-06-12"}`)
-		if code != http.StatusCreated {
-			t.Fatalf("create night = %d", code)
+		var id string
+		if err := pool.QueryRow(context.Background(),
+			`INSERT INTO picks (group_id, picker_id, scheduled_for) VALUES ($1, $2, '2026-06-12') RETURNING id`,
+			group, ada).Scan(&id); err != nil {
+			t.Fatalf("seed night: %v", err)
 		}
-		return n.ID
+		return id
 	}
 
 	attach := func(t *testing.T, group, nightID, body string) (int, nightResponse) {

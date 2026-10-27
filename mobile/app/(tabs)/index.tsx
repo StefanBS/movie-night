@@ -19,7 +19,8 @@ import { GROUP_ID } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import { fetchGroup } from "../../lib/group";
 import { fetchTurn, pickerMeta, picksLabel, type TurnMember } from "../../lib/turn";
-import { listNights, nextScheduledNight, type Night } from "../../lib/nights";
+import { listNights, type Night } from "../../lib/nights";
+import { upNext } from "../../lib/nightLifecycle";
 import { todayLocalISO } from "../../lib/date";
 import {
   borderWidth,
@@ -177,7 +178,7 @@ export default function TonightScreen() {
   const picker = order[0] ?? null;
   const onDeck = order.slice(1, 4);
   const pickerFirstName = picker ? firstName(picker.name) : "";
-  const scheduled = nextScheduledNight(nights, todayLocalISO());
+  const scheduled = upNext(nights, todayLocalISO());
   const openScheduled = () => {
     if (scheduled === null) {
       return;

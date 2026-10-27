@@ -14,7 +14,6 @@ import { GROUP_ID } from "../../lib/api";
 import { todayLocalISO } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { fetchMembers, type Member } from "../../lib/members";
-import { deriveInitialStep, type Step } from "../../lib/nightFlow";
 import { getNightOrNull, type Night } from "../../lib/nights";
 import {
   colors,
@@ -27,7 +26,6 @@ export default function NightDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [night, setNight] = useState<Night | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
-  const [resumeStep, setResumeStep] = useState<Exclude<Step, "when">>("night");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const today = todayLocalISO();
@@ -35,7 +33,6 @@ export default function NightDetailScreen() {
   useFocusEffect(
     useCallback(() => {
       const controller = new AbortController();
-      const loadToday = todayLocalISO();
       (async () => {
         try {
           setLoading(true);
@@ -45,9 +42,6 @@ export default function NightDetailScreen() {
           ]);
           setNight(n);
           setMembers(roster);
-          if (n !== null) {
-            setResumeStep(deriveInitialStep(n, loadToday));
-          }
           setError(null);
         } catch (e) {
           if (!controller.signal.aborted) {
@@ -112,13 +106,15 @@ export default function NightDetailScreen() {
 
   return (
     <ExistingNightEditor
-      key={`${night.id}-${resumeStep}`}
+      key={night.id}
       night={night}
       members={members}
       today={today}
-      initialStep={resumeStep}
       onDone={() => router.back()}
       onCancel={() => router.back()}
+      onEdit={() =>
+        router.push({ pathname: "/night/edit/[id]", params: { id: night.id } })
+      }
       cancelLabel="Back"
       showBackOnNight
     />

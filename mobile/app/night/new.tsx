@@ -12,57 +12,56 @@ import {
 import { useRouter } from "expo-router";
 
 import { TopBar } from "../../components";
-import { WhenStep, ExistingNightEditor } from "../../components/night";
+import { WhenStep, WhoStep, ExistingNightEditor } from "../../components/night";
 import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
 import { todayLocalISO } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { fetchMembers, type Member } from "../../lib/members";
-import {
-  createNight,
-  getCurrentNight,
-  listNights,
-  type Night,
-} from "../../lib/nights";
-import { nightDates } from "../../lib/calendar";
-import { deriveInitialStep, isResumable, type Step } from "../../lib/nightFlow";
+import { createNight, listNights, type Night } from "../../lib/nights";
+import { draftPicker } from "../../lib/nightDraft";
+import { nightDates } from "../../lib/nightLifecycle";
+import { fetchTurnAmong, type TurnMember } from "../../lib/turn";
 import {
   colors,
   textPresets,
   space,
 } from "../../theme";
 
+// NightScreen plans a new Night: When → Who as a client-side draft, then one
+// create with the date, attendees and picker (ADR-0008). Nothing is saved until
+// "Next", so backing out leaves nothing behind. Once created, the Night opens
+// on its film step.
 export default function NightScreen() {
   const router = useRouter();
+  const today = todayLocalISO();
   const [members, setMembers] = useState<Member[]>([]);
-  const [night, setNight] = useState<Night | null>(null);
-  const [resumeStep, setResumeStep] = useState<Exclude<Step, "when">>("who");
+  const [nightDatesSet, setNightDatesSet] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [nightDatesSet, setNightDatesSet] = useState<Set<string>>(new Set());
-  const [createBusy, setCreateBusy] = useState<string | null>(null);
-  const [createError, setCreateError] = useState<string | null>(null);
-  const today = todayLocalISO();
+
+  const [step, setStep] = useState<"when" | "who">("when");
+  const [date, setDate] = useState(today);
+  const [attendeeIds, setAttendeeIds] = useState<Set<string>>(new Set());
+  const [chosenPicker, setChosenPicker] = useState<string | null>(null);
+  const [order, setOrder] = useState<TurnMember[]>([]);
+  const [created, setCreated] = useState<Night | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    const resumeToday = todayLocalISO();
     (async () => {
       try {
-        const [roster, current, allNights] = await Promise.all([
+        const [roster, allNights] = await Promise.all([
           fetchMembers(API_URL, GROUP_ID, controller.signal),
-          getCurrentNight(API_URL, GROUP_ID, controller.signal),
           listNights(API_URL, GROUP_ID, controller.signal).catch(() => [] as Night[]),
         ]);
         setMembers(roster);
         setNightDatesSet(nightDates(allNights));
-        if (current !== null && isResumable(current, resumeToday)) {
-          setNight(current);
-          setResumeStep(deriveInitialStep(current, resumeToday));
-        }
       } catch (e) {
         if (!controller.signal.aborted) {
-          setError(errorMessage(e, "failed to load tonight"));
+          setError(errorMessage(e, "failed to load the club"));
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -73,22 +72,58 @@ export default function NightScreen() {
     return () => controller.abort();
   }, []);
 
-  const onCreate = useCallback(async (scheduledFor: string) => {
-    if (createBusy !== null) {
+  // The live order over the draft's attendees; re-ranked on every toggle, with
+  // the previous request cancelled so a slow response can't overwrite a newer one.
+  useEffect(() => {
+    const controller = new AbortController();
+    (async () => {
+      try {
+        setOrder(await fetchTurnAmong(API_URL, GROUP_ID, [...attendeeIds], controller.signal));
+      } catch (e) {
+        if (!controller.signal.aborted) {
+          setActionError(errorMessage(e, "failed to load pick order"));
+        }
+      }
+    })();
+    return () => controller.abort();
+  }, [attendeeIds]);
+
+  const pickerId = draftPicker(order, attendeeIds, chosenPicker);
+
+  const onToggle = useCallback((member: Member) => {
+    setAttendeeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(member.id)) {
+        next.delete(member.id);
+      } else {
+        next.add(member.id);
+      }
+      return next;
+    });
+    // Removing the chosen picker hands the pick back to the order.
+    setChosenPicker((chosen) => (chosen === member.id ? null : chosen));
+  }, []);
+
+  const onCreate = useCallback(async () => {
+    if (busy !== null || pickerId === null) {
       return;
     }
-    setCreateBusy("create");
-    setCreateError(null);
+    setBusy("create");
+    setActionError(null);
     try {
-      const created = await createNight(API_URL, GROUP_ID, scheduledFor);
-      setNight(created);
-      setResumeStep("who");
+      setCreated(
+        await createNight(API_URL, GROUP_ID, {
+          scheduledFor: date,
+          attendees: [...attendeeIds],
+          pickerId,
+        }),
+      );
     } catch (e) {
-      setCreateError(errorMessage(e, "failed to create night"));
+      setActionError(errorMessage(e, "failed to create night"));
     } finally {
-      setCreateBusy(null);
+      setBusy(null);
     }
-  }, [createBusy]);
+  }, [busy, pickerId, date, attendeeIds]);
 
   if (loading) {
     return (
@@ -100,22 +135,54 @@ export default function NightScreen() {
   if (error !== null) {
     return (
       <View style={styles.screen}>
-        <Text style={[styles.center, styles.error]}>{`Couldn't load tonight: ${error}`}</Text>
+        <Text style={[styles.center, styles.error]}>{`Couldn't load the club: ${error}`}</Text>
       </View>
     );
   }
 
-  if (night !== null) {
+  if (created !== null) {
     return (
       <ExistingNightEditor
-        key={night.id}
-        night={night}
+        key={created.id}
+        night={created}
         members={members}
         today={today}
-        initialStep={resumeStep}
+        initialStep="pick"
         onDone={() => router.back()}
         onCancel={() => router.back()}
+        onEdit={() =>
+          router.push({ pathname: "/night/edit/[id]", params: { id: created.id } })
+        }
       />
+    );
+  }
+
+  const banner =
+    actionError !== null ? (
+      <Text style={[styles.banner, styles.error]}>{actionError}</Text>
+    ) : null;
+
+  if (step === "who") {
+    return (
+      <View style={styles.screen}>
+        <TopBar
+          kind="title"
+          title="New night"
+          back={{ label: "When", onPress: () => setStep("when") }}
+        />
+        {banner}
+        <WhoStep
+          scheduledFor={date}
+          today={today}
+          members={members}
+          attendeeIds={attendeeIds}
+          pickerId={pickerId}
+          busy={busy}
+          onToggle={onToggle}
+          onChoosePicker={setChosenPicker}
+          onNext={onCreate}
+        />
+      </View>
     );
   }
 
@@ -126,10 +193,18 @@ export default function NightScreen() {
         title="New night"
         back={{ label: "Cancel", onPress: () => router.back() }}
       />
-      {createError !== null ? (
-        <Text style={[styles.banner, styles.error]}>{createError}</Text>
-      ) : null}
-      <WhenStep today={today} nightDates={nightDatesSet} busy={createBusy} onNext={onCreate} />
+      {banner}
+      <WhenStep
+        today={today}
+        initial={date}
+        nightDates={nightDatesSet}
+        busy={busy}
+        onNext={(iso) => {
+          setDate(iso);
+          setActionError(null);
+          setStep("who");
+        }}
+      />
     </View>
   );
 }

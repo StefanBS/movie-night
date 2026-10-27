@@ -6,42 +6,45 @@ import { WizardFooter } from "./WizardFooter";
 import { firstName } from "../../lib/avatar";
 import { formatWeekdayDate, relativeLabel } from "../../lib/date";
 import type { Member } from "../../lib/members";
-import type { Night } from "../../lib/nights";
-import type { TurnMember } from "../../lib/turn";
+import { nightTiming } from "../../lib/nightLifecycle";
 import { borderWidth, colors, pressedOpacity, radius, shadow, space, textPresets } from "../../theme";
 
-// WhoStep — attendance toggles for the full roster. The next-up present core
-// member (order[0]) is spotlighted as the picker; the footer records the pick
-// and advances.
+// WhoStep — attendance toggles for the full roster, for a plan that is not yet
+// a Night (ADR-0008). The picker (pickerId — next up among those in, unless the
+// user chose someone) is spotlighted; any other attendee can be made picker,
+// which is how a guest-only night gets one. The footer creates the Night.
 export function WhoStep({
-  night,
+  scheduledFor,
+  today,
   members,
-  order,
   attendeeIds,
+  pickerId,
   busy,
-  future,
   onToggle,
+  onChoosePicker,
   onNext,
 }: {
-  night: Night;
+  scheduledFor: string;
+  today: string;
   members: Member[];
-  order: TurnMember[];
   attendeeIds: Set<string>;
+  pickerId: string | null;
   busy: string | null;
-  future: boolean;
   onToggle: (m: Member) => void;
+  onChoosePicker: (memberId: string) => void;
   onNext: () => void;
 }) {
-  const picker = order[0] ?? null;
+  const future = nightTiming(scheduledFor, today) === "upcoming";
+  const picker = members.find((m) => m.id === pickerId) ?? null;
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content}>
         <Stepper current={1} />
         <View style={styles.headingRow}>
           <Text style={styles.heading} numberOfLines={1}>
-            {formatWeekdayDate(night.scheduledFor)}
+            {formatWeekdayDate(scheduledFor)}
           </Text>
-          <Badge label={relativeLabel(night.scheduledFor)} uppercase={false} />
+          <Badge label={relativeLabel(scheduledFor, today)} uppercase={false} />
         </View>
         <Text style={styles.hint}>
           {future ? "Who's planning to come? The next-up member who's in gets the pick." : "Tap who made it. Tonight's pick goes to whoever's next up and here."}
@@ -70,6 +73,16 @@ export function WhoStep({
                 </Text>
                 {isPicker ? <Text style={styles.getsPick}>GETS THE PICK</Text> : null}
               </View>
+              {here && !isPicker ? (
+                <Pressable
+                  onPress={() => onChoosePicker(m.id)}
+                  disabled={busy !== null}
+                  hitSlop={space[2]}
+                  accessibilityLabel={`Make ${m.name} the picker`}
+                >
+                  <Text style={styles.makePicker}>MAKE PICKER</Text>
+                </Pressable>
+              ) : null}
               {busy === m.id ? (
                 <Text style={styles.tag}>…</Text>
               ) : here ? (
@@ -86,7 +99,9 @@ export function WhoStep({
           title={
             picker
               ? `Next — ${firstName(picker.name)} picks  →`
-              : "Add who's here  →"
+              : attendeeIds.size > 0
+                ? "Choose who picks  →"
+                : "Add who's here  →"
           }
           fullWidth
           disabled={busy !== null || picker === null}
@@ -137,5 +152,6 @@ const styles = StyleSheet.create({
   name: { ...textPresets.rowName, color: colors.text.primary },
   getsPick: { ...textPresets.tag, color: colors.accent.strong, marginTop: space[1] },
   outTag: { ...textPresets.tag, color: colors.text.tertiary },
+  makePicker: { ...textPresets.tag, color: colors.accent.cool },
   tag: { ...textPresets.tag, color: colors.text.secondary },
 });

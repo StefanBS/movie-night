@@ -82,7 +82,7 @@ test("attachMovie posts the tmdbId and returns the night with its movie", async 
   const nightWithMovie: Night = {
     id: NIGHT,
     scheduledFor: "2026-06-12",
-    pickerId: null,
+    pickerId: "u1",
     movie: { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg" },
     attendees: [],
   };

@@ -1,57 +1,51 @@
 import {
   useCallback,
-  useEffect,
-  useMemo,
   useState,
 } from "react";
 import { View, StyleSheet } from "react-native";
 
 import { TopBar } from "../";
-import { NightSteps } from "./NightSteps";
+import { NightSteps, type Step } from "./NightSteps";
 import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
-import { daysUntil } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import type { Member } from "../../lib/members";
+import { nightTiming } from "../../lib/nightLifecycle";
 import {
-  addAttendee,
   attachMovie,
   detachMovie,
-  getNightTurn,
   recordNightPick,
-  removeAttendee,
   type Night,
 } from "../../lib/nights";
 import { searchMovies, type Movie } from "../../lib/movies";
-import type { Step } from "../../lib/nightFlow";
-import type { TurnMember } from "../../lib/turn";
 import { colors } from "../../theme";
 
-// ExistingNightEditor is the Who → Pick → Night wizard for a night that
-// already exists. Mount with key={night.id} when the loaded night changes.
+// ExistingNightEditor is the Pick → Night editor for a saved Night. It keeps
+// the stored picker: only an explicit "Choose who picks" changes it. Mount with
+// key={night.id} when the loaded night changes.
 export function ExistingNightEditor({
   night,
   members,
   today,
-  initialStep,
+  initialStep = "night",
   onDone,
   onCancel,
+  onEdit,
   cancelLabel = "Cancel",
   showBackOnNight = false,
 }: {
   night: Night;
   members: Member[];
   today: string;
-  initialStep: Step;
+  initialStep?: Step;
   onDone: () => void;
   onCancel: () => void;
+  onEdit?: () => void;
   cancelLabel?: string;
   showBackOnNight?: boolean;
 }) {
   const [nightState, setNightState] = useState(night);
   const [step, setStep] = useState<Step>(initialStep);
-  const [pickReturnStep, setPickReturnStep] = useState<Step>("who");
-  const [order, setOrder] = useState<TurnMember[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [movieQuery, setMovieQuery] = useState("");
@@ -59,27 +53,6 @@ export function ExistingNightEditor({
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [changingPicker, setChangingPicker] = useState(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        setOrder(await getNightTurn(API_URL, GROUP_ID, nightState.id, controller.signal));
-      } catch {
-        // Order refresh failures surface on the next write.
-      }
-    })();
-    return () => controller.abort();
-  }, [nightState.id]);
-
-  const attendeeIds = useMemo(
-    () => new Set(nightState.attendees.map((a) => a.id)),
-    [nightState],
-  );
-
-  const refreshOrder = useCallback(async (nightId: string) => {
-    setOrder(await getNightTurn(API_URL, GROUP_ID, nightId));
-  }, []);
 
   const runNightWrite = useCallback(
     async (
@@ -95,11 +68,6 @@ export function ExistingNightEditor({
       try {
         const updated = await write();
         setNightState(updated);
-        try {
-          await refreshOrder(updated.id);
-        } catch (e) {
-          setActionError(errorMessage(e, "failed to load pick order"));
-        }
         return updated;
       } catch (e) {
         setActionError(errorMessage(e, fallback));
@@ -108,38 +76,8 @@ export function ExistingNightEditor({
         setBusy(null);
       }
     },
-    [busy, refreshOrder],
+    [busy],
   );
-
-  const onToggle = useCallback(
-    (member: Member) => {
-      return runNightWrite(
-        member.id,
-        () =>
-          attendeeIds.has(member.id)
-            ? removeAttendee(API_URL, GROUP_ID, nightState.id, member.id)
-            : addAttendee(API_URL, GROUP_ID, nightState.id, member.id),
-        "failed to update attendance",
-      );
-    },
-    [nightState.id, attendeeIds, runNightWrite],
-  );
-
-  const onAdvance = useCallback(async () => {
-    const top = order[0] ?? null;
-    if (top === null) {
-      return;
-    }
-    const recorded = await runNightWrite(
-      top.id,
-      () => recordNightPick(API_URL, GROUP_ID, nightState.id, top.id),
-      "failed to record pick",
-    );
-    if (recorded !== null) {
-      setPickReturnStep("who");
-      setStep("pick");
-    }
-  }, [nightState.id, order, runNightWrite]);
 
   const onRecordPicker = useCallback(
     async (memberId: string) => {
@@ -173,40 +111,29 @@ export function ExistingNightEditor({
 
   const onAttach = useCallback(
     async (tmdbId: number) => {
-      if (busy !== null) {
-        return;
-      }
-      setBusy(String(tmdbId));
-      setActionError(null);
-      try {
-        const updated = await attachMovie(API_URL, GROUP_ID, nightState.id, tmdbId);
-        setNightState(updated);
+      const updated = await runNightWrite(
+        String(tmdbId),
+        () => attachMovie(API_URL, GROUP_ID, nightState.id, tmdbId),
+        "failed to attach movie",
+      );
+      if (updated !== null) {
         setResults([]);
         setSearchError(null);
         setMovieQuery("");
         setStep("night");
-      } catch (e) {
-        setActionError(errorMessage(e, "failed to attach movie"));
-      } finally {
-        setBusy(null);
       }
     },
-    [nightState.id, busy],
+    [nightState.id, runNightWrite],
   );
 
-  const onSkipPick = useCallback(() => {
+  const toNight = useCallback(() => {
+    setChangingPicker(false);
     setStep("night");
   }, []);
 
   const onPickFilm = useCallback(() => {
-    setPickReturnStep("night");
     setStep("pick");
   }, []);
-
-  const onBackFromPick = useCallback(() => {
-    setChangingPicker(false);
-    setStep(pickReturnStep);
-  }, [pickReturnStep]);
 
   const onClearFilm = useCallback(async () => {
     if (busy !== null || nightState.movie === null) {
@@ -223,15 +150,12 @@ export function ExistingNightEditor({
   }, [nightState.id, nightState.movie, busy, runNightWrite]);
 
   const title = step === "pick" ? "The pick" : "Night";
-  // The Night step is the only one that can be back-less: it is the wizard's
+  // The Night step is the only one that can be back-less: it is the editor's
   // resting state, so it shows a back target only when the caller asked for one.
   const back =
     step === "pick"
-      ? {
-          label: pickReturnStep === "night" ? "Night" : "Here",
-          onPress: onBackFromPick,
-        }
-      : step !== "night" || showBackOnNight
+      ? { label: "Night", onPress: toNight }
+      : showBackOnNight
         ? { label: cancelLabel, onPress: onCancel }
         : undefined;
 
@@ -243,11 +167,9 @@ export function ExistingNightEditor({
         members={members}
         today={today}
         step={step}
-        order={order}
-        attendeeIds={attendeeIds}
         busy={busy}
         actionError={actionError}
-        future={daysUntil(nightState.scheduledFor, today) > 0}
+        future={nightTiming(nightState.scheduledFor, today) === "upcoming"}
         changingPicker={changingPicker}
         setChangingPicker={setChangingPicker}
         movieQuery={movieQuery}
@@ -255,15 +177,14 @@ export function ExistingNightEditor({
         results={results}
         searching={searching}
         searchError={searchError}
-        onToggle={onToggle}
-        onAdvance={onAdvance}
         onSearch={onSearch}
         onAttach={onAttach}
         onRecordPicker={onRecordPicker}
-        onSkipPick={onSkipPick}
+        onSkipPick={toNight}
         onDone={onDone}
         onPickFilm={onPickFilm}
         onClearFilm={onClearFilm}
+        onEdit={onEdit}
       />
     </View>
   );

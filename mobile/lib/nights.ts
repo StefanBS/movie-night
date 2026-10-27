@@ -1,7 +1,6 @@
 import { requestJson, requestJsonOrNull, requestNoContent } from "./http";
 import { parseMovie, type Movie } from "./movies";
 import { parseTurn, type TurnMember } from "./turn";
-import { daysUntil, todayLocalISO } from "./date";
 
 export type Attendee = {
   id: string;
@@ -9,10 +8,12 @@ export type Attendee = {
   role: "core" | "guest";
 };
 
+// Night is one dated movie night. Every Night has a picker, who is always one
+// of its attendees (ADR-0008); its date-relative state lives in nightLifecycle.
 export type Night = {
   id: string;
   scheduledFor: string;
-  pickerId: string | null;
+  pickerId: string;
   movie: Movie | null;
   attendees: Attendee[];
 };
@@ -47,8 +48,8 @@ export function parseNight(raw: unknown): Night {
   if (typeof scheduledFor !== "string") {
     throw new Error("night: scheduledFor must be a string");
   }
-  if (pickerId !== undefined && pickerId !== null && typeof pickerId !== "string") {
-    throw new Error("night: pickerId must be a string or null");
+  if (typeof pickerId !== "string") {
+    throw new Error("night: pickerId must be a string");
   }
   if (!Array.isArray(attendees)) {
     throw new Error("night: attendees must be an array");
@@ -57,7 +58,7 @@ export function parseNight(raw: unknown): Night {
   return {
     id,
     scheduledFor,
-    pickerId: pickerId ?? null,
+    pickerId,
     movie: parsedMovie,
     attendees: attendees.map(parseAttendee),
   };
@@ -76,19 +77,26 @@ function fetchNight(url: string, init?: RequestInit): Promise<Night> {
   return requestJson(url, parseNight, init);
 }
 
-// createNight plans a night for scheduledFor (ISO YYYY-MM-DD) with an optional
-// initial attendee list of user IDs.
+// NewNight is everything a Night is created with (ADR-0008): its date (ISO
+// YYYY-MM-DD), who's attending, and the picker, who must be one of them.
+export type NewNight = {
+  scheduledFor: string;
+  attendees: string[];
+  pickerId: string;
+};
+
+// createNight creates a whole Night in one request. The backend rejects a
+// picker who isn't attending (422) and a date that already has a Night (409).
 export function createNight(
   baseUrl: string,
   groupId: string,
-  scheduledFor: string,
-  attendees: string[] = [],
+  night: NewNight,
   signal?: AbortSignal,
 ): Promise<Night> {
   return fetchNight(`${baseUrl}/groups/${groupId}/nights`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scheduledFor, attendees }),
+    body: JSON.stringify(night),
     signal,
   });
 }
@@ -105,20 +113,8 @@ export function getNightOrNull(
   return requestJsonOrNull(`${baseUrl}/groups/${groupId}/nights/${nightId}`, parseNight, { signal });
 }
 
-// getCurrentNight loads the group's latest night (open OR finalized) so the screen
-// can resume and correct it across sessions, or null when there is none (the
-// backend returns 404 in that case).
-export function getCurrentNight(
-  baseUrl: string,
-  groupId: string,
-  signal?: AbortSignal,
-): Promise<Night | null> {
-  return requestJsonOrNull(`${baseUrl}/groups/${groupId}/nights/current`, parseNight, { signal });
-}
-
-// listNights loads the group's picker-set nights, newest first — both recorded
-// past nights (History) and future planned nights (the nextScheduledNight
-// selector below). The backend filters out picker-less nights.
+// listNights loads every Night of the group, past and upcoming, newest first.
+// The nightLifecycle selectors split it for Up next, History and the calendar.
 export function listNights(
   baseUrl: string,
   groupId: string,
@@ -155,7 +151,8 @@ export function removeAttendee(
   );
 }
 
-// getNightTurn loads the core pick order for a night (element 0 is the picker).
+// getNightTurn loads the core pick order over a night's attendees, ignoring the
+// night's own pick — the order its picker is chosen from.
 export function getNightTurn(
   baseUrl: string,
   groupId: string,
@@ -165,7 +162,7 @@ export function getNightTurn(
   return requestJson(`${baseUrl}/groups/${groupId}/nights/${nightId}/turn`, parseTurn, { signal });
 }
 
-// recordNightPick sets (or corrects) the night's picker. The backend derives
+// recordNightPick changes the night's picker (who must be attending). The backend derives
 // is_credited from the picker's role, so the client sends only the id.
 export function recordNightPick(
   baseUrl: string,
@@ -236,27 +233,4 @@ export function deleteNight(
     method: "DELETE",
     signal,
   });
-}
-
-// nextScheduledNight is the home's named selector: the soonest upcoming night,
-// or null when none. "Upcoming" = strictly future (with or without a film yet —
-// a film can be pre-picked for a scheduled night), or today while still
-// film-less; today's night once a film is attached is recorded (done) and drops
-// out. Fed by listNights; drives the "Up next" card, with the spotlight as the
-// null fallback. ISO YYYY-MM-DD compares chronologically as text (like
-// history.ts). `today` is injectable for deterministic tests (mirrors date.ts).
-export function nextScheduledNight(
-  nights: Night[],
-  today: string = todayLocalISO(),
-): Night | null {
-  let soonest: Night | null = null;
-  for (const n of nights) {
-    const d = daysUntil(n.scheduledFor, today);
-    if (d < 0) continue; // already past
-    if (d === 0 && n.movie !== null) continue; // tonight, already recorded → done
-    if (soonest === null || n.scheduledFor < soonest.scheduledFor) {
-      soonest = n;
-    }
-  }
-  return soonest;
 }

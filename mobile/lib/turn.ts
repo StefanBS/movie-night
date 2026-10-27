@@ -54,6 +54,22 @@ export function fetchTurn(
   return requestJson(`${baseUrl}/groups/${groupId}/turn`, parseTurn, { signal });
 }
 
+// fetchTurnAmong ranks only the given people — the live order for a plan that
+// is not yet a Night. An empty set short-circuits to [] without a request: the
+// backend reads a blank `present` as "rank everyone", the opposite of nobody.
+export async function fetchTurnAmong(
+  baseUrl: string,
+  groupId: string,
+  present: string[],
+  signal?: AbortSignal,
+): Promise<TurnMember[]> {
+  if (present.length === 0) {
+    return [];
+  }
+  const query = encodeURIComponent(present.join(","));
+  return requestJson(`${baseUrl}/groups/${groupId}/turn?present=${query}`, parseTurn, { signal });
+}
+
 // picksLabel renders a served-count as a human label: "1 pick", "2 picks".
 export function picksLabel(n: number): string {
   return `${n} pick${n === 1 ? "" : "s"}`;

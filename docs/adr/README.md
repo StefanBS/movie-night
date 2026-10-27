@@ -7,7 +7,7 @@ decision, consequences). Records are append-only: when a decision changes, add a
 new record that supersedes the old one rather than editing history.
 
 **Status legend:** Proposed · Accepted · Superseded · Deprecated
-**Last updated:** 2026-06-10
+**Last updated:** 2026-10-27
 
 ## Index
 
@@ -18,6 +18,7 @@ new record that supersedes the old one rather than editing history.
 - [ADR-0005](0005-least-served-turn-ranking.md) — Determine whose turn it is with a "least-served" ranking · *Accepted*
 - [ADR-0006](0006-membership-churn-handling.md) — Handle core-membership churn by deactivating, seeding, and crediting · *Accepted*
 - [ADR-0007](0007-tmdb-proxy-source-of-truth.md) — Proxy TMDB through the backend; the server is the source of truth on attach · *Accepted*
+- [ADR-0008](0008-night-always-has-a-picker.md) — A Night always has a picker; unfinished plans live on the client · *Accepted*
 
 Open and deferred decisions are tracked in [backlog.md](backlog.md).
 
@@ -30,9 +31,9 @@ schema definition.
 - **groups** — a movie-night crew.
 - **memberships** — person ↔ group link; `role` (core/guest), `status`
   (active/inactive), `baseline_picks`, `rotation_position`, join/leave timestamps.
-- **picks** — one per movie night; references the group, the picker (a person; may
-  be null for a free pick), and the chosen movie; carries `is_credited` and the
-  scheduled date.
+- **picks** — one per movie night (at most one per group per date); references the
+  group, the picker (always an attendee — [ADR-0008](0008-night-always-has-a-picker.md)),
+  and the chosen movie; carries `is_credited` and the scheduled date.
 - **attendances** — who was present at a given night (linked to that night's pick).
 - **movies** — metadata cached from TMDB.
 - **reviews** — a person's rating/notes for a given night's pick.

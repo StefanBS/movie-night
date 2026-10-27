@@ -7,7 +7,6 @@ import {
   addAttendee,
   removeAttendee,
   getNightTurn,
-  getCurrentNight,
   listNights,
   recordNightPick,
   attachMovie,
@@ -39,7 +38,7 @@ const ADA = "a0000000-0000-0000-0000-000000000001";
 const night: Night = {
   id: NIGHT,
   scheduledFor: "2026-06-12",
-  pickerId: null,
+  pickerId: ADA,
   movie: null,
   attendees: [{ id: ADA, name: "Ada", role: "core" }],
 };
@@ -52,7 +51,9 @@ function collect(req: http.IncomingMessage): Promise<string> {
   });
 }
 
-test("createNight posts scheduledFor + attendees and parses the night", async () => {
+const NEW_NIGHT = { scheduledFor: "2026-06-12", attendees: [ADA], pickerId: ADA };
+
+test("createNight posts the date, attendees and picker and parses the night", async () => {
   let path = "";
   let method = "";
   let body = "";
@@ -65,10 +66,10 @@ test("createNight posts scheduledFor + attendees and parses the night", async ()
     res.end(JSON.stringify(night));
   });
   try {
-    const got = await createNight(server.url, GROUP, "2026-06-12", [ADA]);
+    const got = await createNight(server.url, GROUP, NEW_NIGHT);
     assert.equal(method, "POST");
     assert.equal(path, `/groups/${GROUP}/nights`);
-    assert.deepEqual(JSON.parse(body), { scheduledFor: "2026-06-12", attendees: [ADA] });
+    assert.deepEqual(JSON.parse(body), { scheduledFor: "2026-06-12", attendees: [ADA], pickerId: ADA });
     assert.deepEqual(got, night);
   } finally {
     await server.close();
@@ -138,7 +139,7 @@ test("throws on a non-2xx response", async () => {
     res.end("nope");
   });
   try {
-    await assert.rejects(createNight(server.url, GROUP, "2026-06-12", []), /request failed: 422/);
+    await assert.rejects(createNight(server.url, GROUP, NEW_NIGHT), /request failed: 422/);
   } finally {
     await server.close();
   }
@@ -150,7 +151,7 @@ test("aborts the request when the signal fires", async () => {
   });
   try {
     const controller = new AbortController();
-    const pending = createNight(server.url, GROUP, "2026-06-12", [], controller.signal);
+    const pending = createNight(server.url, GROUP, NEW_NIGHT, controller.signal);
     controller.abort();
     await assert.rejects(pending, (err: Error) => err.name === "AbortError");
   } finally {
@@ -165,65 +166,20 @@ test("throws when the 2xx payload fails validation", async () => {
     res.end(JSON.stringify({ id: 42, scheduledFor: "2026-06-12", attendees: [] }));
   });
   try {
-    await assert.rejects(createNight(server.url, GROUP, "2026-06-12", []), /id/);
+    await assert.rejects(createNight(server.url, GROUP, NEW_NIGHT), /id/);
   } finally {
     await server.close();
   }
 });
 
-test("getCurrentNight fetches the open night and parses it", async () => {
-  let path = "";
-  let method = "";
-  const server = await startServer((req, res) => {
-    path = req.url ?? "";
-    method = req.method ?? "";
-    res.statusCode = 200;
+test("createNight surfaces the backend's message for a taken date (409)", async () => {
+  const server = await startServer((_req, res) => {
+    res.statusCode = 409;
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify(night));
+    res.end(JSON.stringify({ error: "there is already a night on that date" }));
   });
   try {
-    const got = await getCurrentNight(server.url, GROUP);
-    assert.equal(method, "GET");
-    assert.equal(path, `/groups/${GROUP}/nights/current`);
-    assert.deepEqual(got, night);
-  } finally {
-    await server.close();
-  }
-});
-
-test("getCurrentNight returns null when there is no open night (404)", async () => {
-  const server = await startServer((_req, res) => {
-    res.statusCode = 404;
-    res.end("no open night");
-  });
-  try {
-    assert.equal(await getCurrentNight(server.url, GROUP), null);
-  } finally {
-    await server.close();
-  }
-});
-
-test("getCurrentNight throws on a non-404 error response", async () => {
-  const server = await startServer((_req, res) => {
-    res.statusCode = 500;
-    res.end("boom");
-  });
-  try {
-    await assert.rejects(getCurrentNight(server.url, GROUP), /request failed: 500/);
-  } finally {
-    await server.close();
-  }
-});
-
-test("getCurrentNight aborts the request when the signal fires", async () => {
-  const server = await startServer((_req, res) => {
-    void res; // never respond, so only an abort can settle the promise
-  });
-  try {
-    const controller = new AbortController();
-    const pending = getCurrentNight(server.url, GROUP, controller.signal);
-    controller.abort();
-    await assert.rejects(pending, (err: Error) => err.name === "AbortError");
+    await assert.rejects(createNight(server.url, GROUP, NEW_NIGHT), /already a night on that date/);
   } finally {
     await server.close();
   }
@@ -233,7 +189,7 @@ test("recordNightPick posts the pickerId and parses the night", async () => {
   let path = "";
   let method = "";
   let body = "";
-  const nightWithPicker: Night = { ...night, pickerId: ADA };
+  const nightWithPicker: Night = { ...night, pickerId: "a0000000-0000-0000-0000-000000000002" };
   const server = await startServer(async (req, res) => {
     path = req.url ?? "";
     method = req.method ?? "";
@@ -243,10 +199,10 @@ test("recordNightPick posts the pickerId and parses the night", async () => {
     res.end(JSON.stringify(nightWithPicker));
   });
   try {
-    const got = await recordNightPick(server.url, GROUP, NIGHT, ADA);
+    const got = await recordNightPick(server.url, GROUP, NIGHT, nightWithPicker.pickerId);
     assert.equal(method, "POST");
     assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/pick`);
-    assert.deepEqual(JSON.parse(body), { pickerId: ADA });
+    assert.deepEqual(JSON.parse(body), { pickerId: nightWithPicker.pickerId });
     assert.deepEqual(got, nightWithPicker);
   } finally {
     await server.close();

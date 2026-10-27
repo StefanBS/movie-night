@@ -91,19 +91,19 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `POST` | `/groups/{groupId}/members/{userId}/reactivate` | Restore; re-seeds if it re-enters the rotation. |
 | `POST` | `/groups/{groupId}/members/{userId}/promote` | Guest → active core. |
 
-**Night lifecycle** — each returns the night `{"id","scheduledFor","pickerId","movie","attendees"}`.
+**Night lifecycle** ([ADR-0008](../docs/adr/0008-night-always-has-a-picker.md)) — each returns the night `{"id","scheduledFor","pickerId","movie","attendees"}`. Every night has a picker, who is always an attendee; at most one night per group per date.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/groups/{groupId}/nights` | Start or resume the group's one open night. Body `{"scheduledFor","attendees"}`. |
-| `GET` | `/groups/{groupId}/nights/current` | Latest night; `404` if none. |
+| `POST` | `/groups/{groupId}/nights` | Create a night with its picker; `201`. Body `{"scheduledFor","attendees","pickerId"}`; `422` if the picker isn't an attendee, `409` if the date is taken. |
+| `GET` | `/groups/{groupId}/nights` | Every night, past and upcoming, newest first. |
 | `GET` | `/groups/{groupId}/nights/{nightId}` | A night and its attendees. |
-| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Change the date. Body `{"scheduledFor"}`. |
+| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Change the date. Body `{"scheduledFor"}`; `409` if the date is taken. |
 | `DELETE` | `/groups/{groupId}/nights/{nightId}` | Cancel/delete the night; `204`. Idempotent. |
-| `GET` | `/groups/{groupId}/nights/{nightId}/turn` | Least-served ranking over the night's attendees. |
+| `GET` | `/groups/{groupId}/nights/{nightId}/turn` | Least-served ranking over the night's attendees, ignoring the night's own pick. |
 | `POST` | `/groups/{groupId}/nights/{nightId}/attendees` | Mark present. Body `{"userId"}`. |
-| `DELETE` | `/groups/{groupId}/nights/{nightId}/attendees/{userId}` | Remove an attendee; idempotent. |
-| `POST` | `/groups/{groupId}/nights/{nightId}/pick` | Set the picker (must be an attendee; guest picks don't move standings). Body `{"pickerId"}`. |
+| `DELETE` | `/groups/{groupId}/nights/{nightId}/attendees/{userId}` | Remove an attendee; idempotent. `409` for the picker — change the picker first. |
+| `POST` | `/groups/{groupId}/nights/{nightId}/pick` | Change the picker (must be an attendee; guest picks don't move standings). Body `{"pickerId"}`. |
 
 **Movies** ([ADR-0007](../docs/adr/0007-tmdb-proxy-source-of-truth.md)) — `503` when `TMDB_READ_TOKEN` is unset.
 

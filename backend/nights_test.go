@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -25,17 +26,22 @@ func TestNightCreateRequestValidation(t *testing.T) {
 	const b = "a0000000-0000-0000-0000-000000000002"
 
 	tests := []struct {
-		name      string
-		req       createNightRequest
-		wantErr   bool
-		wantCount int // attendee count when valid
+		name          string
+		req           createNightRequest
+		wantErr       bool
+		wantNotAttend bool // the error is errPickerNotAttendee (a 422, not a 400)
+		wantCount     int  // attendee count when valid
 	}{
-		{name: "valid with attendees", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a, b}}, wantCount: 2},
-		{name: "valid no attendees", req: createNightRequest{ScheduledFor: "2026-06-12"}, wantCount: 0},
-		{name: "dedupes attendees", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a, a, b}}, wantCount: 2},
-		{name: "bad date", req: createNightRequest{ScheduledFor: "12-06-2026"}, wantErr: true},
-		{name: "empty date", req: createNightRequest{ScheduledFor: ""}, wantErr: true},
-		{name: "bad attendee uuid", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{"nope"}}, wantErr: true},
+		{name: "valid", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a, b}, PickerID: a}, wantCount: 2},
+		{name: "picker alone", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{b}, PickerID: b}, wantCount: 1},
+		{name: "dedupes attendees", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a, a, b}, PickerID: b}, wantCount: 2},
+		{name: "bad date", req: createNightRequest{ScheduledFor: "12-06-2026", Attendees: []string{a}, PickerID: a}, wantErr: true},
+		{name: "empty date", req: createNightRequest{ScheduledFor: "", Attendees: []string{a}, PickerID: a}, wantErr: true},
+		{name: "bad attendee uuid", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{"nope"}, PickerID: a}, wantErr: true},
+		{name: "missing picker", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a}}, wantErr: true},
+		{name: "bad picker uuid", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a}, PickerID: "nope"}, wantErr: true},
+		{name: "picker not attending", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a}, PickerID: b}, wantErr: true, wantNotAttend: true},
+		{name: "no attendees", req: createNightRequest{ScheduledFor: "2026-06-12", PickerID: a}, wantErr: true, wantNotAttend: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -43,6 +49,9 @@ func TestNightCreateRequestValidation(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
+				}
+				if got := errors.Is(err, errPickerNotAttendee); got != tt.wantNotAttend {
+					t.Fatalf("errors.Is(err, errPickerNotAttendee) = %v, want %v (err %v)", got, tt.wantNotAttend, err)
 				}
 				return
 			}
@@ -52,8 +61,8 @@ func TestNightCreateRequestValidation(t *testing.T) {
 			if len(parsed.Attendees) != tt.wantCount {
 				t.Errorf("attendee count = %d, want %d", len(parsed.Attendees), tt.wantCount)
 			}
-			if parsed.Attendees == nil {
-				t.Errorf("Attendees must be non-nil even when empty")
+			if parsed.Picker.String() != tt.req.PickerID {
+				t.Errorf("Picker = %s, want %s", parsed.Picker, tt.req.PickerID)
 			}
 			if !parsed.ScheduledFor.Valid || parsed.ScheduledFor.Time.Format("2006-01-02") != "2026-06-12" {
 				t.Errorf("ScheduledFor = %+v, want valid 2026-06-12", parsed.ScheduledFor)
@@ -141,16 +150,11 @@ func TestToNightResponse(t *testing.T) {
 		}
 	})
 
-	t.Run("pickerId is null when unset and the uuid when set", func(t *testing.T) {
-		open := toNightResponse(mkPick(), nil, nil)
-		if open.PickerID != nil {
-			t.Errorf("open night PickerID = %v, want nil", open.PickerID)
-		}
+	t.Run("pickerId is the picker's uuid", func(t *testing.T) {
 		p := mkPick()
-		p.PickerID = pgtype.UUID{Bytes: ada, Valid: true}
-		got := toNightResponse(p, nil, nil)
-		if got.PickerID == nil || *got.PickerID != ada.String() {
-			t.Errorf("finalized PickerID = %v, want %s", got.PickerID, ada)
+		p.PickerID = ada
+		if got := toNightResponse(p, nil, nil); got.PickerID != ada.String() {
+			t.Errorf("PickerID = %q, want %s", got.PickerID, ada)
 		}
 	})
 
@@ -211,7 +215,7 @@ func TestCreditedForRole(t *testing.T) {
 }
 
 func TestMovieDTOFromCols(t *testing.T) {
-	base := db.ListRecordedNightsRow{
+	base := db.ListNightsRow{
 		ID:           uuid.MustParse("b0000000-0000-0000-0000-0000000000aa"),
 		ScheduledFor: pgtype.Date{Time: mustDate(t, "2026-05-01"), Valid: true},
 	}
@@ -264,17 +268,17 @@ func TestToNightResponses(t *testing.T) {
 	n1 := uuid.MustParse("b0000000-0000-0000-0000-0000000000aa") // newest, has movie + attendees
 	n2 := uuid.MustParse("b0000000-0000-0000-0000-0000000000bb") // older, no movie, no attendees
 	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
-	rows := []db.ListRecordedNightsRow{
+	rows := []db.ListNightsRow{
 		{
 			ID:           n1,
-			PickerID:     pgtype.UUID{Bytes: ada, Valid: true},
+			PickerID:     ada,
 			ScheduledFor: pgtype.Date{Time: mustDate(t, "2026-06-01"), Valid: true},
 			MovieTmdbID:  pgtype.Int4{Int32: 27205, Valid: true},
 			MovieTitle:   pgtype.Text{String: "Inception", Valid: true},
 		},
 		{
 			ID:           n2,
-			PickerID:     pgtype.UUID{Bytes: ada, Valid: true},
+			PickerID:     ada,
 			ScheduledFor: pgtype.Date{Time: mustDate(t, "2026-05-01"), Valid: true},
 		},
 	}
