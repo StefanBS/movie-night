@@ -49,6 +49,11 @@ func main() {
 		log.Print("TMDB configured")
 	}
 
+	// Reminders (ADR-0010) go out from this process every minute until shutdown.
+	// EXPO_ACCESS_TOKEN is only needed once push security is enabled for the
+	// project in EAS.
+	go runReminders(ctx, queries, newExpoPusher(os.Getenv("EXPO_ACCESS_TOKEN")), time.Minute)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		// uuid.Nil: this route is not group-scoped (see logScope).

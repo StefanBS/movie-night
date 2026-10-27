@@ -48,3 +48,20 @@ export const pushDevice: PushDevice = {
     return Intl.DateTimeFormat().resolvedOptions().timeZone;
   },
 };
+
+// showRemindersInForeground makes a reminder that arrives while the app is open
+// show as a normal banner, as it would with the app closed. Without a handler,
+// expo-notifications shows nothing in the foreground.
+export function showRemindersInForeground() {
+  if (Platform.OS === "web") {
+    return;
+  }
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
