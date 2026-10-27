@@ -1,15 +1,38 @@
 # osv-scanner ignore list. Entries self-expire: once `ignoreUntil` passes, the
 # vuln re-surfaces and CI fails again, forcing a re-review. osv-scanner also
 # reports an ignore as "unused" once the upstream fix lands, signalling it can be
-# deleted. Re-review both when bumping the Expo SDK (next chance to drop them).
+# deleted. Re-review both when bumping the Expo SDK. Prefer a same-major `overrides` pin in
+# package.json; ignore only what has no compatible fix.
 
 [[IgnoredVulns]]
-id = "GHSA-w5hq-g745-h8pq"
-ignoreUntil = 2026-09-01T00:00:00Z
-# uuid@7.0.3 — pulled transitively by expo > @expo/config-plugins > xcode.
-# Build-time only (iOS prebuild project generation); never in the JS bundle that
-# runs on-device, so the insecure-randomness issue is not reachable in our app.
-# Fix is uuid 7 -> 11 (major API change) which would break xcode@3.0.1; still
-# present on Expo SDK 57 (expo > @expo/config-plugins > xcode). Re-review when the
-# advisory is fixed upstream or this dependency path changes.
-reason = "transitive build-time xcode dep (Expo SDK 57), not runtime-reachable; re-review on upstream fix or path change"
+id = "GHSA-vcc3-ghjq-m6fr"
+ignoreUntil = 2027-01-31T00:00:00Z
+# decode-uri-component@0.2.2 — expo-router > query-string@7. Runtime-reachable
+# (route/query parsing), but impact is a hang on malformed percent-encoding in a
+# URL handed to our own app. Fix is 0.5.0, which is ESM-only: query-string@7
+# `require()`s it as a function, so an override breaks routing. Still present on
+# expo-router 58. Mitigated on native: app/+native-intent.tsx drops incoming
+# links with malformed percent-encoding or over 2KB (lib/deepLink.ts).
+reason = "fix (0.5.0) is ESM-only and breaks query-string@7; native deep links guarded by lib/deepLink.ts"
+
+[[IgnoredVulns]]
+id = "GHSA-5p2g-fcmc-qvqq"
+ignoreUntil = 2027-01-31T00:00:00Z
+# image-size@1.2.1 — react-native > metro. Build-time only (Metro sizes our own
+# bundled assets); never runs on-device. Fix is the 2.x major, which Metro 0.84
+# doesn't support.
+reason = "metro build-time dep, parses only our own assets; fix is a breaking major"
+
+[[IgnoredVulns]]
+id = "GHSA-w3rx-r6r6-pgpr"
+ignoreUntil = 2027-01-31T00:00:00Z
+# image-size@1.2.1 — same path and rationale as GHSA-5p2g-fcmc-qvqq.
+reason = "metro build-time dep, parses only our own assets; fix is a breaking major"
+
+[[IgnoredVulns]]
+id = "GHSA-mrhx-c7xc-m3w5"
+ignoreUntil = 2027-01-31T00:00:00Z
+# zod@3.25.76 — expo > @expo/cli. Dev CLI only (validates local config); not in
+# the app bundle. Fixed only in zod 4.6.6, and @expo/cli (57 and 58) needs zod 3.
+# The zod@4 copy under eslint-plugin-react-hooks is fixed via `overrides`.
+reason = "@expo/cli dev-time dep on zod 3; no zod 3 fix exists"
