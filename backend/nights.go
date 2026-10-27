@@ -485,7 +485,9 @@ func currentNightHandler(store nightStore) http.HandlerFunc {
 
 // nightTurnHandler serves GET /groups/{groupId}/nights/{nightId}/turn — the core
 // pick order over the night's attendees. Reuses RankGroupTurn with the attendee
-// IDs as a non-nil present set (empty present = rank nobody).
+// IDs as a non-nil present set (empty present = rank nobody), excluding this
+// night's own pick so recording (or re-recording) its picker never reshuffles
+// the order the picker was chosen from.
 func nightTurnHandler(store nightStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
@@ -501,7 +503,11 @@ func nightTurnHandler(store nightStore) http.HandlerFunc {
 			internalError(w, gid, "list night attendees", err)
 			return
 		}
-		ranked, err := store.RankGroupTurn(ctx, db.RankGroupTurnParams{GroupID: gid, Present: presentIDs(rows)})
+		ranked, err := store.RankGroupTurn(ctx, db.RankGroupTurnParams{
+			GroupID:      gid,
+			ExcludeNight: pgtype.UUID{Bytes: nightID, Valid: true},
+			Present:      presentIDs(rows),
+		})
 		if err != nil {
 			internalError(w, gid, "rank group turn", err)
 			return

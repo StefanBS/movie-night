@@ -22,6 +22,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/attendees", addAttendeeHandler(q))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/attendees/{userId}", removeAttendeeHandler(q))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(q))
+	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
 
 	do := func(t *testing.T, method, path, body string) (int, []byte) {
 		t.Helper()
@@ -43,6 +44,17 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		code, got := doJSON[[]turnResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+nightID+"/turn", "")
 		if code != http.StatusOK {
 			t.Fatalf("turn status = %d, want 200", code)
+		}
+		return got
+	}
+
+	// groupTurn is the group-wide ranking (home rotation), which — unlike a
+	// night's order — counts every credited pick, so standings show up here.
+	groupTurn := func(t *testing.T) []turnResponse {
+		t.Helper()
+		code, got := doJSON[[]turnResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/turn", "")
+		if code != http.StatusOK {
+			t.Fatalf("group turn status = %d, want 200", code)
 		}
 		return got
 	}
@@ -172,6 +184,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	})
 
 	t.Run("recording a core picker finalizes the night and credits them", func(t *testing.T) {
+		clearAllPicks(t, pool, seededGroup)
 		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+blake+`"]}`)
 		got := recordPick(t, n.ID, ada)
 		if got.PickerID == nil || *got.PickerID != ada {
@@ -180,8 +193,42 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, ""); code != http.StatusOK {
 			t.Errorf("detail of finalized night = %d, want 200", code)
 		}
+		if order := names(groupTurn(t)); len(order) != 3 || order[0] != "Blake" || order[2] != "Ada" {
+			t.Fatalf("post-pick group order = %v, want Blake first and Ada last (Ada credited)", order)
+		}
+	})
+
+	t.Run("a night's order ignores its own pick", func(t *testing.T) {
+		clearAllPicks(t, pool, seededGroup)
+		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+blake+`"]}`)
+		ranked := turn(t, n.ID)
+		before := names(ranked)
+		recordPick(t, n.ID, ranked[0].ID)
+		// Re-ranking this night must not count the pick just recorded on it, or
+		// its picker would sink and a re-advance would hand the pick to someone else.
+		if after := names(turn(t, n.ID)); len(after) != 2 || after[0] != before[0] || after[1] != before[1] {
+			t.Fatalf("order after recording %s = %v, want unchanged %v", before[0], after, before)
+		}
+	})
+
+	t.Run("a night's order still counts other nights' picks", func(t *testing.T) {
+		clearAllPicks(t, pool, seededGroup)
+		earlier := createNight(t, `{"scheduledFor":"2026-06-05","attendees":["`+ada+`","`+blake+`"]}`)
+		recordPick(t, earlier.ID, ada)
+		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+blake+`"]}`)
 		if order := names(turn(t, n.ID)); len(order) != 2 || order[0] != "Blake" {
-			t.Fatalf("post-pick order = %v, want Blake first (Ada credited)", order)
+			t.Fatalf("order = %v, want Blake first (Ada credited on an earlier night)", order)
+		}
+	})
+
+	t.Run("a pick on an upcoming night counts toward standings immediately", func(t *testing.T) {
+		clearAllPicks(t, pool, seededGroup)
+		// Later subtests resume the latest-dated night, so don't leave this one behind.
+		t.Cleanup(func() { clearAllPicks(t, pool, seededGroup) })
+		n := createNight(t, `{"scheduledFor":"2099-01-02","attendees":["`+ada+`"]}`)
+		recordPick(t, n.ID, ada)
+		if order := names(groupTurn(t)); len(order) != 3 || order[2] != "Ada" {
+			t.Fatalf("group order = %v, want Ada last (planning ahead claims the turn)", order)
 		}
 	})
 
@@ -256,13 +303,13 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	t.Run("re-recording a different attendee re-attributes standings (correction)", func(t *testing.T) {
 		clearAllPicks(t, pool, seededGroup)
 		n := createNight(t, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`","`+blake+`"]}`)
-		recordPick(t, n.ID, ada) // Ada credited → Blake leads
-		if order := names(turn(t, n.ID)); order[0] != "Blake" {
-			t.Fatalf("after recording Ada, order = %v, want Blake first", order)
+		recordPick(t, n.ID, ada) // Ada credited → Blake, Cleo lead the group
+		if order := names(groupTurn(t)); order[2] != "Ada" {
+			t.Fatalf("after recording Ada, group order = %v, want Ada last", order)
 		}
-		recordPick(t, n.ID, blake) // correction: now Blake credited → Ada leads
-		if order := names(turn(t, n.ID)); order[0] != "Ada" {
-			t.Fatalf("after correcting to Blake, order = %v, want Ada first", order)
+		recordPick(t, n.ID, blake) // correction: now Blake credited instead
+		if order := names(groupTurn(t)); order[0] != "Ada" || order[2] != "Blake" {
+			t.Fatalf("after correcting to Blake, group order = %v, want Ada first and Blake last", order)
 		}
 	})
 
