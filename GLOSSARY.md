@@ -53,6 +53,10 @@ A Night dated today.
 A Night dated before today. A past Night with no film still counts.
 _Avoid_: recorded night, done night
 
+**Calendar entry**:
+A one-off copy of a Night placed in a person's own device calendar. It does not follow later changes to the Night.
+_Avoid_: event, calendar sync
+
 ## Rotation
 
 **Credited pick**:

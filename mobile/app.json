@@ -17,7 +17,11 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.drowsily1482.mobile"
+      "package": "com.drowsily1482.mobile",
+      "blockedPermissions": [
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -37,6 +41,13 @@
         {
           "color": "#F68B36",
           "defaultChannel": "reminders"
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Movie Night adds nights you choose to your calendar.",
+          "remindersPermission": false
         }
       ]
     ],

@@ -1,8 +1,8 @@
 import { type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { BellRing, Check, Moon, Sunrise } from "lucide-react-native";
 
-import { AppButton, SectionLabel, TabScrollView, Toggle, TopBar } from "../";
+import { AppButton, SectionLabel, Toggle, TopBar } from "../";
 import { WizardFooter } from "./WizardFooter";
 import type { ReminderAudience, Reminders } from "../../lib/reminders";
 import {
@@ -38,7 +38,7 @@ export function RemindersView({
     <View style={styles.screen}>
       <TopBar kind="title" title="Reminders" back={{ label: "Edit", onPress: onDone }} />
       <View style={styles.flex}>
-        <TabScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.intro}>
             A gentle nudge so nobody forgets — and the picker comes with a film in mind.
           </Text>
@@ -97,7 +97,7 @@ export function RemindersView({
               reminders are off for everyone else.
             </Text>
           </View>
-        </TabScrollView>
+        </ScrollView>
         <WizardFooter>
           <AppButton title="Done" fullWidth onPress={onDone} />
         </WizardFooter>
