@@ -96,6 +96,48 @@ func (ns NullMembershipStatus) Value() (driver.Value, error) {
 	return string(ns.MembershipStatus), nil
 }
 
+type ReminderAudience string
+
+const (
+	ReminderAudienceEveryone ReminderAudience = "everyone"
+	ReminderAudiencePicker   ReminderAudience = "picker"
+)
+
+func (e *ReminderAudience) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ReminderAudience(s)
+	case string:
+		*e = ReminderAudience(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ReminderAudience: %T", src)
+	}
+	return nil
+}
+
+type NullReminderAudience struct {
+	ReminderAudience ReminderAudience `json:"reminder_audience"`
+	Valid            bool             `json:"valid"` // Valid is true if ReminderAudience is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullReminderAudience) Scan(value interface{}) error {
+	if value == nil {
+		ns.ReminderAudience, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ReminderAudience.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullReminderAudience) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ReminderAudience), nil
+}
+
 type Attendance struct {
 	ID     uuid.UUID `json:"id"`
 	PickID uuid.UUID `json:"pick_id"`
@@ -138,13 +180,16 @@ type Movie struct {
 }
 
 type Pick struct {
-	ID           uuid.UUID          `json:"id"`
-	GroupID      uuid.UUID          `json:"group_id"`
-	PickerID     uuid.UUID          `json:"picker_id"`
-	IsCredited   bool               `json:"is_credited"`
-	ScheduledFor pgtype.Date        `json:"scheduled_for"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	MovieID      pgtype.UUID        `json:"movie_id"`
+	ID                uuid.UUID          `json:"id"`
+	GroupID           uuid.UUID          `json:"group_id"`
+	PickerID          uuid.UUID          `json:"picker_id"`
+	IsCredited        bool               `json:"is_credited"`
+	ScheduledFor      pgtype.Date        `json:"scheduled_for"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	MovieID           pgtype.UUID        `json:"movie_id"`
+	RemindNightBefore bool               `json:"remind_night_before"`
+	RemindMorningOf   bool               `json:"remind_morning_of"`
+	RemindAudience    ReminderAudience   `json:"remind_audience"`
 }
 
 type User struct {

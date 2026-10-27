@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import { parseNight, parseNights } from "./nights";
 
+const reminders = { nightBefore: true, morningOf: true, audience: "everyone" };
+
 const valid = {
   id: "n1",
   scheduledFor: "2026-06-12",
@@ -12,6 +14,7 @@ const valid = {
     { id: "u1", name: "Ada", role: "core" },
     { id: "u6", name: "Frankie", role: "guest" },
   ],
+  reminders,
 };
 
 test("parses a valid night with attendees", () => {
@@ -23,7 +26,7 @@ test("parses a valid night with attendees", () => {
 });
 
 test("parses a night with no attendees", () => {
-  const n = parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId: "u1", attendees: [] });
+  const n = parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId: "u1", attendees: [], reminders });
   assert.deepEqual(n.attendees, []);
 });
 
@@ -56,6 +59,7 @@ test("parseNight reads a set pickerId", () => {
     scheduledFor: "2026-06-12",
     pickerId: "u1",
     attendees: [],
+    reminders,
   });
   assert.equal(n.pickerId, "u1");
 });
@@ -86,8 +90,13 @@ test("parseNight rejects a bad movie shape", () => {
   assert.throws(() => parseNight({ ...valid, movie: { tmdbId: "x", title: "Dune" } }), /tmdbId/);
 });
 
+test("parseNight reads the reminder settings and rejects missing ones", () => {
+  assert.deepEqual(parseNight(valid).reminders, reminders);
+  assert.throws(() => parseNight({ ...valid, reminders: undefined }), /reminders/);
+});
+
 test("parseNights parses an array of nights", () => {
-  const ns = parseNights([valid, { id: "n2", scheduledFor: "2026-07-01", pickerId: "u2", attendees: [] }]);
+  const ns = parseNights([valid, { id: "n2", scheduledFor: "2026-07-01", pickerId: "u2", attendees: [], reminders }]);
   assert.equal(ns.length, 2);
   assert.equal(ns[0].id, "n1");
   assert.equal(ns[1].id, "n2");

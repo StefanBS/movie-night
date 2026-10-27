@@ -8,7 +8,15 @@ const TODAY = "2026-06-22";
 const aMovie = { tmdbId: 1, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg" };
 
 function night(id: string, scheduledFor: string, opts: Partial<Night> = {}): Night {
-  return { id, scheduledFor, pickerId: "u1", movie: null, attendees: [], ...opts };
+  return {
+    id,
+    scheduledFor,
+    pickerId: "u1",
+    movie: null,
+    attendees: [],
+    reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
+    ...opts,
+  };
 }
 
 const ids = (ns: Night[]) => ns.map((n) => n.id);

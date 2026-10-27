@@ -80,6 +80,7 @@ func TestUpdateNightRequestValidation(t *testing.T) {
 	)
 	date := func(s string) *string { return &s }
 	ids := func(s ...string) *[]string { return &s }
+	on, everyone := true, "everyone"
 	tests := []struct {
 		name          string
 		req           updateNightRequest
@@ -92,6 +93,8 @@ func TestUpdateNightRequestValidation(t *testing.T) {
 		{name: "both", req: updateNightRequest{ScheduledFor: date("2026-07-04"), Attendees: ids(a)}, wantDate: "2026-07-04", wantAttendees: 1},
 		{name: "dedupes attendees", req: updateNightRequest{Attendees: ids(a, a, b)}, wantAttendees: 2},
 		{name: "empty attendees is a replacement, not unchanged", req: updateNightRequest{Attendees: ids()}, wantAttendees: 0},
+		{name: "reminders only", req: updateNightRequest{Reminders: &remindersRequest{NightBefore: &on, MorningOf: &on, Audience: &everyone}}, wantAttendees: -1},
+		{name: "invalid reminders", req: updateNightRequest{Reminders: &remindersRequest{NightBefore: &on}}, wantErr: true},
 		{name: "nothing to update", req: updateNightRequest{}, wantErr: true},
 		{name: "bad date", req: updateNightRequest{ScheduledFor: date("nope")}, wantErr: true},
 		{name: "empty date", req: updateNightRequest{ScheduledFor: date("")}, wantErr: true},
@@ -120,6 +123,43 @@ func TestUpdateNightRequestValidation(t *testing.T) {
 				t.Errorf("attendees = %v, want unchanged (nil)", got.Attendees)
 			case tt.wantAttendees >= 0 && (got.Attendees == nil || len(got.Attendees) != tt.wantAttendees):
 				t.Errorf("attendees = %v, want %d (non-nil)", got.Attendees, tt.wantAttendees)
+			}
+		})
+	}
+}
+
+func TestParseReminders(t *testing.T) {
+	yes, no := true, false
+	str := func(s string) *string { return &s }
+	tests := []struct {
+		name    string
+		req     remindersRequest
+		want    nightReminders
+		wantErr bool
+	}{
+		{name: "everyone", req: remindersRequest{NightBefore: &yes, MorningOf: &no, Audience: str("everyone")},
+			want: nightReminders{NightBefore: true, MorningOf: false, Audience: db.ReminderAudienceEveryone}},
+		{name: "just the picker, all slots off", req: remindersRequest{NightBefore: &no, MorningOf: &no, Audience: str("picker")},
+			want: nightReminders{Audience: db.ReminderAudiencePicker}},
+		{name: "unknown audience", req: remindersRequest{NightBefore: &yes, MorningOf: &yes, Audience: str("all")}, wantErr: true},
+		{name: "missing nightBefore", req: remindersRequest{MorningOf: &yes, Audience: str("everyone")}, wantErr: true},
+		{name: "missing morningOf", req: remindersRequest{NightBefore: &yes, Audience: str("everyone")}, wantErr: true},
+		{name: "missing audience", req: remindersRequest{NightBefore: &yes, MorningOf: &yes}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseReminders(tt.req)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got %+v", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("got %+v, want %+v", got, tt.want)
 			}
 		})
 	}
@@ -176,6 +216,17 @@ func TestToNightResponse(t *testing.T) {
 		n.PickerID = ada
 		if got := toNightResponse(n, nil); got.PickerID != ada.String() {
 			t.Errorf("PickerID = %q, want %s", got.PickerID, ada)
+		}
+	})
+
+	t.Run("reminders carry the night's settings", func(t *testing.T) {
+		n := mkNight()
+		n.RemindNightBefore = true
+		n.RemindAudience = db.ReminderAudiencePicker
+		got := toNightResponse(n, nil).Reminders
+		want := remindersDTO{NightBefore: true, MorningOf: false, Audience: "picker"}
+		if got != want {
+			t.Errorf("Reminders = %+v, want %+v", got, want)
 		}
 	})
 

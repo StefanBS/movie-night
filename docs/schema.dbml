@@ -32,6 +32,11 @@ Enum membership_status {
   inactive [note: 'Left the rotation; history retained, not a candidate (ADR-0006)']
 }
 
+Enum reminder_audience {
+  everyone [note: 'Every attendee gets the Night\'s reminders']
+  picker   [note: 'Only the picker gets the Night\'s reminders (their nudge goes out regardless)']
+}
+
 // ---------------------------------------------------------------------------
 // People & groups
 // ---------------------------------------------------------------------------
@@ -105,6 +110,9 @@ Table picks {
   is_credited   boolean      [not null, default: true, note: 'TRUE only for normal core picks; guest/free picks are FALSE so they never affect standings (ADR-0006)']
   scheduled_for date         [not null]
   created_at    timestamptz  [not null, default: `now()`]
+  remind_night_before boolean           [not null, default: true, note: 'Reminder at 6 PM the night before, on each recipient\'s clock (ADR-0010)']
+  remind_morning_of   boolean           [not null, default: true, note: 'Reminder at 9 AM on the day (ADR-0010)']
+  remind_audience     reminder_audience [not null, default: 'everyone', note: 'Who the reminders go to; the picker\'s nudge goes out regardless']
 
   Indexes {
     (group_id, scheduled_for) [unique, name: 'uq_night_per_group_date', note: 'At most one night per group per date']

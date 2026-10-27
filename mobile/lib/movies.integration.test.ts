@@ -83,6 +83,7 @@ test("attachMovie posts the tmdbId and returns the night with its movie", async 
     id: NIGHT,
     scheduledFor: "2026-06-12",
     pickerId: "u1",
+    reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
     movie: { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg" },
     attendees: [],
   };

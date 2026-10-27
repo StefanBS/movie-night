@@ -1,5 +1,6 @@
 import { requestJson, requestJsonOrNull, requestNoContent } from "./http";
 import { parseMovie, type Movie } from "./movies";
+import { parseReminders, type Reminders } from "./reminders";
 import { parseTurn, type TurnMember } from "./turn";
 
 export type Attendee = {
@@ -16,6 +17,7 @@ export type Night = {
   pickerId: string;
   movie: Movie | null;
   attendees: Attendee[];
+  reminders: Reminders;
 };
 
 function parseAttendee(raw: unknown, index: number): Attendee {
@@ -41,7 +43,7 @@ export function parseNight(raw: unknown): Night {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("expected a night object");
   }
-  const { id, scheduledFor, pickerId, movie, attendees } = raw as Record<string, unknown>;
+  const { id, scheduledFor, pickerId, movie, attendees, reminders } = raw as Record<string, unknown>;
   if (typeof id !== "string") {
     throw new Error("night: id must be a string");
   }
@@ -61,6 +63,7 @@ export function parseNight(raw: unknown): Night {
     pickerId,
     movie: parsedMovie,
     attendees: attendees.map(parseAttendee),
+    reminders: parseReminders(reminders),
   };
 }
 
@@ -180,14 +183,15 @@ export function detachMovie(
   });
 }
 
-// NightChanges is a saved Night's date and its whole attendee set, which must
-// still include the picker.
+// NightChanges is a saved Night's date, its whole attendee set (which must
+// still include the picker) and its reminder settings.
 export type NightChanges = {
   scheduledFor: string;
   attendees: string[];
+  reminders: Reminders;
 };
 
-// updateNight saves a Night's date and attendees in one request that either
+// updateNight saves a Night's date, attendees and reminders in one request that either
 // fully applies or changes nothing. The backend rejects dropping the picker or
 // a non-member (422) and a date that already has a Night (409).
 export function updateNight(
