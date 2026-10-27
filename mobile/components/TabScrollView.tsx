@@ -3,7 +3,8 @@ import { useBottomTabBarHeight } from "expo-router/js-tabs";
 
 import { space } from "../theme";
 
-// TabScrollView is the scroll container for the tab screens. The tab bar is
+// TabScrollView is the scroll container for the tab screens only: outside the
+// tab navigator the bar height is unavailable and it throws. The tab bar is
 // absolutely positioned and overlays content, so the last row would be hidden;
 // this reads the live bar height (reported by SpotlightTabBar in (tabs)/_layout)
 // and pads the scroll content clear of it. Callers pass their own

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Calendar as CalendarIcon, ChevronRight } from "lucide-react-native";
 
 import {
@@ -9,7 +9,6 @@ import {
   Calendar,
   SectionLabel,
   SettingsRow,
-  TabScrollView,
   TopBar,
   useToast,
 } from "../";
@@ -118,7 +117,7 @@ export function EditNightScreen({
           back={{ label: "Edit night", onPress: () => setMode("main") }}
         />
         <View style={styles.flex}>
-          <TabScrollView contentContainerStyle={styles.dateContent}>
+          <ScrollView contentContainerStyle={styles.dateContent}>
             <View style={styles.calendarCard}>
               <Calendar
                 value={date}
@@ -129,7 +128,7 @@ export function EditNightScreen({
                 onMonth={(dir) => setMonth((m) => shiftMonth(m, dir))}
               />
             </View>
-          </TabScrollView>
+          </ScrollView>
           <WizardFooter>
             <AppButton
               title="Done"
@@ -146,7 +145,7 @@ export function EditNightScreen({
     <View style={styles.screen}>
       <TopBar kind="title" title="Edit night" back={{ label: "Up next", onPress: onBack }} />
       <View style={styles.flex}>
-        <TabScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={styles.content}>
           {actionError !== null ? (
             <Text style={styles.error}>{actionError}</Text>
           ) : null}
@@ -227,7 +226,7 @@ export function EditNightScreen({
               );
             })}
           </View>
-        </TabScrollView>
+        </ScrollView>
 
         <WizardFooter>
           <AppButton
