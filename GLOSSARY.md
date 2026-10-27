@@ -22,6 +22,10 @@ _Avoid_: visitor, plus-one
 One dated movie-night occasion of a group. Every Night has a picker; a plan without a picker is not yet a Night.
 _Avoid_: event, session, open night, pick (for the occasion itself)
 
+**Plan**:
+A Night being arranged (date and attendees) that doesn't exist yet; it becomes a Night once it's saved with a picker.
+_Avoid_: draft, open night
+
 **Attendee**:
 A person present at a Night. The picker is always an attendee.
 _Avoid_: participant

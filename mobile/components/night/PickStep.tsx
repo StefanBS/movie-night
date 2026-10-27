@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton, Avatar, Badge, Input, Poster, SectionLabel } from "../";
@@ -11,40 +12,42 @@ import { borderWidth, colors, fontFamily, fontSize, pressedOpacity, radius, shad
 
 // PickStep — the picker spotlight (with a correction reveal over present
 // attendees), then film search. Selecting a result attaches the movie and
-// advances; selection is the action, so this step has no footer CTA.
+// advances; selection is the action, so this step has no footer CTA. The search
+// text and the reveal are view-only state, so they live here; everything that
+// touches the server comes from the editor (lib/nightEditor).
 export function PickStep({
   night,
   members,
   busy,
   future = false,
-  changingPicker,
-  setChangingPicker,
-  movieQuery,
-  setMovieQuery,
   results,
   searching,
   searchError,
   onSearch,
   onAttach,
-  onRecordPicker,
+  onChangePicker,
   onSkip,
 }: {
   night: Night;
   members: Member[];
   busy: string | null;
   future?: boolean;
-  changingPicker: boolean;
-  setChangingPicker: (v: boolean) => void;
-  movieQuery: string;
-  setMovieQuery: (v: string) => void;
   results: Movie[];
   searching: boolean;
   searchError: string | null;
-  onSearch: () => void;
+  onSearch: (query: string) => void;
   onAttach: (tmdbId: number) => void;
-  onRecordPicker: (memberId: string) => void;
+  onChangePicker: (memberId: string) => Promise<Night | null>;
   onSkip?: () => void;
 }) {
+  const [movieQuery, setMovieQuery] = useState("");
+  const [changingPicker, setChangingPicker] = useState(false);
+  const choosePicker = async (memberId: string) => {
+    if ((await onChangePicker(memberId)) !== null) {
+      setChangingPicker(false);
+    }
+  };
+  const search = () => onSearch(movieQuery);
   const pickerName = members.find((m) => m.id === night.pickerId)?.name ?? "";
   return (
     <View style={styles.flex}>
@@ -77,7 +80,7 @@ export function PickStep({
           ? night.attendees.map((a) => (
               <Pressable
                 key={a.id}
-                onPress={() => onRecordPicker(a.id)}
+                onPress={() => void choosePicker(a.id)}
                 disabled={busy !== null}
                 style={({ pressed }) => [styles.chooseRow, pressed && styles.rowPressed]}
               >
@@ -99,9 +102,9 @@ export function PickStep({
           value={movieQuery}
           onChangeText={setMovieQuery}
           placeholder="Search a film title…"
-          onSubmitEditing={onSearch}
+          onSubmitEditing={search}
           addonLabel="Search"
-          onAddonPress={onSearch}
+          onAddonPress={search}
         />
         {searchError !== null ? (
           <Text style={[styles.hint, styles.error]}>{searchError}</Text>

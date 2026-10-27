@@ -1,8 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -13,129 +9,52 @@ import { useRouter } from "expo-router";
 
 import { TopBar } from "../../components";
 import { WhenStep, WhoStep, ExistingNightEditor } from "../../components/night";
+import { useSession } from "../../components/useSession";
 import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
 import { todayLocalISO } from "../../lib/date";
-import { errorMessage } from "../../lib/errors";
-import { fetchMembers, type Member } from "../../lib/members";
-import { createNight, listNights, type Night } from "../../lib/nights";
-import { draftPicker } from "../../lib/nightDraft";
-import { nightDates } from "../../lib/nightLifecycle";
-import { fetchTurnAmong, type TurnMember } from "../../lib/turn";
+import type { Member } from "../../lib/members";
+import { createNightPlan } from "../../lib/nightPlan";
+import type { Night } from "../../lib/nights";
 import {
   colors,
   textPresets,
   space,
 } from "../../theme";
 
-// NightScreen plans a new Night: When → Who as a client-side draft, then one
-// create with the date, attendees and picker (ADR-0008). Nothing is saved until
-// "Next", so backing out leaves nothing behind. Once created, the Night opens
-// on its film step.
+// NightScreen renders the Plan module (lib/nightPlan) — When, then Who — and,
+// once the Plan is saved as a Night, hands that Night to the editor on its
+// film step. Nothing is saved before "Next", so backing out leaves nothing.
 export default function NightScreen() {
   const router = useRouter();
-  const today = todayLocalISO();
-  const [members, setMembers] = useState<Member[]>([]);
-  const [nightDatesSet, setNightDatesSet] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [step, setStep] = useState<"when" | "who">("when");
-  const [date, setDate] = useState(today);
-  const [attendeeIds, setAttendeeIds] = useState<Set<string>>(new Set());
-  const [chosenPicker, setChosenPicker] = useState<string | null>(null);
-  const [order, setOrder] = useState<TurnMember[]>([]);
+  const [today] = useState(todayLocalISO);
+  const [plan, state] = useSession(() =>
+    createNightPlan({ baseUrl: API_URL, groupId: GROUP_ID, today }),
+  );
   const [created, setCreated] = useState<Night | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        const [roster, allNights] = await Promise.all([
-          fetchMembers(API_URL, GROUP_ID, controller.signal),
-          listNights(API_URL, GROUP_ID, controller.signal).catch(() => [] as Night[]),
-        ]);
-        setMembers(roster);
-        setNightDatesSet(nightDates(allNights));
-      } catch (e) {
-        if (!controller.signal.aborted) {
-          setError(errorMessage(e, "failed to load the club"));
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, []);
+    void plan.load();
+  }, [plan]);
 
-  // The live order over the draft's attendees; re-ranked on every toggle, with
-  // the previous request cancelled so a slow response can't overwrite a newer one.
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        setOrder(await fetchTurnAmong(API_URL, GROUP_ID, [...attendeeIds], controller.signal));
-      } catch (e) {
-        if (!controller.signal.aborted) {
-          setActionError(errorMessage(e, "failed to load pick order"));
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, [attendeeIds]);
-
-  const pickerId = draftPicker(order, attendeeIds, chosenPicker);
-
-  const onToggle = useCallback((member: Member) => {
-    setAttendeeIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(member.id)) {
-        next.delete(member.id);
-      } else {
-        next.add(member.id);
-      }
-      return next;
-    });
-    // Removing the chosen picker hands the pick back to the order.
-    setChosenPicker((chosen) => (chosen === member.id ? null : chosen));
-  }, []);
-
-  const onCreate = useCallback(async () => {
-    if (busy !== null || pickerId === null) {
-      return;
+  const onCreate = async () => {
+    const night = await plan.create();
+    if (night !== null) {
+      setCreated(night);
     }
-    setBusy("create");
-    setActionError(null);
-    try {
-      setCreated(
-        await createNight(API_URL, GROUP_ID, {
-          scheduledFor: date,
-          attendees: [...attendeeIds],
-          pickerId,
-        }),
-      );
-    } catch (e) {
-      setActionError(errorMessage(e, "failed to create night"));
-    } finally {
-      setBusy(null);
-    }
-  }, [busy, pickerId, date, attendeeIds]);
+  };
 
-  if (loading) {
+  if (state.loading) {
     return (
       <View style={styles.screen}>
         <ActivityIndicator style={styles.center} size="large" color={colors.accent.base} />
       </View>
     );
   }
-  if (error !== null) {
+  if (state.error !== null) {
     return (
       <View style={styles.screen}>
-        <Text style={[styles.center, styles.error]}>{`Couldn't load the club: ${error}`}</Text>
+        <Text style={[styles.center, styles.error]}>{`Couldn't load the club: ${state.error}`}</Text>
       </View>
     );
   }
@@ -145,7 +64,7 @@ export default function NightScreen() {
       <ExistingNightEditor
         key={created.id}
         night={created}
-        members={members}
+        members={state.members}
         today={today}
         initialStep="pick"
         onDone={() => router.back()}
@@ -158,29 +77,25 @@ export default function NightScreen() {
   }
 
   const banner =
-    actionError !== null ? (
-      <Text style={[styles.banner, styles.error]}>{actionError}</Text>
+    state.actionError !== null ? (
+      <Text style={[styles.banner, styles.error]}>{state.actionError}</Text>
     ) : null;
 
-  if (step === "who") {
+  if (state.step === "who") {
     return (
       <View style={styles.screen}>
-        <TopBar
-          kind="title"
-          title="New night"
-          back={{ label: "When", onPress: () => setStep("when") }}
-        />
+        <TopBar kind="title" title="New night" back={{ label: "When", onPress: plan.back }} />
         {banner}
         <WhoStep
-          scheduledFor={date}
+          scheduledFor={state.date}
           today={today}
-          members={members}
-          attendeeIds={attendeeIds}
-          pickerId={pickerId}
-          busy={busy}
-          onToggle={onToggle}
-          onChoosePicker={setChosenPicker}
-          onNext={onCreate}
+          members={state.members}
+          attendeeIds={state.attendeeIds}
+          pickerId={state.pickerId}
+          busy={state.busy}
+          onToggle={(m: Member) => void plan.toggle(m.id)}
+          onChoosePicker={plan.choosePicker}
+          onNext={() => void onCreate()}
         />
       </View>
     );
@@ -196,14 +111,10 @@ export default function NightScreen() {
       {banner}
       <WhenStep
         today={today}
-        initial={date}
-        nightDates={nightDatesSet}
-        busy={busy}
-        onNext={(iso) => {
-          setDate(iso);
-          setActionError(null);
-          setStep("who");
-        }}
+        initial={state.date}
+        nightDates={state.nightDates}
+        busy={state.busy}
+        onNext={plan.chooseDate}
       />
     </View>
   );
