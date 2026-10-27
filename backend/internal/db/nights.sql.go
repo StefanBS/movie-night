@@ -12,19 +12,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const addAttendee = `-- name: AddAttendee :exec
+const addAttendees = `-- name: AddAttendees :exec
 INSERT INTO attendances (pick_id, user_id)
-VALUES ($1, $2)
+SELECT $1, unnest($2::uuid[])
 ON CONFLICT (pick_id, user_id) DO NOTHING
 `
 
-type AddAttendeeParams struct {
-	PickID uuid.UUID `json:"pick_id"`
-	UserID uuid.UUID `json:"user_id"`
+type AddAttendeesParams struct {
+	PickID  uuid.UUID   `json:"pick_id"`
+	UserIds []uuid.UUID `json:"user_ids"`
 }
 
-func (q *Queries) AddAttendee(ctx context.Context, arg AddAttendeeParams) error {
-	_, err := q.db.Exec(ctx, addAttendee, arg.PickID, arg.UserID)
+// Adds each user who isn't attending yet; existing attendances are left as-is.
+func (q *Queries) AddAttendees(ctx context.Context, arg AddAttendeesParams) error {
+	_, err := q.db.Exec(ctx, addAttendees, arg.PickID, arg.UserIds)
 	return err
 }
 
@@ -109,6 +110,35 @@ type GetNightParams struct {
 
 func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (Pick, error) {
 	row := q.db.QueryRow(ctx, getNight, arg.NightID, arg.GroupID)
+	var i Pick
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.PickerID,
+		&i.IsCredited,
+		&i.ScheduledFor,
+		&i.CreatedAt,
+		&i.MovieID,
+	)
+	return i, err
+}
+
+const getNightForUpdate = `-- name: GetNightForUpdate :one
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+FROM picks
+WHERE id = $1 AND group_id = $2
+FOR UPDATE
+`
+
+type GetNightForUpdateParams struct {
+	NightID uuid.UUID `json:"night_id"`
+	GroupID uuid.UUID `json:"group_id"`
+}
+
+// Locks the night row for the rest of the edit transaction, so a concurrent
+// record-pick cannot move the picker between the picker check and the write.
+func (q *Queries) GetNightForUpdate(ctx context.Context, arg GetNightForUpdateParams) (Pick, error) {
+	row := q.db.QueryRow(ctx, getNightForUpdate, arg.NightID, arg.GroupID)
 	var i Pick
 	err := row.Scan(
 		&i.ID,
@@ -271,18 +301,18 @@ func (q *Queries) ListNightsAttendees(ctx context.Context, arg ListNightsAttende
 	return items, nil
 }
 
-const removeAttendee = `-- name: RemoveAttendee :exec
+const removeAttendeesNotIn = `-- name: RemoveAttendeesNotIn :exec
 DELETE FROM attendances
-WHERE pick_id = $1 AND user_id = $2
+WHERE pick_id = $1 AND NOT (user_id = ANY($2::uuid[]))
 `
 
-type RemoveAttendeeParams struct {
-	PickID uuid.UUID `json:"pick_id"`
-	UserID uuid.UUID `json:"user_id"`
+type RemoveAttendeesNotInParams struct {
+	PickID uuid.UUID   `json:"pick_id"`
+	Keep   []uuid.UUID `json:"keep"`
 }
 
-func (q *Queries) RemoveAttendee(ctx context.Context, arg RemoveAttendeeParams) error {
-	_, err := q.db.Exec(ctx, removeAttendee, arg.PickID, arg.UserID)
+func (q *Queries) RemoveAttendeesNotIn(ctx context.Context, arg RemoveAttendeesNotInParams) error {
+	_, err := q.db.Exec(ctx, removeAttendeesNotIn, arg.PickID, arg.Keep)
 	return err
 }
 

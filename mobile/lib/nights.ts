@@ -123,34 +123,6 @@ export function listNights(
   return requestJson(`${baseUrl}/groups/${groupId}/nights`, parseNights, { signal });
 }
 
-export function addAttendee(
-  baseUrl: string,
-  groupId: string,
-  nightId: string,
-  userId: string,
-  signal?: AbortSignal,
-): Promise<Night> {
-  return fetchNight(`${baseUrl}/groups/${groupId}/nights/${nightId}/attendees`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId }),
-    signal,
-  });
-}
-
-export function removeAttendee(
-  baseUrl: string,
-  groupId: string,
-  nightId: string,
-  userId: string,
-  signal?: AbortSignal,
-): Promise<Night> {
-  return fetchNight(
-    `${baseUrl}/groups/${groupId}/nights/${nightId}/attendees/${userId}`,
-    { method: "DELETE", signal },
-  );
-}
-
 // getNightTurn loads the core pick order over a night's attendees, ignoring the
 // night's own pick — the order its picker is chosen from.
 export function getNightTurn(
@@ -208,17 +180,27 @@ export function detachMovie(
   });
 }
 
-export function updateNightDate(
+// NightChanges is a saved Night's date and its whole attendee set, which must
+// still include the picker.
+export type NightChanges = {
+  scheduledFor: string;
+  attendees: string[];
+};
+
+// updateNight saves a Night's date and attendees in one request that either
+// fully applies or changes nothing. The backend rejects dropping the picker or
+// a non-member (422) and a date that already has a Night (409).
+export function updateNight(
   baseUrl: string,
   groupId: string,
   nightId: string,
-  scheduledFor: string,
+  changes: NightChanges,
   signal?: AbortSignal,
 ): Promise<Night> {
   return fetchNight(`${baseUrl}/groups/${groupId}/nights/${nightId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scheduledFor }),
+    body: JSON.stringify(changes),
     signal,
   });
 }

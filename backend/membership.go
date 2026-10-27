@@ -128,9 +128,9 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 			//
 			//   Atomicity: if InsertMembership fails after CreateUser, the user row
 			//   is orphaned. It's inert — nothing reads users except through
-			//   memberships — and a retried join just creates a fresh user. Wrapping
-			//   in a tx would fix this cheaply but is the codebase's first transaction;
-			//   defer it until a second multi-statement write justifies a WithTx helper.
+			//   memberships — and a retried join just creates a fresh user. withTx
+			//   (tx.go, introduced for the Night edit) would fix this cheaply; not
+			//   yet adopted here.
 			avg, err := store.AverageServedCount(ctx, gid)
 			if err != nil {
 				internalError(w, gid, "average served", err)

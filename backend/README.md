@@ -2,7 +2,7 @@
 
 Go HTTP API over PostgreSQL. Serves the group roster and "whose turn" ranking,
 handles membership churn (join / deactivate / reactivate / promote), runs the
-per-night lifecycle (create, attendees, pick), and proxies movie search/attach
+per-night lifecycle (create, edit, pick), and proxies movie search/attach
 through [TMDB](https://www.themoviedb.org).
 
 ## Stack
@@ -98,11 +98,9 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `POST` | `/groups/{groupId}/nights` | Create a night with its picker; `201`. Body `{"scheduledFor","attendees","pickerId"}`; `422` if the picker isn't an attendee, `409` if the date is taken. |
 | `GET` | `/groups/{groupId}/nights` | Every night, past and upcoming, newest first. |
 | `GET` | `/groups/{groupId}/nights/{nightId}` | A night and its attendees. |
-| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Change the date. Body `{"scheduledFor"}`; `409` if the date is taken. |
+| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Edit the date and/or replace the attendee set in one transaction — a rejected edit changes nothing. Body `{"scheduledFor"?,"attendees"?}` (omitted = unchanged); `422` if the attendees leave out the picker or include a non-member, `409` if the date is taken. |
 | `DELETE` | `/groups/{groupId}/nights/{nightId}` | Cancel/delete the night; `204`. Idempotent. |
 | `GET` | `/groups/{groupId}/nights/{nightId}/turn` | Least-served ranking over the night's attendees, ignoring the night's own pick. |
-| `POST` | `/groups/{groupId}/nights/{nightId}/attendees` | Mark present. Body `{"userId"}`. |
-| `DELETE` | `/groups/{groupId}/nights/{nightId}/attendees/{userId}` | Remove an attendee; idempotent. `409` for the picker — change the picker first. |
 | `POST` | `/groups/{groupId}/nights/{nightId}/pick` | Change the picker (must be an attendee; guest picks don't move standings). Body `{"pickerId"}`. |
 
 **Movies** ([ADR-0007](../docs/adr/0007-tmdb-proxy-source-of-truth.md)) — `503` when `TMDB_READ_TOKEN` is unset.
@@ -171,7 +169,8 @@ backend/
 ├── roster.go          # roster + turn handlers and response mapping
 ├── turn.go            # least-served ranking response mapping
 ├── membership.go      # join / deactivate / reactivate / promote (churn)
-├── nights.go          # night lifecycle: create, attendees, pick
+├── nights.go          # night lifecycle: create, edit, pick
+├── tx.go              # withTx — one transaction for a multi-statement write
 ├── movies.go          # movie DTO + search/attach handlers (TMDB-backed)
 ├── tmdb.go            # TMDB client (search, fetch, poster URLs)
 ├── *_test.go          # table-driven unit tests (pure functions, no mocks)

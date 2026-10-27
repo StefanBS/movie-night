@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Calendar as CalendarIcon, ChevronRight } from "lucide-react-native";
 
@@ -12,7 +12,10 @@ import {
   TabScrollView,
   TopBar,
 } from "../";
+import { useSession } from "../useSession";
 import { WizardFooter } from "./WizardFooter";
+import { API_URL } from "../../apiUrl";
+import { GROUP_ID } from "../../lib/api";
 import { firstName } from "../../lib/avatar";
 import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
 import {
@@ -20,15 +23,9 @@ import {
   formatShortDate,
   formatWeekdayDate,
 } from "../../lib/date";
-import { errorMessage } from "../../lib/errors";
 import type { Member } from "../../lib/members";
-import {
-  addAttendee,
-  deleteNight,
-  removeAttendee,
-  updateNightDate,
-  type Night,
-} from "../../lib/nights";
+import { createNightEdit } from "../../lib/nightEdit";
+import type { Night } from "../../lib/nights";
 import {
   borderWidth,
   colors,
@@ -42,16 +39,15 @@ import {
   trackPx,
 } from "../../theme";
 
-// EditNightScreen is the scheduling edit flow from the home Up-next card:
-// change the date, toggle who's coming, and cancel the night. Reminders
-// route to the deferred #50 screen.
+// EditNightScreen renders the edit module (lib/nightEdit) from the home
+// Up-next card: change the date, toggle who's coming, then save both in one
+// request, or cancel the night. Reminders route to the deferred #50 screen.
+// Mount with key={night.id} when the loaded night changes.
 export function EditNightScreen({
   night,
   members,
   today,
   nightDates,
-  apiUrl,
-  groupId,
   onBack,
   onSaved,
   onCancelled,
@@ -61,97 +57,34 @@ export function EditNightScreen({
   members: Member[];
   today: string;
   nightDates: Set<string>;
-  apiUrl: string;
-  groupId: string;
   onBack: () => void;
   onSaved: () => void;
   onCancelled: () => void;
   onReminders: () => void;
 }) {
-  const [mode, setMode] = useState<"main" | "date">("main");
-  const [draftDate, setDraftDate] = useState(night.scheduledFor);
-  const [draftAttendees, setDraftAttendees] = useState(
-    () => new Set(night.attendees.map((a) => a.id)),
+  const [edit, state] = useSession(() =>
+    createNightEdit({ baseUrl: API_URL, groupId: GROUP_ID, night, members }),
   );
+  const [mode, setMode] = useState<"main" | "date">("main");
   const [month, setMonth] = useState<YearMonth>(() =>
     yearMonthOf(night.scheduledFor),
   );
-  const [busy, setBusy] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const { date, attendees, rows, dirty, actionError } = state;
+  const busy = state.busy !== null;
+  const pickerId = state.night.pickerId;
+  const picker = members.find((m) => m.id === pickerId) ?? null;
 
-  const coreMembers = useMemo(
-    () => members.filter((m) => m.status === "active" && m.role === "core"),
-    [members],
-  );
-
-  const picker = members.find((m) => m.id === night.pickerId) ?? null;
-
-  const serverAttendeeIds = useMemo(
-    () => new Set(night.attendees.map((a) => a.id)),
-    [night],
-  );
-
-  const dirty =
-    draftDate !== night.scheduledFor ||
-    draftAttendees.size !== serverAttendeeIds.size ||
-    [...draftAttendees].some((id) => !serverAttendeeIds.has(id));
-
-  const toggleAttendee = useCallback((memberId: string) => {
-    setDraftAttendees((prev) => {
-      const next = new Set(prev);
-      if (next.has(memberId)) {
-        next.delete(memberId);
-      } else {
-        next.add(memberId);
-      }
-      return next;
-    });
-  }, []);
-
-  const onSave = useCallback(async () => {
-    if (busy) {
-      return;
-    }
-    setBusy(true);
-    setActionError(null);
-    try {
-      let current = night;
-      if (draftDate !== night.scheduledFor) {
-        current = await updateNightDate(apiUrl, groupId, night.id, draftDate);
-      }
-      const serverIds = new Set(current.attendees.map((a) => a.id));
-      for (const id of draftAttendees) {
-        if (!serverIds.has(id)) {
-          current = await addAttendee(apiUrl, groupId, night.id, id);
-        }
-      }
-      for (const a of current.attendees) {
-        if (!draftAttendees.has(a.id)) {
-          current = await removeAttendee(apiUrl, groupId, night.id, a.id);
-        }
-      }
+  const onSave = async () => {
+    if ((await edit.save()) !== null) {
       onSaved();
-    } catch (e) {
-      setActionError(errorMessage(e, "failed to save changes"));
-    } finally {
-      setBusy(false);
     }
-  }, [apiUrl, groupId, night, draftDate, draftAttendees, busy, onSaved]);
+  };
 
-  const onCancelNight = useCallback(async () => {
-    if (busy) {
-      return;
-    }
-    setBusy(true);
-    setActionError(null);
-    try {
-      await deleteNight(apiUrl, groupId, night.id);
+  const onCancelNight = async () => {
+    if (await edit.cancelNight()) {
       onCancelled();
-    } catch (e) {
-      setActionError(errorMessage(e, "failed to cancel night"));
-      setBusy(false);
     }
-  }, [apiUrl, groupId, night.id, busy, onCancelled]);
+  };
 
   if (mode === "date") {
     return (
@@ -165,11 +98,11 @@ export function EditNightScreen({
           <TabScrollView contentContainerStyle={styles.dateContent}>
             <View style={styles.calendarCard}>
               <Calendar
-                value={draftDate}
+                value={date}
                 today={today}
                 month={month}
                 nightDates={nightDates}
-                onPick={setDraftDate}
+                onPick={edit.setDate}
                 onMonth={(dir) => setMonth((m) => shiftMonth(m, dir))}
               />
             </View>
@@ -201,12 +134,12 @@ export function EditNightScreen({
             </View>
             <View style={styles.heroText}>
               <Text style={styles.heroDate} numberOfLines={1}>
-                {formatWeekdayDate(draftDate)}
+                {formatWeekdayDate(date)}
               </Text>
               <Text style={styles.heroMeta} allowFontScaling={false}>
                 {picker !== null
-                  ? `${countdownLabel(draftDate, today)} · ${firstName(picker.name)} picks`
-                  : countdownLabel(draftDate, today)}
+                  ? `${countdownLabel(date, today)} · ${firstName(picker.name)} picks`
+                  : countdownLabel(date, today)}
               </Text>
             </View>
           </View>
@@ -216,7 +149,7 @@ export function EditNightScreen({
             <View style={styles.divider}>
               <SettingsRow
                 label="Date"
-                value={formatShortDate(draftDate)}
+                value={formatShortDate(date)}
                 right={<ChevronRight size={18} color={colors.text.tertiary} />}
                 onPress={() => setMode("date")}
               />
@@ -229,22 +162,22 @@ export function EditNightScreen({
             />
           </View>
 
-          <SectionLabel>{`Who's coming · ${draftAttendees.size}`}</SectionLabel>
+          <SectionLabel>{`Who's coming · ${attendees.size}`}</SectionLabel>
           <View>
-            {coreMembers.map((m, i) => {
-              const here = draftAttendees.has(m.id);
+            {rows.map((m, i) => {
+              const here = attendees.has(m.id);
               // The picker is always an attendee; change the picker (from the
               // Night) before taking them off the night.
-              const isPicker = m.id === night.pickerId;
+              const isPicker = m.id === pickerId;
               return (
                 <Pressable
                   key={m.id}
-                  onPress={() => toggleAttendee(m.id)}
+                  onPress={() => edit.toggle(m.id)}
                   disabled={busy || isPicker}
                   accessibilityHint={isPicker ? "Change the picker first" : undefined}
                   style={({ pressed }) => [
                     styles.attendRow,
-                    i < coreMembers.length - 1 && styles.attendDivider,
+                    i < rows.length - 1 && styles.attendDivider,
                     !here && styles.dimmed,
                     pressed && styles.rowPressed,
                   ]}

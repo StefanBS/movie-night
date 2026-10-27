@@ -25,8 +25,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(q))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}/turn", nightTurnHandler(q))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/attendees", addAttendeeHandler(q))
-	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/attendees/{userId}", removeAttendeeHandler(q))
+	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(q))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
 
@@ -139,42 +138,19 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 	})
 
-	run("add then remove attendee changes the order", func(t *testing.T) {
+	run("editing the attendees changes the order", func(t *testing.T) {
 		n := createNight(t, nightBody("2026-06-12", ada))
-		if code, b := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/attendees", `{"userId":"`+blake+`"}`); code != http.StatusCreated {
-			t.Fatalf("add status = %d, want 201 (body %s)", code, b)
+		if code, b := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{"attendees":["`+ada+`","`+blake+`"]}`); code != http.StatusOK {
+			t.Fatalf("add status = %d, want 200 (body %s)", code, b)
 		}
 		if got := names(turn(t, n.ID)); len(got) != 2 {
 			t.Fatalf("after add: order = %v, want 2", got)
 		}
-		if code, _ := do(t, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID+"/attendees/"+blake, ""); code != http.StatusOK {
+		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{"attendees":["`+ada+`"]}`); code != http.StatusOK {
 			t.Fatalf("remove status = %d, want 200", code)
 		}
 		if got := names(turn(t, n.ID)); len(got) != 1 || got[0] != "Ada" {
 			t.Fatalf("after remove: order = %v, want [Ada]", got)
-		}
-	})
-
-	run("removing the picker yields 409 and keeps them attending", func(t *testing.T) {
-		n := createNight(t, nightBody("2026-06-12", ada, blake))
-		if code, _ := do(t, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID+"/attendees/"+ada, ""); code != http.StatusConflict {
-			t.Fatalf("remove picker status = %d, want 409", code)
-		}
-		_, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, "")
-		if len(got.Attendees) != 2 {
-			t.Fatalf("attendees = %+v, want both still attending", got.Attendees)
-		}
-		// Changing the picker first frees Ada to leave.
-		recordPick(t, n.ID, blake)
-		if code, _ := do(t, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID+"/attendees/"+ada, ""); code != http.StatusOK {
-			t.Fatalf("remove former picker status = %d, want 200", code)
-		}
-	})
-
-	run("add non-member yields 422", func(t *testing.T) {
-		n := createNight(t, nightBody("2026-06-12", ada))
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/attendees", `{"userId":"`+unknownUser+`"}`); code != http.StatusUnprocessableEntity {
-			t.Fatalf("status = %d, want 422", code)
 		}
 	})
 

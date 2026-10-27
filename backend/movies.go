@@ -187,16 +187,14 @@ func clearNightMovieHandler(store nightStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		// Existence check only — ClearNightMovie hands back the cleared night.
-		if _, ok := loadNight(w, r, store, gid, nightID); !ok {
-			return
-		}
+		// No existence pre-check: an unknown night matches no row, so the
+		// RETURNING miss is the 404.
 		night, err := store.ClearNightMovie(r.Context(), db.ClearNightMovieParams{
 			NightID: nightID,
 			GroupID: gid,
 		})
 		if err != nil {
-			internalError(w, gid, "clear night movie", err)
+			storeError(w, gid, "clear night movie", err, http.StatusNotFound, "night not found")
 			return
 		}
 		writeNightDTO(w, r, store, gid, night, http.StatusOK)

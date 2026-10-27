@@ -7,8 +7,8 @@ import { createSessionCore, type Session } from "./session";
 // The editor module for a saved Night: choosing or clearing its film and
 // changing its picker. It keeps the stored picker — only changePicker moves it
 // (ADR-0008). Writes are one at a time: while one runs (busy), the others
-// return null without a request. Date and attendees are edited elsewhere (the
-// Edit screen).
+// return null without a request. Date and attendees are edited on the Edit
+// screen (lib/nightEdit).
 
 export type EditorStep = "pick" | "night";
 

@@ -4,8 +4,6 @@ import http from "node:http";
 
 import {
   createNight,
-  addAttendee,
-  removeAttendee,
   getNightTurn,
   listNights,
   recordNightPick,
@@ -71,48 +69,6 @@ test("createNight posts the date, attendees and picker and parses the night", as
     assert.equal(path, `/groups/${GROUP}/nights`);
     assert.deepEqual(JSON.parse(body), { scheduledFor: "2026-06-12", attendees: [ADA], pickerId: ADA });
     assert.deepEqual(got, night);
-  } finally {
-    await server.close();
-  }
-});
-
-test("addAttendee posts the userId to the attendees path", async () => {
-  let path = "";
-  let method = "";
-  let body = "";
-  const server = await startServer(async (req, res) => {
-    path = req.url ?? "";
-    method = req.method ?? "";
-    body = await collect(req);
-    res.statusCode = 201;
-    res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify(night));
-  });
-  try {
-    await addAttendee(server.url, GROUP, NIGHT, ADA);
-    assert.equal(method, "POST");
-    assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/attendees`);
-    assert.deepEqual(JSON.parse(body), { userId: ADA });
-  } finally {
-    await server.close();
-  }
-});
-
-test("removeAttendee issues DELETE to the attendee path", async () => {
-  let path = "";
-  let method = "";
-  const server = await startServer((req, res) => {
-    path = req.url ?? "";
-    method = req.method ?? "";
-    res.statusCode = 200;
-    res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify({ ...night, attendees: [] }));
-  });
-  try {
-    const got = await removeAttendee(server.url, GROUP, NIGHT, ADA);
-    assert.equal(method, "DELETE");
-    assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/attendees/${ADA}`);
-    assert.deepEqual(got.attendees, []);
   } finally {
     await server.close();
   }
