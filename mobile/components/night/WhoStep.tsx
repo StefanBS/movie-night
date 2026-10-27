@@ -27,7 +27,7 @@ export function WhoStep({
   scheduledFor: string;
   today: string;
   members: Member[];
-  attendeeIds: Set<string>;
+  attendeeIds: ReadonlySet<string>;
   pickerId: string | null;
   busy: string | null;
   onToggle: (m: Member) => void;
