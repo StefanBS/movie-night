@@ -16,14 +16,23 @@ SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
 FROM picks
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
 
--- name: AddAttendee :exec
-INSERT INTO attendances (pick_id, user_id)
-VALUES (sqlc.arg(pick_id), sqlc.arg(user_id))
-ON CONFLICT (pick_id, user_id) DO NOTHING;
+-- name: GetNightForUpdate :one
+-- Locks the night row for the rest of the edit transaction, so a concurrent
+-- record-pick cannot move the picker between the picker check and the write.
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+FROM picks
+WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
+FOR UPDATE;
 
--- name: RemoveAttendee :exec
+-- name: RemoveAttendeesNotIn :exec
 DELETE FROM attendances
-WHERE pick_id = sqlc.arg(pick_id) AND user_id = sqlc.arg(user_id);
+WHERE pick_id = sqlc.arg(pick_id) AND NOT (user_id = ANY(sqlc.arg(keep)::uuid[]));
+
+-- name: AddAttendees :exec
+-- Adds each user who isn't attending yet; existing attendances are left as-is.
+INSERT INTO attendances (pick_id, user_id)
+SELECT sqlc.arg(pick_id), unnest(sqlc.arg(user_ids)::uuid[])
+ON CONFLICT (pick_id, user_id) DO NOTHING;
 
 -- name: ListNightAttendees :many
 SELECT u.id, u.name, m.role

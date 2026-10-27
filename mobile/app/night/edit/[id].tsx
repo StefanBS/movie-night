@@ -110,8 +110,6 @@ export default function NightEditRoute() {
       members={members}
       today={today}
       nightDates={nightDatesSet}
-      apiUrl={API_URL}
-      groupId={GROUP_ID}
       onBack={() => router.back()}
       onSaved={() => router.back()}
       onCancelled={() => router.replace("/")}

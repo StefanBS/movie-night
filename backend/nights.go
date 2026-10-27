@@ -8,8 +8,10 @@ import (
 	"slices"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -29,9 +31,12 @@ type parsedCreateNight struct {
 	Picker       uuid.UUID
 }
 
-// errPickerNotAttendee is the 422 shared by create and record-pick: a Night's
-// picker is always one of its attendees.
+// errPickerNotAttendee is the 422 shared by create, record-pick and edit: a
+// Night's picker is always one of its attendees.
 var errPickerNotAttendee = errors.New("picker is not an attendee of this night")
+
+// errNotMember is the 422 for an attendee who has no membership in the group.
+var errNotMember = errors.New("attendee is not a member of this group")
 
 // parseAttendeeIDs parses and de-duplicates attendee UUID strings, preserving
 // first-seen order. Always returns a non-nil slice. Pure.
@@ -53,7 +58,7 @@ func parseAttendeeIDs(raw []string) ([]uuid.UUID, error) {
 }
 
 // parseScheduledFor parses the wire scheduledFor into a DATE param, naming the
-// field in the error. Shared by create and the date-edit PATCH so the two paths
+// field in the error. Shared by create and the edit PATCH so the two paths
 // can't disagree on the accepted format. Pure.
 func parseScheduledFor(raw string) (pgtype.Date, error) {
 	d, err := parseDate(raw)
@@ -224,8 +229,6 @@ func presentIDs(rows []db.ListNightAttendeesRow) []uuid.UUID {
 type nightStore interface {
 	CreateNight(ctx context.Context, arg db.CreateNightParams) (db.CreateNightRow, error)
 	GetNight(ctx context.Context, arg db.GetNightParams) (db.Pick, error)
-	AddAttendee(ctx context.Context, arg db.AddAttendeeParams) error
-	RemoveAttendee(ctx context.Context, arg db.RemoveAttendeeParams) error
 	ListNightAttendees(ctx context.Context, arg db.ListNightAttendeesParams) ([]db.ListNightAttendeesRow, error)
 	GetGroupMember(ctx context.Context, arg db.GetGroupMemberParams) (db.GetGroupMemberRow, error)
 	RankGroupTurn(ctx context.Context, arg db.RankGroupTurnParams) ([]db.RankGroupTurnRow, error)
@@ -234,15 +237,9 @@ type nightStore interface {
 	UpsertMovie(ctx context.Context, arg db.UpsertMovieParams) (db.Movie, error)
 	SetNightMovie(ctx context.Context, arg db.SetNightMovieParams) (db.Pick, error)
 	ClearNightMovie(ctx context.Context, arg db.ClearNightMovieParams) (db.Pick, error)
-	UpdateNightDate(ctx context.Context, arg db.UpdateNightDateParams) (db.Pick, error)
 	DeleteNight(ctx context.Context, arg db.DeleteNightParams) error
 	ListNights(ctx context.Context, groupID uuid.UUID) ([]db.ListNightsRow, error)
 	ListNightsAttendees(ctx context.Context, arg db.ListNightsAttendeesParams) ([]db.ListNightsAttendeesRow, error)
-}
-
-// attendeeRequest is the JSON body of POST .../nights/{nightId}/attendees.
-type attendeeRequest struct {
-	UserID string `json:"userId"`
 }
 
 // recordPickRequest is the JSON body of POST .../nights/{nightId}/pick.
@@ -250,14 +247,43 @@ type recordPickRequest struct {
 	PickerID string `json:"pickerId"`
 }
 
-// updateNightDateRequest is the JSON body of PATCH .../nights/{nightId}.
-type updateNightDateRequest struct {
-	ScheduledFor string `json:"scheduledFor"`
+// updateNightRequest is the JSON body of PATCH .../nights/{nightId}. An omitted
+// field is left unchanged; attendees, when sent, replaces the whole set.
+type updateNightRequest struct {
+	ScheduledFor *string   `json:"scheduledFor"`
+	Attendees    *[]string `json:"attendees"`
 }
 
-// validateUpdateNightDateRequest parses scheduledFor as YYYY-MM-DD. Pure.
-func validateUpdateNightDateRequest(req updateNightDateRequest) (pgtype.Date, error) {
-	return parseScheduledFor(req.ScheduledFor)
+// parsedUpdateNight is a validated updateNightRequest. A nil field is
+// unchanged; Attendees is deduped, and non-nil (possibly empty) when sent.
+type parsedUpdateNight struct {
+	ScheduledFor *pgtype.Date
+	Attendees    []uuid.UUID
+}
+
+// validateUpdateNightRequest parses the fields that were sent and rejects a
+// body that changes nothing. The picker rule needs the stored Night, so it is
+// checked in the handler. Pure.
+func validateUpdateNightRequest(req updateNightRequest) (parsedUpdateNight, error) {
+	if req.ScheduledFor == nil && req.Attendees == nil {
+		return parsedUpdateNight{}, fmt.Errorf("nothing to update")
+	}
+	var parsed parsedUpdateNight
+	if req.ScheduledFor != nil {
+		d, err := parseScheduledFor(*req.ScheduledFor)
+		if err != nil {
+			return parsedUpdateNight{}, err
+		}
+		parsed.ScheduledFor = &d
+	}
+	if req.Attendees != nil {
+		ids, err := parseAttendeeIDs(*req.Attendees)
+		if err != nil {
+			return parsedUpdateNight{}, err
+		}
+		parsed.Attendees = ids
+	}
+	return parsed, nil
 }
 
 // creditedForRole derives is_credited from the picker's role: a core pick moves
@@ -309,7 +335,7 @@ func isUniqueViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
-// errNightDateTaken is the 409 for create and date-edit: at most one night per
+// errNightDateTaken is the 409 for create and edit: at most one night per
 // group per date.
 const errNightDateTaken = "there is already a night on that date"
 
@@ -323,7 +349,7 @@ const errNightDateTaken = "there is already a night on that date"
 func requireMember(w http.ResponseWriter, r *http.Request, store nightStore, gid, uid uuid.UUID) (db.GetGroupMemberRow, bool) {
 	m, err := store.GetGroupMember(r.Context(), db.GetGroupMemberParams{GroupID: gid, UserID: uid})
 	if err != nil {
-		storeError(w, gid, "get group member", err, http.StatusUnprocessableEntity, "attendee is not a member of this group")
+		storeError(w, gid, "get group member", err, http.StatusUnprocessableEntity, errNotMember.Error())
 		return db.GetGroupMemberRow{}, false
 	}
 	return m, true
@@ -380,66 +406,6 @@ func createNightHandler(store nightStore) http.HandlerFunc {
 			return
 		}
 		writeNightDTO(w, r, store, gid, db.Pick(row), http.StatusCreated)
-	}
-}
-
-// addAttendeeHandler serves POST /groups/{groupId}/nights/{nightId}/attendees.
-func addAttendeeHandler(store nightStore) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		gid, nightID, ok := pathGroupNight(w, r)
-		if !ok {
-			return
-		}
-		req, ok := decodeJSON[attendeeRequest](w, r)
-		if !ok {
-			return
-		}
-		uid, ok := parseUUID(w, req.UserID, "invalid user id")
-		if !ok {
-			return
-		}
-		night, ok := loadNight(w, r, store, gid, nightID)
-		if !ok {
-			return
-		}
-		if _, ok := requireMember(w, r, store, gid, uid); !ok {
-			return
-		}
-		if err := store.AddAttendee(r.Context(), db.AddAttendeeParams{PickID: nightID, UserID: uid}); err != nil {
-			internalError(w, gid, "add attendee", err)
-			return
-		}
-		writeNightDTO(w, r, store, gid, night, http.StatusCreated)
-	}
-}
-
-// removeAttendeeHandler serves DELETE /groups/{groupId}/nights/{nightId}/attendees/{userId}.
-// Idempotent: removing a non-attendee still returns 200 with the current night.
-// The picker is always an attendee, so removing them is a 409 — change the
-// picker first.
-func removeAttendeeHandler(store nightStore) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		gid, nightID, ok := pathGroupNight(w, r)
-		if !ok {
-			return
-		}
-		uid, ok := pathUUID(w, r, "userId", "invalid user id")
-		if !ok {
-			return
-		}
-		night, ok := loadNight(w, r, store, gid, nightID)
-		if !ok {
-			return
-		}
-		if night.PickerID == uid {
-			writeJSONError(w, http.StatusConflict, "cannot remove the picker; change the picker first")
-			return
-		}
-		if err := store.RemoveAttendee(r.Context(), db.RemoveAttendeeParams{PickID: nightID, UserID: uid}); err != nil {
-			internalError(w, gid, "remove attendee", err)
-			return
-		}
-		writeNightDTO(w, r, store, gid, night, http.StatusOK)
 	}
 }
 
@@ -546,43 +512,90 @@ func recordNightPickHandler(store nightStore) http.HandlerFunc {
 	}
 }
 
-// updateNightDateHandler serves PATCH /groups/{groupId}/nights/{nightId}. Body
-// {"scheduledFor":"YYYY-MM-DD"} moves the night to a new date; a date another
-// night already holds is a 409.
-func updateNightDateHandler(store nightStore) http.HandlerFunc {
+// updateNightHandler serves PATCH /groups/{groupId}/nights/{nightId}. Body
+// {"scheduledFor"?, "attendees"?} edits the Night's date and replaces its
+// attendee set in one transaction, so a rejected edit changes nothing. The
+// picker must stay an attendee (422), every attendee must be a member (422),
+// and a date another night already holds is a 409. The picker itself is
+// changed only by record-pick.
+func updateNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
-		req, ok := decodeJSON[updateNightDateRequest](w, r)
+		req, ok := decodeJSON[updateNightRequest](w, r)
 		if !ok {
 			return
 		}
-		scheduledFor, err := validateUpdateNightDateRequest(req)
+		parsed, err := validateUpdateNightRequest(req)
 		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		// Existence check only — UpdateNightDate hands back the moved night.
-		if _, ok := loadNight(w, r, store, gid, nightID); !ok {
-			return
+		var night db.Pick
+		err = withTx(r.Context(), pool, func(q *db.Queries) error {
+			var err error
+			night, err = editNight(r.Context(), q, gid, nightID, parsed)
+			return err
+		})
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+			writeJSONError(w, http.StatusNotFound, "night not found")
+		case errors.Is(err, errPickerNotAttendee), errors.Is(err, errNotMember):
+			writeJSONError(w, http.StatusUnprocessableEntity, err.Error())
+		case isUniqueViolation(err):
+			writeJSONError(w, http.StatusConflict, errNightDateTaken)
+		case err != nil:
+			internalError(w, gid, "update night", err)
+		default:
+			writeNightDTO(w, r, db.New(pool), gid, night, http.StatusOK)
 		}
-		night, err := store.UpdateNightDate(r.Context(), db.UpdateNightDateParams{
+	}
+}
+
+// editNight applies a validated edit inside the caller's transaction. It locks
+// the Night first (a miss is pgx.ErrNoRows), so a concurrent record-pick can't
+// move the picker between the picker check and the write. A taken date fails on
+// the last statement, after the attendee writes; the rollback undoes them.
+func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit parsedUpdateNight) (db.Pick, error) {
+	night, err := q.GetNightForUpdate(ctx, db.GetNightForUpdateParams{NightID: nightID, GroupID: gid})
+	if err != nil {
+		return db.Pick{}, err
+	}
+	if edit.Attendees != nil {
+		if !slices.Contains(edit.Attendees, night.PickerID) {
+			return db.Pick{}, errPickerNotAttendee
+		}
+		for _, uid := range edit.Attendees {
+			_, err := q.GetGroupMember(ctx, db.GetGroupMemberParams{GroupID: gid, UserID: uid})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return db.Pick{}, errNotMember
+			}
+			if err != nil {
+				return db.Pick{}, err
+			}
+		}
+	}
+	if edit.Attendees != nil {
+		if err := q.RemoveAttendeesNotIn(ctx, db.RemoveAttendeesNotInParams{PickID: nightID, Keep: edit.Attendees}); err != nil {
+			return db.Pick{}, err
+		}
+		if err := q.AddAttendees(ctx, db.AddAttendeesParams{PickID: nightID, UserIds: edit.Attendees}); err != nil {
+			return db.Pick{}, err
+		}
+	}
+	if edit.ScheduledFor != nil {
+		night, err = q.UpdateNightDate(ctx, db.UpdateNightDateParams{
 			NightID:      nightID,
 			GroupID:      gid,
-			ScheduledFor: scheduledFor,
+			ScheduledFor: *edit.ScheduledFor,
 		})
-		if isUniqueViolation(err) {
-			writeJSONError(w, http.StatusConflict, errNightDateTaken)
-			return
-		}
 		if err != nil {
-			internalError(w, gid, "update night date", err)
-			return
+			return db.Pick{}, err
 		}
-		writeNightDTO(w, r, store, gid, night, http.StatusOK)
 	}
+	return night, nil
 }
 
 // deleteNightHandler serves DELETE /groups/{groupId}/nights/{nightId}. It

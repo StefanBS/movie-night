@@ -71,20 +71,33 @@ func TestNightCreateRequestValidation(t *testing.T) {
 	}
 }
 
-func TestUpdateNightDateRequestValidation(t *testing.T) {
+func TestUpdateNightRequestValidation(t *testing.T) {
+	const (
+		a = "a0000000-0000-0000-0000-000000000001"
+		b = "a0000000-0000-0000-0000-000000000002"
+	)
+	date := func(s string) *string { return &s }
+	ids := func(s ...string) *[]string { return &s }
 	tests := []struct {
-		name    string
-		req     updateNightDateRequest
-		wantErr bool
-		want    string
+		name          string
+		req           updateNightRequest
+		wantErr       bool
+		wantDate      string // "" = date unchanged
+		wantAttendees int    // -1 = attendees unchanged
 	}{
-		{name: "valid", req: updateNightDateRequest{ScheduledFor: "2026-07-04"}, want: "2026-07-04"},
-		{name: "bad date", req: updateNightDateRequest{ScheduledFor: "nope"}, wantErr: true},
-		{name: "empty date", req: updateNightDateRequest{ScheduledFor: ""}, wantErr: true},
+		{name: "date only", req: updateNightRequest{ScheduledFor: date("2026-07-04")}, wantDate: "2026-07-04", wantAttendees: -1},
+		{name: "attendees only", req: updateNightRequest{Attendees: ids(a, b)}, wantAttendees: 2},
+		{name: "both", req: updateNightRequest{ScheduledFor: date("2026-07-04"), Attendees: ids(a)}, wantDate: "2026-07-04", wantAttendees: 1},
+		{name: "dedupes attendees", req: updateNightRequest{Attendees: ids(a, a, b)}, wantAttendees: 2},
+		{name: "empty attendees is a replacement, not unchanged", req: updateNightRequest{Attendees: ids()}, wantAttendees: 0},
+		{name: "nothing to update", req: updateNightRequest{}, wantErr: true},
+		{name: "bad date", req: updateNightRequest{ScheduledFor: date("nope")}, wantErr: true},
+		{name: "empty date", req: updateNightRequest{ScheduledFor: date("")}, wantErr: true},
+		{name: "bad attendee uuid", req: updateNightRequest{Attendees: ids("nope")}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := validateUpdateNightDateRequest(tt.req)
+			got, err := validateUpdateNightRequest(tt.req)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -94,8 +107,17 @@ func TestUpdateNightDateRequestValidation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if !got.Valid || got.Time.Format("2006-01-02") != tt.want {
-				t.Fatalf("date = %+v, want %s", got, tt.want)
+			switch {
+			case tt.wantDate == "" && got.ScheduledFor != nil:
+				t.Errorf("date = %+v, want unchanged (nil)", got.ScheduledFor)
+			case tt.wantDate != "" && (got.ScheduledFor == nil || got.ScheduledFor.Time.Format("2006-01-02") != tt.wantDate):
+				t.Errorf("date = %+v, want %s", got.ScheduledFor, tt.wantDate)
+			}
+			switch {
+			case tt.wantAttendees == -1 && got.Attendees != nil:
+				t.Errorf("attendees = %v, want unchanged (nil)", got.Attendees)
+			case tt.wantAttendees >= 0 && (got.Attendees == nil || len(got.Attendees) != tt.wantAttendees):
+				t.Errorf("attendees = %v, want %d (non-nil)", got.Attendees, tt.wantAttendees)
 			}
 		})
 	}
