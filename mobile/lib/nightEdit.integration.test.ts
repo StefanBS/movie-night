@@ -5,6 +5,7 @@ import http from "node:http";
 import { createNightEdit } from "./nightEdit";
 import type { Member } from "./members";
 import type { Night } from "./nights";
+import type { Reminders } from "./reminders";
 
 // Integration tests: the Edit screen's session against a real local HTTP
 // server over real fetch. No mocks — the test drives the session only through
@@ -51,6 +52,7 @@ const SAVED: Night = {
   id: NIGHT,
   scheduledFor: "2026-06-26",
   pickerId: "ada",
+  reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
   movie: null,
   attendees: [
     { id: "ada", name: "Ada", role: "core" },
@@ -58,7 +60,7 @@ const SAVED: Night = {
   ],
 };
 
-type Edit = { scheduledFor: string; attendees: string[] };
+type Edit = { scheduledFor: string; attendees: string[]; reminders: Reminders };
 
 // backend fakes the two routes the session touches, recording every request
 // and applying a PATCH to its one Night in memory.
@@ -78,6 +80,7 @@ function backend(over: Partial<Record<string, Handler>> = {}) {
       night = {
         ...night,
         scheduledFor: edit.scheduledFor,
+        reminders: edit.reminders,
         attendees: edit.attendees.map((id) => {
           const m = MEMBERS.find((x) => x.id === id);
           return { id, name: m?.name ?? id, role: m?.role ?? "core" };
@@ -129,6 +132,31 @@ test("toggling and changing the date make the draft dirty; undoing them doesn't"
     edit.setDate("2026-07-03");
     assert.equal(edit.state.dirty, true);
     edit.setDate("2026-06-26");
+    assert.equal(edit.state.dirty, false);
+  });
+});
+
+test("changing reminders makes the draft dirty; restoring them doesn't", async () => {
+  await withEdit(backend().handler, async (edit) => {
+    edit.setReminders({ nightBefore: true, morningOf: false, audience: "picker" });
+    assert.equal(edit.state.dirty, true);
+    edit.setReminders(SAVED.reminders);
+    assert.equal(edit.state.dirty, false);
+  });
+});
+
+test("save sends the reminder settings with the rest of the draft", async () => {
+  const { handler, requests } = backend();
+  await withEdit(handler, async (edit) => {
+    const reminders: Reminders = { nightBefore: false, morningOf: true, audience: "picker" };
+    edit.setReminders(reminders);
+    const saved = await edit.save();
+    const sent = JSON.parse(requests[0].body) as Edit;
+    assert.deepEqual(sent.reminders, reminders);
+    assert.equal(sent.scheduledFor, SAVED.scheduledFor);
+    assert.deepEqual([...sent.attendees].sort(), ["ada", "frankie"]);
+    assert.deepEqual(saved?.reminders, reminders);
+    assert.deepEqual(edit.state.reminders, reminders);
     assert.equal(edit.state.dirty, false);
   });
 });

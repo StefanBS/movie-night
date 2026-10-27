@@ -95,10 +95,54 @@ func TestNightEditsIntegration(t *testing.T) {
 		t.Helper()
 		_, after := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+before.ID, "")
 		if after.ScheduledFor != before.ScheduledFor || after.PickerID != before.PickerID ||
-			!slices.Equal(attendeeIDs(after), attendeeIDs(before)) {
+			!slices.Equal(attendeeIDs(after), attendeeIDs(before)) || after.Reminders != before.Reminders {
 			t.Fatalf("night after rejected edit = %+v, want unchanged %+v", after, before)
 		}
 	}
+
+	t.Run("a new night has the default reminders", func(t *testing.T) {
+		n := mkNight(t)
+		want := remindersDTO{NightBefore: true, MorningOf: true, Audience: "everyone"}
+		if n.Reminders != want {
+			t.Fatalf("reminders = %+v, want %+v", n.Reminders, want)
+		}
+	})
+
+	t.Run("PATCH replaces the reminders", func(t *testing.T) {
+		n := mkNight(t)
+		code, got := doJSON[nightResponse](t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			`{"reminders":{"nightBefore":false,"morningOf":true,"audience":"picker"}}`)
+		if code != http.StatusOK {
+			t.Fatalf("patch status = %d, want 200", code)
+		}
+		want := remindersDTO{NightBefore: false, MorningOf: true, Audience: "picker"}
+		if got.Reminders != want {
+			t.Fatalf("reminders = %+v, want %+v", got.Reminders, want)
+		}
+		if _, read := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, ""); read.Reminders != want {
+			t.Fatalf("stored reminders = %+v, want %+v", read.Reminders, want)
+		}
+	})
+
+	t.Run("PATCH with incomplete reminders yields 400", func(t *testing.T) {
+		n := mkNight(t)
+		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{"reminders":{"nightBefore":false}}`); code != http.StatusBadRequest {
+			t.Fatalf("patch status = %d, want 400", code)
+		}
+	})
+
+	t.Run("PATCH onto a taken date with new reminders changes nothing", func(t *testing.T) {
+		n := mkNight(t)
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-07-04", blake)); code != http.StatusCreated {
+			t.Fatalf("create second night = %d, want 201", code)
+		}
+		code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			`{"scheduledFor":"2026-07-04","reminders":{"nightBefore":false,"morningOf":false,"audience":"picker"}}`)
+		if code != http.StatusConflict {
+			t.Fatalf("patch status = %d, want 409", code)
+		}
+		unchanged(t, n)
+	})
 
 	t.Run("PATCH onto a taken date with new attendees changes nothing", func(t *testing.T) {
 		n := mkNight(t)

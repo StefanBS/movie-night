@@ -66,3 +66,13 @@ _Avoid_: score, turns used
 **Turn ranking**:
 The order of core members by served count (fewest first), then least-recent pick. Ranking for a Night considers that Night's attendees and ignores that Night's own pick.
 _Avoid_: queue, rotation order (for the computed result)
+
+## Reminders
+
+**Reminder**:
+A notification about an upcoming Night, sent to that Night's audience at a set time before it. When and to whom are settings of the Night, shared by the group.
+_Avoid_: alert, push (for the message itself)
+
+**Nudge**:
+The picker's personal "it's your turn" reminder for a Night. The picker gets it even when the Night's other reminders are off, and gets it in place of the group reminder for the same slot.
+_Avoid_: next-up nudge

@@ -9,6 +9,7 @@ function night(id: string, scheduledFor: string, tmdbId: number | null): Night {
     id,
     scheduledFor,
     pickerId: "u1",
+    reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
     movie:
       tmdbId === null
         ? null

@@ -11,8 +11,10 @@ import {
   SettingsRow,
   TabScrollView,
   TopBar,
+  useToast,
 } from "../";
 import { useSession } from "../useSession";
+import { RemindersView } from "./RemindersView";
 import { WizardFooter } from "./WizardFooter";
 import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
@@ -26,6 +28,11 @@ import {
 import type { Member } from "../../lib/members";
 import { createNightEdit } from "../../lib/nightEdit";
 import type { Night } from "../../lib/nights";
+import {
+  formatRemindersSummary,
+  reminderConfirmation,
+  sameReminders,
+} from "../../lib/reminders";
 import {
   borderWidth,
   colors,
@@ -41,8 +48,9 @@ import {
 
 // EditNightScreen renders the edit module (lib/nightEdit) from the home
 // Up-next card: change the date, toggle who's coming, then save both in one
-// request, or cancel the night. Reminders route to the deferred #50 screen.
-// Mount with key={night.id} when the loaded night changes.
+// request, or cancel the night. Date and Reminders are steps over the same
+// draft, so they save (or are discarded) with it. Mount with key={night.id}
+// when the loaded night changes.
 export function EditNightScreen({
   night,
   members,
@@ -51,7 +59,6 @@ export function EditNightScreen({
   onBack,
   onSaved,
   onCancelled,
-  onReminders,
 }: {
   night: Night;
   members: Member[];
@@ -60,24 +67,30 @@ export function EditNightScreen({
   onBack: () => void;
   onSaved: () => void;
   onCancelled: () => void;
-  onReminders: () => void;
 }) {
   const [edit, state] = useSession(() =>
     createNightEdit({ baseUrl: API_URL, groupId: GROUP_ID, night, members }),
   );
-  const [mode, setMode] = useState<"main" | "date">("main");
+  const showToast = useToast();
+  const [mode, setMode] = useState<"main" | "date" | "reminders">("main");
   const [month, setMonth] = useState<YearMonth>(() =>
     yearMonthOf(night.scheduledFor),
   );
-  const { date, attendees, rows, dirty, actionError } = state;
+  const { date, attendees, reminders, rows, dirty, actionError } = state;
   const busy = state.busy !== null;
   const pickerId = state.night.pickerId;
   const picker = members.find((m) => m.id === pickerId) ?? null;
 
   const onSave = async () => {
-    if ((await edit.save()) !== null) {
-      onSaved();
+    const remindersChanged = !sameReminders(reminders, state.night.reminders);
+    const saved = await edit.save();
+    if (saved === null) {
+      return;
     }
+    if (remindersChanged) {
+      showToast(reminderConfirmation(saved.reminders));
+    }
+    onSaved();
   };
 
   const onCancelNight = async () => {
@@ -85,6 +98,16 @@ export function EditNightScreen({
       onCancelled();
     }
   };
+
+  if (mode === "reminders") {
+    return (
+      <RemindersView
+        reminders={reminders}
+        onChange={edit.setReminders}
+        onDone={() => setMode("main")}
+      />
+    );
+  }
 
   if (mode === "date") {
     return (
@@ -156,9 +179,9 @@ export function EditNightScreen({
             </View>
             <SettingsRow
               label="Reminders"
-              value="Day before, morning of"
+              value={formatRemindersSummary(reminders)}
               right={<ChevronRight size={18} color={colors.text.tertiary} />}
-              onPress={onReminders}
+              onPress={() => setMode("reminders")}
             />
           </View>
 

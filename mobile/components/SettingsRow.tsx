@@ -12,8 +12,8 @@ import {
 } from "../theme";
 
 // SettingsRow is the Settings screen's grouped-row primitive: a sentence-case
-// label with an optional right slot — a mono `value`, a `right` node (Toggle /
-// chevron), or nothing. `disabled` dims rows whose backend isn't wired yet;
+// label with an optional mono `value` and an optional `right` node (Toggle /
+// chevron); a row with both shows the value before the node. `disabled` dims rows whose backend isn't wired yet;
 // `danger` is the red Danger-zone ink. Grouping (card + dividers) is the
 // caller's job, so the same row works in every group.
 export function SettingsRow({
@@ -39,13 +39,12 @@ export function SettingsRow({
       >
         {label}
       </Text>
-      {right ? (
-        <View style={styles.right}>{right}</View>
-      ) : value ? (
+      {value ? (
         <Text style={styles.value} numberOfLines={1}>
           {value}
         </Text>
       ) : null}
+      {right ? <View style={styles.right}>{right}</View> : null}
     </>
   );
 

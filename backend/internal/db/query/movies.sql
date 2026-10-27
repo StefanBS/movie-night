@@ -13,10 +13,12 @@ WITH p AS (
   UPDATE picks
   SET movie_id = sqlc.arg(movie_id)
   WHERE picks.id = sqlc.arg(night_id) AND picks.group_id = sqlc.arg(group_id)
-  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id,
+            remind_night_before, remind_morning_of, remind_audience
 )
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  p.remind_night_before, p.remind_morning_of, p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -29,10 +31,12 @@ WITH p AS (
   UPDATE picks
   SET movie_id = NULL
   WHERE picks.id = sqlc.arg(night_id) AND picks.group_id = sqlc.arg(group_id)
-  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id,
+            remind_night_before, remind_morning_of, remind_audience
 )
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  p.remind_night_before, p.remind_morning_of, p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,

@@ -102,14 +102,24 @@ type attendee struct {
 	Role string `json:"role"`
 }
 
+// remindersDTO is a Night's shared reminder settings (ADR-0010): which slots
+// are on and who they go to. Audience is "everyone" or "picker"; the picker's
+// nudge goes out whatever these say.
+type remindersDTO struct {
+	NightBefore bool   `json:"nightBefore"`
+	MorningOf   bool   `json:"morningOf"`
+	Audience    string `json:"audience"`
+}
+
 // nightResponse is the JSON shape for a night and its current attendees. Every
 // night has a picker (ADR-0008); Movie is null until a film is attached.
 type nightResponse struct {
-	ID           string     `json:"id"`
-	ScheduledFor string     `json:"scheduledFor"`
-	PickerID     string     `json:"pickerId"`
-	Movie        *movieDTO  `json:"movie"`
-	Attendees    []attendee `json:"attendees"`
+	ID           string       `json:"id"`
+	ScheduledFor string       `json:"scheduledFor"`
+	PickerID     string       `json:"pickerId"`
+	Movie        *movieDTO    `json:"movie"`
+	Attendees    []attendee   `json:"attendees"`
+	Reminders    remindersDTO `json:"reminders"`
 }
 
 // toAttendee builds the attendee DTO. The single-night query and the grouped
@@ -119,20 +129,25 @@ func toAttendee(id uuid.UUID, name string, role db.MembershipRole) attendee {
 	return attendee{ID: id.String(), Name: name, Role: string(role)}
 }
 
-// newNightResponse assembles the night DTO from its parts. The detail path and
-// the history-list path read different row shapes but both build through here,
-// so a new field is added once. Attendees is normalized to non-nil so an empty
-// list encodes as [] rather than null.
-func newNightResponse(id uuid.UUID, scheduledFor pgtype.Date, pickerID uuid.UUID, movie *movieDTO, atts []attendee) nightResponse {
+// newNightResponse assembles the night DTO from a night row and its attendees.
+// The detail path and the history-list path read attendees in different row
+// shapes but both build through here, so a new field is added once. Attendees
+// is normalized to non-nil so an empty list encodes as [] rather than null.
+func newNightResponse(night nightRow, atts []attendee) nightResponse {
 	if atts == nil {
 		atts = []attendee{}
 	}
 	return nightResponse{
-		ID:           id.String(),
-		ScheduledFor: formatDate(scheduledFor),
-		PickerID:     pickerID.String(),
-		Movie:        movie,
+		ID:           night.ID.String(),
+		ScheduledFor: formatDate(night.ScheduledFor),
+		PickerID:     night.PickerID.String(),
+		Movie:        movieDTOFromCols(night),
 		Attendees:    atts,
+		Reminders: remindersDTO{
+			NightBefore: night.RemindNightBefore,
+			MorningOf:   night.RemindMorningOf,
+			Audience:    string(night.RemindAudience),
+		},
 	}
 }
 
@@ -148,7 +163,7 @@ func toNightResponse(night nightRow, rows []db.ListNightAttendeesRow) nightRespo
 	for _, r := range rows {
 		attendees = append(attendees, toAttendee(r.ID, r.Name, r.Role))
 	}
-	return newNightResponse(night.ID, night.ScheduledFor, night.PickerID, movieDTOFromCols(night), attendees)
+	return newNightResponse(night, attendees)
 }
 
 // movieDTOFromCols builds the movie DTO from a night row's nullable LEFT JOIN
@@ -183,7 +198,7 @@ func groupAttendees(rows []db.ListNightsAttendeesRow) map[uuid.UUID][]attendee {
 func toNightResponses(rows []db.ListNightsRow, byNight map[uuid.UUID][]attendee) []nightResponse {
 	out := make([]nightResponse, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, newNightResponse(row.ID, row.ScheduledFor, row.PickerID, movieDTOFromCols(nightRow(row)), byNight[row.ID]))
+		out = append(out, newNightResponse(nightRow(row), byNight[row.ID]))
 	}
 	return out
 }
@@ -255,10 +270,27 @@ type recordPickRequest struct {
 }
 
 // updateNightRequest is the JSON body of PATCH .../nights/{nightId}. An omitted
-// field is left unchanged; attendees, when sent, replaces the whole set.
+// field is left unchanged; attendees and reminders, when sent, replace the
+// whole set.
 type updateNightRequest struct {
-	ScheduledFor *string   `json:"scheduledFor"`
-	Attendees    *[]string `json:"attendees"`
+	ScheduledFor *string           `json:"scheduledFor"`
+	Attendees    *[]string         `json:"attendees"`
+	Reminders    *remindersRequest `json:"reminders"`
+}
+
+// remindersRequest is the wire form of remindersDTO with every field a pointer,
+// so an omitted field is rejected rather than read as false.
+type remindersRequest struct {
+	NightBefore *bool   `json:"nightBefore"`
+	MorningOf   *bool   `json:"morningOf"`
+	Audience    *string `json:"audience"`
+}
+
+// nightReminders is a validated remindersRequest.
+type nightReminders struct {
+	NightBefore bool
+	MorningOf   bool
+	Audience    db.ReminderAudience
 }
 
 // parsedUpdateNight is a validated updateNightRequest. A nil field is
@@ -266,13 +298,26 @@ type updateNightRequest struct {
 type parsedUpdateNight struct {
 	ScheduledFor *pgtype.Date
 	Attendees    []uuid.UUID
+	Reminders    *nightReminders
+}
+
+// parseReminders requires all three settings and a known audience. Pure.
+func parseReminders(req remindersRequest) (nightReminders, error) {
+	if req.NightBefore == nil || req.MorningOf == nil || req.Audience == nil {
+		return nightReminders{}, fmt.Errorf("reminders needs nightBefore, morningOf and audience")
+	}
+	audience := db.ReminderAudience(*req.Audience)
+	if audience != db.ReminderAudienceEveryone && audience != db.ReminderAudiencePicker {
+		return nightReminders{}, fmt.Errorf("invalid reminders audience")
+	}
+	return nightReminders{NightBefore: *req.NightBefore, MorningOf: *req.MorningOf, Audience: audience}, nil
 }
 
 // validateUpdateNightRequest parses the fields that were sent and rejects a
 // body that changes nothing. The picker rule needs the stored Night, so it is
 // checked in the handler. Pure.
 func validateUpdateNightRequest(req updateNightRequest) (parsedUpdateNight, error) {
-	if req.ScheduledFor == nil && req.Attendees == nil {
+	if req.ScheduledFor == nil && req.Attendees == nil && req.Reminders == nil {
 		return parsedUpdateNight{}, fmt.Errorf("nothing to update")
 	}
 	var parsed parsedUpdateNight
@@ -289,6 +334,13 @@ func validateUpdateNightRequest(req updateNightRequest) (parsedUpdateNight, erro
 			return parsedUpdateNight{}, err
 		}
 		parsed.Attendees = ids
+	}
+	if req.Reminders != nil {
+		rem, err := parseReminders(*req.Reminders)
+		if err != nil {
+			return parsedUpdateNight{}, err
+		}
+		parsed.Reminders = &rem
 	}
 	return parsed, nil
 }
@@ -514,8 +566,9 @@ func recordNightPickHandler(store nightStore) http.HandlerFunc {
 }
 
 // updateNightHandler serves PATCH /groups/{groupId}/nights/{nightId}. Body
-// {"scheduledFor"?, "attendees"?} edits the Night's date and replaces its
-// attendee set in one transaction, so a rejected edit changes nothing. The
+// {"scheduledFor"?, "attendees"?, "reminders"?} edits the Night's date and
+// replaces its attendee set and reminder settings in one transaction, so a
+// rejected edit changes nothing. The
 // picker must stay an attendee (422), every attendee must be a member (422),
 // and a date another night already holds is a 409. The picker itself is
 // changed only by record-pick.
@@ -582,6 +635,19 @@ func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit 
 		if err := q.AddAttendees(ctx, db.AddAttendeesParams{PickID: nightID, UserIds: edit.Attendees}); err != nil {
 			return nightRow{}, err
 		}
+	}
+	if edit.Reminders != nil {
+		updated, err := q.UpdateNightReminders(ctx, db.UpdateNightRemindersParams{
+			NightID:           nightID,
+			GroupID:           gid,
+			RemindNightBefore: edit.Reminders.NightBefore,
+			RemindMorningOf:   edit.Reminders.MorningOf,
+			RemindAudience:    edit.Reminders.Audience,
+		})
+		if err != nil {
+			return nightRow{}, err
+		}
+		night = nightRow(updated)
 	}
 	if edit.ScheduledFor != nil {
 		updated, err := q.UpdateNightDate(ctx, db.UpdateNightDateParams{

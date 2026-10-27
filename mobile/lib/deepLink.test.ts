@@ -8,7 +8,7 @@ test("safeIncomingPath", async (t) => {
   const cases: { name: string; path: string; initial: boolean; want: string | null }[] = [
     { name: "passes a plain route through", path: "/rotation", initial: false, want: "/rotation" },
     { name: "passes a full scheme URL through", path: `movienight://night/${uuid}`, initial: true, want: `movienight://night/${uuid}` },
-    { name: "passes a query string through", path: `/night/edit/reminders?id=${uuid}`, initial: false, want: `/night/edit/reminders?id=${uuid}` },
+    { name: "passes a query string through", path: `/night/new?date=2026-06-19&ref=${uuid}`, initial: false, want: `/night/new?date=2026-06-19&ref=${uuid}` },
     { name: "passes well-formed percent-encoding through", path: "/member/new?name=Ana%20Mar%C3%ADa", initial: false, want: "/member/new?name=Ana%20Mar%C3%ADa" },
     { name: "passes a path at the length cap through", path: "/" + "a".repeat(MAX_INCOMING_PATH_LENGTH - 1), initial: false, want: "/" + "a".repeat(MAX_INCOMING_PATH_LENGTH - 1) },
     { name: "sends an oversized initial link home", path: "/" + "a".repeat(MAX_INCOMING_PATH_LENGTH), initial: true, want: "/" },

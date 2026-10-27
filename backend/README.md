@@ -99,14 +99,14 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `GET` | `/identity` | The bearer's identity `{"id","name"}`. |
 | `DELETE` | `/identity` | Release the identity, revoking the token; `204`. Idempotent. |
 
-**Night lifecycle** ([ADR-0008](../docs/adr/0008-night-always-has-a-picker.md)) — each returns the night `{"id","scheduledFor","pickerId","movie","attendees"}`. Every night has a picker, who is always an attendee; at most one night per group per date.
+**Night lifecycle** ([ADR-0008](../docs/adr/0008-night-always-has-a-picker.md)) — each returns the night `{"id","scheduledFor","pickerId","movie","attendees","reminders"}`, where `reminders` is `{"nightBefore","morningOf","audience"}` with audience `everyone` or `picker` ([ADR-0010](../docs/adr/0010-server-push-reminders.md)). Every night has a picker, who is always an attendee; at most one night per group per date.
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/groups/{groupId}/nights` | Create a night with its picker; `201`. Body `{"scheduledFor","attendees","pickerId"}`; `422` if the picker isn't an attendee, `409` if the date is taken. |
 | `GET` | `/groups/{groupId}/nights` | Every night, past and upcoming, newest first. |
 | `GET` | `/groups/{groupId}/nights/{nightId}` | A night and its attendees. |
-| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Edit the date and/or replace the attendee set in one transaction — a rejected edit changes nothing. Body `{"scheduledFor"?,"attendees"?}` (omitted = unchanged); `422` if the attendees leave out the picker or include a non-member, `409` if the date is taken. |
+| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Edit the date and/or replace the attendee set and reminder settings in one transaction — a rejected edit changes nothing. Body `{"scheduledFor"?,"attendees"?,"reminders"?}` (omitted = unchanged; `reminders` needs all three fields); `422` if the attendees leave out the picker or include a non-member, `409` if the date is taken. |
 | `DELETE` | `/groups/{groupId}/nights/{nightId}` | Cancel/delete the night; `204`. Idempotent. |
 | `GET` | `/groups/{groupId}/nights/{nightId}/turn` | Least-served ranking over the night's attendees, ignoring the night's own pick. |
 | `POST` | `/groups/{groupId}/nights/{nightId}/pick` | Change the picker (must be an attendee; guest picks don't move standings). Body `{"pickerId"}`. |

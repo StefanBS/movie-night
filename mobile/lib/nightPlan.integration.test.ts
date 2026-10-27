@@ -53,7 +53,14 @@ const member = (id: string, role: "core" | "guest" = "core"): Member => ({
 const ranked = (id: string): TurnMember => ({ id, name: id, role: "core", servedCount: 0, lastPickedOn: null });
 
 const ROSTER = [member("ada"), member("blake"), member("frankie", "guest")];
-const EXISTING: Night = { id: "n0", scheduledFor: "2026-06-19", pickerId: "ada", movie: null, attendees: [] };
+const EXISTING: Night = {
+  id: "n0",
+  scheduledFor: "2026-06-19",
+  pickerId: "ada",
+  movie: null,
+  attendees: [],
+  reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
+};
 
 // backend is a small fake of the routes a Plan touches. The turn ranking is
 // "present core members in roster order", which is enough to see reranks.
@@ -78,6 +85,7 @@ function backend(over: Partial<Record<string, Handler>> = {}): Handler {
         id: "n1",
         scheduledFor: req.scheduledFor,
         pickerId: req.pickerId,
+        reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
         movie: null,
         attendees: req.attendees.map((id) => ({ id, name: id, role: id === "frankie" ? "guest" : "core" })),
       };

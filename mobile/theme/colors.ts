@@ -86,6 +86,11 @@ export const colors = {
     danger: palette.red[500],
     success: palette.green[500],
   },
+  // Toggle: the track is accent.base when on.
+  control: {
+    trackOff: palette.night[600],
+    knob: palette.haze[100],
+  },
 } as const;
 
 // --- Avatar tints — the seven jewel friends of the logo ring (assets/brand/logomark.svg).

@@ -4,13 +4,15 @@
 WITH night AS (
   INSERT INTO picks (group_id, scheduled_for, picker_id, is_credited)
   VALUES (sqlc.arg(group_id), sqlc.arg(scheduled_for), sqlc.arg(picker_id), sqlc.arg(is_credited))
-  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id,
+            remind_night_before, remind_morning_of, remind_audience
 ), attended AS (
   INSERT INTO attendances (pick_id, user_id)
   SELECT night.id, unnest(sqlc.arg(attendees)::uuid[]) FROM night
 )
 SELECT
   night.id, night.group_id, night.picker_id, night.is_credited, night.scheduled_for, night.created_at,
+  night.remind_night_before, night.remind_morning_of, night.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -23,6 +25,7 @@ LEFT JOIN movies m ON m.id = night.movie_id;
 -- JOIN columns), so one mapper builds every night response.
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  p.remind_night_before, p.remind_morning_of, p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -36,6 +39,7 @@ WHERE p.id = sqlc.arg(night_id) AND p.group_id = sqlc.arg(group_id);
 -- record-pick cannot move the picker between the picker check and the write.
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  p.remind_night_before, p.remind_morning_of, p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -70,10 +74,12 @@ WITH p AS (
   UPDATE picks
   SET picker_id = sqlc.arg(picker_id), is_credited = sqlc.arg(is_credited)
   WHERE picks.id = sqlc.arg(night_id) AND picks.group_id = sqlc.arg(group_id)
-  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id,
+            remind_night_before, remind_morning_of, remind_audience
 )
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  p.remind_night_before, p.remind_morning_of, p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -84,6 +90,7 @@ LEFT JOIN movies m ON m.id = p.movie_id;
 -- name: ListNights :many
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  p.remind_night_before, p.remind_morning_of, p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -98,10 +105,32 @@ WITH p AS (
   UPDATE picks
   SET scheduled_for = sqlc.arg(scheduled_for)
   WHERE picks.id = sqlc.arg(night_id) AND picks.group_id = sqlc.arg(group_id)
-  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id,
+            remind_night_before, remind_morning_of, remind_audience
 )
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  p.remind_night_before, p.remind_morning_of, p.remind_audience,
+  m.tmdb_id      AS movie_tmdb_id,
+  m.title        AS movie_title,
+  m.release_year AS movie_release_year,
+  m.poster_path  AS movie_poster_path
+FROM p
+LEFT JOIN movies m ON m.id = p.movie_id;
+
+-- name: UpdateNightReminders :one
+WITH p AS (
+  UPDATE picks
+  SET remind_night_before = sqlc.arg(remind_night_before),
+      remind_morning_of   = sqlc.arg(remind_morning_of),
+      remind_audience     = sqlc.arg(remind_audience)
+  WHERE picks.id = sqlc.arg(night_id) AND picks.group_id = sqlc.arg(group_id)
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id,
+            remind_night_before, remind_morning_of, remind_audience
+)
+SELECT
+  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  p.remind_night_before, p.remind_morning_of, p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
