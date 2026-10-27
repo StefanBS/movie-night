@@ -52,7 +52,7 @@ knows which person each device is.
 - Android delivery needs FCM credentials configured through EAS (a one-time
   manual setup), and `expo-notifications` is a native dependency: the dev client
   must be rebuilt.
-- Adding a Night start time (e.g. for calendar export, #51) can bring back a
+- Adding a Night start time can bring back a
   "hours before" slot without changing this model.
 
 ---

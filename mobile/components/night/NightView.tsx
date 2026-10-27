@@ -1,8 +1,9 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Clock } from "lucide-react-native";
 
-import { AppButton, Avatar, Badge, Poster, SectionLabel } from "../";
+import { AppButton, Avatar, Badge, Poster, SectionLabel, useToast } from "../";
 import { WizardFooter } from "./WizardFooter";
+import { addToCalendar } from "../../calendarExport";
 import { countdownLabel, formatShortDate, weekday } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import { nightTiming } from "../../lib/nightLifecycle";
@@ -44,9 +45,18 @@ export function NightView({
   onClearFilm?: () => void;
   onEdit?: () => void;
 }) {
-  const future = nightTiming(night.scheduledFor, today) === "upcoming";
+  const toast = useToast();
+  const timing = nightTiming(night.scheduledFor, today);
+  const future = timing === "upcoming";
+  // A Calendar entry is for a Night still ahead; the OS form has no web version.
+  const canExport = timing !== "past" && Platform.OS !== "web";
   const movie = night.movie;
   const pickerName = members.find((m) => m.id === night.pickerId)?.name ?? "";
+  const onAddToCalendar = async () => {
+    if ((await addToCalendar(night)) === "saved") {
+      toast({ title: "Added to your calendar", body: "It won't follow later changes to the night." });
+    }
+  };
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -120,6 +130,9 @@ export function NightView({
           ) : null}
           {onEdit !== undefined ? (
             <AppButton title="Edit night" variant="ghost" onPress={onEdit} />
+          ) : null}
+          {canExport ? (
+            <AppButton title="Add to calendar" variant="ghost" onPress={() => void onAddToCalendar()} />
           ) : null}
         </View>
       </WizardFooter>
