@@ -52,7 +52,7 @@ func seedBaseline(avgServed float64, existingCredited int32) int32 {
 // *db.Queries satisfies it, so no mock is ever written (same pattern as
 // pickStore/turnStore).
 type memberStore interface {
-	CreateUser(ctx context.Context, name string) (db.User, error)
+	CreateUser(ctx context.Context, name string) (db.CreateUserRow, error)
 	InsertMembership(ctx context.Context, arg db.InsertMembershipParams) (db.Membership, error)
 	GetGroupMember(ctx context.Context, arg db.GetGroupMemberParams) (db.GetGroupMemberRow, error)
 	DeactivateMembership(ctx context.Context, arg db.DeactivateMembershipParams) (db.Membership, error)

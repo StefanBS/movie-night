@@ -9,12 +9,13 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createDevice = `-- name: CreateDevice :one
 INSERT INTO devices (user_id, token_hash)
 VALUES ($1, $2)
-RETURNING id, user_id, token_hash, created_at, last_seen_at
+RETURNING id, user_id
 `
 
 type CreateDeviceParams struct {
@@ -22,16 +23,15 @@ type CreateDeviceParams struct {
 	TokenHash []byte    `json:"token_hash"`
 }
 
-func (q *Queries) CreateDevice(ctx context.Context, arg CreateDeviceParams) (Device, error) {
+type CreateDeviceRow struct {
+	ID     uuid.UUID `json:"id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) CreateDevice(ctx context.Context, arg CreateDeviceParams) (CreateDeviceRow, error) {
 	row := q.db.QueryRow(ctx, createDevice, arg.UserID, arg.TokenHash)
-	var i Device
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.TokenHash,
-		&i.CreatedAt,
-		&i.LastSeenAt,
-	)
+	var i CreateDeviceRow
+	err := row.Scan(&i.ID, &i.UserID)
 	return i, err
 }
 
@@ -47,17 +47,76 @@ func (q *Queries) DeleteDevice(ctx context.Context, tokenHash []byte) (int64, er
 	return result.RowsAffected(), nil
 }
 
+const registerPush = `-- name: RegisterPush :execrows
+WITH me AS (
+  SELECT d.id FROM devices d WHERE d.token_hash = $3
+), cleared AS (
+  UPDATE devices o SET push_token = NULL
+  WHERE o.push_token = $1 AND o.id NOT IN (SELECT me.id FROM me)
+)
+UPDATE devices t
+SET push_token = $1, time_zone = $2, last_seen_at = now()
+WHERE t.id IN (SELECT me.id FROM me)
+`
+
+type RegisterPushParams struct {
+	PushToken pgtype.Text `json:"push_token"`
+	TimeZone  pgtype.Text `json:"time_zone"`
+	TokenHash []byte      `json:"token_hash"`
+}
+
+// Points the device's reminders at its push token and time zone. A push token
+// names one install, so it is taken off any other device row first (a
+// reinstall's orphaned row, say) so nobody gets a reminder twice or someone
+// else's. No row means the token is unknown or was released.
+func (q *Queries) RegisterPush(ctx context.Context, arg RegisterPushParams) (int64, error) {
+	result, err := q.db.Exec(ctx, registerPush, arg.PushToken, arg.TimeZone, arg.TokenHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setRemindersMuted = `-- name: SetRemindersMuted :one
+UPDATE users u
+SET reminders_muted = $1
+FROM devices d
+WHERE d.token_hash = $2 AND u.id = d.user_id
+RETURNING u.id AS user_id, u.name, u.reminders_muted
+`
+
+type SetRemindersMutedParams struct {
+	RemindersMuted bool   `json:"reminders_muted"`
+	TokenHash      []byte `json:"token_hash"`
+}
+
+type SetRemindersMutedRow struct {
+	UserID         uuid.UUID `json:"user_id"`
+	Name           string    `json:"name"`
+	RemindersMuted bool      `json:"reminders_muted"`
+}
+
+// Mutes or unmutes reminders for the device's identity; no row means the
+// token is unknown or was released.
+func (q *Queries) SetRemindersMuted(ctx context.Context, arg SetRemindersMutedParams) (SetRemindersMutedRow, error) {
+	row := q.db.QueryRow(ctx, setRemindersMuted, arg.RemindersMuted, arg.TokenHash)
+	var i SetRemindersMutedRow
+	err := row.Scan(&i.UserID, &i.Name, &i.RemindersMuted)
+	return i, err
+}
+
 const touchDevice = `-- name: TouchDevice :one
 UPDATE devices d
 SET last_seen_at = now()
 FROM users u
 WHERE d.token_hash = $1 AND u.id = d.user_id
-RETURNING u.id AS user_id, u.name
+RETURNING u.id AS user_id, u.name, u.reminders_muted
 `
 
 type TouchDeviceRow struct {
-	UserID uuid.UUID `json:"user_id"`
-	Name   string    `json:"name"`
+	UserID         uuid.UUID `json:"user_id"`
+	Name           string    `json:"name"`
+	RemindersMuted bool      `json:"reminders_muted"`
 }
 
 // Resolves a token hash to its identity and records that the device was seen;
@@ -65,6 +124,6 @@ type TouchDeviceRow struct {
 func (q *Queries) TouchDevice(ctx context.Context, tokenHash []byte) (TouchDeviceRow, error) {
 	row := q.db.QueryRow(ctx, touchDevice, tokenHash)
 	var i TouchDeviceRow
-	err := row.Scan(&i.UserID, &i.Name)
+	err := row.Scan(&i.UserID, &i.Name, &i.RemindersMuted)
 	return i, err
 }

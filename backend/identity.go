@@ -5,10 +5,13 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -26,10 +29,12 @@ type claimRequest struct {
 	UserID  string `json:"userId"`
 }
 
-// identityResponse is the person an install acts as.
+// identityResponse is the person an install acts as, with their one personal
+// reminder setting (ADR-0010).
 type identityResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	RemindersMuted bool   `json:"remindersMuted"`
 }
 
 // claimResponse is identityResponse plus the bearer token, returned once.
@@ -42,9 +47,40 @@ type claimResponse struct {
 // real *db.Queries satisfies it.
 type identityStore interface {
 	GetGroupMember(ctx context.Context, arg db.GetGroupMemberParams) (db.GetGroupMemberRow, error)
-	CreateDevice(ctx context.Context, arg db.CreateDeviceParams) (db.Device, error)
+	CreateDevice(ctx context.Context, arg db.CreateDeviceParams) (db.CreateDeviceRow, error)
 	TouchDevice(ctx context.Context, tokenHash []byte) (db.TouchDeviceRow, error)
 	DeleteDevice(ctx context.Context, tokenHash []byte) (int64, error)
+	RegisterPush(ctx context.Context, arg db.RegisterPushParams) (int64, error)
+	SetRemindersMuted(ctx context.Context, arg db.SetRemindersMutedParams) (db.SetRemindersMutedRow, error)
+}
+
+// pushRequest is the JSON body of PUT /identity/push.
+type pushRequest struct {
+	PushToken string `json:"pushToken"`
+	TimeZone  string `json:"timeZone"`
+}
+
+// preferencesRequest is the JSON body of PUT /identity/preferences.
+type preferencesRequest struct {
+	RemindersMuted *bool `json:"remindersMuted"`
+}
+
+// validatePushRequest requires an Expo push token and an IANA time zone the
+// server knows ("Europe/Madrid"), since reminder slots are wall-clock times
+// on the device. Pure.
+func validatePushRequest(req pushRequest) error {
+	tok := req.PushToken
+	if !(strings.HasPrefix(tok, "ExponentPushToken[") || strings.HasPrefix(tok, "ExpoPushToken[")) ||
+		!strings.HasSuffix(tok, "]") || len(tok) > 256 {
+		return fmt.Errorf("invalid pushToken")
+	}
+	if req.TimeZone == "" || req.TimeZone == "Local" {
+		return fmt.Errorf("invalid timeZone")
+	}
+	if _, err := time.LoadLocation(req.TimeZone); err != nil {
+		return fmt.Errorf("invalid timeZone")
+	}
+	return nil
 }
 
 // newToken returns a fresh random bearer token (32 bytes, base64url).
@@ -119,7 +155,7 @@ func claimIdentityHandler(store identityStore) http.HandlerFunc {
 		}
 		respondJSON(w, http.StatusCreated, claimResponse{
 			Token:    token,
-			Identity: identityResponse{ID: m.UserID.String(), Name: m.Name},
+			Identity: identityResponse{ID: m.UserID.String(), Name: m.Name, RemindersMuted: m.RemindersMuted},
 		}, gid, "encode claim response")
 	}
 }
@@ -137,7 +173,7 @@ func getIdentityHandler(store identityStore) http.HandlerFunc {
 			storeError(w, uuid.Nil, "touch device", err, http.StatusUnauthorized, "unknown token")
 			return
 		}
-		respondJSON(w, http.StatusOK, identityResponse{ID: row.UserID.String(), Name: row.Name}, uuid.Nil, "encode identity response")
+		respondJSON(w, http.StatusOK, identityResponse{ID: row.UserID.String(), Name: row.Name, RemindersMuted: row.RemindersMuted}, uuid.Nil, "encode identity response")
 	}
 }
 
@@ -155,5 +191,68 @@ func releaseIdentityHandler(store identityStore) http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// registerPushHandler serves PUT /identity/push: the install's Expo push token
+// and time zone, re-sent on every launch so both stay current. 204 on success;
+// an unknown or released token is a 401.
+func registerPushHandler(store identityStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token, ok := requireBearer(w, r)
+		if !ok {
+			return
+		}
+		req, ok := decodeJSON[pushRequest](w, r)
+		if !ok {
+			return
+		}
+		if err := validatePushRequest(req); err != nil {
+			writeJSONError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		n, err := store.RegisterPush(r.Context(), db.RegisterPushParams{
+			TokenHash: hashToken(token),
+			PushToken: pgtype.Text{String: req.PushToken, Valid: true},
+			TimeZone:  pgtype.Text{String: req.TimeZone, Valid: true},
+		})
+		if err != nil {
+			internalError(w, uuid.Nil, "register push", err)
+			return
+		}
+		if n == 0 {
+			writeJSONError(w, http.StatusUnauthorized, "unknown token")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// setPreferencesHandler serves PUT /identity/preferences: body
+// {"remindersMuted"} mutes or unmutes every reminder and nudge to the
+// install's identity, on all of their devices. Returns the identity.
+func setPreferencesHandler(store identityStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token, ok := requireBearer(w, r)
+		if !ok {
+			return
+		}
+		req, ok := decodeJSON[preferencesRequest](w, r)
+		if !ok {
+			return
+		}
+		if req.RemindersMuted == nil {
+			writeJSONError(w, http.StatusBadRequest, "remindersMuted is required")
+			return
+		}
+		row, err := store.SetRemindersMuted(r.Context(), db.SetRemindersMutedParams{
+			TokenHash:      hashToken(token),
+			RemindersMuted: *req.RemindersMuted,
+		})
+		if err != nil {
+			storeError(w, uuid.Nil, "set reminders muted", err, http.StatusUnauthorized, "unknown token")
+			return
+		}
+		respondJSON(w, http.StatusOK, identityResponse{ID: row.UserID.String(), Name: row.Name, RemindersMuted: row.RemindersMuted}, uuid.Nil, "encode identity response")
 	}
 }

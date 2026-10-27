@@ -91,13 +91,15 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `POST` | `/groups/{groupId}/members/{userId}/reactivate` | Restore; re-seeds if it re-enters the rotation. |
 | `POST` | `/groups/{groupId}/members/{userId}/promote` | Guest → active core. |
 
-**Identity** ([ADR-0009](../docs/adr/0009-claimed-identity-device-tokens.md)) — the person an install acts as. `GET`/`DELETE` take `Authorization: Bearer <token>` and return `401` without a valid one; the other routes are unauthenticated.
+**Identity** ([ADR-0009](../docs/adr/0009-claimed-identity-device-tokens.md)) — the person an install acts as. Every route but the claim takes `Authorization: Bearer <token>` and return `401` without a valid one; the other routes are unauthenticated.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/identity` | Claim an active member (core or guest); `201` `{"token","identity":{"id","name"}}`. Body `{"groupId","userId"}`; `404` if not a member, `422` if inactive. |
-| `GET` | `/identity` | The bearer's identity `{"id","name"}`. |
+| `POST` | `/identity` | Claim an active member (core or guest); `201` `{"token","identity":{"id","name","remindersMuted"}}`. Body `{"groupId","userId"}`; `404` if not a member, `422` if inactive. |
+| `GET` | `/identity` | The bearer's identity `{"id","name","remindersMuted"}`. |
 | `DELETE` | `/identity` | Release the identity, revoking the token; `204`. Idempotent. |
+| `PUT` | `/identity/push` | Register this device for reminders ([ADR-0010](../docs/adr/0010-server-push-reminders.md)); `204`. Body `{"pushToken","timeZone"}`: an Expo push token and an IANA zone; `400` if either is invalid. The push token is taken off any other device. |
+| `PUT` | `/identity/preferences` | Mute or unmute every reminder to this person, on all their devices. Body `{"remindersMuted"}`; returns the identity. |
 
 **Night lifecycle** ([ADR-0008](../docs/adr/0008-night-always-has-a-picker.md)) — each returns the night `{"id","scheduledFor","pickerId","movie","attendees","reminders"}`, where `reminders` is `{"nightBefore","morningOf","audience"}` with audience `everyone` or `picker` ([ADR-0010](../docs/adr/0010-server-push-reminders.md)). Every night has a picker, who is always an attendee; at most one night per group per date.
 

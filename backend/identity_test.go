@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -52,5 +53,30 @@ func TestNewToken(t *testing.T) {
 	// 32 random bytes in unpadded base64url.
 	if len(a) != 43 {
 		t.Errorf("len(token) = %d, want 43", len(a))
+	}
+}
+
+func TestValidatePushRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		req     pushRequest
+		wantErr bool
+	}{
+		{name: "expo token and zone", req: pushRequest{PushToken: "ExponentPushToken[abc]", TimeZone: "Europe/Madrid"}},
+		{name: "newer token prefix", req: pushRequest{PushToken: "ExpoPushToken[abc]", TimeZone: "America/New_York"}},
+		{name: "UTC", req: pushRequest{PushToken: "ExponentPushToken[abc]", TimeZone: "UTC"}},
+		{name: "missing token", req: pushRequest{TimeZone: "UTC"}, wantErr: true},
+		{name: "not an expo token", req: pushRequest{PushToken: "fcm:abc", TimeZone: "UTC"}, wantErr: true},
+		{name: "unterminated token", req: pushRequest{PushToken: "ExponentPushToken[abc", TimeZone: "UTC"}, wantErr: true},
+		{name: "oversized token", req: pushRequest{PushToken: "ExponentPushToken[" + strings.Repeat("a", 300) + "]", TimeZone: "UTC"}, wantErr: true},
+		{name: "missing zone", req: pushRequest{PushToken: "ExponentPushToken[abc]"}, wantErr: true},
+		{name: "Local is not a zone", req: pushRequest{PushToken: "ExponentPushToken[abc]", TimeZone: "Local"}, wantErr: true},
+		{name: "unknown zone", req: pushRequest{PushToken: "ExponentPushToken[abc]", TimeZone: "Mars/Olympus"}, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := validatePushRequest(tc.req); (err != nil) != tc.wantErr {
+				t.Errorf("validatePushRequest(%+v) = %v, wantErr %v", tc.req, err, tc.wantErr)
+			}
+		})
 	}
 }

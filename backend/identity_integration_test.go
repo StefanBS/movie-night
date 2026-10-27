@@ -20,6 +20,8 @@ func TestIdentityIntegration(t *testing.T) {
 	mux.Handle("POST /identity", claimIdentityHandler(q))
 	mux.Handle("GET /identity", getIdentityHandler(q))
 	mux.Handle("DELETE /identity", releaseIdentityHandler(q))
+	mux.Handle("PUT /identity/push", registerPushHandler(q))
+	mux.Handle("PUT /identity/preferences", setPreferencesHandler(q))
 
 	claimBody := func(group, user string) string {
 		return fmt.Sprintf(`{"groupId":%q,"userId":%q}`, group, user)
@@ -103,6 +105,96 @@ func TestIdentityIntegration(t *testing.T) {
 			t.Errorf("GET status = %d, want 200", code)
 		}
 	})
+
+	pushBody := func(pushToken, timeZone string) string {
+		return fmt.Sprintf(`{"pushToken":%q,"timeZone":%q}`, pushToken, timeZone)
+	}
+	// pushOf reads back the push token and time zone stored for a device.
+	pushOf := func(t *testing.T, token string) (pushToken, timeZone *string) {
+		t.Helper()
+		if err := pool.QueryRow(t.Context(),
+			`SELECT push_token, time_zone FROM devices WHERE token_hash = $1`, hashToken(token)).Scan(&pushToken, &timeZone); err != nil {
+			t.Fatalf("read device: %v", err)
+		}
+		return pushToken, timeZone
+	}
+	mute := func(t *testing.T, token string, muted bool) (int, identityResponse) {
+		t.Helper()
+		code, b := doReqAuth(t, mux, http.MethodPut, "/identity/preferences", fmt.Sprintf(`{"remindersMuted":%t}`, muted), "Bearer "+token)
+		var id identityResponse
+		if code == http.StatusOK {
+			if err := json.Unmarshal(b, &id); err != nil {
+				t.Fatalf("decode identity: %v (body %s)", err, b)
+			}
+		}
+		return code, id
+	}
+
+	t.Run("registering push stores the token and time zone", func(t *testing.T) {
+		c := claim(t, ada)
+		if code, b := doReqAuth(t, mux, http.MethodPut, "/identity/push", pushBody("ExponentPushToken[ada-1]", "Europe/Madrid"), "Bearer "+c.Token); code != http.StatusNoContent {
+			t.Fatalf("PUT status = %d (%s), want 204", code, b)
+		}
+		pt, tz := pushOf(t, c.Token)
+		if pt == nil || *pt != "ExponentPushToken[ada-1]" || tz == nil || *tz != "Europe/Madrid" {
+			t.Errorf("stored push = %v, %v", pt, tz)
+		}
+	})
+
+	t.Run("a push token moves to the device that registers it last", func(t *testing.T) {
+		old, reinstalled := claim(t, blake), claim(t, blake)
+		for _, c := range []claimResponse{old, reinstalled} {
+			if code, _ := doReqAuth(t, mux, http.MethodPut, "/identity/push", pushBody("ExponentPushToken[shared]", "UTC"), "Bearer "+c.Token); code != http.StatusNoContent {
+				t.Fatalf("PUT status = %d, want 204", code)
+			}
+		}
+		if pt, _ := pushOf(t, old.Token); pt != nil {
+			t.Errorf("old device push token = %q, want cleared", *pt)
+		}
+		if pt, _ := pushOf(t, reinstalled.Token); pt == nil || *pt != "ExponentPushToken[shared]" {
+			t.Errorf("new device push token = %v, want ExponentPushToken[shared]", pt)
+		}
+	})
+
+	t.Run("muting applies to the person on every device", func(t *testing.T) {
+		phone, tablet := claim(t, frankie), claim(t, frankie)
+		if phone.Identity.RemindersMuted {
+			t.Fatal("a new identity starts muted")
+		}
+		code, id := mute(t, phone.Token, true)
+		if code != http.StatusOK || !id.RemindersMuted {
+			t.Fatalf("mute = %d %+v, want 200 muted", code, id)
+		}
+		if _, other := whoAmI(t, tablet.Token); !other.RemindersMuted {
+			t.Error("other device does not see the mute")
+		}
+		if c := claim(t, frankie); !c.Identity.RemindersMuted {
+			t.Error("a new claim does not see the mute")
+		}
+		if _, id := mute(t, tablet.Token, false); id.RemindersMuted {
+			t.Error("unmute did not apply")
+		}
+	})
+
+	for _, tc := range []struct {
+		name          string
+		path          string
+		body          string
+		authorization string
+		want          int
+	}{
+		{name: "push with an unknown token is 401", path: "/identity/push", body: pushBody("ExponentPushToken[x]", "UTC"), authorization: "Bearer never-issued", want: http.StatusUnauthorized},
+		{name: "push without a token is 401", path: "/identity/push", body: pushBody("ExponentPushToken[x]", "UTC"), want: http.StatusUnauthorized},
+		{name: "preferences with an unknown token is 401", path: "/identity/preferences", body: `{"remindersMuted":true}`, authorization: "Bearer never-issued", want: http.StatusUnauthorized},
+		{name: "preferences without remindersMuted is 400", path: "/identity/preferences", body: `{}`, authorization: "Bearer never-issued", want: http.StatusBadRequest},
+		{name: "push with a bad time zone is 400", path: "/identity/push", body: pushBody("ExponentPushToken[x]", "Mars/Olympus"), authorization: "Bearer never-issued", want: http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if code, _ := doReqAuth(t, mux, http.MethodPut, tc.path, tc.body, tc.authorization); code != tc.want {
+				t.Errorf("status = %d, want %d", code, tc.want)
+			}
+		})
+	}
 
 	for _, tc := range []struct {
 		name string

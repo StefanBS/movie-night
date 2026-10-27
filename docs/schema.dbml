@@ -46,6 +46,7 @@ Table users {
   name            varchar      [not null]
   letterboxd_user varchar      [null, note: 'Optional handle; watchlists seeded via CSV import (ADR-0003)']
   created_at      timestamptz  [not null, default: `now()`]
+  reminders_muted boolean      [not null, default: false, note: 'Mutes every reminder and nudge to this person (ADR-0010)']
 
   Note: 'Every human — core member or guest. Repeated guests are recurring rows (ADR-0004).'
 }
@@ -56,6 +57,8 @@ Table devices {
   token_hash   bytea        [not null, unique, note: 'SHA-256 of the bearer token; the raw token lives only on the device']
   created_at   timestamptz  [not null, default: `now()`]
   last_seen_at timestamptz  [not null, default: `now()`]
+  push_token   text         [null, note: 'Expo push token; at most one device holds a given token (ADR-0010)']
+  time_zone    text         [null, note: 'IANA zone the device reported; reminder slots are wall-clock times there']
 
   Note: 'An install and the identity it claimed (ADR-0009). Deleted on release.'
 }

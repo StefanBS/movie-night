@@ -17,9 +17,16 @@ INSERT INTO users (name) VALUES ($1)
 RETURNING id, name, letterboxd_user, created_at
 `
 
-func (q *Queries) CreateUser(ctx context.Context, name string) (User, error) {
+type CreateUserRow struct {
+	ID             uuid.UUID          `json:"id"`
+	Name           string             `json:"name"`
+	LetterboxdUser pgtype.Text        `json:"letterboxd_user"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, name string) (CreateUserRow, error) {
 	row := q.db.QueryRow(ctx, createUser, name)
-	var i User
+	var i CreateUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -97,7 +104,7 @@ func (q *Queries) FilterGroupMembers(ctx context.Context, arg FilterGroupMembers
 }
 
 const getGroupMember = `-- name: GetGroupMember :one
-SELECT u.id AS user_id, u.name, m.role, m.status, m.baseline_picks, m.joined_at
+SELECT u.id AS user_id, u.name, u.reminders_muted, m.role, m.status, m.baseline_picks, m.joined_at
 FROM memberships m
 JOIN users u ON u.id = m.user_id
 WHERE m.group_id = $1 AND m.user_id = $2
@@ -109,12 +116,13 @@ type GetGroupMemberParams struct {
 }
 
 type GetGroupMemberRow struct {
-	UserID        uuid.UUID          `json:"user_id"`
-	Name          string             `json:"name"`
-	Role          MembershipRole     `json:"role"`
-	Status        MembershipStatus   `json:"status"`
-	BaselinePicks int32              `json:"baseline_picks"`
-	JoinedAt      pgtype.Timestamptz `json:"joined_at"`
+	UserID         uuid.UUID          `json:"user_id"`
+	Name           string             `json:"name"`
+	RemindersMuted bool               `json:"reminders_muted"`
+	Role           MembershipRole     `json:"role"`
+	Status         MembershipStatus   `json:"status"`
+	BaselinePicks  int32              `json:"baseline_picks"`
+	JoinedAt       pgtype.Timestamptz `json:"joined_at"`
 }
 
 func (q *Queries) GetGroupMember(ctx context.Context, arg GetGroupMemberParams) (GetGroupMemberRow, error) {
@@ -123,6 +131,7 @@ func (q *Queries) GetGroupMember(ctx context.Context, arg GetGroupMemberParams) 
 	err := row.Scan(
 		&i.UserID,
 		&i.Name,
+		&i.RemindersMuted,
 		&i.Role,
 		&i.Status,
 		&i.BaselinePicks,
