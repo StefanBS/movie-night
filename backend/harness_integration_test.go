@@ -230,3 +230,21 @@ func doJSON[T any](t *testing.T, mux http.Handler, method, path, body string) (i
 	}
 	return code, v
 }
+
+// editBody is a PATCH body for Night n: the whole editable Night as it stands,
+// as the app sends it, with change applied.
+func editBody(t *testing.T, n nightResponse, change func(*updateNightRequest)) string {
+	t.Helper()
+	req := updateNightRequest{
+		ScheduledFor: n.ScheduledFor,
+		StartTime:    n.StartTime,
+		Attendees:    attendeeIDs(n),
+		Reminders:    n.Reminders,
+	}
+	change(&req)
+	b, err := json.Marshal(req)
+	if err != nil {
+		t.Fatalf("encode edit body: %v", err)
+	}
+	return string(b)
+}

@@ -113,7 +113,7 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `POST` | `/groups/{groupId}/nights` | Create a night with its picker; `201`. Body `{"scheduledFor","startTime"?,"attendees","pickerId"}` (`startTime` `HH:MM`, omitted or `null` for none); `422` if the picker isn't an attendee, `409` if the date is taken. |
 | `GET` | `/groups/{groupId}/nights` | Every night, past and upcoming, newest first. |
 | `GET` | `/groups/{groupId}/nights/{nightId}` | A night and its attendees. |
-| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Edit the date and start time and/or replace the attendee set and reminder settings in one transaction — a rejected edit changes nothing. Body `{"scheduledFor"?,"startTime"?,"attendees"?,"reminders"?}` (omitted = unchanged; `startTime` `null` clears it; `reminders` needs all four fields); `422` if the attendees leave out the picker or include a non-member, `409` if the date is taken. |
+| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Replace the whole editable Night (date, start time, attendee set, reminder settings) in one transaction — a rejected edit changes nothing. Body `{"scheduledFor","startTime","attendees","reminders"}` (`startTime` `null` for none); `422` if the attendees leave out the picker or include a non-member, `409` if the date is taken. |
 | `DELETE` | `/groups/{groupId}/nights/{nightId}` | Cancel/delete the night; `204`. Idempotent. |
 | `GET` | `/groups/{groupId}/nights/{nightId}/turn` | Least-served ranking over the night's attendees, ignoring the night's own pick. |
 | `POST` | `/groups/{groupId}/nights/{nightId}/pick` | Change the picker (must be an attendee; guest picks don't move standings). Body `{"pickerId"}`. |
@@ -167,7 +167,10 @@ just db-reset       # destroy the container AND its data volume
 - **Migrations** — [`migrations/`](migrations) (goose). Schema:
   [`../docs/schema.dbml`](../docs/schema.dbml).
 - **Queries** — `internal/db/query/`. Run `just sqlc` after edits to regenerate
-  `internal/db` (marked `DO NOT EDIT` — change the SQL, not the Go).
+  `internal/db` (marked `DO NOT EDIT` — change the SQL, not the Go). A full
+  Night is read only through the `nights` view (`picks` + its movie), so a new
+  Night column goes into that view, not into individual queries; writes go to
+  `picks` and return at most the id.
 - **Seed** — `seed.sql`, idempotent fixtures keyed on fixed UUIDs (not a
   migration). The seeded group `11111111-1111-1111-1111-111111111111` is shared
   with the mobile app and integration tests.
@@ -184,7 +187,8 @@ backend/
 ├── roster.go          # roster + turn handlers and response mapping
 ├── turn.go            # least-served ranking response mapping
 ├── membership.go      # join / deactivate / reactivate / promote (churn)
-├── nights.go          # night lifecycle: create, edit, pick
+├── nights.go          # night lifecycle handlers: create, read, edit, pick
+├── night_writes.go    # create/edit/pick writes: one transaction, Night row locked, ADR-0008 rules
 ├── tx.go              # withTx — one transaction for a multi-statement write
 ├── movies.go          # movie DTO + search/attach handlers (TMDB-backed)
 ├── tmdb.go            # TMDB client (search, fetch, poster URLs)

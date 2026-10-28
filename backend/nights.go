@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -87,6 +85,15 @@ func parseStartTime(raw string) (pgtype.Time, error) {
 	return pgtype.Time{Microseconds: int64(t.Hour()*60+t.Minute()) * int64(time.Minute/time.Microsecond), Valid: true}, nil
 }
 
+// parseOptionalStartTime is parseStartTime for the wire's nullable field: nil
+// is no start time (not Valid). Shared by create and edit. Pure.
+func parseOptionalStartTime(raw *string) (pgtype.Time, error) {
+	if raw == nil {
+		return pgtype.Time{}, nil
+	}
+	return parseStartTime(*raw)
+}
+
 // formatStartTimeWire is a start time as the wire carries it: HH:MM, or nil
 // when the Night has none. Pure.
 func formatStartTimeWire(t pgtype.Time) *string {
@@ -106,11 +113,9 @@ func validateCreateNightRequest(req createNightRequest) (parsedCreateNight, erro
 	if err != nil {
 		return parsedCreateNight{}, err
 	}
-	var startTime pgtype.Time
-	if req.StartTime != nil {
-		if startTime, err = parseStartTime(*req.StartTime); err != nil {
-			return parsedCreateNight{}, err
-		}
+	startTime, err := parseOptionalStartTime(req.StartTime)
+	if err != nil {
+		return parsedCreateNight{}, err
 	}
 	attendees, err := parseAttendeeIDs(req.Attendees)
 	if err != nil {
@@ -191,11 +196,9 @@ func newNightResponse(night nightRow, atts []attendee) nightResponse {
 	}
 }
 
-// nightRow is a night plus its attached movie's LEFT JOIN columns: the one shape
-// every night query returns. sqlc generates an identical row type per query and
-// each converts to this one (nightRow(row)), so a select list that drifts from
-// the others fails to compile rather than silently dropping a field.
-type nightRow = db.GetNightRow
+// nightRow is a full Night: a row of the nights view, which every Night read
+// selects from, so this is the one shape a Night response is built from.
+type nightRow = db.Night
 
 // toNightResponse maps a night row + attendee rows to the night DTO.
 func toNightResponse(night nightRow, rows []db.ListNightAttendeesRow) nightResponse {
@@ -235,10 +238,10 @@ func groupAttendees(rows []db.ListNightsAttendeesRow) map[uuid.UUID][]attendee {
 // and the attendees grouped by night. A nil byNight (no night had attendees) is
 // fine: reads from a nil map yield the zero value, which newNightResponse
 // normalizes to [].
-func toNightResponses(rows []db.ListNightsRow, byNight map[uuid.UUID][]attendee) []nightResponse {
+func toNightResponses(rows []nightRow, byNight map[uuid.UUID][]attendee) []nightResponse {
 	out := make([]nightResponse, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, newNightResponse(nightRow(row), byNight[row.ID]))
+		out = append(out, newNightResponse(row, byNight[row.ID]))
 	}
 	return out
 }
@@ -286,21 +289,19 @@ func presentIDs(rows []db.ListNightAttendeesRow) []uuid.UUID {
 	return ids
 }
 
-// nightStore is the subset of *db.Queries the night handlers need; the real
-// *db.Queries satisfies it, so no mock is ever written (same pattern as
-// turnStore/pickStore/memberStore).
+// nightStore is the subset of *db.Queries the night read handlers (and the
+// movie attach) need; the real *db.Queries satisfies it, so no mock is ever
+// written (same pattern as turnStore/pickStore/memberStore). The picker and
+// attendee writes take the pool instead and run in night_writes.go.
 type nightStore interface {
-	CreateNight(ctx context.Context, arg db.CreateNightParams) (db.CreateNightRow, error)
-	GetNight(ctx context.Context, arg db.GetNightParams) (db.GetNightRow, error)
+	GetNight(ctx context.Context, arg db.GetNightParams) (db.Night, error)
 	ListNightAttendees(ctx context.Context, arg db.ListNightAttendeesParams) ([]db.ListNightAttendeesRow, error)
-	FilterGroupMembers(ctx context.Context, arg db.FilterGroupMembersParams) ([]db.FilterGroupMembersRow, error)
 	RankGroupTurn(ctx context.Context, arg db.RankGroupTurnParams) ([]db.RankGroupTurnRow, error)
-	SetNightPicker(ctx context.Context, arg db.SetNightPickerParams) (db.SetNightPickerRow, error)
 	UpsertMovie(ctx context.Context, arg db.UpsertMovieParams) (uuid.UUID, error)
-	SetNightMovie(ctx context.Context, arg db.SetNightMovieParams) (db.SetNightMovieRow, error)
-	ClearNightMovie(ctx context.Context, arg db.ClearNightMovieParams) (db.ClearNightMovieRow, error)
+	SetNightMovie(ctx context.Context, arg db.SetNightMovieParams) error
+	ClearNightMovie(ctx context.Context, arg db.ClearNightMovieParams) (uuid.UUID, error)
 	DeleteNight(ctx context.Context, arg db.DeleteNightParams) error
-	ListNights(ctx context.Context, groupID uuid.UUID) ([]db.ListNightsRow, error)
+	ListNights(ctx context.Context, groupID uuid.UUID) ([]db.Night, error)
 	ListNightsAttendees(ctx context.Context, arg db.ListNightsAttendeesParams) ([]db.ListNightsAttendeesRow, error)
 }
 
@@ -309,38 +310,17 @@ type recordPickRequest struct {
 	PickerID string `json:"pickerId"`
 }
 
-// updateNightRequest is the JSON body of PATCH .../nights/{nightId}. An omitted
-// field is left unchanged; attendees and reminders, when sent, replace the
-// whole set; startTime null clears it.
+// updateNightRequest is the JSON body of PATCH .../nights/{nightId}: the whole
+// editable Night, which replaces the stored one. A null (or omitted) startTime
+// clears it; attendees replace the whole set.
 type updateNightRequest struct {
-	ScheduledFor *string           `json:"scheduledFor"`
-	StartTime    optionalStartTime `json:"startTime"`
-	Attendees    *[]string         `json:"attendees"`
-	Reminders    *remindersRequest `json:"reminders"`
+	ScheduledFor string       `json:"scheduledFor"`
+	StartTime    *string      `json:"startTime"`
+	Attendees    []string     `json:"attendees"`
+	Reminders    remindersDTO `json:"reminders"`
 }
 
-// optionalStartTime tells an omitted startTime (Sent false) from null (Sent,
-// Value nil), which a plain *string can't.
-type optionalStartTime struct {
-	Sent  bool
-	Value *string
-}
-
-func (o *optionalStartTime) UnmarshalJSON(b []byte) error {
-	o.Sent = true
-	return json.Unmarshal(b, &o.Value)
-}
-
-// remindersRequest is the wire form of remindersDTO with every field a pointer,
-// so an omitted field is rejected rather than read as false.
-type remindersRequest struct {
-	NightBefore    *bool   `json:"nightBefore"`
-	MorningOf      *bool   `json:"morningOf"`
-	TwoHoursBefore *bool   `json:"twoHoursBefore"`
-	Audience       *string `json:"audience"`
-}
-
-// nightReminders is a validated remindersRequest.
+// nightReminders is a validated remindersDTO.
 type nightReminders struct {
 	NightBefore    bool
 	MorningOf      bool
@@ -348,73 +328,54 @@ type nightReminders struct {
 	Audience       db.ReminderAudience
 }
 
-// parsedUpdateNight is a validated updateNightRequest. A nil field is
-// unchanged; Attendees is deduped, and non-nil (possibly empty) when sent;
-// StartTime, when sent, is not Valid to clear it.
-type parsedUpdateNight struct {
-	ScheduledFor *pgtype.Date
-	StartTime    *pgtype.Time
+// nightEdit is a validated updateNightRequest. Attendees is deduped; StartTime
+// is not Valid when the Night has none.
+type nightEdit struct {
+	ScheduledFor pgtype.Date
+	StartTime    pgtype.Time
 	Attendees    []uuid.UUID
-	Reminders    *nightReminders
+	Reminders    nightReminders
 }
 
-// parseReminders requires every setting and a known audience. Pure.
-func parseReminders(req remindersRequest) (nightReminders, error) {
-	if req.NightBefore == nil || req.MorningOf == nil || req.TwoHoursBefore == nil || req.Audience == nil {
-		return nightReminders{}, fmt.Errorf("reminders needs nightBefore, morningOf, twoHoursBefore and audience")
-	}
-	audience := db.ReminderAudience(*req.Audience)
+// parseReminders requires a known audience. Pure.
+func parseReminders(req remindersDTO) (nightReminders, error) {
+	audience := db.ReminderAudience(req.Audience)
 	if audience != db.ReminderAudienceEveryone && audience != db.ReminderAudiencePicker {
 		return nightReminders{}, fmt.Errorf("invalid reminders audience")
 	}
 	return nightReminders{
-		NightBefore:    *req.NightBefore,
-		MorningOf:      *req.MorningOf,
-		TwoHoursBefore: *req.TwoHoursBefore,
+		NightBefore:    req.NightBefore,
+		MorningOf:      req.MorningOf,
+		TwoHoursBefore: req.TwoHoursBefore,
 		Audience:       audience,
 	}, nil
 }
 
-// validateUpdateNightRequest parses the fields that were sent and rejects a
-// body that changes nothing. The picker rule needs the stored Night, so it is
-// checked in the handler. Pure.
-func validateUpdateNightRequest(req updateNightRequest) (parsedUpdateNight, error) {
-	if req.ScheduledFor == nil && !req.StartTime.Sent && req.Attendees == nil && req.Reminders == nil {
-		return parsedUpdateNight{}, fmt.Errorf("nothing to update")
+// validateUpdateNightRequest parses the whole edited Night. The picker rule
+// needs the stored Night, so editNight checks it. Pure.
+func validateUpdateNightRequest(req updateNightRequest) (nightEdit, error) {
+	scheduledFor, err := parseScheduledFor(req.ScheduledFor)
+	if err != nil {
+		return nightEdit{}, err
 	}
-	var parsed parsedUpdateNight
-	if req.ScheduledFor != nil {
-		d, err := parseScheduledFor(*req.ScheduledFor)
-		if err != nil {
-			return parsedUpdateNight{}, err
-		}
-		parsed.ScheduledFor = &d
+	startTime, err := parseOptionalStartTime(req.StartTime)
+	if err != nil {
+		return nightEdit{}, err
 	}
-	if req.StartTime.Sent {
-		var t pgtype.Time
-		if req.StartTime.Value != nil {
-			var err error
-			if t, err = parseStartTime(*req.StartTime.Value); err != nil {
-				return parsedUpdateNight{}, err
-			}
-		}
-		parsed.StartTime = &t
+	attendees, err := parseAttendeeIDs(req.Attendees)
+	if err != nil {
+		return nightEdit{}, err
 	}
-	if req.Attendees != nil {
-		ids, err := parseAttendeeIDs(*req.Attendees)
-		if err != nil {
-			return parsedUpdateNight{}, err
-		}
-		parsed.Attendees = ids
+	reminders, err := parseReminders(req.Reminders)
+	if err != nil {
+		return nightEdit{}, err
 	}
-	if req.Reminders != nil {
-		rem, err := parseReminders(*req.Reminders)
-		if err != nil {
-			return parsedUpdateNight{}, err
-		}
-		parsed.Reminders = &rem
-	}
-	return parsed, nil
+	return nightEdit{
+		ScheduledFor: scheduledFor,
+		StartTime:    startTime,
+		Attendees:    attendees,
+		Reminders:    reminders,
+	}, nil
 }
 
 // creditedForRole derives is_credited from the picker's role: a core pick moves
@@ -455,12 +416,14 @@ func loadNight(w http.ResponseWriter, r *http.Request, store nightStore, gid, ni
 	return night, true
 }
 
-// writeNightDTO encodes an ALREADY-LOADED night (its movie columns included)
-// plus its attendees with the given status, so the client always gets the
-// current night back. Taking the row rather than an id is what lets the write
-// handlers pass on what their RETURNING clause already gave them: no endpoint
-// reads the same picks row twice, and none reads the movie separately.
-func writeNightDTO(w http.ResponseWriter, r *http.Request, store nightStore, gid uuid.UUID, night nightRow, code int) {
+// writeNight reads a Night (GetNight, the one full-Night read) and its
+// attendees and encodes them with the given status, so every handler, read or
+// write, answers with the current Night.
+func writeNight(w http.ResponseWriter, r *http.Request, store nightStore, gid, nightID uuid.UUID, code int) {
+	night, ok := loadNight(w, r, store, gid, nightID)
+	if !ok {
+		return
+	}
 	rows, err := store.ListNightAttendees(r.Context(), db.ListNightAttendeesParams{GroupID: gid, NightID: night.ID})
 	if err != nil {
 		internalError(w, gid, "list night attendees", err)
@@ -482,11 +445,10 @@ const errNightDateTaken = "there is already a night on that date"
 
 // createNightHandler serves POST /groups/{groupId}/nights. A night is created
 // whole — date, attendees and picker in one request (ADR-0008); unfinished plans
-// live on the client, so there is no picker-less night to resume. Every attendee
-// must be a member, checked in one query BEFORE the write; the night and its
-// attendances are then inserted in one statement. is_credited is derived from the picker's role,
-// as on record-pick. A second night on the same date is a 409.
-func createNightHandler(store nightStore) http.HandlerFunc {
+// live on the client, so there is no picker-less night to resume. createNight
+// checks every attendee is a member and credits the pick by the picker's role.
+// A second night on the same date is a 409.
+func createNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
 		if !ok {
@@ -505,33 +467,17 @@ func createNightHandler(store nightStore) http.HandlerFunc {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		members, err := store.FilterGroupMembers(r.Context(), db.FilterGroupMembersParams{GroupID: gid, UserIds: parsed.Attendees})
-		if err != nil {
-			internalError(w, gid, "filter group members", err)
-			return
-		}
-		roles, err := attendeeRoles(parsed.Attendees, members)
-		if err != nil {
-			writeJSONError(w, http.StatusUnprocessableEntity, err.Error())
-			return
-		}
-		row, err := store.CreateNight(r.Context(), db.CreateNightParams{
-			GroupID:      gid,
-			ScheduledFor: parsed.ScheduledFor,
-			StartTime:    parsed.StartTime,
-			PickerID:     parsed.Picker,
-			IsCredited:   creditedForRole(roles[parsed.Picker]),
-			Attendees:    parsed.Attendees,
+		var nightID uuid.UUID
+		err = withTx(r.Context(), pool, func(q *db.Queries) error {
+			var err error
+			nightID, err = createNight(r.Context(), q, gid, parsed)
+			return err
 		})
-		if isUniqueViolation(err) {
-			writeJSONError(w, http.StatusConflict, errNightDateTaken)
-			return
-		}
 		if err != nil {
-			internalError(w, gid, "create night", err)
+			writeNightError(w, gid, "create night", err)
 			return
 		}
-		writeNightDTO(w, r, store, gid, nightRow(row), http.StatusCreated)
+		writeNight(w, r, db.New(pool), gid, nightID, http.StatusCreated)
 	}
 }
 
@@ -542,11 +488,7 @@ func nightDetailHandler(store nightStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		night, ok := loadNight(w, r, store, gid, nightID)
-		if !ok {
-			return
-		}
-		writeNightDTO(w, r, store, gid, night, http.StatusOK)
+		writeNight(w, r, store, gid, nightID, http.StatusOK)
 	}
 }
 
@@ -588,7 +530,7 @@ func nightTurnHandler(store nightStore) http.HandlerFunc {
 // be an attendee; is_credited is derived from their role, so a guest pick never
 // moves standings. RankGroupTurn recomputes served-counts from the picks table on
 // read, so re-recording simply re-attributes — there is no stored counter to fix.
-func recordNightPickHandler(store nightStore) http.HandlerFunc {
+func recordNightPickHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
@@ -602,48 +544,22 @@ func recordNightPickHandler(store nightStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		// Existence check only — the 404 must precede the 422 below, and
-		// SetNightPicker hands back the post-write row for the response.
-		if _, ok := loadNight(w, r, store, gid, nightID); !ok {
-			return
-		}
-		rows, err := store.ListNightAttendees(r.Context(), db.ListNightAttendeesParams{GroupID: gid, NightID: nightID})
-		if err != nil {
-			internalError(w, gid, "list night attendees", err)
-			return
-		}
-		var role db.MembershipRole
-		found := false
-		for _, row := range rows {
-			if row.ID == pickerID {
-				role, found = row.Role, true
-				break
-			}
-		}
-		if !found {
-			writeJSONError(w, http.StatusUnprocessableEntity, errPickerNotAttendee.Error())
-			return
-		}
-		night, err := store.SetNightPicker(r.Context(), db.SetNightPickerParams{
-			NightID:    nightID,
-			GroupID:    gid,
-			PickerID:   pickerID,
-			IsCredited: creditedForRole(role),
+		err := withTx(r.Context(), pool, func(q *db.Queries) error {
+			return recordPick(r.Context(), q, gid, nightID, pickerID)
 		})
 		if err != nil {
-			internalError(w, gid, "set night picker", err)
+			writeNightError(w, gid, "record pick", err)
 			return
 		}
-		writeNightDTO(w, r, store, gid, nightRow(night), http.StatusOK)
+		writeNight(w, r, db.New(pool), gid, nightID, http.StatusOK)
 	}
 }
 
-// updateNightHandler serves PATCH /groups/{groupId}/nights/{nightId}. Body
-// {"scheduledFor"?, "startTime"?, "attendees"?, "reminders"?} edits the Night's
-// date and start time and replaces its attendee set and reminder settings in
-// one transaction, so a rejected edit changes nothing. The
-// picker must stay an attendee (422), every attendee must be a member (422),
-// and a date another night already holds is a 409. The picker itself is
+// updateNightHandler serves PATCH /groups/{groupId}/nights/{nightId}. The body
+// {"scheduledFor", "startTime", "attendees", "reminders"} is the whole editable
+// Night and replaces it in one transaction, so a rejected edit changes nothing.
+// The picker must stay an attendee (422), every attendee must be a member
+// (422), and a date another night already holds is a 409. The picker itself is
 // changed only by record-pick.
 func updateNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -655,97 +571,20 @@ func updateNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		parsed, err := validateUpdateNightRequest(req)
+		edit, err := validateUpdateNightRequest(req)
 		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		var night nightRow
 		err = withTx(r.Context(), pool, func(q *db.Queries) error {
-			var err error
-			night, err = editNight(r.Context(), q, gid, nightID, parsed)
-			return err
-		})
-		switch {
-		case errors.Is(err, pgx.ErrNoRows):
-			writeJSONError(w, http.StatusNotFound, "night not found")
-		case errors.Is(err, errPickerNotAttendee), errors.Is(err, errNotMember):
-			writeJSONError(w, http.StatusUnprocessableEntity, err.Error())
-		case isUniqueViolation(err):
-			writeJSONError(w, http.StatusConflict, errNightDateTaken)
-		case err != nil:
-			internalError(w, gid, "update night", err)
-		default:
-			writeNightDTO(w, r, db.New(pool), gid, night, http.StatusOK)
-		}
-	}
-}
-
-// editNight applies a validated edit inside the caller's transaction. It locks
-// the Night first (a miss is pgx.ErrNoRows), so a concurrent record-pick can't
-// move the picker between the picker check and the write. A taken date fails on
-// the last statement, after the attendee writes; the rollback undoes them.
-func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit parsedUpdateNight) (nightRow, error) {
-	locked, err := q.GetNightForUpdate(ctx, db.GetNightForUpdateParams{NightID: nightID, GroupID: gid})
-	if err != nil {
-		return nightRow{}, err
-	}
-	night := nightRow(locked)
-	if edit.Attendees != nil {
-		if !slices.Contains(edit.Attendees, night.PickerID) {
-			return nightRow{}, errPickerNotAttendee
-		}
-		members, err := q.FilterGroupMembers(ctx, db.FilterGroupMembersParams{GroupID: gid, UserIds: edit.Attendees})
-		if err != nil {
-			return nightRow{}, err
-		}
-		if _, err := attendeeRoles(edit.Attendees, members); err != nil {
-			return nightRow{}, err
-		}
-		if err := q.RemoveAttendeesNotIn(ctx, db.RemoveAttendeesNotInParams{PickID: nightID, Keep: edit.Attendees}); err != nil {
-			return nightRow{}, err
-		}
-		if err := q.AddAttendees(ctx, db.AddAttendeesParams{PickID: nightID, UserIds: edit.Attendees}); err != nil {
-			return nightRow{}, err
-		}
-	}
-	if edit.Reminders != nil {
-		updated, err := q.UpdateNightReminders(ctx, db.UpdateNightRemindersParams{
-			NightID:              nightID,
-			GroupID:              gid,
-			RemindNightBefore:    edit.Reminders.NightBefore,
-			RemindMorningOf:      edit.Reminders.MorningOf,
-			RemindTwoHoursBefore: edit.Reminders.TwoHoursBefore,
-			RemindAudience:       edit.Reminders.Audience,
+			return editNight(r.Context(), q, gid, nightID, edit)
 		})
 		if err != nil {
-			return nightRow{}, err
+			writeNightError(w, gid, "update night", err)
+			return
 		}
-		night = nightRow(updated)
+		writeNight(w, r, db.New(pool), gid, nightID, http.StatusOK)
 	}
-	if edit.StartTime != nil {
-		updated, err := q.UpdateNightStartTime(ctx, db.UpdateNightStartTimeParams{
-			NightID:   nightID,
-			GroupID:   gid,
-			StartTime: *edit.StartTime,
-		})
-		if err != nil {
-			return nightRow{}, err
-		}
-		night = nightRow(updated)
-	}
-	if edit.ScheduledFor != nil {
-		updated, err := q.UpdateNightDate(ctx, db.UpdateNightDateParams{
-			NightID:      nightID,
-			GroupID:      gid,
-			ScheduledFor: *edit.ScheduledFor,
-		})
-		if err != nil {
-			return nightRow{}, err
-		}
-		night = nightRow(updated)
-	}
-	return night, nil
 }
 
 // deleteNightHandler serves DELETE /groups/{groupId}/nights/{nightId}. It

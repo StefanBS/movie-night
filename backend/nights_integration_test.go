@@ -22,11 +22,11 @@ func TestNightAttendanceIntegration(t *testing.T) {
 
 	mux := http.NewServeMux()
 	q := db.New(pool)
-	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(q))
+	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}/turn", nightTurnHandler(q))
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(q))
+	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(pool))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
 
 	// run starts every subtest from the seed baseline: no nights, so dates never
@@ -140,13 +140,13 @@ func TestNightAttendanceIntegration(t *testing.T) {
 
 	run("editing the attendees changes the order", func(t *testing.T) {
 		n := createNight(t, nightBody("2026-06-12", ada))
-		if code, b := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{"attendees":["`+ada+`","`+blake+`"]}`); code != http.StatusOK {
+		if code, b := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.Attendees = []string{ada, blake} })); code != http.StatusOK {
 			t.Fatalf("add status = %d, want 200 (body %s)", code, b)
 		}
 		if got := names(turn(t, n.ID)); len(got) != 2 {
 			t.Fatalf("after add: order = %v, want 2", got)
 		}
-		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{"attendees":["`+ada+`"]}`); code != http.StatusOK {
+		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.Attendees = []string{ada} })); code != http.StatusOK {
 			t.Fatalf("remove status = %d, want 200", code)
 		}
 		if got := names(turn(t, n.ID)); len(got) != 1 || got[0] != "Ada" {
