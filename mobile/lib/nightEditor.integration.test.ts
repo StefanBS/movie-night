@@ -234,3 +234,43 @@ test("a write clears the previous error", async () => {
     },
   );
 });
+
+test("refresh swaps in a fresher Night and roster but keeps the step and search", async () => {
+  await withEditor(
+    backend(),
+    async (editor) => {
+      await editor.search("dune");
+      const moved = { ...SAVED, scheduledFor: "2026-07-03" };
+      const roster = [...MEMBERS, { ...MEMBERS[0], id: "cleo", name: "Cleo" }];
+      editor.refresh(moved, roster, performance.now());
+      assert.equal(editor.state.night.scheduledFor, "2026-07-03");
+      assert.deepEqual(editor.state.members.map((m) => m.id), ["ada", "blake", "cleo"]);
+      assert.equal(editor.state.step, "pick");
+      assert.deepEqual(editor.state.results, [DUNE]);
+    },
+    "pick",
+  );
+});
+
+test("refresh is ignored while a write runs, so the write's reply wins", async () => {
+  await withEditor(backend(), async (editor) => {
+    const write = editor.changePicker("blake");
+    editor.refresh({ ...SAVED, scheduledFor: "2026-07-03" }, MEMBERS, performance.now());
+    await write;
+    assert.equal(editor.state.night.scheduledFor, SAVED.scheduledFor);
+    assert.equal(editor.state.night.pickerId, "blake");
+  });
+});
+
+test("a refresh whose load started before a write doesn't undo it", async () => {
+  await withEditor(backend(), async (editor) => {
+    const loadStartedAt = performance.now();
+    await editor.changePicker("blake");
+    // The load read the Night before the write, then landed after it.
+    editor.refresh(SAVED, MEMBERS, loadStartedAt);
+    assert.equal(editor.state.night.pickerId, "blake");
+    // A load that starts after the write applies.
+    editor.refresh({ ...SAVED, pickerId: "blake", scheduledFor: "2026-07-03" }, MEMBERS, performance.now());
+    assert.equal(editor.state.night.scheduledFor, "2026-07-03");
+  });
+});

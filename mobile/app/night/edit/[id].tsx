@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -9,58 +9,38 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
 import { TopBar } from "../../../components";
 import { EditNightScreen } from "../../../components/night/EditNightScreen";
+import { useSession } from "../../../components/useSession";
 import { API_URL } from "../../../apiUrl";
 import { GROUP_ID } from "../../../lib/api";
 import { todayLocalISO } from "../../../lib/date";
-import { errorMessage } from "../../../lib/errors";
-import { fetchMembers, type Member } from "../../../lib/members";
-import { nightDates } from "../../../lib/nightLifecycle";
-import { getNightOrNull, listNights, type Night } from "../../../lib/nights";
+import { createNightLoad, nightLoadView } from "../../../lib/nightLoad";
 import { colors, space, textPresets } from "../../../theme";
 
 export default function NightEditRoute() {
-  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [night, setNight] = useState<Night | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [nightDatesSet, setNightDatesSet] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  return <NightEditLoader key={id} id={id} />;
+}
+
+// NightEditLoader loads the Night on every focus (lib/nightLoad). Only the
+// first load shows the spinner: the editor holds unsaved drafts, so a refocus
+// refresh must not unmount it. The draft keeps the Night it opened with; a
+// refresh only updates the calendar's dots.
+function NightEditLoader({ id }: { id: string }) {
+  const router = useRouter();
+  const [load, state] = useSession(() =>
+    createNightLoad({ baseUrl: API_URL, groupId: GROUP_ID, nightId: id, withNightDates: true }),
+  );
+  const { night, members, nightDates, error } = state;
+  const view = nightLoadView(state);
   const today = todayLocalISO();
 
   useFocusEffect(
     useCallback(() => {
-      const controller = new AbortController();
-      (async () => {
-        try {
-          setLoading(true);
-          const [n, roster, planned] = await Promise.all([
-            getNightOrNull(API_URL, GROUP_ID, id, controller.signal),
-            fetchMembers(API_URL, GROUP_ID, controller.signal),
-            listNights(API_URL, GROUP_ID, controller.signal).catch(() => [] as Night[]),
-          ]);
-          setNight(n);
-          setMembers(roster);
-          setNightDatesSet(nightDates(planned));
-          setError(null);
-        } catch (e) {
-          if (!controller.signal.aborted) {
-            setError(errorMessage(e, "failed to load night"));
-          }
-        } finally {
-          if (!controller.signal.aborted) {
-            setLoading(false);
-          }
-        }
-      })();
-      return () => controller.abort();
-    }, [id]),
+      void load.load();
+    }, [load]),
   );
 
-  // Gated on "no night yet", not on loading: the editor holds unsaved drafts, so
-  // a refocus refetch must not unmount it. A failed refresh leaves the
-  // last-known-good night on screen.
-  if (night === null && loading) {
+  if (view === "loading") {
     return (
       <View style={styles.screen}>
         <TopBar
@@ -73,7 +53,7 @@ export default function NightEditRoute() {
     );
   }
 
-  if (night === null && error !== null) {
+  if (view === "failed") {
     return (
       <View style={styles.screen}>
         <TopBar
@@ -109,7 +89,7 @@ export default function NightEditRoute() {
       night={night}
       members={members}
       today={today}
-      nightDates={nightDatesSet}
+      nightDates={nightDates}
       onBack={() => router.back()}
       onSaved={() => router.back()}
       onCancelled={() => router.replace("/")}

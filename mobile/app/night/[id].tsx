@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -9,55 +9,41 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
 import { TopBar } from "../../components";
 import { ExistingNightEditor } from "../../components/night/ExistingNightEditor";
+import { useSession } from "../../components/useSession";
 import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
 import { todayLocalISO } from "../../lib/date";
-import { errorMessage } from "../../lib/errors";
-import { fetchMembers, type Member } from "../../lib/members";
-import { getNightOrNull, type Night } from "../../lib/nights";
+import { createNightLoad, nightLoadView } from "../../lib/nightLoad";
 import {
   colors,
   space,
   textPresets,
 } from "../../theme";
 
-export default function NightDetailScreen() {
-  const router = useRouter();
+export default function NightDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [night, setNight] = useState<Night | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  return <NightDetailLoader key={id} id={id} />;
+}
+
+// NightDetailLoader loads the Night on every focus (lib/nightLoad). Only the
+// first load shows the spinner, so returning from the Edit screen refreshes the
+// Night under a still-mounted editor instead of resetting its step and search.
+function NightDetailLoader({ id }: { id: string }) {
+  const router = useRouter();
+  const [load, state] = useSession(() =>
+    createNightLoad({ baseUrl: API_URL, groupId: GROUP_ID, nightId: id }),
+  );
+  const { night, members, error, loadStartedAt } = state;
+  const view = nightLoadView(state);
   const today = todayLocalISO();
 
   useFocusEffect(
     useCallback(() => {
-      const controller = new AbortController();
-      (async () => {
-        try {
-          setLoading(true);
-          const [n, roster] = await Promise.all([
-            getNightOrNull(API_URL, GROUP_ID, id, controller.signal),
-            fetchMembers(API_URL, GROUP_ID, controller.signal),
-          ]);
-          setNight(n);
-          setMembers(roster);
-          setError(null);
-        } catch (e) {
-          if (!controller.signal.aborted) {
-            setError(errorMessage(e, "failed to load night"));
-          }
-        } finally {
-          if (!controller.signal.aborted) {
-            setLoading(false);
-          }
-        }
-      })();
-      return () => controller.abort();
-    }, [id]),
+      void load.load();
+    }, [load]),
   );
 
-  if (loading) {
+  if (view === "loading") {
     return (
       <View style={styles.screen}>
         <TopBar
@@ -74,7 +60,7 @@ export default function NightDetailScreen() {
     );
   }
 
-  if (error !== null) {
+  if (view === "failed") {
     return (
       <View style={styles.screen}>
         <TopBar
@@ -109,6 +95,7 @@ export default function NightDetailScreen() {
       key={night.id}
       night={night}
       members={members}
+      loadStartedAt={loadStartedAt}
       today={today}
       onDone={() => router.back()}
       onCancel={() => router.back()}

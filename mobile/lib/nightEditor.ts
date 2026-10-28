@@ -31,6 +31,11 @@ export type NightEditor = Session<NightEditorState> & {
   attach(tmdbId: number): Promise<Night | null>;
   clearFilm(): Promise<Night | null>;
   changePicker(memberId: string): Promise<Night | null>;
+  // refresh swaps in a Night and roster loaded since, keeping the step, search
+  // and errors. loadStartedAt (performance.now()) is when that load began: a
+  // load that began before the last write finished may have read the Night
+  // before it, so it is ignored, as is any refresh while a write runs.
+  refresh(night: Night, members: Member[], loadStartedAt: number): void;
 };
 
 export function createNightEditor({
@@ -57,6 +62,8 @@ export function createNightEditor({
     searchError: null,
   });
 
+  let lastWriteAt = -Infinity;
+
   // write runs one Night write under the busy guard, keeping the returned
   // Night; on failure the Night is unchanged and the error is shown.
   const write = async (
@@ -70,6 +77,7 @@ export function createNightEditor({
     core.set({ busy: busyKey, actionError: null });
     try {
       const updated = await core.track(run);
+      lastWriteAt = performance.now();
       core.set({ night: updated, busy: null });
       return updated;
     } catch (e) {
@@ -142,6 +150,13 @@ export function createNightEditor({
         (signal) => recordNightPick(baseUrl, groupId, nightId, memberId, signal),
         "failed to record pick",
       );
+    },
+
+    refresh(night, members, loadStartedAt) {
+      if (core.state.busy !== null || loadStartedAt < lastWriteAt) {
+        return;
+      }
+      core.set({ night, members });
     },
   };
 }

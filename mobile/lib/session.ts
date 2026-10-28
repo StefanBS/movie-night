@@ -1,7 +1,8 @@
 // Session is the shape shared by the framework-free screen modules (nightPlan,
-// nightEditor, nightEdit): readable state, change notification, and teardown.
-// React binds to it with useSyncExternalStore (components/useSession), so the
-// modules stay free of React and are tested directly over a real HTTP server.
+// nightEditor, nightEdit, nightLoad): readable state, change notification, and
+// teardown. React binds to it with useSyncExternalStore (components/useSession),
+// so the modules stay free of React and are tested directly over a real HTTP
+// server.
 export type Session<S> = {
   readonly state: S;
   subscribe(listener: () => void): () => void;
