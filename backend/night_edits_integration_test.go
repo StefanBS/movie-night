@@ -95,14 +95,15 @@ func TestNightEditsIntegration(t *testing.T) {
 		t.Helper()
 		_, after := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+before.ID, "")
 		if after.ScheduledFor != before.ScheduledFor || after.PickerID != before.PickerID ||
-			!slices.Equal(attendeeIDs(after), attendeeIDs(before)) || after.Reminders != before.Reminders {
+			!slices.Equal(attendeeIDs(after), attendeeIDs(before)) || after.Reminders != before.Reminders ||
+			!equalPtr(after.StartTime, deref(before.StartTime)) {
 			t.Fatalf("night after rejected edit = %+v, want unchanged %+v", after, before)
 		}
 	}
 
 	t.Run("a new night has the default reminders", func(t *testing.T) {
 		n := mkNight(t)
-		want := remindersDTO{NightBefore: true, MorningOf: true, Audience: "everyone"}
+		want := remindersDTO{NightBefore: true, MorningOf: true, TwoHoursBefore: true, Audience: "everyone"}
 		if n.Reminders != want {
 			t.Fatalf("reminders = %+v, want %+v", n.Reminders, want)
 		}
@@ -111,17 +112,71 @@ func TestNightEditsIntegration(t *testing.T) {
 	t.Run("PATCH replaces the reminders", func(t *testing.T) {
 		n := mkNight(t)
 		code, got := doJSON[nightResponse](t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
-			`{"reminders":{"nightBefore":false,"morningOf":true,"audience":"picker"}}`)
+			`{"reminders":{"nightBefore":false,"morningOf":true,"twoHoursBefore":false,"audience":"picker"}}`)
 		if code != http.StatusOK {
 			t.Fatalf("patch status = %d, want 200", code)
 		}
-		want := remindersDTO{NightBefore: false, MorningOf: true, Audience: "picker"}
+		want := remindersDTO{NightBefore: false, MorningOf: true, TwoHoursBefore: false, Audience: "picker"}
 		if got.Reminders != want {
 			t.Fatalf("reminders = %+v, want %+v", got.Reminders, want)
 		}
 		if _, read := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, ""); read.Reminders != want {
 			t.Fatalf("stored reminders = %+v, want %+v", read.Reminders, want)
 		}
+	})
+
+	t.Run("a new night has no start time", func(t *testing.T) {
+		if n := mkNight(t); n.StartTime != nil {
+			t.Fatalf("startTime = %q, want null", *n.StartTime)
+		}
+	})
+
+	t.Run("a night created with a start time keeps it", func(t *testing.T) {
+		clearAllPicks(t, pool, seededGroup)
+		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights",
+			`{"scheduledFor":"2026-06-12","startTime":"19:30","pickerId":"`+ada+`","attendees":["`+ada+`"]}`)
+		if code != http.StatusCreated || !equalPtr(n.StartTime, "19:30") {
+			t.Fatalf("create = %d, startTime %v; want 201, 19:30", code, n.StartTime)
+		}
+		if _, read := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, ""); !equalPtr(read.StartTime, "19:30") {
+			t.Fatalf("stored startTime = %v, want 19:30", read.StartTime)
+		}
+	})
+
+	t.Run("a bad start time on create yields 400", func(t *testing.T) {
+		clearAllPicks(t, pool, seededGroup)
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights",
+			`{"scheduledFor":"2026-06-12","startTime":"7pm","pickerId":"`+ada+`","attendees":["`+ada+`"]}`); code != http.StatusBadRequest {
+			t.Fatalf("create status = %d, want 400", code)
+		}
+	})
+
+	t.Run("PATCH sets, keeps and clears the start time", func(t *testing.T) {
+		n := mkNight(t)
+		path := "/groups/" + seededGroup + "/nights/" + n.ID
+		if code, got := doJSON[nightResponse](t, mux, http.MethodPatch, path, `{"startTime":"20:15"}`); code != http.StatusOK || !equalPtr(got.StartTime, "20:15") {
+			t.Fatalf("set = %d, startTime %v; want 200, 20:15", code, got.StartTime)
+		}
+		if _, got := doJSON[nightResponse](t, mux, http.MethodPatch, path, `{"scheduledFor":"2026-06-13"}`); !equalPtr(got.StartTime, "20:15") {
+			t.Fatalf("after a date-only edit startTime = %v, want 20:15 kept", got.StartTime)
+		}
+		if _, got := doJSON[nightResponse](t, mux, http.MethodPatch, path, `{"startTime":null}`); got.StartTime != nil {
+			t.Fatalf("after clearing startTime = %q, want null", *got.StartTime)
+		}
+		if _, read := doJSON[nightResponse](t, mux, http.MethodGet, path, ""); read.StartTime != nil {
+			t.Fatalf("stored startTime = %q, want null", *read.StartTime)
+		}
+	})
+
+	t.Run("PATCH onto a taken date with a new start time changes nothing", func(t *testing.T) {
+		n := mkNight(t)
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-07-04", blake)); code != http.StatusCreated {
+			t.Fatalf("create second night = %d, want 201", code)
+		}
+		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{"scheduledFor":"2026-07-04","startTime":"21:00"}`); code != http.StatusConflict {
+			t.Fatalf("patch status = %d, want 409", code)
+		}
+		unchanged(t, n)
 	})
 
 	t.Run("PATCH with incomplete reminders yields 400", func(t *testing.T) {
@@ -137,7 +192,7 @@ func TestNightEditsIntegration(t *testing.T) {
 			t.Fatalf("create second night = %d, want 201", code)
 		}
 		code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
-			`{"scheduledFor":"2026-07-04","reminders":{"nightBefore":false,"morningOf":false,"audience":"picker"}}`)
+			`{"scheduledFor":"2026-07-04","reminders":{"nightBefore":false,"morningOf":false,"twoHoursBefore":false,"audience":"picker"}}`)
 		if code != http.StatusConflict {
 			t.Fatalf("patch status = %d, want 409", code)
 		}

@@ -1,9 +1,10 @@
 import { type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { BellRing, Check, Moon, Sunrise } from "lucide-react-native";
+import { BellRing, Check, Clock, Moon, Sunrise } from "lucide-react-native";
 
 import { AppButton, SectionLabel, Toggle, TopBar } from "../";
 import { WizardFooter } from "./WizardFooter";
+import { formatStartTime, startTimeMinus } from "../../lib/date";
 import type { ReminderAudience, Reminders } from "../../lib/reminders";
 import {
   borderWidth,
@@ -24,13 +25,16 @@ const AUDIENCES: { id: ReminderAudience; label: string; note: string }[] = [
 
 // RemindersView is the Edit screen's Reminders step (ADR-0010): when to remind
 // and who gets nudged. It edits the Edit draft, so changes save with "Save
-// changes" and are discarded with it.
+// changes" and are discarded with it. "2 hours before" needs a start time
+// (ADR-0011), so without one it is shown disabled with a hint.
 export function RemindersView({
   reminders,
+  startTime,
   onChange,
   onDone,
 }: {
   reminders: Reminders;
+  startTime: string | null;
   onChange: (next: Reminders) => void;
   onDone: () => void;
 }) {
@@ -59,6 +63,19 @@ export function RemindersView({
               time="9:00 AM"
               value={reminders.morningOf}
               onChange={(morningOf) => onChange({ ...reminders, morningOf })}
+              divider
+            />
+            <SlotRow
+              icon={<Clock size={18} color={colors.text.secondary} />}
+              label="2 hours before"
+              time={
+                startTime !== null
+                  ? formatStartTime(startTimeMinus(startTime, 120))
+                  : "Set a start time to get this reminder"
+              }
+              value={startTime !== null && reminders.twoHoursBefore}
+              onChange={(twoHoursBefore) => onChange({ ...reminders, twoHoursBefore })}
+              disabled={startTime === null}
             />
           </View>
 
@@ -113,6 +130,7 @@ function SlotRow({
   value,
   onChange,
   divider = false,
+  disabled = false,
 }: {
   icon: ReactNode;
   label: string;
@@ -120,6 +138,7 @@ function SlotRow({
   value: boolean;
   onChange: (next: boolean) => void;
   divider?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <View style={[styles.slot, divider && styles.divider]}>
@@ -130,7 +149,7 @@ function SlotRow({
           {time}
         </Text>
       </View>
-      <Toggle value={value} onChange={onChange} label={label} />
+      <Toggle value={value} onChange={onChange} label={label} disabled={disabled} />
     </View>
   );
 }

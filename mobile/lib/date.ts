@@ -91,3 +91,38 @@ export function countdownLabel(iso: string, today: string = todayLocalISO()): st
   if (n > 0) return `in ${n} days`;
   return `${-n} days ago`;
 }
+
+// A Night's start time is a zone-less "HH:MM" (ADR-0011), read on this phone's
+// clock. These helpers convert it for display and for the OS time picker.
+
+// formatStartTime renders "HH:MM" in the locale's own clock: "7:30 PM" on a
+// 12-hour clock, or the zero-padded "19:30" / "09:05" on a 24-hour one.
+// `locale` defaults to the device's; the narrow no-break space some locales put
+// before AM/PM is normalized to a plain space.
+export function formatStartTime(hhmm: string, locale?: string): string {
+  const fmt = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" });
+  if (!fmt.resolvedOptions().hour12) {
+    return hhmm;
+  }
+  return fmt.format(startTimeDate(hhmm)).replace(/\s/g, " ");
+}
+
+// startTimeDate is "HH:MM" on `day`'s local date (default: today). Pure given
+// `day`.
+export function startTimeDate(hhmm: string, day: Date = new Date()): Date {
+  const [hour, minute] = hhmm.split(":").map(Number);
+  return new Date(day.getFullYear(), day.getMonth(), day.getDate(), hour, minute);
+}
+
+// toStartTime is a Date's local time of day as "HH:MM", dropping seconds.
+export function toStartTime(d: Date): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// startTimeMinus is the "HH:MM" `minutes` before `hhmm` on the clock, wrapping
+// past midnight — e.g. when a 2-hours-before reminder goes out. Pure.
+export function startTimeMinus(hhmm: string, minutes: number): string {
+  const [hour, minute] = hhmm.split(":").map(Number);
+  const total = (((hour * 60 + minute - minutes) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}

@@ -112,6 +112,7 @@ export default function NightScreen() {
       <WhenStep
         today={today}
         initial={state.date}
+        initialStartTime={state.startTime}
         nightDates={state.nightDates}
         busy={state.busy}
         onNext={plan.chooseDate}

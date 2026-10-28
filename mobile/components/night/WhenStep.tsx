@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { AppButton, Calendar } from "../";
+import { StartTimeRow } from "./StartTimeRow";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
 import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
@@ -18,24 +19,28 @@ import {
   textPresets,
 } from "../../theme";
 
-// WhenStep is the wizard's first step: a "Tonight" chip + the Calendar, with a
-// sticky footer that names the plan (TONIGHT/PLANNING) and its relative date. It
-// owns its own selection/month — it is just a date picker that reports the chosen
-// date on "Next". `initial` restores the selection when the user comes back.
+// WhenStep is the wizard's first step: a "Tonight" chip + the Calendar and an
+// optional start time, with a sticky footer that names the plan
+// (TONIGHT/PLANNING) and its relative date. It owns its own selection/month —
+// it reports the chosen date and start time on "Next". `initial` and
+// `initialStartTime` restore them when the user comes back.
 export function WhenStep({
   today,
   initial = today,
+  initialStartTime = null,
   nightDates,
   busy,
   onNext,
 }: {
   today: string;
   initial?: string;
+  initialStartTime?: string | null;
   nightDates: Set<string>;
   busy: string | null;
-  onNext: (iso: string) => void;
+  onNext: (iso: string, startTime: string | null) => void;
 }) {
   const [selected, setSelected] = useState(initial);
+  const [startTime, setStartTime] = useState(initialStartTime);
   const [month, setMonth] = useState<YearMonth>(() => yearMonthOf(initial));
   const isToday = selected === today;
   const future = nightTiming(selected, today) === "upcoming";
@@ -82,6 +87,10 @@ export function WhenStep({
             onMonth={(dir) => setMonth((m) => shiftMonth(m, dir))}
           />
         </View>
+
+        <View style={styles.timeCard}>
+          <StartTimeRow startTime={startTime} onChange={setStartTime} disabled={busy !== null} />
+        </View>
       </ScrollView>
 
       <WizardFooter>
@@ -97,7 +106,7 @@ export function WhenStep({
           title="Next: who's coming  →"
           fullWidth
           disabled={busy !== null}
-          onPress={() => onNext(selected)}
+          onPress={() => onNext(selected, startTime)}
         />
       </WizardFooter>
     </View>
@@ -127,6 +136,14 @@ const styles = StyleSheet.create({
     borderWidth: borderWidth.hairline,
     borderColor: colors.border.hairline,
     borderRadius: radius.lg,
+  },
+  timeCard: {
+    marginTop: space[3],
+    backgroundColor: colors.surface.card,
+    borderWidth: borderWidth.hairline,
+    borderColor: colors.border.hairline,
+    borderRadius: radius.lg,
+    overflow: "hidden",
   },
   footerMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   planTag: { ...textPresets.tag, color: colors.text.tertiary },

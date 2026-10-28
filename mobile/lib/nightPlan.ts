@@ -7,7 +7,7 @@ import { createSessionCore, type Session } from "./session";
 import { fetchTurnAmong, type TurnMember } from "./turn";
 
 // The Plan module behind the New night screen (GLOSSARY: Plan). A Plan is a
-// Night being arranged — date, then who's coming — that exists only here until
+// Night being arranged — date and start time, then who's coming — that exists only here until
 // create() saves it whole with its picker (ADR-0008). It owns the When → Who
 // step, the live turn order over the attendees, and who picks.
 
@@ -20,6 +20,7 @@ export type NightPlanState = {
   nightDates: Set<string>;
   step: PlanStep;
   date: string;
+  startTime: string | null;
   attendeeIds: ReadonlySet<string>;
   order: TurnMember[];
   pickerId: string | null;
@@ -30,8 +31,8 @@ export type NightPlanState = {
 export type NightPlan = Session<NightPlanState> & {
   // load fetches the roster and the dates that already hold a Night.
   load(): Promise<void>;
-  // chooseDate sets the date and moves on to Who.
-  chooseDate(iso: string): void;
+  // chooseDate sets the date and HH:MM start time (or none) and moves on to Who.
+  chooseDate(iso: string, startTime: string | null): void;
   back(): void;
   // toggle adds or removes an attendee, then reranks. A rank that returns after
   // a newer one is dropped.
@@ -59,6 +60,7 @@ export function createNightPlan({
     nightDates: new Set(),
     step: "when",
     date: today,
+    startTime: null,
     attendeeIds: new Set(),
     order: [],
     pickerId: null,
@@ -101,8 +103,8 @@ export function createNightPlan({
       }
     },
 
-    chooseDate(iso) {
-      core.set({ date: iso, step: "who", actionError: null });
+    chooseDate(iso, startTime) {
+      core.set({ date: iso, startTime, step: "who", actionError: null });
     },
 
     back() {
@@ -142,14 +144,14 @@ export function createNightPlan({
     },
 
     async create() {
-      const { busy, pickerId, date, attendeeIds } = core.state;
+      const { busy, pickerId, date, startTime, attendeeIds } = core.state;
       if (busy !== null || pickerId === null) {
         return null;
       }
       core.set({ busy: "create", actionError: null });
       try {
         const night = await core.track((signal) =>
-          createNight(baseUrl, groupId, { scheduledFor: date, attendees: [...attendeeIds], pickerId }, signal),
+          createNight(baseUrl, groupId, { scheduledFor: date, startTime, attendees: [...attendeeIds], pickerId }, signal),
         );
         core.set({ busy: null });
         return night;

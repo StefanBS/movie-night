@@ -24,8 +24,8 @@ func (q *Queries) ClearPushToken(ctx context.Context, pushToken pgtype.Text) err
 
 const listReminderCandidates = `-- name: ListReminderCandidates :many
 SELECT
-  p.id AS night_id, p.scheduled_for, p.picker_id,
-  p.remind_night_before, p.remind_morning_of, p.remind_audience,
+  p.id AS night_id, p.scheduled_for, p.start_time, p.picker_id,
+  p.remind_night_before, p.remind_morning_of, p.remind_two_hours_before, p.remind_audience,
   g.name AS group_name,
   pu.name AS picker_name,
   (SELECT count(*) FROM attendances c WHERE c.pick_id = p.id)::int AS going,
@@ -47,18 +47,20 @@ type ListReminderCandidatesParams struct {
 }
 
 type ListReminderCandidatesRow struct {
-	NightID           uuid.UUID        `json:"night_id"`
-	ScheduledFor      pgtype.Date      `json:"scheduled_for"`
-	PickerID          uuid.UUID        `json:"picker_id"`
-	RemindNightBefore bool             `json:"remind_night_before"`
-	RemindMorningOf   bool             `json:"remind_morning_of"`
-	RemindAudience    ReminderAudience `json:"remind_audience"`
-	GroupName         string           `json:"group_name"`
-	PickerName        string           `json:"picker_name"`
-	Going             int32            `json:"going"`
-	UserID            uuid.UUID        `json:"user_id"`
-	PushToken         string           `json:"push_token"`
-	TimeZone          string           `json:"time_zone"`
+	NightID              uuid.UUID        `json:"night_id"`
+	ScheduledFor         pgtype.Date      `json:"scheduled_for"`
+	StartTime            pgtype.Time      `json:"start_time"`
+	PickerID             uuid.UUID        `json:"picker_id"`
+	RemindNightBefore    bool             `json:"remind_night_before"`
+	RemindMorningOf      bool             `json:"remind_morning_of"`
+	RemindTwoHoursBefore bool             `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience `json:"remind_audience"`
+	GroupName            string           `json:"group_name"`
+	PickerName           string           `json:"picker_name"`
+	Going                int32            `json:"going"`
+	UserID               uuid.UUID        `json:"user_id"`
+	PushToken            string           `json:"push_token"`
+	TimeZone             string           `json:"time_zone"`
 }
 
 // Every device that could get a reminder for a Night dated in the window: one
@@ -77,9 +79,11 @@ func (q *Queries) ListReminderCandidates(ctx context.Context, arg ListReminderCa
 		if err := rows.Scan(
 			&i.NightID,
 			&i.ScheduledFor,
+			&i.StartTime,
 			&i.PickerID,
 			&i.RemindNightBefore,
 			&i.RemindMorningOf,
+			&i.RemindTwoHoursBefore,
 			&i.RemindAudience,
 			&i.GroupName,
 			&i.PickerName,

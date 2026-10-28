@@ -51,8 +51,9 @@ const MEMBERS: Member[] = [
 const SAVED: Night = {
   id: NIGHT,
   scheduledFor: "2026-06-26",
+  startTime: null,
   pickerId: "ada",
-  reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
+  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
   movie: null,
   attendees: [
     { id: "ada", name: "Ada", role: "core" },
@@ -60,7 +61,7 @@ const SAVED: Night = {
   ],
 };
 
-type Edit = { scheduledFor: string; attendees: string[]; reminders: Reminders };
+type Edit = { scheduledFor: string; startTime: string | null; attendees: string[]; reminders: Reminders };
 
 // backend fakes the two routes the session touches, recording every request
 // and applying a PATCH to its one Night in memory.
@@ -80,6 +81,7 @@ function backend(over: Partial<Record<string, Handler>> = {}) {
       night = {
         ...night,
         scheduledFor: edit.scheduledFor,
+        startTime: edit.startTime,
         reminders: edit.reminders,
         attendees: edit.attendees.map((id) => {
           const m = MEMBERS.find((x) => x.id === id);
@@ -138,17 +140,44 @@ test("toggling and changing the date make the draft dirty; undoing them doesn't"
 
 test("changing reminders makes the draft dirty; restoring them doesn't", async () => {
   await withEdit(backend().handler, async (edit) => {
-    edit.setReminders({ nightBefore: true, morningOf: false, audience: "picker" });
+    edit.setReminders({ nightBefore: true, morningOf: false, twoHoursBefore: true, audience: "picker" });
     assert.equal(edit.state.dirty, true);
     edit.setReminders(SAVED.reminders);
     assert.equal(edit.state.dirty, false);
   });
 });
 
+test("setting a start time makes the draft dirty; clearing it again doesn't", async () => {
+  await withEdit(backend().handler, async (edit) => {
+    assert.equal(edit.state.startTime, null);
+    edit.setStartTime("20:15");
+    assert.equal(edit.state.startTime, "20:15");
+    assert.equal(edit.state.dirty, true);
+    edit.setStartTime(null);
+    assert.equal(edit.state.dirty, false);
+  });
+});
+
+test("save sends the start time with the rest of the draft, and null once cleared", async () => {
+  const { handler, requests } = backend();
+  await withEdit(handler, async (edit) => {
+    edit.setStartTime("20:15");
+    const saved = await edit.save();
+    assert.equal((JSON.parse(requests[0].body) as Edit).startTime, "20:15");
+    assert.equal(saved?.startTime, "20:15");
+    assert.equal(edit.state.dirty, false);
+
+    edit.setStartTime(null);
+    await edit.save();
+    assert.equal((JSON.parse(requests[1].body) as Edit).startTime, null);
+    assert.equal(edit.state.startTime, null);
+  });
+});
+
 test("save sends the reminder settings with the rest of the draft", async () => {
   const { handler, requests } = backend();
   await withEdit(handler, async (edit) => {
-    const reminders: Reminders = { nightBefore: false, morningOf: true, audience: "picker" };
+    const reminders: Reminders = { nightBefore: false, morningOf: true, twoHoursBefore: false, audience: "picker" };
     edit.setReminders(reminders);
     const saved = await edit.save();
     const sent = JSON.parse(requests[0].body) as Edit;

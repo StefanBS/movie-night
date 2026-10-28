@@ -1,10 +1,10 @@
 import { firstName } from "./avatar";
 import type { Night } from "./nights";
 
-// A Night has no time of day, so a Calendar entry gets this default evening;
-// the person can change it in the OS form before saving.
-const START_HOUR = 19;
-const START_MINUTE = 30;
+// A Calendar entry starts at the Night's start time, or this default evening
+// when it has none (ADR-0011), and runs DURATION_HOURS; the person can change
+// either in the OS form before saving.
+const DEFAULT_START = "19:30";
 const DURATION_HOURS = 3;
 
 export type CalendarEntry = {
@@ -18,7 +18,8 @@ export type CalendarEntry = {
 // calendarEntry builds the one-off copy of a Night handed to the OS calendar
 // form: who picks, who's coming, the film if chosen, and a link back to the
 // Night. Times are local wall-clock (numeric Date args, like lib/date.ts), so
-// 7:30 PM is 7:30 PM on the phone that saves it. Pure.
+// 7:30 PM is 7:30 PM on the phone that saves it; a late start's end rolls into
+// the next day. Pure.
 export function calendarEntry(night: Night): CalendarEntry {
   const picker = night.attendees.find((a) => a.id === night.pickerId);
   const pickerName = firstName(picker?.name ?? "");
@@ -32,11 +33,12 @@ export function calendarEntry(night: Night): CalendarEntry {
   lines.push(url);
 
   const [year, month, day] = night.scheduledFor.split("-").map(Number);
+  const [hour, minute] = (night.startTime ?? DEFAULT_START).split(":").map(Number);
   return {
     title: pickerName !== "" ? `🎬 Movie Night — ${pickerName} picks` : "🎬 Movie Night",
     notes: lines.join("\n"),
     url,
-    startDate: new Date(year, month - 1, day, START_HOUR, START_MINUTE),
-    endDate: new Date(year, month - 1, day, START_HOUR + DURATION_HOURS, START_MINUTE),
+    startDate: new Date(year, month - 1, day, hour, minute),
+    endDate: new Date(year, month - 1, day, hour + DURATION_HOURS, minute),
   };
 }

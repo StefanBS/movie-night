@@ -4,8 +4,8 @@ import { deleteNight, updateNight, type Night } from "./nights";
 import { sameReminders, type Reminders } from "./reminders";
 import { createSessionCore, type Session } from "./session";
 
-// The Edit screen's module for a saved Night: a draft of its date, attendees
-// and reminder settings, saved in one request that either fully applies or changes nothing,
+// The Edit screen's module for a saved Night: a draft of its date, start time,
+// attendees and reminder settings, saved in one request that either fully applies or changes nothing,
 // and cancelling the Night. The picker is always an attendee (ADR-0008), so the
 // draft never drops them — change the picker from the Night first. Writes are
 // one at a time: while one runs (busy), the others return without a request.
@@ -17,6 +17,7 @@ export type NightEditState = {
   night: Night;
   members: Member[];
   date: string;
+  startTime: string | null;
   attendees: ReadonlySet<string>;
   reminders: Reminders;
   rows: EditRow[];
@@ -27,6 +28,8 @@ export type NightEditState = {
 
 export type NightEdit = Session<NightEditState> & {
   setDate(date: string): void;
+  // setStartTime sets the HH:MM start time, or clears it with null.
+  setStartTime(startTime: string | null): void;
   toggle(memberId: string): void;
   setReminders(reminders: Reminders): void;
   // save returns the saved Night, or null when nothing was sent or it failed.
@@ -51,11 +54,12 @@ export function editRows(night: Night, members: Member[]): EditRow[] {
   return rows;
 }
 
-type Draft = Pick<NightEditState, "date" | "attendees" | "reminders">;
+type Draft = Pick<NightEditState, "date" | "startTime" | "attendees" | "reminders">;
 
-function isDirty(night: Night, { date, attendees, reminders }: Draft): boolean {
+function isDirty(night: Night, { date, startTime, attendees, reminders }: Draft): boolean {
   return (
     date !== night.scheduledFor ||
+    startTime !== night.startTime ||
     !sameReminders(reminders, night.reminders) ||
     attendees.size !== night.attendees.length ||
     night.attendees.some((a) => !attendees.has(a.id))
@@ -67,6 +71,7 @@ function fromNight(night: Night, members: Member[]) {
   return {
     night,
     date: night.scheduledFor,
+    startTime: night.startTime,
     attendees: new Set(night.attendees.map((a) => a.id)),
     reminders: night.reminders,
     rows: editRows(night, members),
@@ -93,8 +98,8 @@ export function createNightEdit({
   });
 
   const setDraft = (change: Partial<Draft>) => {
-    const { date, attendees, reminders } = core.state;
-    const draft = { date, attendees, reminders, ...change };
+    const { date, startTime, attendees, reminders } = core.state;
+    const draft = { date, startTime, attendees, reminders, ...change };
     core.set({ ...draft, dirty: isDirty(core.state.night, draft) });
   };
 
@@ -109,6 +114,10 @@ export function createNightEdit({
 
     setDate(date) {
       setDraft({ date });
+    },
+
+    setStartTime(startTime) {
+      setDraft({ startTime });
     },
 
     toggle(memberId) {
@@ -127,14 +136,20 @@ export function createNightEdit({
     },
 
     async save() {
-      const { busy, dirty, date, attendees, reminders } = core.state;
+      const { busy, dirty, date, startTime, attendees, reminders } = core.state;
       if (busy !== null || !dirty) {
         return null;
       }
       core.set({ busy: "save", actionError: null });
       try {
         const saved = await core.track((signal) =>
-          updateNight(baseUrl, groupId, nightId, { scheduledFor: date, attendees: [...attendees], reminders }, signal),
+          updateNight(
+            baseUrl,
+            groupId,
+            nightId,
+            { scheduledFor: date, startTime, attendees: [...attendees], reminders },
+            signal,
+          ),
         );
         core.set({ ...fromNight(saved, core.state.members), busy: null });
         return saved;

@@ -4,8 +4,8 @@
 -- active and who haven't muted reminders. Which slot is due, and whether this
 -- person gets it, is decided in Go against each device's time zone.
 SELECT
-  p.id AS night_id, p.scheduled_for, p.picker_id,
-  p.remind_night_before, p.remind_morning_of, p.remind_audience,
+  p.id AS night_id, p.scheduled_for, p.start_time, p.picker_id,
+  p.remind_night_before, p.remind_morning_of, p.remind_two_hours_before, p.remind_audience,
   g.name AS group_name,
   pu.name AS picker_name,
   (SELECT count(*) FROM attendances c WHERE c.pick_id = p.id)::int AS going,

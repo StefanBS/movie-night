@@ -30,6 +30,10 @@ _Avoid_: event, session, open night, pick (for the occasion itself)
 A Night being arranged (date and attendees) that doesn't exist yet; it becomes a Night once it's saved with a picker.
 _Avoid_: draft, open night
 
+**Start time**:
+The time of day a Night begins, read on each person's own clock. Optional, and set per Night. It does not change whether a Night is upcoming, tonight or past.
+_Avoid_: showtime, kickoff
+
 **Attendee**:
 A person present at a Night. The picker is always an attendee.
 _Avoid_: participant

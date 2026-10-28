@@ -4,7 +4,7 @@ import { Clock } from "lucide-react-native";
 
 import { AppButton } from "./AppButton";
 import { Avatar } from "./Avatar";
-import { countdownLabel, formatWeekdayDate } from "../lib/date";
+import { countdownLabel, formatStartTime, formatWeekdayDate } from "../lib/date";
 import type { Night } from "../lib/nights";
 import {
   borderWidth,
@@ -55,7 +55,9 @@ export function UpNextCard({
         <View style={styles.pill}>
           <Clock size={12} color={colors.text.onAccent} strokeWidth={2.5} />
           <Text style={styles.pillText} allowFontScaling={false}>
-            {countdownLabel(night.scheduledFor)}
+            {night.startTime !== null
+              ? `${countdownLabel(night.scheduledFor)} · ${formatStartTime(night.startTime)}`
+              : countdownLabel(night.scheduledFor)}
           </Text>
         </View>
       </View>

@@ -23,8 +23,9 @@ const ROSTER: Member[] = [
 const night = (...ids: string[]): Night => ({
   id: "n1",
   scheduledFor: "2026-06-26",
+  startTime: null,
   pickerId: ids[0],
-  reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
+  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
   movie: null,
   attendees: ids.map((id) => ({ id, name: id[0].toUpperCase() + id.slice(1), role: id === "frankie" ? "guest" : "core" })),
 });

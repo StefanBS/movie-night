@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { parseNight, parseNights } from "./nights";
 
-const reminders = { nightBefore: true, morningOf: true, audience: "everyone" };
+const reminders = { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" };
 
 const valid = {
   id: "n1",
@@ -23,6 +23,14 @@ test("parses a valid night with attendees", () => {
   assert.equal(n.scheduledFor, "2026-06-12");
   assert.equal(n.attendees.length, 2);
   assert.equal(n.attendees[1].role, "guest");
+});
+
+test("parses a night's start time, or none", () => {
+  assert.equal(parseNight(valid).startTime, null);
+  assert.equal(parseNight({ ...valid, startTime: null }).startTime, null);
+  assert.equal(parseNight({ ...valid, startTime: "19:30" }).startTime, "19:30");
+  assert.throws(() => parseNight({ ...valid, startTime: 1930 }), /startTime/);
+  assert.throws(() => parseNight({ ...valid, startTime: "7:30 PM" }), /startTime/);
 });
 
 test("parses a night with no attendees", () => {

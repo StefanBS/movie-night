@@ -135,7 +135,7 @@ func TestRemindersIntegration(t *testing.T) {
 		device(t, ada, "ExponentPushToken[ada]")
 		device(t, blake, "ExponentPushToken[blake]")
 		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
-			`{"reminders":{"nightBefore":false,"morningOf":false,"audience":"picker"}}`); code != http.StatusOK {
+			`{"reminders":{"nightBefore":false,"morningOf":false,"twoHoursBefore":false,"audience":"picker"}}`); code != http.StatusOK {
 			t.Fatalf("patch = %d", code)
 		}
 		push, sent := fakeExpo(t)
@@ -178,6 +178,30 @@ func TestRemindersIntegration(t *testing.T) {
 		}
 		if left != nil {
 			t.Errorf("push token = %q, want cleared", *left)
+		}
+	})
+
+	t.Run("2 hours before a Night's start time, once", func(t *testing.T) {
+		n := reset(t)
+		device(t, blake, "ExponentPushToken[blake]")
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{"startTime":"21:00"}`); code != http.StatusOK {
+			t.Fatalf("set start time = %d", code)
+		}
+		push, sent := fakeExpo(t)
+		twoHoursBefore := time.Date(2026, 6, 19, 17, 1, 0, 0, time.UTC) // 19:01 in Madrid
+
+		if err := sendDueReminders(t.Context(), q, push, twoHoursBefore); err != nil {
+			t.Fatalf("send: %v", err)
+		}
+		got := sent()
+		if len(got) != 1 || got[0].Title != "Movie night starts at 9:00 PM" {
+			t.Fatalf("sent %+v, want Blake's 2-hours-before reminder", got)
+		}
+		if err := sendDueReminders(t.Context(), q, push, twoHoursBefore.Add(time.Minute)); err != nil {
+			t.Fatalf("second send: %v", err)
+		}
+		if again := sent(); len(again) != 0 {
+			t.Errorf("resent %d reminders, want none", len(again))
 		}
 	})
 }
