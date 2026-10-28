@@ -106,14 +106,14 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `PUT` | `/identity/push` | Register this device for reminders ([ADR-0010](../docs/adr/0010-server-push-reminders.md)); `204`. Body `{"pushToken","timeZone"}`: an Expo push token and an IANA zone; `400` if either is invalid. The push token is taken off any other device. |
 | `PUT` | `/identity/preferences` | Mute or unmute every reminder to this person, on all their devices. Body `{"remindersMuted"}`; returns the identity. |
 
-**Night lifecycle** ([ADR-0008](../docs/adr/0008-night-always-has-a-picker.md)) — each returns the night `{"id","scheduledFor","pickerId","movie","attendees","reminders"}`, where `reminders` is `{"nightBefore","morningOf","audience"}` with audience `everyone` or `picker` ([ADR-0010](../docs/adr/0010-server-push-reminders.md)). Every night has a picker, who is always an attendee; at most one night per group per date.
+**Night lifecycle** ([ADR-0008](../docs/adr/0008-night-always-has-a-picker.md)) — each returns the night `{"id","scheduledFor","startTime","pickerId","movie","attendees","reminders"}`, where `startTime` is a zone-less `HH:MM` or `null` ([ADR-0011](../docs/adr/0011-night-start-time-wall-clock.md)) and `reminders` is `{"nightBefore","morningOf","twoHoursBefore","audience"}` with audience `everyone` or `picker` ([ADR-0010](../docs/adr/0010-server-push-reminders.md)); `twoHoursBefore` only fires on a night with a start time. Every night has a picker, who is always an attendee; at most one night per group per date.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/groups/{groupId}/nights` | Create a night with its picker; `201`. Body `{"scheduledFor","attendees","pickerId"}`; `422` if the picker isn't an attendee, `409` if the date is taken. |
+| `POST` | `/groups/{groupId}/nights` | Create a night with its picker; `201`. Body `{"scheduledFor","startTime"?,"attendees","pickerId"}` (`startTime` `HH:MM`, omitted or `null` for none); `422` if the picker isn't an attendee, `409` if the date is taken. |
 | `GET` | `/groups/{groupId}/nights` | Every night, past and upcoming, newest first. |
 | `GET` | `/groups/{groupId}/nights/{nightId}` | A night and its attendees. |
-| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Edit the date and/or replace the attendee set and reminder settings in one transaction — a rejected edit changes nothing. Body `{"scheduledFor"?,"attendees"?,"reminders"?}` (omitted = unchanged; `reminders` needs all three fields); `422` if the attendees leave out the picker or include a non-member, `409` if the date is taken. |
+| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Edit the date and start time and/or replace the attendee set and reminder settings in one transaction — a rejected edit changes nothing. Body `{"scheduledFor"?,"startTime"?,"attendees"?,"reminders"?}` (omitted = unchanged; `startTime` `null` clears it; `reminders` needs all four fields); `422` if the attendees leave out the picker or include a non-member, `409` if the date is taken. |
 | `DELETE` | `/groups/{groupId}/nights/{nightId}` | Cancel/delete the night; `204`. Idempotent. |
 | `GET` | `/groups/{groupId}/nights/{nightId}/turn` | Least-served ranking over the night's attendees, ignoring the night's own pick. |
 | `POST` | `/groups/{groupId}/nights/{nightId}/pick` | Change the picker (must be an attendee; guest picks don't move standings). Body `{"pickerId"}`. |

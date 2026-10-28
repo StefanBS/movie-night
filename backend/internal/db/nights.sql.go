@@ -31,17 +31,18 @@ func (q *Queries) AddAttendees(ctx context.Context, arg AddAttendeesParams) erro
 
 const createNight = `-- name: CreateNight :one
 WITH night AS (
-  INSERT INTO picks (group_id, scheduled_for, picker_id, is_credited)
-  VALUES ($1, $2, $3, $4)
+  INSERT INTO picks (group_id, scheduled_for, start_time, picker_id, is_credited)
+  VALUES ($1, $2, $3, $4, $5)
   RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id,
-            remind_night_before, remind_morning_of, remind_audience
+            start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience
 ), attended AS (
   INSERT INTO attendances (pick_id, user_id)
-  SELECT night.id, unnest($5::uuid[]) FROM night
+  SELECT night.id, unnest($6::uuid[]) FROM night
 )
 SELECT
   night.id, night.group_id, night.picker_id, night.is_credited, night.scheduled_for, night.created_at,
-  night.remind_night_before, night.remind_morning_of, night.remind_audience,
+  night.start_time, night.remind_night_before, night.remind_morning_of, night.remind_two_hours_before,
+  night.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -53,25 +54,28 @@ LEFT JOIN movies m ON m.id = night.movie_id
 type CreateNightParams struct {
 	GroupID      uuid.UUID   `json:"group_id"`
 	ScheduledFor pgtype.Date `json:"scheduled_for"`
+	StartTime    pgtype.Time `json:"start_time"`
 	PickerID     uuid.UUID   `json:"picker_id"`
 	IsCredited   bool        `json:"is_credited"`
 	Attendees    []uuid.UUID `json:"attendees"`
 }
 
 type CreateNightRow struct {
-	ID                uuid.UUID          `json:"id"`
-	GroupID           uuid.UUID          `json:"group_id"`
-	PickerID          uuid.UUID          `json:"picker_id"`
-	IsCredited        bool               `json:"is_credited"`
-	ScheduledFor      pgtype.Date        `json:"scheduled_for"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	RemindNightBefore bool               `json:"remind_night_before"`
-	RemindMorningOf   bool               `json:"remind_morning_of"`
-	RemindAudience    ReminderAudience   `json:"remind_audience"`
-	MovieTmdbID       pgtype.Int4        `json:"movie_tmdb_id"`
-	MovieTitle        pgtype.Text        `json:"movie_title"`
-	MovieReleaseYear  pgtype.Int4        `json:"movie_release_year"`
-	MoviePosterPath   pgtype.Text        `json:"movie_poster_path"`
+	ID                   uuid.UUID          `json:"id"`
+	GroupID              uuid.UUID          `json:"group_id"`
+	PickerID             uuid.UUID          `json:"picker_id"`
+	IsCredited           bool               `json:"is_credited"`
+	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	StartTime            pgtype.Time        `json:"start_time"`
+	RemindNightBefore    bool               `json:"remind_night_before"`
+	RemindMorningOf      bool               `json:"remind_morning_of"`
+	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience   `json:"remind_audience"`
+	MovieTmdbID          pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle           pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
 }
 
 // Inserts the night and its attendees in one statement, so a night never exists
@@ -80,6 +84,7 @@ func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (Creat
 	row := q.db.QueryRow(ctx, createNight,
 		arg.GroupID,
 		arg.ScheduledFor,
+		arg.StartTime,
 		arg.PickerID,
 		arg.IsCredited,
 		arg.Attendees,
@@ -92,8 +97,10 @@ func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (Creat
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
+		&i.StartTime,
 		&i.RemindNightBefore,
 		&i.RemindMorningOf,
+		&i.RemindTwoHoursBefore,
 		&i.RemindAudience,
 		&i.MovieTmdbID,
 		&i.MovieTitle,
@@ -121,7 +128,8 @@ func (q *Queries) DeleteNight(ctx context.Context, arg DeleteNightParams) error 
 const getNight = `-- name: GetNight :one
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
-  p.remind_night_before, p.remind_morning_of, p.remind_audience,
+  p.start_time, p.remind_night_before, p.remind_morning_of, p.remind_two_hours_before,
+  p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -137,19 +145,21 @@ type GetNightParams struct {
 }
 
 type GetNightRow struct {
-	ID                uuid.UUID          `json:"id"`
-	GroupID           uuid.UUID          `json:"group_id"`
-	PickerID          uuid.UUID          `json:"picker_id"`
-	IsCredited        bool               `json:"is_credited"`
-	ScheduledFor      pgtype.Date        `json:"scheduled_for"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	RemindNightBefore bool               `json:"remind_night_before"`
-	RemindMorningOf   bool               `json:"remind_morning_of"`
-	RemindAudience    ReminderAudience   `json:"remind_audience"`
-	MovieTmdbID       pgtype.Int4        `json:"movie_tmdb_id"`
-	MovieTitle        pgtype.Text        `json:"movie_title"`
-	MovieReleaseYear  pgtype.Int4        `json:"movie_release_year"`
-	MoviePosterPath   pgtype.Text        `json:"movie_poster_path"`
+	ID                   uuid.UUID          `json:"id"`
+	GroupID              uuid.UUID          `json:"group_id"`
+	PickerID             uuid.UUID          `json:"picker_id"`
+	IsCredited           bool               `json:"is_credited"`
+	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	StartTime            pgtype.Time        `json:"start_time"`
+	RemindNightBefore    bool               `json:"remind_night_before"`
+	RemindMorningOf      bool               `json:"remind_morning_of"`
+	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience   `json:"remind_audience"`
+	MovieTmdbID          pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle           pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
 }
 
 // Every night query returns this same shape (the night plus its movie's LEFT
@@ -164,8 +174,10 @@ func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (GetNightRow
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
+		&i.StartTime,
 		&i.RemindNightBefore,
 		&i.RemindMorningOf,
+		&i.RemindTwoHoursBefore,
 		&i.RemindAudience,
 		&i.MovieTmdbID,
 		&i.MovieTitle,
@@ -178,7 +190,8 @@ func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (GetNightRow
 const getNightForUpdate = `-- name: GetNightForUpdate :one
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
-  p.remind_night_before, p.remind_morning_of, p.remind_audience,
+  p.start_time, p.remind_night_before, p.remind_morning_of, p.remind_two_hours_before,
+  p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -195,19 +208,21 @@ type GetNightForUpdateParams struct {
 }
 
 type GetNightForUpdateRow struct {
-	ID                uuid.UUID          `json:"id"`
-	GroupID           uuid.UUID          `json:"group_id"`
-	PickerID          uuid.UUID          `json:"picker_id"`
-	IsCredited        bool               `json:"is_credited"`
-	ScheduledFor      pgtype.Date        `json:"scheduled_for"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	RemindNightBefore bool               `json:"remind_night_before"`
-	RemindMorningOf   bool               `json:"remind_morning_of"`
-	RemindAudience    ReminderAudience   `json:"remind_audience"`
-	MovieTmdbID       pgtype.Int4        `json:"movie_tmdb_id"`
-	MovieTitle        pgtype.Text        `json:"movie_title"`
-	MovieReleaseYear  pgtype.Int4        `json:"movie_release_year"`
-	MoviePosterPath   pgtype.Text        `json:"movie_poster_path"`
+	ID                   uuid.UUID          `json:"id"`
+	GroupID              uuid.UUID          `json:"group_id"`
+	PickerID             uuid.UUID          `json:"picker_id"`
+	IsCredited           bool               `json:"is_credited"`
+	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	StartTime            pgtype.Time        `json:"start_time"`
+	RemindNightBefore    bool               `json:"remind_night_before"`
+	RemindMorningOf      bool               `json:"remind_morning_of"`
+	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience   `json:"remind_audience"`
+	MovieTmdbID          pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle           pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
 }
 
 // Locks the night row for the rest of the edit transaction, so a concurrent
@@ -222,8 +237,10 @@ func (q *Queries) GetNightForUpdate(ctx context.Context, arg GetNightForUpdatePa
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
+		&i.StartTime,
 		&i.RemindNightBefore,
 		&i.RemindMorningOf,
+		&i.RemindTwoHoursBefore,
 		&i.RemindAudience,
 		&i.MovieTmdbID,
 		&i.MovieTitle,
@@ -278,7 +295,8 @@ func (q *Queries) ListNightAttendees(ctx context.Context, arg ListNightAttendees
 const listNights = `-- name: ListNights :many
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
-  p.remind_night_before, p.remind_morning_of, p.remind_audience,
+  p.start_time, p.remind_night_before, p.remind_morning_of, p.remind_two_hours_before,
+  p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -290,19 +308,21 @@ ORDER BY p.scheduled_for DESC
 `
 
 type ListNightsRow struct {
-	ID                uuid.UUID          `json:"id"`
-	GroupID           uuid.UUID          `json:"group_id"`
-	PickerID          uuid.UUID          `json:"picker_id"`
-	IsCredited        bool               `json:"is_credited"`
-	ScheduledFor      pgtype.Date        `json:"scheduled_for"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	RemindNightBefore bool               `json:"remind_night_before"`
-	RemindMorningOf   bool               `json:"remind_morning_of"`
-	RemindAudience    ReminderAudience   `json:"remind_audience"`
-	MovieTmdbID       pgtype.Int4        `json:"movie_tmdb_id"`
-	MovieTitle        pgtype.Text        `json:"movie_title"`
-	MovieReleaseYear  pgtype.Int4        `json:"movie_release_year"`
-	MoviePosterPath   pgtype.Text        `json:"movie_poster_path"`
+	ID                   uuid.UUID          `json:"id"`
+	GroupID              uuid.UUID          `json:"group_id"`
+	PickerID             uuid.UUID          `json:"picker_id"`
+	IsCredited           bool               `json:"is_credited"`
+	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	StartTime            pgtype.Time        `json:"start_time"`
+	RemindNightBefore    bool               `json:"remind_night_before"`
+	RemindMorningOf      bool               `json:"remind_morning_of"`
+	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience   `json:"remind_audience"`
+	MovieTmdbID          pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle           pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
 }
 
 func (q *Queries) ListNights(ctx context.Context, groupID uuid.UUID) ([]ListNightsRow, error) {
@@ -321,8 +341,10 @@ func (q *Queries) ListNights(ctx context.Context, groupID uuid.UUID) ([]ListNigh
 			&i.IsCredited,
 			&i.ScheduledFor,
 			&i.CreatedAt,
+			&i.StartTime,
 			&i.RemindNightBefore,
 			&i.RemindMorningOf,
+			&i.RemindTwoHoursBefore,
 			&i.RemindAudience,
 			&i.MovieTmdbID,
 			&i.MovieTitle,
@@ -408,11 +430,12 @@ WITH p AS (
   SET picker_id = $1, is_credited = $2
   WHERE picks.id = $3 AND picks.group_id = $4
   RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id,
-            remind_night_before, remind_morning_of, remind_audience
+            start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience
 )
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
-  p.remind_night_before, p.remind_morning_of, p.remind_audience,
+  p.start_time, p.remind_night_before, p.remind_morning_of, p.remind_two_hours_before,
+  p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -429,19 +452,21 @@ type SetNightPickerParams struct {
 }
 
 type SetNightPickerRow struct {
-	ID                uuid.UUID          `json:"id"`
-	GroupID           uuid.UUID          `json:"group_id"`
-	PickerID          uuid.UUID          `json:"picker_id"`
-	IsCredited        bool               `json:"is_credited"`
-	ScheduledFor      pgtype.Date        `json:"scheduled_for"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	RemindNightBefore bool               `json:"remind_night_before"`
-	RemindMorningOf   bool               `json:"remind_morning_of"`
-	RemindAudience    ReminderAudience   `json:"remind_audience"`
-	MovieTmdbID       pgtype.Int4        `json:"movie_tmdb_id"`
-	MovieTitle        pgtype.Text        `json:"movie_title"`
-	MovieReleaseYear  pgtype.Int4        `json:"movie_release_year"`
-	MoviePosterPath   pgtype.Text        `json:"movie_poster_path"`
+	ID                   uuid.UUID          `json:"id"`
+	GroupID              uuid.UUID          `json:"group_id"`
+	PickerID             uuid.UUID          `json:"picker_id"`
+	IsCredited           bool               `json:"is_credited"`
+	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	StartTime            pgtype.Time        `json:"start_time"`
+	RemindNightBefore    bool               `json:"remind_night_before"`
+	RemindMorningOf      bool               `json:"remind_morning_of"`
+	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience   `json:"remind_audience"`
+	MovieTmdbID          pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle           pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
 }
 
 func (q *Queries) SetNightPicker(ctx context.Context, arg SetNightPickerParams) (SetNightPickerRow, error) {
@@ -459,8 +484,10 @@ func (q *Queries) SetNightPicker(ctx context.Context, arg SetNightPickerParams) 
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
+		&i.StartTime,
 		&i.RemindNightBefore,
 		&i.RemindMorningOf,
+		&i.RemindTwoHoursBefore,
 		&i.RemindAudience,
 		&i.MovieTmdbID,
 		&i.MovieTitle,
@@ -476,11 +503,12 @@ WITH p AS (
   SET scheduled_for = $1
   WHERE picks.id = $2 AND picks.group_id = $3
   RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id,
-            remind_night_before, remind_morning_of, remind_audience
+            start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience
 )
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
-  p.remind_night_before, p.remind_morning_of, p.remind_audience,
+  p.start_time, p.remind_night_before, p.remind_morning_of, p.remind_two_hours_before,
+  p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -496,19 +524,21 @@ type UpdateNightDateParams struct {
 }
 
 type UpdateNightDateRow struct {
-	ID                uuid.UUID          `json:"id"`
-	GroupID           uuid.UUID          `json:"group_id"`
-	PickerID          uuid.UUID          `json:"picker_id"`
-	IsCredited        bool               `json:"is_credited"`
-	ScheduledFor      pgtype.Date        `json:"scheduled_for"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	RemindNightBefore bool               `json:"remind_night_before"`
-	RemindMorningOf   bool               `json:"remind_morning_of"`
-	RemindAudience    ReminderAudience   `json:"remind_audience"`
-	MovieTmdbID       pgtype.Int4        `json:"movie_tmdb_id"`
-	MovieTitle        pgtype.Text        `json:"movie_title"`
-	MovieReleaseYear  pgtype.Int4        `json:"movie_release_year"`
-	MoviePosterPath   pgtype.Text        `json:"movie_poster_path"`
+	ID                   uuid.UUID          `json:"id"`
+	GroupID              uuid.UUID          `json:"group_id"`
+	PickerID             uuid.UUID          `json:"picker_id"`
+	IsCredited           bool               `json:"is_credited"`
+	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	StartTime            pgtype.Time        `json:"start_time"`
+	RemindNightBefore    bool               `json:"remind_night_before"`
+	RemindMorningOf      bool               `json:"remind_morning_of"`
+	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience   `json:"remind_audience"`
+	MovieTmdbID          pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle           pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
 }
 
 func (q *Queries) UpdateNightDate(ctx context.Context, arg UpdateNightDateParams) (UpdateNightDateRow, error) {
@@ -521,8 +551,10 @@ func (q *Queries) UpdateNightDate(ctx context.Context, arg UpdateNightDateParams
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
+		&i.StartTime,
 		&i.RemindNightBefore,
 		&i.RemindMorningOf,
+		&i.RemindTwoHoursBefore,
 		&i.RemindAudience,
 		&i.MovieTmdbID,
 		&i.MovieTitle,
@@ -535,16 +567,18 @@ func (q *Queries) UpdateNightDate(ctx context.Context, arg UpdateNightDateParams
 const updateNightReminders = `-- name: UpdateNightReminders :one
 WITH p AS (
   UPDATE picks
-  SET remind_night_before = $1,
-      remind_morning_of   = $2,
-      remind_audience     = $3
-  WHERE picks.id = $4 AND picks.group_id = $5
+  SET remind_night_before     = $1,
+      remind_morning_of       = $2,
+      remind_two_hours_before = $3,
+      remind_audience         = $4
+  WHERE picks.id = $5 AND picks.group_id = $6
   RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id,
-            remind_night_before, remind_morning_of, remind_audience
+            start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience
 )
 SELECT
   p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
-  p.remind_night_before, p.remind_morning_of, p.remind_audience,
+  p.start_time, p.remind_night_before, p.remind_morning_of, p.remind_two_hours_before,
+  p.remind_audience,
   m.tmdb_id      AS movie_tmdb_id,
   m.title        AS movie_title,
   m.release_year AS movie_release_year,
@@ -554,33 +588,37 @@ LEFT JOIN movies m ON m.id = p.movie_id
 `
 
 type UpdateNightRemindersParams struct {
-	RemindNightBefore bool             `json:"remind_night_before"`
-	RemindMorningOf   bool             `json:"remind_morning_of"`
-	RemindAudience    ReminderAudience `json:"remind_audience"`
-	NightID           uuid.UUID        `json:"night_id"`
-	GroupID           uuid.UUID        `json:"group_id"`
+	RemindNightBefore    bool             `json:"remind_night_before"`
+	RemindMorningOf      bool             `json:"remind_morning_of"`
+	RemindTwoHoursBefore bool             `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience `json:"remind_audience"`
+	NightID              uuid.UUID        `json:"night_id"`
+	GroupID              uuid.UUID        `json:"group_id"`
 }
 
 type UpdateNightRemindersRow struct {
-	ID                uuid.UUID          `json:"id"`
-	GroupID           uuid.UUID          `json:"group_id"`
-	PickerID          uuid.UUID          `json:"picker_id"`
-	IsCredited        bool               `json:"is_credited"`
-	ScheduledFor      pgtype.Date        `json:"scheduled_for"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	RemindNightBefore bool               `json:"remind_night_before"`
-	RemindMorningOf   bool               `json:"remind_morning_of"`
-	RemindAudience    ReminderAudience   `json:"remind_audience"`
-	MovieTmdbID       pgtype.Int4        `json:"movie_tmdb_id"`
-	MovieTitle        pgtype.Text        `json:"movie_title"`
-	MovieReleaseYear  pgtype.Int4        `json:"movie_release_year"`
-	MoviePosterPath   pgtype.Text        `json:"movie_poster_path"`
+	ID                   uuid.UUID          `json:"id"`
+	GroupID              uuid.UUID          `json:"group_id"`
+	PickerID             uuid.UUID          `json:"picker_id"`
+	IsCredited           bool               `json:"is_credited"`
+	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	StartTime            pgtype.Time        `json:"start_time"`
+	RemindNightBefore    bool               `json:"remind_night_before"`
+	RemindMorningOf      bool               `json:"remind_morning_of"`
+	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience   `json:"remind_audience"`
+	MovieTmdbID          pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle           pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
 }
 
 func (q *Queries) UpdateNightReminders(ctx context.Context, arg UpdateNightRemindersParams) (UpdateNightRemindersRow, error) {
 	row := q.db.QueryRow(ctx, updateNightReminders,
 		arg.RemindNightBefore,
 		arg.RemindMorningOf,
+		arg.RemindTwoHoursBefore,
 		arg.RemindAudience,
 		arg.NightID,
 		arg.GroupID,
@@ -593,8 +631,78 @@ func (q *Queries) UpdateNightReminders(ctx context.Context, arg UpdateNightRemin
 		&i.IsCredited,
 		&i.ScheduledFor,
 		&i.CreatedAt,
+		&i.StartTime,
 		&i.RemindNightBefore,
 		&i.RemindMorningOf,
+		&i.RemindTwoHoursBefore,
+		&i.RemindAudience,
+		&i.MovieTmdbID,
+		&i.MovieTitle,
+		&i.MovieReleaseYear,
+		&i.MoviePosterPath,
+	)
+	return i, err
+}
+
+const updateNightStartTime = `-- name: UpdateNightStartTime :one
+WITH p AS (
+  UPDATE picks
+  SET start_time = $1
+  WHERE picks.id = $2 AND picks.group_id = $3
+  RETURNING id, group_id, picker_id, is_credited, scheduled_for, created_at, movie_id,
+            start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience
+)
+SELECT
+  p.id, p.group_id, p.picker_id, p.is_credited, p.scheduled_for, p.created_at,
+  p.start_time, p.remind_night_before, p.remind_morning_of, p.remind_two_hours_before,
+  p.remind_audience,
+  m.tmdb_id      AS movie_tmdb_id,
+  m.title        AS movie_title,
+  m.release_year AS movie_release_year,
+  m.poster_path  AS movie_poster_path
+FROM p
+LEFT JOIN movies m ON m.id = p.movie_id
+`
+
+type UpdateNightStartTimeParams struct {
+	StartTime pgtype.Time `json:"start_time"`
+	NightID   uuid.UUID   `json:"night_id"`
+	GroupID   uuid.UUID   `json:"group_id"`
+}
+
+type UpdateNightStartTimeRow struct {
+	ID                   uuid.UUID          `json:"id"`
+	GroupID              uuid.UUID          `json:"group_id"`
+	PickerID             uuid.UUID          `json:"picker_id"`
+	IsCredited           bool               `json:"is_credited"`
+	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	StartTime            pgtype.Time        `json:"start_time"`
+	RemindNightBefore    bool               `json:"remind_night_before"`
+	RemindMorningOf      bool               `json:"remind_morning_of"`
+	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience   `json:"remind_audience"`
+	MovieTmdbID          pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle           pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
+}
+
+// A NULL start_time clears it.
+func (q *Queries) UpdateNightStartTime(ctx context.Context, arg UpdateNightStartTimeParams) (UpdateNightStartTimeRow, error) {
+	row := q.db.QueryRow(ctx, updateNightStartTime, arg.StartTime, arg.NightID, arg.GroupID)
+	var i UpdateNightStartTimeRow
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.PickerID,
+		&i.IsCredited,
+		&i.ScheduledFor,
+		&i.CreatedAt,
+		&i.StartTime,
+		&i.RemindNightBefore,
+		&i.RemindMorningOf,
+		&i.RemindTwoHoursBefore,
 		&i.RemindAudience,
 		&i.MovieTmdbID,
 		&i.MovieTitle,

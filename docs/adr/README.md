@@ -7,7 +7,7 @@ decision, consequences). Records are append-only: when a decision changes, add a
 new record that supersedes the old one rather than editing history.
 
 **Status legend:** Proposed · Accepted · Superseded · Deprecated
-**Last updated:** 2026-10-27
+**Last updated:** 2026-10-28
 
 ## Index
 
@@ -21,6 +21,7 @@ new record that supersedes the old one rather than editing history.
 - [ADR-0008](0008-night-always-has-a-picker.md) — A Night always has a picker; unfinished plans live on the client · *Accepted*
 - [ADR-0009](0009-claimed-identity-device-tokens.md) — An install claims its identity from the roster and holds a device token · *Accepted*
 - [ADR-0010](0010-server-push-reminders.md) — Reminders are server push, computed each minute and sent at most once · *Accepted*
+- [ADR-0011](0011-night-start-time-wall-clock.md) — A Night's start time is a zone-less wall-clock time, read on each device · *Accepted*
 
 Open and deferred decisions are tracked in [backlog.md](backlog.md).
 
@@ -35,7 +36,8 @@ schema definition.
   (active/inactive), `baseline_picks`, `rotation_position`, join/leave timestamps.
 - **picks** — one per movie night (at most one per group per date); references the
   group, the picker (always an attendee — [ADR-0008](0008-night-always-has-a-picker.md)),
-  and the chosen movie; carries `is_credited` and the scheduled date.
+  and the chosen movie; carries `is_credited`, the scheduled date, and an optional start time
+  ([ADR-0011](0011-night-start-time-wall-clock.md)).
 - **attendances** — who was present at a given night (linked to that night's pick).
 - **movies** — metadata cached from TMDB.
 - **reviews** — a person's rating/notes for a given night's pick.

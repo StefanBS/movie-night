@@ -22,23 +22,31 @@ var (
 func candidate(t *testing.T, user uuid.UUID, token, zone string, opts ...func(*db.ListReminderCandidatesRow)) db.ListReminderCandidatesRow {
 	t.Helper()
 	row := db.ListReminderCandidatesRow{
-		NightID:           remNight,
-		ScheduledFor:      pgtype.Date{Time: mustDate(t, "2026-06-19"), Valid: true},
-		PickerID:          remPicker,
-		RemindNightBefore: true,
-		RemindMorningOf:   true,
-		RemindAudience:    db.ReminderAudienceEveryone,
-		GroupName:         "Friday Film Club",
-		PickerName:        "Ada Lovelace",
-		Going:             4,
-		UserID:            user,
-		PushToken:         token,
-		TimeZone:          zone,
+		NightID:              remNight,
+		ScheduledFor:         pgtype.Date{Time: mustDate(t, "2026-06-19"), Valid: true},
+		PickerID:             remPicker,
+		RemindNightBefore:    true,
+		RemindMorningOf:      true,
+		RemindTwoHoursBefore: true,
+		RemindAudience:       db.ReminderAudienceEveryone,
+		GroupName:            "Friday Film Club",
+		PickerName:           "Ada Lovelace",
+		Going:                4,
+		UserID:               user,
+		PushToken:            token,
+		TimeZone:             zone,
 	}
 	for _, o := range opts {
 		o(&row)
 	}
 	return row
+}
+
+// startsAt gives the candidate's Night a start time of hh:mm.
+func startsAt(hh, mm int) func(*db.ListReminderCandidatesRow) {
+	return func(r *db.ListReminderCandidatesRow) {
+		r.StartTime = pgtype.Time{Microseconds: int64(hh*60+mm) * 60 * 1e6, Valid: true}
+	}
 }
 
 func at(t *testing.T, s string) time.Time {
@@ -76,10 +84,12 @@ func TestWantsSlot(t *testing.T) {
 }
 
 func TestReminderMessage(t *testing.T) {
+	evening := startsAt(19, 30)
 	for _, tc := range []struct {
 		name      string
 		user      uuid.UUID
 		slot      db.ReminderSlot
+		opts      []func(*db.ListReminderCandidatesRow)
 		wantTitle string
 		wantBody  string
 	}{
@@ -103,9 +113,39 @@ func TestReminderMessage(t *testing.T) {
 			wantTitle: "Movie night is on tonight",
 			wantBody:  "Ada picks · 4 going. Tap to see who's coming.",
 		},
+		{
+			name: "the picker's nudge with a start time", user: remPicker, slot: db.ReminderSlotNightBefore, opts: []func(*db.ListReminderCandidatesRow){evening},
+			wantTitle: "✦ It's your turn — you pick tomorrow's movie",
+			wantBody:  "Friday Film Club · Jun 19 at 7:30 PM. Come with a film in mind.",
+		},
+		{
+			name: "the group the night before with a start time", user: remGuest, slot: db.ReminderSlotNightBefore, opts: []func(*db.ListReminderCandidatesRow){evening},
+			wantTitle: "Movie night is on for tomorrow at 7:30 PM",
+			wantBody:  "Ada picks · 4 going. Tap to see who's coming.",
+		},
+		{
+			name: "the group on the day with a start time", user: remGuest, slot: db.ReminderSlotMorningOf, opts: []func(*db.ListReminderCandidatesRow){evening},
+			wantTitle: "Movie night is on tonight at 7:30 PM",
+			wantBody:  "Ada picks · 4 going. Tap to see who's coming.",
+		},
+		{
+			name: "the group 2 hours before", user: remGuest, slot: db.ReminderSlotTwoHoursBefore, opts: []func(*db.ListReminderCandidatesRow){evening},
+			wantTitle: "Movie night starts at 7:30 PM",
+			wantBody:  "Ada picks · 4 going. Tap to see who's coming.",
+		},
+		{
+			name: "the picker 2 hours before", user: remPicker, slot: db.ReminderSlotTwoHoursBefore, opts: []func(*db.ListReminderCandidatesRow){evening},
+			wantTitle: "✦ It's your turn — you pick tonight's movie",
+			wantBody:  "Friday Film Club · Jun 19 at 7:30 PM. Come with a film in mind.",
+		},
+		{
+			name: "a start time on the hour", user: remGuest, slot: db.ReminderSlotTwoHoursBefore, opts: []func(*db.ListReminderCandidatesRow){startsAt(21, 0)},
+			wantTitle: "Movie night starts at 9:00 PM",
+			wantBody:  "Ada picks · 4 going. Tap to see who's coming.",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			title, body := reminderMessage(candidate(t, tc.user, "", ""), tc.slot)
+			title, body := reminderMessage(candidate(t, tc.user, "", "", tc.opts...), tc.slot)
 			if title != tc.wantTitle || body != tc.wantBody {
 				t.Errorf("got (%q, %q), want (%q, %q)", title, body, tc.wantTitle, tc.wantBody)
 			}
@@ -165,6 +205,38 @@ func TestDueReminders(t *testing.T) {
 			want: []want{{remGuest, db.ReminderSlotNightBefore, []string{"ny", "madrid"}}},
 		},
 		{
+			// 19:30 in Madrid is 17:30 UTC, so 2 hours before is 15:30 UTC.
+			name: "2 hours before the start time",
+			rows: []db.ListReminderCandidatesRow{
+				candidate(t, remPicker, "p", "Europe/Madrid", startsAt(19, 30)),
+				candidate(t, remGuest, "g", "Europe/Madrid", startsAt(19, 30)),
+			},
+			now:  "2026-06-19T15:30:00Z",
+			want: []want{{remPicker, db.ReminderSlotTwoHoursBefore, []string{"p"}}, {remGuest, db.ReminderSlotTwoHoursBefore, []string{"g"}}},
+		},
+		{name: "no 2-hours-before without a start time", rows: []db.ListReminderCandidatesRow{madrid(remGuest, "g")}, now: "2026-06-19T15:30:00Z"},
+		{
+			name: "2 hours before switched off",
+			rows: []db.ListReminderCandidatesRow{candidate(t, remGuest, "g", "Europe/Madrid", startsAt(19, 30), func(r *db.ListReminderCandidatesRow) { r.RemindTwoHoursBefore = false })},
+			now:  "2026-06-19T15:30:00Z",
+		},
+		{
+			name: "2 hours before, just the picker",
+			rows: []db.ListReminderCandidatesRow{
+				candidate(t, remPicker, "p", "Europe/Madrid", startsAt(19, 30), func(r *db.ListReminderCandidatesRow) { r.RemindAudience = db.ReminderAudiencePicker }),
+				candidate(t, remGuest, "g", "Europe/Madrid", startsAt(19, 30), func(r *db.ListReminderCandidatesRow) { r.RemindAudience = db.ReminderAudiencePicker }),
+			},
+			now:  "2026-06-19T15:30:00Z",
+			want: []want{{remPicker, db.ReminderSlotTwoHoursBefore, []string{"p"}}},
+		},
+		{
+			// A 01:00 start puts the slot at 23:00 Madrid the day before (21:00 UTC).
+			name: "an after-midnight start reminds the evening before",
+			rows: []db.ListReminderCandidatesRow{candidate(t, remGuest, "g", "Europe/Madrid", startsAt(1, 0))},
+			now:  "2026-06-18T21:00:00Z",
+			want: []want{{remGuest, db.ReminderSlotTwoHoursBefore, []string{"g"}}},
+		},
+		{
 			name: "an unknown zone is skipped",
 			rows: []db.ListReminderCandidatesRow{candidate(t, remGuest, "g", "Mars/Olympus")},
 			now:  "2026-06-18T16:00:00Z",
@@ -191,5 +263,27 @@ func TestCandidateDates(t *testing.T) {
 	}
 	if got := formatDate(to); got != "2026-06-21" {
 		t.Errorf("to = %s, want 2026-06-21", got)
+	}
+}
+
+// A Night starting at 00:00 has its 2-hours-before slot at 22:00 the day
+// before, so the candidate range must reach a day past the device's date in
+// the widest zones either side of UTC.
+func TestCandidateDatesCoverAfterMidnightStart(t *testing.T) {
+	for _, tc := range []struct{ zone, night string }{
+		{"Pacific/Kiritimati", "2026-06-19"}, // UTC+14
+		{"Etc/GMT+12", "2026-06-19"},         // UTC-12
+	} {
+		t.Run(tc.zone, func(t *testing.T) {
+			loc, err := time.LoadLocation(tc.zone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			slot, _ := slotTime(reminderSlot{slot: db.ReminderSlotTwoHoursBefore, beforeStart: 2 * time.Hour}, mustDate(t, tc.night), pgtype.Time{Valid: true}, loc)
+			from, to := candidateDates(slot)
+			if night := mustDate(t, tc.night); night.Before(from.Time) || night.After(to.Time) {
+				t.Errorf("night %s outside [%s, %s] at %s", tc.night, formatDate(from), formatDate(to), slot.UTC())
+			}
+		})
 	}
 }

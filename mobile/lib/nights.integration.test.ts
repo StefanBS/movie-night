@@ -36,8 +36,9 @@ const ADA = "a0000000-0000-0000-0000-000000000001";
 const night: Night = {
   id: NIGHT,
   scheduledFor: "2026-06-12",
+  startTime: null,
   pickerId: ADA,
-  reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
+  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
   movie: null,
   attendees: [{ id: ADA, name: "Ada", role: "core" }],
 };
@@ -50,7 +51,7 @@ function collect(req: http.IncomingMessage): Promise<string> {
   });
 }
 
-const NEW_NIGHT = { scheduledFor: "2026-06-12", attendees: [ADA], pickerId: ADA };
+const NEW_NIGHT = { scheduledFor: "2026-06-12", startTime: null, attendees: [ADA], pickerId: ADA };
 
 test("createNight posts the date, attendees and picker and parses the night", async () => {
   let path = "";
@@ -68,7 +69,7 @@ test("createNight posts the date, attendees and picker and parses the night", as
     const got = await createNight(server.url, GROUP, NEW_NIGHT);
     assert.equal(method, "POST");
     assert.equal(path, `/groups/${GROUP}/nights`);
-    assert.deepEqual(JSON.parse(body), { scheduledFor: "2026-06-12", attendees: [ADA], pickerId: ADA });
+    assert.deepEqual(JSON.parse(body), { scheduledFor: "2026-06-12", startTime: null, attendees: [ADA], pickerId: ADA });
     assert.deepEqual(got, night);
   } finally {
     await server.close();

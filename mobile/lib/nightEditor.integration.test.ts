@@ -50,8 +50,9 @@ const MEMBERS: Member[] = [
 const SAVED: Night = {
   id: NIGHT,
   scheduledFor: "2026-06-26",
+  startTime: null,
   pickerId: "ada",
-  reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
+  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
   movie: null,
   attendees: [
     { id: "ada", name: "Ada", role: "core" },

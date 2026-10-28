@@ -14,6 +14,7 @@ import {
 } from "../";
 import { useSession } from "../useSession";
 import { RemindersView } from "./RemindersView";
+import { StartTimeRow } from "./StartTimeRow";
 import { WizardFooter } from "./WizardFooter";
 import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
@@ -22,6 +23,7 @@ import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
 import {
   countdownLabel,
   formatShortDate,
+  formatStartTime,
   formatWeekdayDate,
 } from "../../lib/date";
 import type { Member } from "../../lib/members";
@@ -46,7 +48,7 @@ import {
 } from "../../theme";
 
 // EditNightScreen renders the edit module (lib/nightEdit) from the home
-// Up-next card: change the date, toggle who's coming, then save both in one
+// Up-next card: change the date and start time, toggle who's coming, then save both in one
 // request, or cancel the night. Date and Reminders are steps over the same
 // draft, so they save (or are discarded) with it. Mount with key={night.id}
 // when the loaded night changes.
@@ -75,7 +77,7 @@ export function EditNightScreen({
   const [month, setMonth] = useState<YearMonth>(() =>
     yearMonthOf(night.scheduledFor),
   );
-  const { date, attendees, reminders, rows, dirty, actionError } = state;
+  const { date, startTime, attendees, reminders, rows, dirty, actionError } = state;
   const busy = state.busy !== null;
   const pickerId = state.night.pickerId;
   const picker = members.find((m) => m.id === pickerId) ?? null;
@@ -87,7 +89,7 @@ export function EditNightScreen({
       return;
     }
     if (remindersChanged) {
-      showToast(reminderConfirmation(saved.reminders));
+      showToast(reminderConfirmation(saved.reminders, saved.startTime));
     }
     onSaved();
   };
@@ -102,6 +104,7 @@ export function EditNightScreen({
     return (
       <RemindersView
         reminders={reminders}
+        startTime={startTime}
         onChange={edit.setReminders}
         onDone={() => setMode("main")}
       />
@@ -159,9 +162,13 @@ export function EditNightScreen({
                 {formatWeekdayDate(date)}
               </Text>
               <Text style={styles.heroMeta} allowFontScaling={false}>
-                {picker !== null
-                  ? `${countdownLabel(date, today)} · ${firstName(picker.name)} picks`
-                  : countdownLabel(date, today)}
+                {[
+                  countdownLabel(date, today),
+                  startTime !== null ? formatStartTime(startTime) : null,
+                  picker !== null ? `${firstName(picker.name)} picks` : null,
+                ]
+                  .filter((part) => part !== null)
+                  .join(" · ")}
               </Text>
             </View>
           </View>
@@ -176,9 +183,12 @@ export function EditNightScreen({
                 onPress={() => setMode("date")}
               />
             </View>
+            <View style={styles.divider}>
+              <StartTimeRow startTime={startTime} onChange={edit.setStartTime} disabled={busy} />
+            </View>
             <SettingsRow
               label="Reminders"
-              value={formatRemindersSummary(reminders)}
+              value={formatRemindersSummary(reminders, startTime)}
               right={<ChevronRight size={18} color={colors.text.tertiary} />}
               onPress={() => setMode("reminders")}
             />

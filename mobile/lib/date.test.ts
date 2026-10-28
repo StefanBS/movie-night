@@ -6,9 +6,13 @@ import {
   daysUntil,
   formatMonthYear,
   formatShortDate,
+  formatStartTime,
   formatWeekdayDate,
   relativeLabel,
+  startTimeDate,
+  startTimeMinus,
   todayLocalISO,
+  toStartTime,
   weekday,
 } from "./date";
 
@@ -130,4 +134,30 @@ test("countdownLabel handles tonight / tomorrow / yesterday", () => {
 test("countdownLabel counts future and past days", () => {
   assert.equal(countdownLabel("2026-06-24", "2026-06-19"), "in 5 days");
   assert.equal(countdownLabel("2026-06-16", "2026-06-19"), "3 days ago");
+});
+
+test("formatStartTime follows the locale's 12- or 24-hour clock", () => {
+  const cases: { hhmm: string; locale: string; want: string }[] = [
+    { hhmm: "19:30", locale: "en-US", want: "7:30 PM" },
+    { hhmm: "09:05", locale: "en-US", want: "9:05 AM" },
+    { hhmm: "00:00", locale: "en-US", want: "12:00 AM" },
+    { hhmm: "19:30", locale: "en-GB", want: "19:30" },
+    { hhmm: "09:05", locale: "en-GB", want: "09:05" },
+  ];
+  for (const c of cases) {
+    assert.equal(formatStartTime(c.hhmm, c.locale), c.want, `${c.hhmm} ${c.locale}`);
+  }
+});
+
+test("startTimeDate and toStartTime convert between HH:MM and a local Date", () => {
+  const d = startTimeDate("20:15", new Date(2026, 10, 6, 8, 0, 42));
+  assert.deepEqual(d, new Date(2026, 10, 6, 20, 15));
+  assert.equal(toStartTime(new Date(2026, 10, 6, 7, 5, 59)), "07:05");
+  assert.equal(toStartTime(startTimeDate("23:59")), "23:59");
+});
+
+test("startTimeMinus counts back across midnight", () => {
+  assert.equal(startTimeMinus("19:30", 120), "17:30");
+  assert.equal(startTimeMinus("01:00", 120), "23:00");
+  assert.equal(startTimeMinus("02:00", 120), "00:00");
 });

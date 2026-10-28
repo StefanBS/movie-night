@@ -11,10 +11,11 @@ function night(id: string, scheduledFor: string, opts: Partial<Night> = {}): Nig
   return {
     id,
     scheduledFor,
+    startTime: null,
     pickerId: "u1",
     movie: null,
     attendees: [],
-    reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
+    reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
     ...opts,
   };
 }

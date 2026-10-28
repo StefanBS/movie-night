@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"maps"
 	"strings"
@@ -23,6 +24,16 @@ func mustDate(t *testing.T, s string) time.Time {
 	return tm
 }
 
+func str(s string) *string { return &s }
+
+// equalPtr reports whether got holds want, reading "" as nil.
+func equalPtr(got *string, want string) bool {
+	if want == "" {
+		return got == nil
+	}
+	return got != nil && *got == want
+}
+
 func TestNightCreateRequestValidation(t *testing.T) {
 	const a = "a0000000-0000-0000-0000-000000000001"
 	const b = "a0000000-0000-0000-0000-000000000002"
@@ -31,9 +42,15 @@ func TestNightCreateRequestValidation(t *testing.T) {
 		name          string
 		req           createNightRequest
 		wantErr       bool
-		wantNotAttend bool // the error is errPickerNotAttendee (a 422, not a 400)
-		wantCount     int  // attendee count when valid
+		wantNotAttend bool   // the error is errPickerNotAttendee (a 422, not a 400)
+		wantCount     int    // attendee count when valid
+		wantStart     string // "" = no start time
 	}{
+		{name: "with a start time", req: createNightRequest{ScheduledFor: "2026-06-12", StartTime: str("19:30"), Attendees: []string{a}, PickerID: a}, wantCount: 1, wantStart: "19:30"},
+		{name: "a null start time is none", req: createNightRequest{ScheduledFor: "2026-06-12", StartTime: nil, Attendees: []string{a}, PickerID: a}, wantCount: 1},
+		{name: "bad start time", req: createNightRequest{ScheduledFor: "2026-06-12", StartTime: str("7pm"), Attendees: []string{a}, PickerID: a}, wantErr: true},
+		{name: "start time with seconds", req: createNightRequest{ScheduledFor: "2026-06-12", StartTime: str("19:30:00"), Attendees: []string{a}, PickerID: a}, wantErr: true},
+		{name: "start time out of range", req: createNightRequest{ScheduledFor: "2026-06-12", StartTime: str("24:00"), Attendees: []string{a}, PickerID: a}, wantErr: true},
 		{name: "valid", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a, b}, PickerID: a}, wantCount: 2},
 		{name: "picker alone", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{b}, PickerID: b}, wantCount: 1},
 		{name: "dedupes attendees", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a, a, b}, PickerID: b}, wantCount: 2},
@@ -69,6 +86,9 @@ func TestNightCreateRequestValidation(t *testing.T) {
 			if !parsed.ScheduledFor.Valid || parsed.ScheduledFor.Time.Format("2006-01-02") != "2026-06-12" {
 				t.Errorf("ScheduledFor = %+v, want valid 2026-06-12", parsed.ScheduledFor)
 			}
+			if got := formatStartTimeWire(parsed.StartTime); !equalPtr(got, tt.wantStart) {
+				t.Errorf("StartTime = %v, want %q", got, tt.wantStart)
+			}
 		})
 	}
 }
@@ -93,7 +113,7 @@ func TestUpdateNightRequestValidation(t *testing.T) {
 		{name: "both", req: updateNightRequest{ScheduledFor: date("2026-07-04"), Attendees: ids(a)}, wantDate: "2026-07-04", wantAttendees: 1},
 		{name: "dedupes attendees", req: updateNightRequest{Attendees: ids(a, a, b)}, wantAttendees: 2},
 		{name: "empty attendees is a replacement, not unchanged", req: updateNightRequest{Attendees: ids()}, wantAttendees: 0},
-		{name: "reminders only", req: updateNightRequest{Reminders: &remindersRequest{NightBefore: &on, MorningOf: &on, Audience: &everyone}}, wantAttendees: -1},
+		{name: "reminders only", req: updateNightRequest{Reminders: &remindersRequest{NightBefore: &on, MorningOf: &on, TwoHoursBefore: &on, Audience: &everyone}}, wantAttendees: -1},
 		{name: "invalid reminders", req: updateNightRequest{Reminders: &remindersRequest{NightBefore: &on}}, wantErr: true},
 		{name: "nothing to update", req: updateNightRequest{}, wantErr: true},
 		{name: "bad date", req: updateNightRequest{ScheduledFor: date("nope")}, wantErr: true},
@@ -128,23 +148,72 @@ func TestUpdateNightRequestValidation(t *testing.T) {
 	}
 }
 
+// The edit's startTime is three-way on the wire: omitted leaves it, null
+// clears it, a time sets it.
+func TestUpdateNightRequestStartTime(t *testing.T) {
+	tests := []struct {
+		name      string
+		body      string
+		wantErr   bool
+		unchanged bool
+		want      string // "" = cleared
+	}{
+		{name: "omitted is unchanged", body: `{"scheduledFor":"2026-07-04"}`, unchanged: true},
+		{name: "null clears", body: `{"startTime":null}`},
+		{name: "a time sets", body: `{"startTime":"20:15"}`, want: "20:15"},
+		{name: "a bad time", body: `{"startTime":"8:15 PM"}`, wantErr: true},
+		{name: "not a string", body: `{"startTime":2015}`, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var req updateNightRequest
+			err := json.Unmarshal([]byte(tt.body), &req)
+			var got parsedUpdateNight
+			if err == nil {
+				got, err = validateUpdateNightRequest(req)
+			}
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got %+v", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tt.unchanged {
+				if got.StartTime != nil {
+					t.Errorf("StartTime = %+v, want unchanged (nil)", got.StartTime)
+				}
+				return
+			}
+			if got.StartTime == nil {
+				t.Fatal("StartTime = nil (unchanged), want a change")
+			}
+			if s := formatStartTimeWire(*got.StartTime); !equalPtr(s, tt.want) {
+				t.Errorf("StartTime = %v, want %q", s, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseReminders(t *testing.T) {
 	yes, no := true, false
-	str := func(s string) *string { return &s }
 	tests := []struct {
 		name    string
 		req     remindersRequest
 		want    nightReminders
 		wantErr bool
 	}{
-		{name: "everyone", req: remindersRequest{NightBefore: &yes, MorningOf: &no, Audience: str("everyone")},
-			want: nightReminders{NightBefore: true, MorningOf: false, Audience: db.ReminderAudienceEveryone}},
-		{name: "just the picker, all slots off", req: remindersRequest{NightBefore: &no, MorningOf: &no, Audience: str("picker")},
+		{name: "everyone", req: remindersRequest{NightBefore: &yes, MorningOf: &no, TwoHoursBefore: &yes, Audience: str("everyone")},
+			want: nightReminders{NightBefore: true, MorningOf: false, TwoHoursBefore: true, Audience: db.ReminderAudienceEveryone}},
+		{name: "just the picker, all slots off", req: remindersRequest{NightBefore: &no, MorningOf: &no, TwoHoursBefore: &no, Audience: str("picker")},
 			want: nightReminders{Audience: db.ReminderAudiencePicker}},
-		{name: "unknown audience", req: remindersRequest{NightBefore: &yes, MorningOf: &yes, Audience: str("all")}, wantErr: true},
-		{name: "missing nightBefore", req: remindersRequest{MorningOf: &yes, Audience: str("everyone")}, wantErr: true},
-		{name: "missing morningOf", req: remindersRequest{NightBefore: &yes, Audience: str("everyone")}, wantErr: true},
-		{name: "missing audience", req: remindersRequest{NightBefore: &yes, MorningOf: &yes}, wantErr: true},
+		{name: "unknown audience", req: remindersRequest{NightBefore: &yes, MorningOf: &yes, TwoHoursBefore: &yes, Audience: str("all")}, wantErr: true},
+		{name: "missing nightBefore", req: remindersRequest{MorningOf: &yes, TwoHoursBefore: &yes, Audience: str("everyone")}, wantErr: true},
+		{name: "missing morningOf", req: remindersRequest{NightBefore: &yes, TwoHoursBefore: &yes, Audience: str("everyone")}, wantErr: true},
+		{name: "missing twoHoursBefore", req: remindersRequest{NightBefore: &yes, MorningOf: &yes, Audience: str("everyone")}, wantErr: true},
+		{name: "missing audience", req: remindersRequest{NightBefore: &yes, MorningOf: &yes, TwoHoursBefore: &yes}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -222,11 +291,23 @@ func TestToNightResponse(t *testing.T) {
 	t.Run("reminders carry the night's settings", func(t *testing.T) {
 		n := mkNight()
 		n.RemindNightBefore = true
+		n.RemindTwoHoursBefore = true
 		n.RemindAudience = db.ReminderAudiencePicker
 		got := toNightResponse(n, nil).Reminders
-		want := remindersDTO{NightBefore: true, MorningOf: false, Audience: "picker"}
+		want := remindersDTO{NightBefore: true, MorningOf: false, TwoHoursBefore: true, Audience: "picker"}
 		if got != want {
 			t.Errorf("Reminders = %+v, want %+v", got, want)
+		}
+	})
+
+	t.Run("startTime is null when unset and HH:MM when set", func(t *testing.T) {
+		if got := toNightResponse(mkNight(), nil).StartTime; got != nil {
+			t.Errorf("StartTime = %q, want nil", *got)
+		}
+		n := mkNight()
+		n.StartTime = pgtype.Time{Microseconds: (19*60 + 5) * 60 * 1e6, Valid: true}
+		if got := toNightResponse(n, nil).StartTime; !equalPtr(got, "19:05") {
+			t.Errorf("StartTime = %v, want 19:05", got)
 		}
 	})
 
@@ -454,4 +535,12 @@ func TestValidateMovieRequest(t *testing.T) {
 			t.Errorf("tmdbId %d accepted, want error", bad)
 		}
 	}
+}
+
+// deref is *s, or "" for nil.
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

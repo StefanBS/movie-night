@@ -27,15 +27,22 @@ import (
 // briefly stalled scheduler catches up but a long outage never sends late.
 const reminderWindow = 15 * time.Minute
 
-// reminderSlots in send order, with each one's wall-clock time relative to the
-// Night's date on the recipient's device.
-var reminderSlots = []struct {
-	slot      db.ReminderSlot
-	dayOffset int
-	hour      int
-}{
-	{db.ReminderSlotNightBefore, -1, 18},
-	{db.ReminderSlotMorningOf, 0, 9},
+// reminderSlot is when one slot fires on the recipient's device: a wall-clock
+// hour relative to the Night's date, or, when beforeStart is set, that long
+// before the Night's start time (ADR-0011) — a slot that only exists once the
+// Night has one.
+type reminderSlot struct {
+	slot        db.ReminderSlot
+	dayOffset   int
+	hour        int
+	beforeStart time.Duration
+}
+
+// reminderSlots in send order.
+var reminderSlots = []reminderSlot{
+	{slot: db.ReminderSlotNightBefore, dayOffset: -1, hour: 18},
+	{slot: db.ReminderSlotMorningOf, dayOffset: 0, hour: 9},
+	{slot: db.ReminderSlotTwoHoursBefore, beforeStart: 2 * time.Hour},
 }
 
 // reminderChannel is the Android notification channel the app creates
@@ -52,10 +59,19 @@ type dueReminder struct {
 	Body    string
 }
 
-// slotTime is when slot fires for a Night dated date, in loc. Pure.
-func slotTime(date time.Time, dayOffset, hour int, loc *time.Location) time.Time {
+// slotTime is when s fires for a Night dated date that starts at start (if
+// set), in loc; false when the Night has no start time for s to count back
+// from. Pure.
+func slotTime(s reminderSlot, date time.Time, start pgtype.Time, loc *time.Location) (time.Time, bool) {
 	y, m, d := date.Date()
-	return time.Date(y, m, d+dayOffset, hour, 0, 0, 0, loc)
+	if s.beforeStart == 0 {
+		return time.Date(y, m, d+s.dayOffset, s.hour, 0, 0, 0, loc), true
+	}
+	if !start.Valid {
+		return time.Time{}, false
+	}
+	minute := int(start.Microseconds / int64(time.Minute/time.Microsecond))
+	return time.Date(y, m, d, 0, minute, 0, 0, loc).Add(-s.beforeStart), true
 }
 
 // wantsSlot reports whether a person gets a reminder for a Night in a slot.
@@ -67,27 +83,43 @@ func wantsSlot(row db.ListReminderCandidatesRow, slot db.ReminderSlot) bool {
 		return true
 	}
 	on := (slot == db.ReminderSlotNightBefore && row.RemindNightBefore) ||
-		(slot == db.ReminderSlotMorningOf && row.RemindMorningOf)
+		(slot == db.ReminderSlotMorningOf && row.RemindMorningOf) ||
+		(slot == db.ReminderSlotTwoHoursBefore && row.RemindTwoHoursBefore)
 	return on && (row.RemindAudience == db.ReminderAudienceEveryone || isPicker)
 }
 
 // reminderMessage is the notification copy. Everything to the picker is the
-// personal "it's your turn" form; everyone else gets the group heads-up. Pure.
+// personal "it's your turn" form; everyone else gets the group heads-up. A
+// Night with a start time names it. Pure.
 func reminderMessage(row db.ListReminderCandidatesRow, slot db.ReminderSlot) (title, body string) {
 	tomorrow := slot == db.ReminderSlotNightBefore
+	at := ""
+	if row.StartTime.Valid {
+		at = " at " + formatStartTime(row.StartTime)
+	}
 	if row.UserID == row.PickerID {
 		whose := "tonight's"
 		if tomorrow {
 			whose = "tomorrow's"
 		}
 		return "✦ It's your turn — you pick " + whose + " movie",
-			fmt.Sprintf("%s · %s. Come with a film in mind.", row.GroupName, row.ScheduledFor.Time.Format("Jan 2"))
+			fmt.Sprintf("%s · %s%s. Come with a film in mind.", row.GroupName, row.ScheduledFor.Time.Format("Jan 2"), at)
 	}
-	title = "Movie night is on tonight"
-	if tomorrow {
-		title = "Movie night is on for tomorrow"
+	switch {
+	case slot == db.ReminderSlotTwoHoursBefore:
+		title = "Movie night starts" + at
+	case tomorrow:
+		title = "Movie night is on for tomorrow" + at
+	default:
+		title = "Movie night is on tonight" + at
 	}
 	return title, fmt.Sprintf("%s picks · %d going. Tap to see who's coming.", firstName(row.PickerName), row.Going)
+}
+
+// formatStartTime is a start time as reminder copy shows it, e.g. "7:30 PM".
+// Pure.
+func formatStartTime(t pgtype.Time) string {
+	return time.Time{}.Add(time.Duration(t.Microseconds) * time.Microsecond).Format("3:04 PM")
 }
 
 // firstName is the first word of a person's name. Pure.
@@ -122,8 +154,8 @@ func dueReminders(rows []db.ListReminderCandidatesRow, now time.Time) []dueRemin
 				if err != nil {
 					continue
 				}
-				at := slotTime(d.ScheduledFor.Time, s.dayOffset, s.hour, loc)
-				if !now.Before(at) && now.Before(at.Add(reminderWindow)) {
+				at, ok := slotTime(s, d.ScheduledFor.Time, d.StartTime, loc)
+				if ok && !now.Before(at) && now.Before(at.Add(reminderWindow)) {
 					due = true
 					break
 				}

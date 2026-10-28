@@ -141,8 +141,9 @@ func (ns NullReminderAudience) Value() (driver.Value, error) {
 type ReminderSlot string
 
 const (
-	ReminderSlotNightBefore ReminderSlot = "night_before"
-	ReminderSlotMorningOf   ReminderSlot = "morning_of"
+	ReminderSlotNightBefore    ReminderSlot = "night_before"
+	ReminderSlotMorningOf      ReminderSlot = "morning_of"
+	ReminderSlotTwoHoursBefore ReminderSlot = "two_hours_before"
 )
 
 func (e *ReminderSlot) Scan(src interface{}) error {
@@ -224,16 +225,18 @@ type Movie struct {
 }
 
 type Pick struct {
-	ID                uuid.UUID          `json:"id"`
-	GroupID           uuid.UUID          `json:"group_id"`
-	PickerID          uuid.UUID          `json:"picker_id"`
-	IsCredited        bool               `json:"is_credited"`
-	ScheduledFor      pgtype.Date        `json:"scheduled_for"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	MovieID           pgtype.UUID        `json:"movie_id"`
-	RemindNightBefore bool               `json:"remind_night_before"`
-	RemindMorningOf   bool               `json:"remind_morning_of"`
-	RemindAudience    ReminderAudience   `json:"remind_audience"`
+	ID                   uuid.UUID          `json:"id"`
+	GroupID              uuid.UUID          `json:"group_id"`
+	PickerID             uuid.UUID          `json:"picker_id"`
+	IsCredited           bool               `json:"is_credited"`
+	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	MovieID              pgtype.UUID        `json:"movie_id"`
+	RemindNightBefore    bool               `json:"remind_night_before"`
+	RemindMorningOf      bool               `json:"remind_morning_of"`
+	RemindAudience       ReminderAudience   `json:"remind_audience"`
+	StartTime            pgtype.Time        `json:"start_time"`
+	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
 }
 
 type RemindersSent struct {

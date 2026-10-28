@@ -32,7 +32,8 @@ knows which person each device is.
   **before** sending: delivery is at most once, never repeated even after edits.
   A slot is due only within 15 minutes of its time; missed slots are skipped,
   never sent late.
-- **"2 hours before" is dropped** until a Night has a start time.
+- **"2 hours before" is dropped** until a Night has a start time. *(Brought
+  back by [ADR-0011](0011-night-start-time-wall-clock.md).)*
 
 ## Rationale and alternatives
 - *Local notifications (the handoff's suggestion):* rejected — a phone only

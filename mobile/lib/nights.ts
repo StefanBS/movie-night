@@ -11,9 +11,12 @@ export type Attendee = {
 
 // Night is one dated movie night. Every Night has a picker, who is always one
 // of its attendees (ADR-0008); its date-relative state lives in nightLifecycle.
+// startTime is an optional zone-less HH:MM, read on this phone's clock
+// (ADR-0011).
 export type Night = {
   id: string;
   scheduledFor: string;
+  startTime: string | null;
   pickerId: string;
   movie: Movie | null;
   attendees: Attendee[];
@@ -37,18 +40,23 @@ function parseAttendee(raw: unknown, index: number): Attendee {
   return { id, name, role };
 }
 
+const START_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 // parseNight validates an untrusted JSON payload and returns a typed Night,
 // throwing a descriptive error if the shape is wrong.
 export function parseNight(raw: unknown): Night {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("expected a night object");
   }
-  const { id, scheduledFor, pickerId, movie, attendees, reminders } = raw as Record<string, unknown>;
+  const { id, scheduledFor, startTime, pickerId, movie, attendees, reminders } = raw as Record<string, unknown>;
   if (typeof id !== "string") {
     throw new Error("night: id must be a string");
   }
   if (typeof scheduledFor !== "string") {
     throw new Error("night: scheduledFor must be a string");
+  }
+  if (startTime !== undefined && startTime !== null && (typeof startTime !== "string" || !START_TIME.test(startTime))) {
+    throw new Error("night: startTime must be HH:MM or null");
   }
   if (typeof pickerId !== "string") {
     throw new Error("night: pickerId must be a string");
@@ -60,6 +68,7 @@ export function parseNight(raw: unknown): Night {
   return {
     id,
     scheduledFor,
+    startTime: startTime ?? null,
     pickerId,
     movie: parsedMovie,
     attendees: attendees.map(parseAttendee),
@@ -81,9 +90,11 @@ function fetchNight(url: string, init?: RequestInit): Promise<Night> {
 }
 
 // NewNight is everything a Night is created with (ADR-0008): its date (ISO
-// YYYY-MM-DD), who's attending, and the picker, who must be one of them.
+// YYYY-MM-DD), its optional HH:MM start time, who's attending, and the picker,
+// who must be one of them.
 export type NewNight = {
   scheduledFor: string;
+  startTime: string | null;
   attendees: string[];
   pickerId: string;
 };
@@ -183,15 +194,17 @@ export function detachMovie(
   });
 }
 
-// NightChanges is a saved Night's date, its whole attendee set (which must
-// still include the picker) and its reminder settings.
+// NightChanges is a saved Night's date and start time (null clears it), its
+// whole attendee set (which must still include the picker) and its reminder
+// settings.
 export type NightChanges = {
   scheduledFor: string;
+  startTime: string | null;
   attendees: string[];
   reminders: Reminders;
 };
 
-// updateNight saves a Night's date, attendees and reminders in one request that either
+// updateNight saves a Night's date, start time, attendees and reminders in one request that either
 // fully applies or changes nothing. The backend rejects dropping the picker or
 // a non-member (422) and a date that already has a Night (409).
 export function updateNight(

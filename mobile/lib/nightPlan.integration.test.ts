@@ -56,10 +56,11 @@ const ROSTER = [member("ada"), member("blake"), member("frankie", "guest")];
 const EXISTING: Night = {
   id: "n0",
   scheduledFor: "2026-06-19",
+  startTime: null,
   pickerId: "ada",
   movie: null,
   attendees: [],
-  reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
+  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
 };
 
 // backend is a small fake of the routes a Plan touches. The turn ranking is
@@ -80,12 +81,13 @@ function backend(over: Partial<Record<string, Handler>> = {}): Handler {
       return json(res, 200, ROSTER.filter((m) => m.role === "core" && present.includes(m.id)).map((m) => ranked(m.id)));
     }
     if (key === `POST /groups/${GROUP}/nights`) {
-      const req = JSON.parse(body) as { scheduledFor: string; attendees: string[]; pickerId: string };
+      const req = JSON.parse(body) as { scheduledFor: string; startTime: string | null; attendees: string[]; pickerId: string };
       const night: Night = {
         id: "n1",
         scheduledFor: req.scheduledFor,
+        startTime: req.startTime,
         pickerId: req.pickerId,
-        reminders: { nightBefore: true, morningOf: true, audience: "everyone" },
+        reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
         movie: null,
         attendees: req.attendees.map((id) => ({ id, name: id, role: id === "frankie" ? "guest" : "core" })),
       };
@@ -132,7 +134,7 @@ test("starts on When for today; choosing a date moves to Who; back returns", asy
   await withPlan(backend(), async (plan) => {
     assert.equal(plan.state.step, "when");
     assert.equal(plan.state.date, TODAY);
-    plan.chooseDate("2026-06-26");
+    plan.chooseDate("2026-06-26", null);
     assert.equal(plan.state.step, "who");
     assert.equal(plan.state.date, "2026-06-26");
     plan.back();
@@ -227,13 +229,34 @@ test("create posts the date, attendees and picker and returns the Night", async 
       },
     }),
     async (plan) => {
-      plan.chooseDate("2026-06-26");
+      plan.chooseDate("2026-06-26", null);
       await plan.toggle("ada");
       await plan.toggle("frankie");
       const night = await plan.create();
-      assert.deepEqual(posted, { scheduledFor: "2026-06-26", attendees: ["ada", "frankie"], pickerId: "ada" });
+      assert.deepEqual(posted, { scheduledFor: "2026-06-26", startTime: null, attendees: ["ada", "frankie"], pickerId: "ada" });
       assert.equal(night?.id, "n1");
       assert.equal(plan.state.busy, null);
+    },
+  );
+});
+
+test("create posts the start time chosen with the date", async () => {
+  let posted: { startTime?: unknown } | null = null;
+  const base = backend();
+  await withPlan(
+    backend({
+      [`POST /groups/${GROUP}/nights`]: (req, res, body) => {
+        posted = JSON.parse(body) as { startTime?: unknown };
+        base(req, res, body);
+      },
+    }),
+    async (plan) => {
+      plan.chooseDate("2026-06-26", "20:15");
+      assert.equal(plan.state.startTime, "20:15");
+      await plan.toggle("ada");
+      const night = await plan.create();
+      assert.equal(posted?.startTime, "20:15");
+      assert.equal(night?.startTime, "20:15");
     },
   );
 });
@@ -255,7 +278,7 @@ test("a taken date surfaces the backend's message and keeps the plan", async () 
       [`POST /groups/${GROUP}/nights`]: (_q, res) => json(res, 409, { error: "there is already a night on that date" }),
     }),
     async (plan) => {
-      plan.chooseDate("2026-06-19");
+      plan.chooseDate("2026-06-19", null);
       await plan.toggle("ada");
       assert.equal(await plan.create(), null);
       assert.equal(plan.state.actionError, "there is already a night on that date");
@@ -272,7 +295,7 @@ test("choosing a new date clears the last create error", async () => {
     async (plan) => {
       await plan.toggle("ada");
       await plan.create();
-      plan.chooseDate("2026-06-27");
+      plan.chooseDate("2026-06-27", null);
       assert.equal(plan.state.actionError, null);
     },
   );
@@ -302,7 +325,7 @@ test("subscribers hear every change", async () => {
   await withPlan(backend(), async (plan) => {
     let calls = 0;
     const unsubscribe = plan.subscribe(() => calls++);
-    plan.chooseDate("2026-06-26");
+    plan.chooseDate("2026-06-26", null);
     assert.ok(calls >= 1);
     unsubscribe();
     const before = calls;

@@ -4,7 +4,7 @@ import { Clock } from "lucide-react-native";
 import { AppButton, Avatar, Badge, Poster, SectionLabel, useToast } from "../";
 import { WizardFooter } from "./WizardFooter";
 import { addToCalendar } from "../../calendarExport";
-import { countdownLabel, formatShortDate, weekday } from "../../lib/date";
+import { countdownLabel, formatShortDate, formatStartTime, weekday } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import { nightTiming } from "../../lib/nightLifecycle";
 import type { Night } from "../../lib/nights";
@@ -85,11 +85,16 @@ export function NightView({
           </View>
         )}
 
-        {future ? (
+        {future || night.startTime !== null ? (
           <View style={styles.countdownRow}>
             <Clock size={13} color={colors.accent.strong} />
             <Text style={styles.countdown} allowFontScaling={false}>
-              {countdownLabel(night.scheduledFor, today)}
+              {[
+                future ? countdownLabel(night.scheduledFor, today) : null,
+                night.startTime !== null ? formatStartTime(night.startTime) : null,
+              ]
+                .filter((part) => part !== null)
+                .join(" · ")}
             </Text>
           </View>
         ) : null}
