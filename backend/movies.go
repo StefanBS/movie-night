@@ -113,7 +113,7 @@ func searchMoviesHandler(client *tmdbClient) http.HandlerFunc {
 // The body carries only {tmdbId}; the backend re-fetches canonical title/year from
 // TMDB (source of truth), caches the movie, and sets it on the night. Repeatable:
 // attaching a different movie is the correction path. It reuses the night plumbing
-// (loadNight/writeNightDTO over nightStore) from nights.go.
+// (loadNight/writeNight over nightStore) from nights.go.
 func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
@@ -129,7 +129,7 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			return
 		}
 		// Existence check only — an unknown night must 404 before we call TMDB;
-		// SetNightMovie below hands back the row for the response.
+		// writeNight reads the result back.
 		if _, ok := loadNight(w, r, store, gid, nightID); !ok {
 			return
 		}
@@ -157,7 +157,7 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			internalError(w, gid, "upsert movie", err)
 			return
 		}
-		night, err := store.SetNightMovie(r.Context(), db.SetNightMovieParams{
+		err = store.SetNightMovie(r.Context(), db.SetNightMovieParams{
 			MovieID: pgtype.UUID{Bytes: movieID, Valid: true},
 			NightID: nightID,
 			GroupID: gid,
@@ -166,7 +166,7 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			internalError(w, gid, "set night movie", err)
 			return
 		}
-		writeNightDTO(w, r, store, gid, nightRow(night), http.StatusOK)
+		writeNight(w, r, store, gid, nightID, http.StatusOK)
 	}
 }
 
@@ -181,7 +181,7 @@ func clearNightMovieHandler(store nightStore) http.HandlerFunc {
 		}
 		// No existence pre-check: an unknown night matches no row, so the
 		// RETURNING miss is the 404.
-		night, err := store.ClearNightMovie(r.Context(), db.ClearNightMovieParams{
+		_, err := store.ClearNightMovie(r.Context(), db.ClearNightMovieParams{
 			NightID: nightID,
 			GroupID: gid,
 		})
@@ -189,6 +189,6 @@ func clearNightMovieHandler(store nightStore) http.HandlerFunc {
 			storeError(w, gid, "clear night movie", err, http.StatusNotFound, "night not found")
 			return
 		}
-		writeNightDTO(w, r, store, gid, nightRow(night), http.StatusOK)
+		writeNight(w, r, store, gid, nightID, http.StatusOK)
 	}
 }

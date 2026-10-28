@@ -20,7 +20,7 @@ func TestMembershipChurnIntegration(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/members/{userId}/deactivate", deactivateMemberHandler(q))
 	mux.Handle("POST /groups/{groupId}/members/{userId}/reactivate", reactivateMemberHandler(q))
 	mux.Handle("POST /groups/{groupId}/members/{userId}/promote", promoteMemberHandler(q))
-	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(q))
+	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
 
 	do := func(t *testing.T, method, path, body string) (int, memberResponse) {

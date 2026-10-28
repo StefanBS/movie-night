@@ -30,7 +30,7 @@ SELECT
   pu.name AS picker_name,
   (SELECT count(*) FROM attendances c WHERE c.pick_id = p.id)::int AS going,
   a.user_id, d.push_token::text AS push_token, d.time_zone::text AS time_zone
-FROM picks p
+FROM nights p
 JOIN groups g ON g.id = p.group_id
 JOIN users pu ON pu.id = p.picker_id
 JOIN attendances a ON a.pick_id = p.id

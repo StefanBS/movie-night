@@ -57,7 +57,7 @@ func TestRemindersIntegration(t *testing.T) {
 	q := db.New(pool)
 
 	mux := http.NewServeMux()
-	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(q))
+	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
 
 	// device registers a push-ready device for a person, in Madrid.
@@ -135,7 +135,7 @@ func TestRemindersIntegration(t *testing.T) {
 		device(t, ada, "ExponentPushToken[ada]")
 		device(t, blake, "ExponentPushToken[blake]")
 		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
-			`{"reminders":{"nightBefore":false,"morningOf":false,"twoHoursBefore":false,"audience":"picker"}}`); code != http.StatusOK {
+			editBody(t, n, func(r *updateNightRequest) { r.Reminders = remindersDTO{Audience: "picker"} })); code != http.StatusOK {
 			t.Fatalf("patch = %d", code)
 		}
 		push, sent := fakeExpo(t)
@@ -184,7 +184,7 @@ func TestRemindersIntegration(t *testing.T) {
 	t.Run("2 hours before a Night's start time, once", func(t *testing.T) {
 		n := reset(t)
 		device(t, blake, "ExponentPushToken[blake]")
-		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{"startTime":"21:00"}`); code != http.StatusOK {
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.StartTime = str("21:00") })); code != http.StatusOK {
 			t.Fatalf("set start time = %d", code)
 		}
 		push, sent := fakeExpo(t)

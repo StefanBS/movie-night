@@ -224,6 +224,24 @@ type Movie struct {
 	PosterPath  pgtype.Text        `json:"poster_path"`
 }
 
+type Night struct {
+	ID                   uuid.UUID          `json:"id"`
+	GroupID              uuid.UUID          `json:"group_id"`
+	PickerID             uuid.UUID          `json:"picker_id"`
+	IsCredited           bool               `json:"is_credited"`
+	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	StartTime            pgtype.Time        `json:"start_time"`
+	RemindNightBefore    bool               `json:"remind_night_before"`
+	RemindMorningOf      bool               `json:"remind_morning_of"`
+	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience   `json:"remind_audience"`
+	MovieTmdbID          pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle           pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
+}
+
 type Pick struct {
 	ID                   uuid.UUID          `json:"id"`
 	GroupID              uuid.UUID          `json:"group_id"`
