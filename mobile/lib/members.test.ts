@@ -71,6 +71,12 @@ const actionCases: { name: string; member: Member; want: MemberAction[] }[] = [
     want: ["reactivate"],
   },
   {
+    // The backend rejects promoting an inactive member (409): reactivate first.
+    name: "inactive guest can only reactivate, not promote",
+    member: { id: "d", name: "Di", role: "guest", status: "inactive", joinedOn: "2025-03-04" },
+    want: ["reactivate"],
+  },
+  {
     name: "active guest can promote or deactivate",
     member: { id: "b", name: "Bo", role: "guest", status: "active", joinedOn: "2025-01-02" },
     want: ["promote", "deactivate"],

@@ -48,6 +48,58 @@ func seedBaseline(avgServed float64, existingCredited int32) int32 {
 	return seed
 }
 
+// memberAction is a churn transition on an existing membership; the value is
+// the endpoint verb.
+type memberAction string
+
+const (
+	actionDeactivate memberAction = "deactivate"
+	actionReactivate memberAction = "reactivate"
+	actionPromote    memberAction = "promote"
+)
+
+// membershipMove is what a churn action does to a member in a given state:
+// noOp echoes the current state back unchanged (the actions are idempotent);
+// seed means the move crosses into the rotation and must be re-seeded
+// (ADR-0006).
+type membershipMove struct {
+	noOp bool
+	seed bool
+}
+
+// inRotation reports whether a membership in this state takes turns: only
+// active core members do (ADR-0004/0006).
+func inRotation(role db.MembershipRole, status db.MembershipStatus) bool {
+	return role == db.MembershipRoleCore && status == db.MembershipStatusActive
+}
+
+// planMove is the single owner of the membership transition rules: which moves
+// are allowed, which are no-ops, and which re-seed. Promote requires an active
+// guest — an inactive member must be reactivated first, so a returner keeps
+// their slot instead of promote quietly reactivating them into a new one.
+// The mobile memberActions mirrors these rules. A non-nil error means the move
+// is not allowed from this state. Pure.
+func planMove(action memberAction, role db.MembershipRole, status db.MembershipStatus) (membershipMove, error) {
+	toRole, toStatus := role, status
+	switch action {
+	case actionDeactivate:
+		toStatus = db.MembershipStatusInactive
+	case actionReactivate:
+		toStatus = db.MembershipStatusActive
+	case actionPromote:
+		if status != db.MembershipStatusActive {
+			return membershipMove{}, fmt.Errorf("an inactive member must be reactivated before being promoted")
+		}
+		toRole = db.MembershipRoleCore
+	default:
+		return membershipMove{}, fmt.Errorf("unknown member action %q", action)
+	}
+	if toRole == role && toStatus == status {
+		return membershipMove{noOp: true}, nil
+	}
+	return membershipMove{seed: !inRotation(role, status) && inRotation(toRole, toStatus)}, nil
+}
+
 // memberStore is the subset of *db.Queries the churn handlers need; the real
 // *db.Queries satisfies it, so no mock is ever written (same pattern as
 // pickStore/turnStore).
@@ -112,7 +164,7 @@ func joinMemberHandler(store memberStore) http.HandlerFunc {
 		// and take the next rotation slot (the original behavior).
 		baseline := int32(0)
 		position := int32(0)
-		if role == string(db.MembershipRoleCore) {
+		if inRotation(db.MembershipRole(role), db.MembershipStatusActive) {
 			// Read-then-write without a transaction is deliberate. Two distinct
 			// concerns, both acceptable for this single-group, admin-driven app:
 			//
@@ -177,6 +229,23 @@ func loadMember(w http.ResponseWriter, r *http.Request, store memberStore, gid, 
 	return m, true
 }
 
+// gateMove applies planMove to a loaded member and writes the responses that end
+// the request early: the unchanged member for a no-op, a 409 for a move the
+// member's state doesn't allow. ok=false means a response has already been
+// written and the caller should stop.
+func gateMove(w http.ResponseWriter, action memberAction, m db.GetGroupMemberRow, gid uuid.UUID) (membershipMove, bool) {
+	move, err := planMove(action, m.Role, m.Status)
+	if err != nil {
+		writeJSONError(w, http.StatusConflict, err.Error())
+		return membershipMove{}, false
+	}
+	if move.noOp {
+		respondJSON(w, http.StatusOK, currentMember(m), gid, "encode member response")
+		return membershipMove{}, false
+	}
+	return move, true
+}
+
 // rotationSeed computes where a member entering the rotation lands: the
 // baseline_picks that puts them on the current active-core average (discounting
 // the credited picks they already have) and the next rotation slot. Join,
@@ -204,9 +273,7 @@ func deactivateMemberHandler(store memberStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		// Idempotent: already inactive → no-op.
-		if m.Status == db.MembershipStatusInactive {
-			respondJSON(w, http.StatusOK, currentMember(m), gid, "encode member response")
+		if _, ok := gateMove(w, actionDeactivate, m, gid); !ok {
 			return
 		}
 		updated, err := store.DeactivateMembership(r.Context(), db.DeactivateMembershipParams{GroupID: gid, UserID: uid})
@@ -229,15 +296,13 @@ func reactivateMemberHandler(store memberStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		// Idempotent: already active → no-op.
-		if m.Status == db.MembershipStatusActive {
-			respondJSON(w, http.StatusOK, currentMember(m), gid, "encode member response")
+		move, ok := gateMove(w, actionReactivate, m, gid)
+		if !ok {
 			return
 		}
-		// Seed only when this crosses into the rotation (active core). A
-		// reactivated guest stays out of the rotation, so its baseline is kept.
+		// A reactivated guest stays out of the rotation, so its baseline is kept.
 		baseline := m.BaselinePicks
-		if m.Role == db.MembershipRoleCore {
+		if move.seed {
 			if baseline, _, ok = rotationSeed(w, r, store, gid, uid); !ok {
 				return
 			}
@@ -263,9 +328,10 @@ func promoteMemberHandler(store memberStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		// Idempotent: already active core → no-op.
-		if m.Role == db.MembershipRoleCore && m.Status == db.MembershipStatusActive {
-			respondJSON(w, http.StatusOK, currentMember(m), gid, "encode member response")
+		// planMove allows promote only from active guest, a move that always
+		// crosses into the rotation (TestPlanMove pins seed=true), so it needs
+		// a fresh baseline and a new rotation slot unconditionally.
+		if _, ok := gateMove(w, actionPromote, m, gid); !ok {
 			return
 		}
 		baseline, position, ok := rotationSeed(w, r, store, gid, uid)
@@ -279,7 +345,8 @@ func promoteMemberHandler(store memberStore) http.HandlerFunc {
 			RotationPosition: position,
 		})
 		if err != nil {
-			internalError(w, gid, "promote membership", err)
+			// No row: deactivated since loadMember read them — the same 409.
+			storeError(w, gid, "promote membership", err, http.StatusConflict, "an inactive member must be reactivated before being promoted")
 			return
 		}
 		respondJSON(w, http.StatusOK, updatedMember(updated, m), gid, "encode member response")
