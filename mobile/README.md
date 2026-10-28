@@ -75,6 +75,20 @@ just start          # or: npm start
 Open the installed **Movie Night / mobile** app on the phone (not Expo Go) and
 connect to the Metro bundler. Use `just ios` (macOS) or `just web` for those targets.
 
+**Driving the phone from the terminal** (adb-attached, including wireless adb):
+
+```bash
+just phone launch [port]    # force-stop, open the dev client on http://<lan-ip>:<port> (8081), wait for load
+just phone dump             # visible text of our app, with bounds
+just phone tap "History"    # tap the first element whose text matches exactly
+just phone shot screen.png  # screenshot
+just phone has "someText"   # exit 0 if the text is in the phone's JS bundle, 1 if not
+```
+
+Before trusting any on-device result, run `just phone has <something from your
+change>`. A long-running Metro can serve the phone a stale bundle even when a
+fresh `curl` of the bundle shows new code.
+
 ### Optional: EAS development build
 
 If you cannot use a local Android toolchain, an EAS development profile is
@@ -124,6 +138,8 @@ Restart with a cleared cache and reload in the dev client / restart Metro:
 ```bash
 just start-clean    # = npx expo start -c
 ```
+
+Then `just phone launch` and check with `just phone has <text from your change>`.
 
 If it persists, confirm the backend is reachable from the phone:
 

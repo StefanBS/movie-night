@@ -67,3 +67,9 @@ audit:
 # Emit SARIF for the code-scanning upload AND gate it, in a single scan run.
 audit-sarif:
     osv-scanner scan source --lockfile=package-lock.json --config=osv-scanner.toml --format sarif > osv-scanner.sarif
+
+# Drive the dev client on the adb-attached phone: launch [port] | tap "<text>" |
+# dump | shot <file> | has <text> (is my change in the phone's bundle?)
+[positional-arguments]
+phone *args:
+    bash scripts/phone.sh "$@"
