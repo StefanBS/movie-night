@@ -149,7 +149,12 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: space[5], paddingTop: space[3], paddingBottom: space[6] },
   filmHero: { alignItems: "center", paddingTop: space[2] },
   badgeWrap: { marginTop: space[5] },
+  // Stretch to the full width (textAlign centres the lines) instead of letting
+  // filmHero's alignItems shrink-wrap the box to the measured text. On Android,
+  // after the search keyboard opens, the title can draw wider than its
+  // measurement, and a shrink-wrapped box clips the wrapped last word (#156).
   filmTitle: {
+    alignSelf: "stretch",
     fontFamily: fontFamily.display,
     fontSize: 34,
     lineHeight: 36,
