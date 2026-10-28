@@ -11,3 +11,12 @@ ignoreUntil = 2027-01-31T00:00:00Z
 # the app bundle. Fixed only in zod 4.6.6, and @expo/cli (57 and 58) needs zod 3.
 # The zod@4 copy under eslint-plugin-react-hooks already resolves to a fixed 4.x.
 reason = "@expo/cli dev-time dep on zod 3; no zod 3 fix exists"
+
+[[IgnoredVulns]]
+id = "GHSA-gcqx-w48m-w2h4"
+ignoreUntil = 2027-01-31T00:00:00Z
+# deepmerge@4.3.1 — expo > @expo/config and react-native-svg-transformer >
+# @svgr/plugin-svgo. Both run at build time (reading app.json, transforming
+# SVGs in Metro); neither is in the app bundle (checked with `expo export`).
+# Prototype poisoning in mergeObject(); 4.3.1 is the latest release, no fix.
+reason = "build-time dep of @expo/config and svgr; no fixed deepmerge release"
