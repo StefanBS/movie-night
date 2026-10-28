@@ -34,6 +34,9 @@ least-served ranking ([ADR-0005](0005-least-served-turn-ranking.md)), three prob
   recomputation or history loss.
 - Reactivation reuses the join seeding, preventing a returner's stale low count from
   dominating.
+- Promotion applies only to an active guest; an inactive member is reactivated first,
+  so a returner keeps their rotation slot (2026-10-28). The allowed moves, no-ops and
+  re-seeding rules live in one pure function, `planMove` (`backend/membership.go`).
 - Requires a uniqueness guarantee for a person's membership within a group, and a
   small amount of seed logic at join time.
 

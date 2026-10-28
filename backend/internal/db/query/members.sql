@@ -33,10 +33,13 @@ WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id)
 RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at;
 
 -- name: PromoteMembership :one
+-- Promote only touches an active membership: an inactive member is reactivated
+-- first (planMove), so a member deactivated since the handler's read matches no
+-- row instead of being reactivated into a new slot.
 UPDATE memberships
-SET role = 'core', status = 'active', left_at = NULL,
+SET role = 'core',
     baseline_picks = sqlc.arg(baseline_picks), rotation_position = sqlc.arg(rotation_position)
-WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id)
+WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id) AND status = 'active'
 RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at;
 
 -- name: RotationSeedInputs :one

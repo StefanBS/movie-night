@@ -166,6 +166,22 @@ func TestMembershipChurnIntegration(t *testing.T) {
 		}
 	})
 
+	t.Run("promote rejects an inactive guest; they must be reactivated first", func(t *testing.T) {
+		code, g := do(t, http.MethodPost, "/groups/"+seededGroup+"/members", `{"name":"Idle Guest","role":"guest"}`)
+		if code != http.StatusCreated {
+			t.Fatalf("join status = %d, want 201", code)
+		}
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/members/"+g.ID+"/deactivate", ""); code != http.StatusOK {
+			t.Fatalf("deactivate status = %d, want 200", code)
+		}
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/members/"+g.ID+"/promote", ""); code != http.StatusConflict {
+			t.Fatalf("promote status = %d, want 409", code)
+		}
+		if _, ok := servedOf(t, "Idle Guest"); ok {
+			t.Error("rejected promote put Idle Guest into /turn")
+		}
+	})
+
 	t.Run("invalid role is rejected", func(t *testing.T) {
 		code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/members", `{"name":"Nope","role":"admin"}`)
 		if code != http.StatusBadRequest {

@@ -100,7 +100,9 @@ export function transitionMember(
 }
 
 // memberActions returns the churn transitions valid for a member's current
-// state. The rules live here (pure, testable) rather than in the screen.
+// state. The rules live here (pure, testable) rather than in the screen, and
+// mirror the backend's planMove: an inactive member (guest or core) can only
+// reactivate — the backend answers 409 to promoting one.
 export function memberActions(m: Member): MemberAction[] {
   if (m.status === "inactive") {
     return ["reactivate"];

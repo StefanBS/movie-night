@@ -94,7 +94,7 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `POST` | `/groups/{groupId}/members` | Join as active core, seeded to the current average. Body `{"name"}`. |
 | `POST` | `/groups/{groupId}/members/{userId}/deactivate` | Mark inactive (leaves the rotation). |
 | `POST` | `/groups/{groupId}/members/{userId}/reactivate` | Restore; re-seeds if it re-enters the rotation. |
-| `POST` | `/groups/{groupId}/members/{userId}/promote` | Guest → active core. |
+| `POST` | `/groups/{groupId}/members/{userId}/promote` | Active guest → active core. `409` for an inactive member (reactivate first). |
 
 **Identity** ([ADR-0009](../docs/adr/0009-claimed-identity-device-tokens.md)) — the person an install acts as. Every route but the claim takes `Authorization: Bearer <token>` and return `401` without a valid one; the other routes are unauthenticated.
 

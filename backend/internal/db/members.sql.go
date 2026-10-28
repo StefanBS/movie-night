@@ -181,9 +181,9 @@ func (q *Queries) InsertMembership(ctx context.Context, arg InsertMembershipPara
 
 const promoteMembership = `-- name: PromoteMembership :one
 UPDATE memberships
-SET role = 'core', status = 'active', left_at = NULL,
+SET role = 'core',
     baseline_picks = $1, rotation_position = $2
-WHERE group_id = $3 AND user_id = $4
+WHERE group_id = $3 AND user_id = $4 AND status = 'active'
 RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at
 `
 
@@ -194,6 +194,9 @@ type PromoteMembershipParams struct {
 	UserID           uuid.UUID `json:"user_id"`
 }
 
+// Promote only touches an active membership: an inactive member is reactivated
+// first (planMove), so a member deactivated since the handler's read matches no
+// row instead of being reactivated into a new slot.
 func (q *Queries) PromoteMembership(ctx context.Context, arg PromoteMembershipParams) (Membership, error) {
 	row := q.db.QueryRow(ctx, promoteMembership,
 		arg.BaselinePicks,
