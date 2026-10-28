@@ -6,7 +6,7 @@ import { WizardFooter } from "./WizardFooter";
 import { firstName } from "../../lib/avatar";
 import { formatWeekdayDate, relativeLabel } from "../../lib/date";
 import type { Member } from "../../lib/members";
-import { nightTiming } from "../../lib/nightLifecycle";
+import { nightWording } from "../../lib/nightLifecycle";
 import { borderWidth, colors, pressedOpacity, radius, shadow, space, textPresets } from "../../theme";
 
 // WhoStep — attendance toggles for the full roster, for a plan that is not yet
@@ -34,7 +34,7 @@ export function WhoStep({
   onChoosePicker: (memberId: string) => void;
   onNext: () => void;
 }) {
-  const future = nightTiming(scheduledFor, today) === "upcoming";
+  const wording = nightWording(scheduledFor, today);
   const picker = members.find((m) => m.id === pickerId) ?? null;
   return (
     <View style={styles.flex}>
@@ -47,10 +47,10 @@ export function WhoStep({
           <Badge label={relativeLabel(scheduledFor, today)} uppercase={false} />
         </View>
         <Text style={styles.hint}>
-          {future ? "Who's planning to come? The next-up member who's in gets the pick." : "Tap who made it. Tonight's pick goes to whoever's next up and here."}
+          {wording.whoHint}
         </Text>
 
-        <SectionLabel>{future ? "Who's coming?" : "Who's here?"}</SectionLabel>
+        <SectionLabel>{wording.whoSection}</SectionLabel>
         {members.map((m) => {
           const here = attendeeIds.has(m.id);
           const isPicker = picker?.id === m.id;

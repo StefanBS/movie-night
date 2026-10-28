@@ -7,6 +7,7 @@ import { WizardFooter } from "./WizardFooter";
 import { firstName } from "../../lib/avatar";
 import type { Member } from "../../lib/members";
 import type { Movie } from "../../lib/movies";
+import { nightWording } from "../../lib/nightLifecycle";
 import type { Night } from "../../lib/nights";
 import { borderWidth, colors, fontFamily, fontSize, pressedOpacity, radius, shadow, space, textPresets } from "../../theme";
 
@@ -18,8 +19,8 @@ import { borderWidth, colors, fontFamily, fontSize, pressedOpacity, radius, shad
 export function PickStep({
   night,
   members,
+  today,
   busy,
-  future = false,
   results,
   searching,
   searchError,
@@ -30,8 +31,8 @@ export function PickStep({
 }: {
   night: Night;
   members: Member[];
+  today: string;
   busy: string | null;
-  future?: boolean;
   results: Movie[];
   searching: boolean;
   searchError: string | null;
@@ -49,6 +50,7 @@ export function PickStep({
   };
   const search = () => onSearch(movieQuery);
   const pickerName = members.find((m) => m.id === night.pickerId)?.name ?? "";
+  const wording = nightWording(night.scheduledFor, today);
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -57,7 +59,7 @@ export function PickStep({
         <View style={styles.pickerCard}>
           <Avatar name={pickerName} size={44} glow />
           <View style={styles.rowText}>
-            <Text style={styles.pickingTag}>{future ? "✦ Picking ahead" : "✦ Picking tonight"}</Text>
+            <Text style={styles.pickingTag}>{wording.pickingTag}</Text>
             <Text style={styles.pickerName} numberOfLines={1}>
               {pickerName}
             </Text>
@@ -136,7 +138,7 @@ export function PickStep({
       {onSkip ? (
         <WizardFooter>
           <AppButton
-            title={future ? "Decide on the night  →" : "Skip for now  →"}
+            title={wording.skipLabel}
             variant="ghost"
             onPress={onSkip}
             disabled={busy !== null}

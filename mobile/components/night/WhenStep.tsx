@@ -7,7 +7,7 @@ import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
 import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
 import { relativeLabel } from "../../lib/date";
-import { nightTiming } from "../../lib/nightLifecycle";
+import { nightWording } from "../../lib/nightLifecycle";
 import {
   borderWidth,
   colors,
@@ -21,7 +21,7 @@ import {
 
 // WhenStep is the wizard's first step: a "Tonight" chip + the Calendar and an
 // optional start time, with a sticky footer that names the plan
-// (TONIGHT/PLANNING) and its relative date. It owns its own selection/month —
+// (PLANNING/TONIGHT/RECORDING) and its relative date. It owns its own selection/month —
 // it reports the chosen date and start time on "Next". `initial` and
 // `initialStartTime` restore them when the user comes back.
 export function WhenStep({
@@ -43,7 +43,7 @@ export function WhenStep({
   const [startTime, setStartTime] = useState(initialStartTime);
   const [month, setMonth] = useState<YearMonth>(() => yearMonthOf(initial));
   const isToday = selected === today;
-  const future = nightTiming(selected, today) === "upcoming";
+  const wording = nightWording(selected, today);
 
   const pickToday = () => {
     setSelected(today);
@@ -96,7 +96,7 @@ export function WhenStep({
       <WizardFooter>
         <View style={styles.footerMeta}>
           <Text style={styles.planTag} allowFontScaling={false}>
-            {future ? "PLANNING" : "TONIGHT"}
+            {wording.planTag}
           </Text>
           <Text style={styles.relLabel} allowFontScaling={false}>
             {relativeLabel(selected, today)}
