@@ -21,13 +21,13 @@ import { GROUP_ID } from "../../lib/api";
 import { firstName } from "../../lib/avatar";
 import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
 import {
-  countdownLabel,
   formatShortDate,
   formatStartTime,
   formatWeekdayDate,
 } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import { createNightEdit } from "../../lib/nightEdit";
+import { nightWording } from "../../lib/nightLifecycle";
 import type { Night } from "../../lib/nights";
 import {
   formatRemindersSummary,
@@ -81,6 +81,7 @@ export function EditNightScreen({
   const busy = state.busy !== null;
   const pickerId = state.night.pickerId;
   const picker = members.find((m) => m.id === pickerId) ?? null;
+  const wording = nightWording(date, today);
 
   const onSave = async () => {
     const remindersChanged = !sameReminders(reminders, state.night.reminders);
@@ -163,9 +164,9 @@ export function EditNightScreen({
               </Text>
               <Text style={styles.heroMeta} allowFontScaling={false}>
                 {[
-                  countdownLabel(date, today),
+                  wording.countdown,
                   startTime !== null ? formatStartTime(startTime) : null,
-                  picker !== null ? `${firstName(picker.name)} picks` : null,
+                  picker !== null ? wording.pickerTitle(firstName(picker.name)) : null,
                 ]
                   .filter((part) => part !== null)
                   .join(" · ")}

@@ -4,9 +4,9 @@ import { Clock } from "lucide-react-native";
 import { AppButton, Avatar, Badge, Poster, SectionLabel, useToast } from "../";
 import { WizardFooter } from "./WizardFooter";
 import { addToCalendar } from "../../calendarExport";
-import { countdownLabel, formatShortDate, formatStartTime, weekday } from "../../lib/date";
+import { formatShortDate, formatStartTime, weekday } from "../../lib/date";
 import type { Member } from "../../lib/members";
-import { nightTiming } from "../../lib/nightLifecycle";
+import { nightWording } from "../../lib/nightLifecycle";
 import type { Night } from "../../lib/nights";
 import {
   borderWidth,
@@ -21,9 +21,9 @@ import {
 } from "../../theme";
 
 // NightView is the unified night terminal — one editable view for a night
-// whatever its date or completeness. It frames by date: a future night leads
-// with a date hero + countdown ("Scheduled ✓"); a tonight/past night with a
-// film leads with the film poster ("Recorded ✓"). The film shows when set, with
+// whatever its date or completeness. A night with a film leads with the film
+// poster, one without with a date hero; the wording for its timing (badge,
+// countdown, section labels) comes from nightWording. The film shows when set, with
 // a "Change film" action; when unset, "Choose the film now". The picker and
 // attendees render; editing the film re-enters PickStep, and "Edit night" (when
 // onEdit is given) is the explicit way to change the date or who's coming.
@@ -46,10 +46,9 @@ export function NightView({
   onEdit?: () => void;
 }) {
   const toast = useToast();
-  const timing = nightTiming(night.scheduledFor, today);
-  const future = timing === "upcoming";
-  // A Calendar entry is for a Night still ahead; the OS form has no web version.
-  const canExport = timing !== "past" && Platform.OS !== "web";
+  const wording = nightWording(night.scheduledFor, today);
+  // The OS calendar form has no web version.
+  const canExport = wording.canAddToCalendar && Platform.OS !== "web";
   const movie = night.movie;
   const pickerName = members.find((m) => m.id === night.pickerId)?.name ?? "";
   const onAddToCalendar = async () => {
@@ -64,7 +63,7 @@ export function NightView({
           <View style={styles.filmHero}>
             <Poster uri={movie.posterUrl} title={movie.title} w={150} h={222} />
             <View style={styles.badgeWrap}>
-              <Badge label={future ? "Scheduled ✓" : "Recorded ✓"} tone="solid" />
+              <Badge label={wording.badge} tone="solid" />
             </View>
             <Text style={styles.filmTitle} numberOfLines={3}>
               {movie.title}
@@ -75,7 +74,7 @@ export function NightView({
           </View>
         ) : (
           <View style={styles.dateHero}>
-            <Badge label={future ? "Scheduled ✓" : "Recorded ✓"} tone="solid" />
+            <Badge label={wording.badge} tone="solid" />
             <Text style={styles.heroWeekday} allowFontScaling={false}>
               {weekday(night.scheduledFor, true)}
             </Text>
@@ -85,12 +84,12 @@ export function NightView({
           </View>
         )}
 
-        {future || night.startTime !== null ? (
+        {wording.countdown !== null || night.startTime !== null ? (
           <View style={styles.countdownRow}>
             <Clock size={13} color={colors.accent.strong} />
             <Text style={styles.countdown} allowFontScaling={false}>
               {[
-                future ? countdownLabel(night.scheduledFor, today) : null,
+                wording.countdown,
                 night.startTime !== null ? formatStartTime(night.startTime) : null,
               ]
                 .filter((part) => part !== null)
@@ -99,21 +98,21 @@ export function NightView({
           </View>
         ) : null}
 
-        <SectionLabel>{future ? "On the night" : "The pick"}</SectionLabel>
+        <SectionLabel>{wording.pickSection}</SectionLabel>
         <View style={styles.pickerRow}>
           <Avatar name={pickerName} size={40} glow />
           <View style={styles.pickerText}>
             <Text style={styles.pickerName} numberOfLines={1}>
-              {future ? `${pickerName} picks` : pickerName}
+              {wording.pickerTitle(pickerName)}
             </Text>
             <Text style={styles.pickerSub} allowFontScaling={false}>
-              {future ? "CHOOSES THE FILM THAT NIGHT" : `PICKED · ${formatShortDate(night.scheduledFor)}`}
+              {wording.pickerSub}
             </Text>
           </View>
           <Badge label="✦ Up" uppercase={false} />
         </View>
 
-        <SectionLabel>{future ? `Coming · ${night.attendees.length}` : "Who watched"}</SectionLabel>
+        <SectionLabel>{wording.attendeesSection(night.attendees.length)}</SectionLabel>
         <View style={styles.cluster}>
           {night.attendees.map((a, i) => (
             <View key={a.id} style={[styles.clusterAvatar, i > 0 && styles.clusterOverlap]}>

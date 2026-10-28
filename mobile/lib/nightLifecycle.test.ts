@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { historyNights, nightDates, nightTiming, upNext, type NightTiming } from "./nightLifecycle";
+import { historyNights, nightDates, nightTiming, nightWording, upNext, type NightTiming } from "./nightLifecycle";
 import type { Night } from "./nights";
 
 const TODAY = "2026-06-22";
@@ -90,3 +90,78 @@ test("nightDates: one entry per dated night, past and upcoming", () => {
   const set = nightDates([night("a", "2026-06-19"), night("b", "2026-06-26")]);
   assert.deepEqual([...set].sort(), ["2026-06-19", "2026-06-26"]);
 });
+
+// nightWording: what each screen says for a Night's timing. One row per timing,
+// with an upcoming date three days out so the countdown has a day count.
+
+const UPCOMING = "2026-06-25";
+const PAST = "2026-06-20";
+
+const badgeCases: [string, string][] = [
+  [UPCOMING, "Scheduled ✓"],
+  [TODAY, "Tonight ✓"],
+  [PAST, "Recorded ✓"],
+];
+for (const [date, want] of badgeCases) {
+  test(`nightWording: badge for ${date} → ${want}`, () => {
+    assert.equal(nightWording(date, TODAY).badge, want);
+  });
+}
+
+const countdownCases: [string, string | null][] = [
+  [UPCOMING, "in 3 days"],
+  [TODAY, "tonight"],
+  [PAST, null],
+];
+for (const [date, want] of countdownCases) {
+  test(`nightWording: countdown for ${date} → ${want}`, () => {
+    assert.equal(nightWording(date, TODAY).countdown, want);
+  });
+}
+
+const pickCases: [string, { section: string; title: string; sub: string }][] = [
+  [UPCOMING, { section: "On the night", title: "Ana picks", sub: "CHOOSES THE FILM THAT NIGHT" }],
+  [TODAY, { section: "Tonight's pick", title: "Ana picks", sub: "CHOOSES THE FILM TONIGHT" }],
+  [PAST, { section: "The pick", title: "Ana", sub: "PICKED · Jun 20" }],
+];
+for (const [date, want] of pickCases) {
+  test(`nightWording: the pick for ${date}`, () => {
+    const w = nightWording(date, TODAY);
+    assert.deepEqual({ section: w.pickSection, title: w.pickerTitle("Ana"), sub: w.pickerSub }, want);
+  });
+}
+
+const attendeesCases: [string, string][] = [
+  [UPCOMING, "Coming · 4"],
+  [TODAY, "Coming · 4"],
+  [PAST, "Who watched"],
+];
+for (const [date, want] of attendeesCases) {
+  test(`nightWording: attendees heading for ${date} → ${want}`, () => {
+    assert.equal(nightWording(date, TODAY).attendeesSection(4), want);
+  });
+}
+
+const whoCases: [string, { section: string; hint: string }][] = [
+  [UPCOMING, { section: "Who's coming?", hint: "Who's planning to come? The next-up member who's in gets the pick." }],
+  [TODAY, { section: "Who's here?", hint: "Tap who made it. Tonight's pick goes to whoever's next up and here." }],
+  [PAST, { section: "Who was there?", hint: "Tap who made it. The pick goes to whoever was next up and there." }],
+];
+for (const [date, want] of whoCases) {
+  test(`nightWording: the Who step for ${date}`, () => {
+    const w = nightWording(date, TODAY);
+    assert.deepEqual({ section: w.whoSection, hint: w.whoHint }, want);
+  });
+}
+
+const planCases: [string, { planTag: string; pickingTag: string; skipLabel: string; canAddToCalendar: boolean }][] = [
+  [UPCOMING, { planTag: "PLANNING", pickingTag: "✦ Picking ahead", skipLabel: "Decide on the night  →", canAddToCalendar: true }],
+  [TODAY, { planTag: "TONIGHT", pickingTag: "✦ Picking tonight", skipLabel: "Skip for now  →", canAddToCalendar: true }],
+  [PAST, { planTag: "RECORDING", pickingTag: "✦ Recording the pick", skipLabel: "Skip for now  →", canAddToCalendar: false }],
+];
+for (const [date, want] of planCases) {
+  test(`nightWording: wizard tags and calendar for ${date}`, () => {
+    const { planTag, pickingTag, skipLabel, canAddToCalendar } = nightWording(date, TODAY);
+    assert.deepEqual({ planTag, pickingTag, skipLabel, canAddToCalendar }, want);
+  });
+}

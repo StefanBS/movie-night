@@ -8,7 +8,6 @@ import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
 import type { Member } from "../../lib/members";
 import { createNightEditor, type EditorStep } from "../../lib/nightEditor";
-import { nightTiming } from "../../lib/nightLifecycle";
 import type { Night } from "../../lib/nights";
 import { colors, space, textPresets } from "../../theme";
 
@@ -60,8 +59,8 @@ export function ExistingNightEditor({
         <PickStep
           night={current}
           members={state.members}
+          today={today}
           busy={state.busy}
-          future={nightTiming(current.scheduledFor, today) === "upcoming"}
           results={state.results}
           searching={state.searching}
           searchError={state.searchError}

@@ -4,7 +4,8 @@ import { Clock } from "lucide-react-native";
 
 import { AppButton } from "./AppButton";
 import { Avatar } from "./Avatar";
-import { countdownLabel, formatStartTime, formatWeekdayDate } from "../lib/date";
+import { formatStartTime, formatWeekdayDate } from "../lib/date";
+import { nightWording } from "../lib/nightLifecycle";
 import type { Night } from "../lib/nights";
 import {
   borderWidth,
@@ -27,15 +28,18 @@ const MAX_AVATARS = 4; // overlapping "coming" faces shown on the picker row
 // /night/edit/[id].
 export function UpNextCard({
   night,
+  today,
   onStart,
   onEdit,
 }: {
   night: Night;
+  today: string;
   onStart: () => void;
   onEdit: () => void;
 }) {
   const picker = night.attendees.find((a) => a.id === night.pickerId) ?? null;
   const coming = night.attendees.slice(0, MAX_AVATARS);
+  const wording = nightWording(night.scheduledFor, today);
   return (
     <View style={styles.card}>
       <Svg style={[StyleSheet.absoluteFill, styles.noPointer]}>
@@ -55,9 +59,9 @@ export function UpNextCard({
         <View style={styles.pill}>
           <Clock size={12} color={colors.text.onAccent} strokeWidth={2.5} />
           <Text style={styles.pillText} allowFontScaling={false}>
-            {night.startTime !== null
-              ? `${countdownLabel(night.scheduledFor)} · ${formatStartTime(night.startTime)}`
-              : countdownLabel(night.scheduledFor)}
+            {[wording.countdown, night.startTime !== null ? formatStartTime(night.startTime) : null]
+              .filter((part) => part !== null)
+              .join(" · ")}
           </Text>
         </View>
       </View>
@@ -79,7 +83,7 @@ export function UpNextCard({
               </Text>
             ) : (
               <Text style={styles.pickerMeta} allowFontScaling={false}>
-                {"Chooses the film that night"}
+                {wording.pickerSub}
               </Text>
             )}
           </View>

@@ -178,7 +178,8 @@ export default function TonightScreen() {
   const picker = order[0] ?? null;
   const onDeck = order.slice(1, 4);
   const pickerFirstName = picker ? firstName(picker.name) : "";
-  const scheduled = upNext(nights, todayLocalISO());
+  const today = todayLocalISO();
+  const scheduled = upNext(nights, today);
   const openScheduled = () => {
     if (scheduled === null) {
       return;
@@ -215,6 +216,7 @@ export default function TonightScreen() {
             <>
               <UpNextCard
                 night={scheduled}
+                today={today}
                 onStart={openScheduled}
                 onEdit={openEdit}
               />

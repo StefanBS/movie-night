@@ -1,4 +1,4 @@
-import { daysUntil, todayLocalISO } from "./date";
+import { countdownLabel, daysUntil, formatShortDate, todayLocalISO } from "./date";
 import type { Night } from "./nights";
 
 // The Night lifecycle: the one owner of a Night's date-relative state and the
@@ -45,4 +45,76 @@ export function historyNights(nights: Night[], today: string = todayLocalISO()):
 // Night. A group has at most one Night per date.
 export function nightDates(nights: Night[]): Set<string> {
   return new Set(nights.map((n) => n.scheduledFor));
+}
+
+// NightWording is what the screens say about a Night for its timing, so no
+// screen reduces the timing to its own yes/no. Tonight's Night reads forward
+// (the film hasn't been watched yet); a past Night reads as a record.
+export type NightWording = {
+  badge: string;
+  // countdown is null once the Night has passed.
+  countdown: string | null;
+  pickSection: string;
+  pickerTitle: (name: string) => string;
+  pickerSub: string;
+  attendeesSection: (count: number) => string;
+  whoSection: string;
+  whoHint: string;
+  planTag: string;
+  pickingTag: string;
+  skipLabel: string;
+  // A Calendar entry is for a Night still ahead.
+  canAddToCalendar: boolean;
+};
+
+// nightWording words a Night dated `scheduledFor` (or a plan for that date).
+export function nightWording(scheduledFor: string, today: string = todayLocalISO()): NightWording {
+  const timing = nightTiming(scheduledFor, today);
+  switch (timing) {
+    case "upcoming":
+      return {
+        badge: "Scheduled ✓",
+        countdown: countdownLabel(scheduledFor, today),
+        pickSection: "On the night",
+        pickerTitle: (name) => `${name} picks`,
+        pickerSub: "CHOOSES THE FILM THAT NIGHT",
+        attendeesSection: (count) => `Coming · ${count}`,
+        whoSection: "Who's coming?",
+        whoHint: "Who's planning to come? The next-up member who's in gets the pick.",
+        planTag: "PLANNING",
+        pickingTag: "✦ Picking ahead",
+        skipLabel: "Decide on the night  →",
+        canAddToCalendar: true,
+      };
+    case "tonight":
+      return {
+        badge: "Tonight ✓",
+        countdown: countdownLabel(scheduledFor, today),
+        pickSection: "Tonight's pick",
+        pickerTitle: (name) => `${name} picks`,
+        pickerSub: "CHOOSES THE FILM TONIGHT",
+        attendeesSection: (count) => `Coming · ${count}`,
+        whoSection: "Who's here?",
+        whoHint: "Tap who made it. Tonight's pick goes to whoever's next up and here.",
+        planTag: "TONIGHT",
+        pickingTag: "✦ Picking tonight",
+        skipLabel: "Skip for now  →",
+        canAddToCalendar: true,
+      };
+    case "past":
+      return {
+        badge: "Recorded ✓",
+        countdown: null,
+        pickSection: "The pick",
+        pickerTitle: (name) => name,
+        pickerSub: `PICKED · ${formatShortDate(scheduledFor)}`,
+        attendeesSection: () => "Who watched",
+        whoSection: "Who was there?",
+        whoHint: "Tap who made it. The pick goes to whoever was next up and there.",
+        planTag: "RECORDING",
+        pickingTag: "✦ Recording the pick",
+        skipLabel: "Skip for now  →",
+        canAddToCalendar: false,
+      };
+  }
 }
