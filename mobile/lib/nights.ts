@@ -129,6 +129,9 @@ export function getNightOrNull(
 
 // listNights loads every Night of the group, past and upcoming, newest first.
 // The nightLifecycle selectors split it for Up next, History and the calendar.
+// A failure fails the screen only where the list is what the screen is for
+// (History). Elsewhere it is a hint — Home's planned card, the calendar dots —
+// so callers degrade to an empty list and let their main fetch own the error.
 export function listNights(
   baseUrl: string,
   groupId: string,

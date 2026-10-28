@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { View, StyleSheet, Text } from "react-native";
 
 import { TopBar } from "../";
@@ -13,10 +14,13 @@ import { colors, space, textPresets } from "../../theme";
 
 // ExistingNightEditor renders the editor module (lib/nightEditor) for a saved
 // Night: the Pick step or the Night view it rests on. Mount with
-// key={night.id} when the loaded night changes.
+// key={night.id} when the loaded night changes. A route that refreshes the
+// Night passes loadStartedAt with it, and the editor takes the refreshed copy
+// without remounting, so its step survives.
 export function ExistingNightEditor({
   night,
   members,
+  loadStartedAt,
   today,
   initialStep,
   onDone,
@@ -27,6 +31,7 @@ export function ExistingNightEditor({
 }: {
   night: Night;
   members: Member[];
+  loadStartedAt?: number;
   today: string;
   initialStep?: EditorStep;
   onDone: () => void;
@@ -38,6 +43,11 @@ export function ExistingNightEditor({
   const [editor, state] = useSession(() =>
     createNightEditor({ baseUrl: API_URL, groupId: GROUP_ID, night, members, initialStep }),
   );
+  useEffect(() => {
+    if (loadStartedAt !== undefined) {
+      editor.refresh(night, members, loadStartedAt);
+    }
+  }, [editor, night, members, loadStartedAt]);
   const current = state.night;
 
   // The Night view is the editor's resting state, so it shows a back target
