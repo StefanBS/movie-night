@@ -1,0 +1,9 @@
+/* ============================================================
+   Movie Night — Fonts
+   - Schibsted Grotesk : everything — names, titles, UI (400–800)
+   - Newsreader Italic : film titles only
+   Google-hosted for web. For Expo, bundle the .ttf files with
+   expo-font (see readme.md).
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&display=swap');

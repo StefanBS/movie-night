@@ -1,18 +1,10 @@
 import { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
-import {
-  colors,
-  fontFamily,
-  fontSize,
-  pressedOpacity,
-  space,
-  textPresets,
-  trackPx,
-} from "../theme";
+import { createThemedStyles, fontFamily, pressedOpacity, space, textPresets } from "../theme";
 
 // SettingsRow is the Settings screen's grouped-row primitive: a sentence-case
-// label with an optional mono `value` and an optional `right` node (Toggle /
+// label with an optional `value` and an optional `right` node (Toggle /
 // chevron); a row with both shows the value before the node. `disabled` dims rows whose backend isn't wired yet;
 // `danger` is the red Danger-zone ink. Grouping (card + dividers) is the
 // caller's job, so the same row works in every group.
@@ -31,6 +23,7 @@ export function SettingsRow({
   disabled?: boolean;
   danger?: boolean;
 }) {
+  const styles = useStyles();
   const content = (
     <>
       <Text
@@ -44,7 +37,7 @@ export function SettingsRow({
           {value}
         </Text>
       ) : null}
-      {right ? <View style={styles.right}>{right}</View> : null}
+      {right ? <View>{right}</View> : null}
     </>
   );
 
@@ -70,23 +63,24 @@ export function SettingsRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   row: {
     flexDirection: "row",
     alignItems: "center",
     gap: space[3],
-    paddingVertical: space[3],
+    minHeight: 52,
     paddingHorizontal: space[4],
   },
-  label: { ...textPresets.body, color: colors.text.primary, flex: 1 },
-  dangerLabel: { color: colors.text.danger },
-  value: {
-    fontFamily: fontFamily.mono,
-    fontSize: fontSize.caption,
-    color: colors.text.tertiary,
-    letterSpacing: trackPx(fontSize.caption, "normal"),
+  label: {
+    ...textPresets.body,
+    fontFamily: fontFamily.sansMedium,
+    color: colors.text.primary,
+    flex: 1,
+    minWidth: 0,
   },
-  right: { marginLeft: space[2] },
+  dangerLabel: { color: colors.text.danger },
+  // No tabular figures: values can be prose ("Night before, morning of").
+  value: { ...textPresets.meta, color: colors.text.secondary },
   disabled: { opacity: 0.45 },
   pressed: { opacity: pressedOpacity },
-});
+}));

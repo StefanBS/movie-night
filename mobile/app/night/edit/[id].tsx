@@ -1,7 +1,6 @@
 import { useCallback } from "react";
 import {
   ActivityIndicator,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -14,7 +13,7 @@ import { API_URL } from "../../../apiUrl";
 import { GROUP_ID } from "../../../lib/api";
 import { todayLocalISO } from "../../../lib/date";
 import { createNightLoad, nightLoadView } from "../../../lib/nightLoad";
-import { colors, space, textPresets } from "../../../theme";
+import { createThemedStyles, space, textPresets, useColors } from "../../../theme";
 
 export default function NightEditRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,6 +25,8 @@ export default function NightEditRoute() {
 // refresh must not unmount it. The draft keeps the Night it opened with; a
 // refresh only updates the calendar's dots.
 function NightEditLoader({ id }: { id: string }) {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const [load, state] = useSession(() =>
     createNightLoad({ baseUrl: API_URL, groupId: GROUP_ID, nightId: id, withNightDates: true }),
@@ -48,7 +49,7 @@ function NightEditLoader({ id }: { id: string }) {
           title="Edit night"
           back={{ label: "Up next", onPress: () => router.back() }}
         />
-        <ActivityIndicator style={styles.center} size="large" color={colors.accent.base} />
+        <ActivityIndicator style={styles.center} size="large" color={colors.text.secondary} />
       </View>
     );
   }
@@ -97,10 +98,10 @@ function NightEditLoader({ id }: { id: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   center: { flex: 1, textAlignVertical: "center", textAlign: "center", paddingHorizontal: space[5] },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
   error: { ...textPresets.body, color: colors.text.danger },
   muted: { ...textPresets.body, color: colors.text.secondary },
-});
+}));

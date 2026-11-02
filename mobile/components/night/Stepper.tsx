@@ -1,63 +1,51 @@
-import { Fragment } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
-import { colors, fontFamily, radius, space, textPresets } from "../../theme";
+import { createThemedStyles, fontFamily, lh, space } from "../../theme";
 
 const STEP_LABELS = ["When", "Here", "Pick", "Done"] as const;
 
-// Stepper is the wizard's four-dot progress rail (When · Here · Pick · Done).
-// Dots before the current step show a check; the current dot is ember; the rest
-// are muted.
+// Stepper is the wizard's progress: four segments with sentence-case labels
+// (When · Here · Pick · Done). Done segments are solid text colour, the current
+// one the accent, the rest a strong hairline.
 export function Stepper({ current }: { current: number }) {
+  const styles = useStyles();
   return (
-    <View style={styles.stepper}>
+    <View
+      style={styles.stepper}
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 1, max: STEP_LABELS.length, now: current + 1 }}
+    >
       {STEP_LABELS.map((label, i) => {
         const on = i === current;
         const done = i < current;
         return (
-          <Fragment key={label}>
-            {i > 0 ? (
-              <View style={[styles.stepBar, done && styles.stepBarDone]} />
-            ) : null}
-            <View style={styles.stepItem}>
-              <View style={[styles.stepDot, (on || done) && styles.stepDotActive]}>
-                <Text
-                  style={[styles.stepDotText, (on || done) && styles.stepDotTextActive]}
-                  allowFontScaling={false}
-                >
-                  {done ? "✓" : String(i + 1)}
-                </Text>
-              </View>
-              <Text
-                style={[styles.stepLabel, on && styles.stepLabelActive]}
-                allowFontScaling={false}
-              >
-                {label}
-              </Text>
-            </View>
-          </Fragment>
+          <View key={label} style={styles.step}>
+            <View style={[styles.bar, on ? styles.barOn : done ? styles.barDone : null]} />
+            <Text
+              style={[styles.label, (on || done) && styles.labelReached, on && styles.labelOn]}
+              allowFontScaling={false}
+            >
+              {label}
+            </Text>
+          </View>
         );
       })}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  stepper: { flexDirection: "row", alignItems: "center", gap: space[2], marginTop: space[2] },
-  stepItem: { flexDirection: "row", alignItems: "center", gap: space[1] },
-  stepBar: { flex: 1, height: 1, backgroundColor: colors.border.hairline },
-  stepBarDone: { backgroundColor: colors.accent.base },
-  stepDot: {
-    width: 18,
-    height: 18,
-    borderRadius: radius.full,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface.subtle,
+const useStyles = createThemedStyles((colors) => ({
+  stepper: { flexDirection: "row", gap: 6, marginTop: space[2] },
+  step: { flex: 1, minWidth: 0, gap: space[2] },
+  bar: { height: 3, borderRadius: 2, backgroundColor: colors.border.strong },
+  barOn: { backgroundColor: colors.accent.base },
+  barDone: { backgroundColor: colors.text.primary },
+  label: {
+    fontFamily: fontFamily.sansMedium,
+    fontSize: 13,
+    lineHeight: lh(13),
+    color: colors.text.tertiary,
   },
-  stepDotActive: { backgroundColor: colors.accent.base },
-  stepDotText: { fontFamily: fontFamily.monoBold, fontSize: 10, color: colors.text.tertiary },
-  stepDotTextActive: { color: colors.text.onAccent },
-  stepLabel: { ...textPresets.tag, color: colors.text.tertiary },
-  stepLabelActive: { color: colors.accent.strong },
-});
+  labelReached: { color: colors.text.primary },
+  labelOn: { fontFamily: fontFamily.sansBold },
+}));

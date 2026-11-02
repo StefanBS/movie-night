@@ -1,31 +1,21 @@
-import { StyleSheet, Text, View } from "react-native";
-import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
-import { Clock } from "lucide-react-native";
+import { Text, View } from "react-native";
 
 import { AppButton } from "./AppButton";
 import { Avatar } from "./Avatar";
+import { firstName } from "../lib/avatar";
 import { formatStartTime, formatWeekdayDate } from "../lib/date";
 import { nightWording } from "../lib/nightLifecycle";
 import type { Night } from "../lib/nights";
-import {
-  borderWidth,
-  colors,
-  fontFamily,
-  fontSize,
-  radius,
-  shadow,
-  space,
-  textPresets,
-  trackPx,
-} from "../theme";
+import { capitalize } from "../lib/text";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, radius, space, tabular, textPresets, trackPx } from "../theme";
 
-const MAX_AVATARS = 4; // overlapping "coming" faces shown on the picker row
+const MAX_AVATARS = 4; // overlapping "coming" faces
 
-// UpNextCard is the home's scheduled-night spotlight: when a night is on the
-// calendar, the home leads with this countdown card instead of the whose-turn
-// hero. It reuses the rationed-ember treatment (surface.dark + a bonfire wash +
-// shadow.spotlight) — the scheduled night *is* "next up". Edit routes to
-// /night/edit/[id].
+// UpNextCard is the home's scheduled-night card: when a night is on the
+// calendar, the home leads with it instead of the whose-turn hero. The
+// picker's first name is the headline, with the film (once chosen) in
+// Newsreader Italic below it. A small accent dot marks the date line; nothing
+// glows. Edit routes to /night/edit/[id].
 export function UpNextCard({
   night,
   today,
@@ -37,66 +27,49 @@ export function UpNextCard({
   onStart: () => void;
   onEdit: () => void;
 }) {
+  const styles = useStyles();
   const picker = night.attendees.find((a) => a.id === night.pickerId) ?? null;
-  const coming = night.attendees.slice(0, MAX_AVATARS);
   const wording = nightWording(night.scheduledFor, today);
+  const when = [
+    wording.countdown,
+    formatWeekdayDate(night.scheduledFor),
+    night.startTime !== null ? formatStartTime(night.startTime) : null,
+  ]
+    .filter((part) => part !== null)
+    .join(" · ");
   return (
     <View style={styles.card}>
-      <Svg style={[StyleSheet.absoluteFill, styles.noPointer]}>
-        <Defs>
-          <RadialGradient id="upNextWash" cx="50%" cy="0%" rx="80%" ry="55%">
-            <Stop offset="0" stopColor={colors.accent.base} stopOpacity={0.22} />
-            <Stop offset="1" stopColor={colors.accent.base} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#upNextWash)" />
-      </Svg>
-
-      <View style={styles.headerRow}>
-        <Text style={styles.tag} allowFontScaling={false}>
-          {"✦ Next movie night"}
+      <View style={styles.whenRow}>
+        <View style={styles.dot} />
+        <Text style={styles.when} numberOfLines={1}>
+          {capitalize(when)}
         </Text>
-        <View style={styles.pill}>
-          <Clock size={12} color={colors.text.onAccent} strokeWidth={2.5} />
-          <Text style={styles.pillText} allowFontScaling={false}>
-            {[wording.countdown, night.startTime !== null ? formatStartTime(night.startTime) : null]
-              .filter((part) => part !== null)
-              .join(" · ")}
-          </Text>
-        </View>
       </View>
-
-      <Text style={styles.date} numberOfLines={1}>
-        {formatWeekdayDate(night.scheduledFor)}
-      </Text>
 
       {picker !== null ? (
         <View style={styles.pickerRow}>
-          <Avatar name={picker.name} size={40} />
           <View style={styles.pickerText}>
-            <Text style={styles.pickerName} numberOfLines={1}>
-              {`${picker.name}'s pick`}
+            <Text style={styles.pickerName} numberOfLines={1} allowFontScaling={false}>
+              {firstName(picker.name)}
             </Text>
-            {night.movie !== null ? (
-              <Text style={styles.pickerFilm} numberOfLines={1}>
-                {night.movie.title}
-              </Text>
-            ) : (
-              <Text style={styles.pickerMeta} allowFontScaling={false}>
-                {wording.pickerSub}
-              </Text>
-            )}
+            <Text style={styles.film} numberOfLines={2}>
+              {night.movie !== null ? `${night.movie.title}.` : "picks the film."}
+            </Text>
           </View>
+          <Avatar name={picker.name} size={48} />
+        </View>
+      ) : null}
+
+      {night.attendees.length > 0 ? (
+        <View style={styles.comingRow}>
           <View style={styles.avatars}>
-            {coming.map((a, i) => (
-              <View
-                key={a.id}
-                style={[styles.avatarChip, i > 0 && styles.avatarOverlap]}
-              >
-                <Avatar name={a.name} size={28} />
+            {night.attendees.slice(0, MAX_AVATARS).map((a, i) => (
+              <View key={a.id} style={[styles.avatarChip, i > 0 && styles.avatarOverlap]}>
+                <Avatar name={a.name} size={26} />
               </View>
             ))}
           </View>
+          <Text style={styles.coming}>{`${night.attendees.length} coming`}</Text>
         </View>
       ) : null}
 
@@ -110,78 +83,64 @@ export function UpNextCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   card: {
     borderRadius: radius.xl,
-    padding: space[5],
-    backgroundColor: colors.surface.dark,
-    overflow: "hidden",
-    ...shadow.spotlight,
+    paddingTop: space[6],
+    paddingHorizontal: space[5],
+    paddingBottom: space[5],
+    backgroundColor: colors.surface.card,
   },
-  noPointer: { pointerEvents: "none" },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: space[3],
-  },
-  tag: { ...textPresets.tag, color: colors.accent.strong, flexShrink: 1 },
-  pill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space[1],
-    backgroundColor: colors.accent.base,
-    borderRadius: radius.full,
-    paddingHorizontal: space[2],
-    paddingVertical: space[1],
-  },
-  pillText: {
-    fontFamily: fontFamily.monoBold,
-    fontSize: fontSize.caption,
-    letterSpacing: trackPx(fontSize.caption, "caption"),
-    color: colors.text.onAccent,
-    textTransform: "uppercase",
-  },
-  date: {
-    fontFamily: fontFamily.display,
-    fontSize: 30,
-    lineHeight: 34,
-    letterSpacing: trackPx(30, "display"),
-    color: colors.text.primary,
-    marginTop: space[4],
+  whenRow: { flexDirection: "row", alignItems: "center", gap: space[2] },
+  dot: { width: 8, height: 8, borderRadius: radius.full, backgroundColor: colors.accent.base },
+  // No tabular figures: this line is prose ("Monday, Nov 2") and Schibsted's
+  // tabular comma would open a gap before it.
+  when: {
+    ...textPresets.meta,
+    fontFamily: fontFamily.sansSemibold,
+    color: colors.text.secondary,
+    flexShrink: 1,
   },
   pickerRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
     gap: space[3],
     marginTop: space[4],
+  },
+  pickerText: { flex: 1, minWidth: 0 },
+  pickerName: {
+    fontFamily: fontFamily.display,
+    fontSize: fontSize["4xl"],
+    // leading-tight (0.9) clips the name's ascenders in RN, so it sits at 1.
+    lineHeight: lh(fontSize["4xl"], "none"),
+    letterSpacing: trackPx(fontSize["4xl"], "display"),
+    color: colors.text.primary,
+  },
+  film: {
+    fontFamily: fontFamily.serifItalic,
+    fontSize: 26,
+    lineHeight: Math.round(26 * 1.15),
+    color: colors.text.primary,
+    marginTop: 6,
+  },
+  comingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: space[5],
     paddingTop: space[4],
     borderTopWidth: borderWidth.hairline,
     borderTopColor: colors.border.hairline,
   },
-  pickerText: { flex: 1, minWidth: 0 },
-  pickerName: { ...textPresets.rowName, color: colors.text.primary },
-  pickerMeta: {
-    fontFamily: fontFamily.mono,
-    fontSize: fontSize.caption,
-    letterSpacing: trackPx(fontSize.caption, "caption"),
-    color: colors.text.secondary,
-    textTransform: "uppercase",
-    marginTop: space[1],
-  },
-  pickerFilm: {
-    fontFamily: fontFamily.sansSemibold,
-    fontSize: fontSize.sm,
-    color: colors.text.primary,
-    marginTop: space[1],
-  },
   avatars: { flexDirection: "row", alignItems: "center" },
+  // A 2px ring in the card colour separates the overlapping faces.
   avatarChip: {
     borderRadius: radius.full,
-    borderWidth: borderWidth.regular,
-    borderColor: colors.surface.dark,
+    boxShadow: `0 0 0 ${borderWidth.ring}px ${colors.surface.card}`,
   },
-  avatarOverlap: { marginLeft: -space[3] },
+  avatarOverlap: { marginLeft: -space[2] },
+  coming: { ...textPresets.meta, ...tabular, color: colors.text.secondary },
   actions: { flexDirection: "row", gap: space[3], marginTop: space[5] },
   startWrap: { flex: 1 },
-});
+}));

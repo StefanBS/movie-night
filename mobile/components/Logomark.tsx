@@ -1,8 +1,14 @@
-import Mark from "../assets/brand/logomark.svg";
+import MarkDark from "../assets/brand/logomark.svg";
+import MarkLight from "../assets/brand/logomark-light.svg";
+import { useScheme } from "../theme/useColors";
 
-// Logomark renders the Spotlight brand mark (the ring of friends with tonight's
-// picker glowing ember at top). The SVG is the source of truth — never redraw it.
-// Imported as a component via react-native-svg-transformer (see metro.config.js).
+// Logomark renders the brand mark: a calendar page with a terracotta play
+// button (the film is the group's plan for the day). The SVGs in assets/brand/
+// are the source of truth, copied byte for byte from the design system: never
+// redraw or recolour them. Each theme has its own file (frame in text.primary,
+// play in accent). Imported as components via react-native-svg-transformer
+// (see metro.config.js).
 export function Logomark({ size = 30 }: { size?: number }) {
+  const Mark = useScheme() === "light" ? MarkLight : MarkDark;
   return <Mark width={size} height={size} />;
 }

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { View, StyleSheet, Text } from "react-native";
+import { View, Text } from "react-native";
 
 import { TopBar } from "../";
 import { useSession } from "../useSession";
@@ -10,7 +10,7 @@ import { GROUP_ID } from "../../lib/api";
 import type { Member } from "../../lib/members";
 import { createNightEditor, type EditorStep } from "../../lib/nightEditor";
 import type { Night } from "../../lib/nights";
-import { colors, space, textPresets } from "../../theme";
+import { createThemedStyles, space, textPresets } from "../../theme";
 
 // ExistingNightEditor renders the editor module (lib/nightEditor) for a saved
 // Night: the Pick step or the Night view it rests on. Mount with
@@ -40,6 +40,7 @@ export function ExistingNightEditor({
   cancelLabel?: string;
   showBackOnNight?: boolean;
 }) {
+  const styles = useStyles();
   const [editor, state] = useSession(() =>
     createNightEditor({ baseUrl: API_URL, groupId: GROUP_ID, night, members, initialStep }),
   );
@@ -94,7 +95,7 @@ export function ExistingNightEditor({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   banner: {
     ...textPresets.body,
@@ -103,4 +104,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[5],
     textAlign: "center",
   },
-});
+}));

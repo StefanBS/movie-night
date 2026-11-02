@@ -1,24 +1,25 @@
-import { StyleSheet, Text } from "react-native";
+import { Text } from "react-native";
 
-import { colors, fontFamily, fontSize, space, trackPx } from "../theme";
+import { createThemedStyles, fontFamily, lh, space } from "../theme";
 
-// SectionLabel is the mono uppercase group heading (the app's only uppercase outside badges).
+// SectionLabel is the small group heading above a list: sentence case, 13px
+// semibold, secondary colour. Never uppercase.
 export function SectionLabel({ children }: { children: string }) {
+  const styles = useStyles();
   return (
-    <Text style={styles.label} allowFontScaling={false}>
+    <Text style={styles.label} accessibilityRole="header">
       {children}
     </Text>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   label: {
-    fontFamily: fontFamily.monoBold,
-    fontSize: fontSize.caption,
-    color: colors.text.tertiary,
-    textTransform: "uppercase",
-    letterSpacing: trackPx(fontSize.caption, "caption"),
-    marginTop: space[5],
+    fontFamily: fontFamily.sansSemibold,
+    fontSize: 13,
+    lineHeight: lh(13),
+    color: colors.text.secondary,
+    marginTop: space[6],
     marginBottom: space[2],
   },
-});
+}));

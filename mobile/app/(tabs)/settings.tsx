@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Linking, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Text, View } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 
 import {
@@ -16,18 +16,11 @@ import { GROUP_ID } from "../../lib/api";
 import { formatMonthYear } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { fetchGroup, renameGroup, type Group } from "../../lib/group";
-import {
-  borderWidth,
-  colors,
-  fontFamily,
-  fontSize,
-  radius,
-  space,
-  textPresets,
-  trackPx,
-} from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, radius, space, textPresets, useColors } from "../../theme";
 
 export default function SettingsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const identity = useIdentity();
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,12 +89,12 @@ export default function SettingsScreen() {
     <View style={styles.screen}>
       <TopBar kind="tab" title="Settings" />
       <TabScrollView contentContainerStyle={styles.content}>
-        <View style={styles.ruleCard}>
-          <Text style={styles.ruleKicker} allowFontScaling={false}>
-            THE HOUSE RULE
-          </Text>
-          <Text style={styles.ruleText}>
-            One pick a night. No voting, no vetoing.
+        <View style={styles.rule}>
+          <Text style={styles.ruleKicker}>The house rule</Text>
+          <Text style={styles.ruleText}>One pick a night.</Text>
+          <Text style={styles.ruleLine}>No voting, no vetoing.</Text>
+          <Text style={styles.ruleNote}>
+            {"The app tracks who's picked and proposes whose turn is next, so it's always fair."}
           </Text>
         </View>
 
@@ -109,7 +102,7 @@ export default function SettingsScreen() {
         {loading ? (
           <View style={styles.card}>
             <View style={styles.loadingRow}>
-              <ActivityIndicator color={colors.accent.base} />
+              <ActivityIndicator color={colors.text.secondary} />
             </View>
           </View>
         ) : error !== null ? (
@@ -197,25 +190,35 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const RULE = 28; // the house rule's headline
+
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   content: { paddingHorizontal: space[5] },
-  ruleCard: {
-    backgroundColor: colors.surface.card,
-    borderRadius: radius.lg,
-    padding: space[5],
-    marginTop: space[6],
-    marginBottom: space[4],
-    gap: space[2],
+  // The house rule sits flush on the page, closed off by a hairline.
+  rule: {
+    marginTop: 22,
+    paddingBottom: 22,
+    borderBottomWidth: borderWidth.hairline,
+    borderBottomColor: colors.border.hairline,
   },
-  ruleKicker: {
-    fontFamily: fontFamily.monoBold,
-    fontSize: fontSize.caption,
-    color: colors.text.tertiary,
-    textTransform: "uppercase",
-    letterSpacing: trackPx(fontSize.caption, "caption"),
+  ruleKicker: { fontFamily: fontFamily.sansSemibold, fontSize: 13, color: colors.text.secondary },
+  ruleText: {
+    fontFamily: fontFamily.display,
+    fontSize: RULE,
+    lineHeight: Math.round(RULE * 1.05),
+    letterSpacing: RULE * -0.035,
+    color: colors.text.primary,
+    marginTop: space[2],
   },
-  ruleText: { ...textPresets.screenTitle, color: colors.text.primary },
+  ruleLine: {
+    ...textPresets.filmTitle,
+    fontSize: 24,
+    lineHeight: Math.round(24 * 1.2),
+    color: colors.text.primary,
+    marginTop: 2,
+  },
+  ruleNote: { ...textPresets.meta, color: colors.text.secondary, marginTop: 10 },
   card: {
     backgroundColor: colors.surface.card,
     borderRadius: radius.lg,
@@ -229,4 +232,4 @@ const styles = StyleSheet.create({
   messageRow: { paddingVertical: space[3], paddingHorizontal: space[4] },
   errorText: { ...textPresets.body, color: colors.text.danger },
   editGroup: { gap: space[2] },
-});
+}));

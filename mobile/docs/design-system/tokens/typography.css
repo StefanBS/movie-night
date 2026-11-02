@@ -1,0 +1,43 @@
+/* ============================================================
+   Movie Night — Typography tokens · "Spotlight" (refined)
+   One grotesk does almost everything: Schibsted Grotesk, set big
+   and tight for names and titles, plain for UI. Film titles are
+   the one exception: Newsreader Italic. No uppercase, no mono.
+   ============================================================ */
+
+:root {
+  /* Families */
+  --font-display: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans:    "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif:   "Newsreader", Georgia, "Times New Roman", serif; /* film titles, italic only */
+  --font-mono:    var(--font-sans); /* deprecated — use --font-sans + tabular-nums */
+
+  /* Weights */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+  --weight-heavy:    800; /* names + titles */
+
+  /* Type scale (px) */
+  --text-caption: 12px; /* badges, fine print */
+  --text-sm:      14px; /* meta */
+  --text-base:    16px; /* body, buttons, inputs */
+  --text-lg:      18px; /* row names */
+  --text-xl:      22px; /* section headings, film title in rows */
+  --text-2xl:     30px; /* bar titles */
+  --text-3xl:     44px; /* tab titles */
+  --text-4xl:     64px; /* card hero name */
+  --text-display: 96px; /* the picker's name on Tonight */
+
+  /* Line heights */
+  --leading-tight:  0.9;  /* display names */
+  --leading-snug:   1.15;
+  --leading-normal: 1.45;
+
+  /* Letter spacing */
+  --tracking-display: -0.045em; /* 44px+ */
+  --tracking-title:   -0.025em; /* 22–30px */
+  --tracking-caption:  0.01em;
+  --tracking-normal:   0;
+}

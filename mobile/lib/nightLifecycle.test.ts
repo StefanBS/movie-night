@@ -120,9 +120,9 @@ for (const [date, want] of countdownCases) {
 }
 
 const pickCases: [string, { section: string; title: string; sub: string }][] = [
-  [UPCOMING, { section: "On the night", title: "Ana picks", sub: "CHOOSES THE FILM THAT NIGHT" }],
-  [TODAY, { section: "Tonight's pick", title: "Ana picks", sub: "CHOOSES THE FILM TONIGHT" }],
-  [PAST, { section: "The pick", title: "Ana", sub: "PICKED · Jun 20" }],
+  [UPCOMING, { section: "On the night", title: "Ana picks", sub: "Chooses the film that night" }],
+  [TODAY, { section: "Tonight's pick", title: "Ana picks", sub: "Chooses the film tonight" }],
+  [PAST, { section: "The pick", title: "Ana", sub: "Picked · Jun 20" }],
 ];
 for (const [date, want] of pickCases) {
   test(`nightWording: the pick for ${date}`, () => {
@@ -155,9 +155,9 @@ for (const [date, want] of whoCases) {
 }
 
 const planCases: [string, { planTag: string; pickingTag: string; skipLabel: string; canAddToCalendar: boolean }][] = [
-  [UPCOMING, { planTag: "PLANNING", pickingTag: "✦ Picking ahead", skipLabel: "Decide on the night  →", canAddToCalendar: true }],
-  [TODAY, { planTag: "TONIGHT", pickingTag: "✦ Picking tonight", skipLabel: "Skip for now  →", canAddToCalendar: true }],
-  [PAST, { planTag: "RECORDING", pickingTag: "✦ Recording the pick", skipLabel: "Skip for now  →", canAddToCalendar: false }],
+  [UPCOMING, { planTag: "Planning", pickingTag: "Picking ahead", skipLabel: "Decide on the night →", canAddToCalendar: true }],
+  [TODAY, { planTag: "Tonight", pickingTag: "Picking tonight", skipLabel: "Skip for now →", canAddToCalendar: true }],
+  [PAST, { planTag: "Recording", pickingTag: "Recording the pick", skipLabel: "Skip for now →", canAddToCalendar: false }],
 ];
 for (const [date, want] of planCases) {
   test(`nightWording: wizard tags and calendar for ${date}`, () => {

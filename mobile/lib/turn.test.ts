@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseTurn, picksLabel, pickerMeta, type TurnMember } from "./turn";
+import { parseTurn, picksLabel, pickerMeta, pickerSummary, type TurnMember } from "./turn";
 
 // parseTurn validates an untrusted JSON payload from the backend and returns
 // typed TurnMembers, or throws a descriptive error. Pure, table-driven.
@@ -74,3 +74,16 @@ test("pickerMeta falls back to first-turn copy if servedCount>0 but date missing
   };
   assert.equal(pickerMeta(m), "First turn · hasn't picked yet");
 });
+
+const summaryCases: { name: string; servedCount: number; lastPickedOn: string | null; want: string }[] = [
+  { name: "never picked", servedCount: 0, lastPickedOn: null, want: "Their first turn. Whatever they choose, we watch." },
+  { name: "picked once", servedCount: 1, lastPickedOn: "2026-05-30", want: "1 pick so far, last on May 30." },
+  { name: "picked twice", servedCount: 2, lastPickedOn: "2026-05-30", want: "2 picks so far, last on May 30." },
+  { name: "count but no date", servedCount: 1, lastPickedOn: null, want: "Their first turn. Whatever they choose, we watch." },
+];
+for (const c of summaryCases) {
+  test(`pickerSummary: ${c.name}`, () => {
+    const m: TurnMember = { id: "x", name: "Ada", role: "core", servedCount: c.servedCount, lastPickedOn: c.lastPickedOn };
+    assert.equal(pickerSummary(m), c.want);
+  });
+}

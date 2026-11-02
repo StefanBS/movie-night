@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# design system export (unpacked, minus stale PNGs, in docs/design-system/)
+/movie-night-design-system.zip

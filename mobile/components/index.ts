@@ -13,6 +13,7 @@ export { IconButton } from "./IconButton";
 export { TopBar } from "./TopBar";
 export { TabScrollView } from "./TabScrollView";
 export { Calendar } from "./Calendar";
+export { PickerHero } from "./PickerHero";
 export { UpNextCard } from "./UpNextCard";
 export { Toggle } from "./Toggle";
 export { ToastProvider, useToast, type ToastMessage } from "./Toast";

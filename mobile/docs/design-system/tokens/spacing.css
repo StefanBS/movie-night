@@ -1,0 +1,45 @@
+/* ============================================================
+   Movie Night — Spacing, radius, border, motion · "Spotlight" (refined)
+   4px grid. Buttons are pills; cards are soft. Elevation is quiet
+   and lives in colors.css because it differs per theme. Nothing
+   glows: emphasis comes from type size and the ember accent.
+   ============================================================ */
+
+:root {
+  /* Spacing — 4px grid */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radius */
+  --radius-sm:   4px;  /* posters */
+  --radius-md:   12px; /* inputs, toasts */
+  --radius-lg:   18px; /* cards */
+  --radius-xl:   28px; /* sheets, hero cards */
+  --radius-full: 999px; /* buttons, badges, avatars */
+
+  /* Borders */
+  --border-width-hairline: 1px;
+  --border-width-regular:  1.5px;
+  --border-width-ring:     2px; /* the picker's avatar ring */
+
+  --shadow-none: none;
+  /* Deprecated: the glow is retired. Kept so old screens don't break. */
+  --glow-spotlight: 0 0 0 0 transparent; /* @kind shadow */
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1); /* @kind other */
+  --ease-out:      cubic-bezier(0.16, 1, 0.3, 1); /* @kind other */
+  --duration-fast: 130ms; /* @kind other */
+  --duration-base: 220ms; /* @kind other */
+
+  /* Interaction */
+  --pressed-opacity: 0.72; /* @kind other */
+}

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { ChevronRight, Plus } from "lucide-react-native";
 
@@ -17,9 +17,11 @@ import { errorMessage } from "../../lib/errors";
 import { fetchMembers, type Member } from "../../lib/members";
 import { fetchTurn, pickerMeta, type TurnMember } from "../../lib/turn";
 import { buildClubSections, clubSummary } from "../../lib/club";
-import { borderWidth, colors, space, textPresets } from "../../theme";
+import { createThemedStyles, space, textPresets, useColors } from "../../theme";
 
 export default function ClubScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const [members, setMembers] = useState<Member[]>([]);
   const [turn, setTurn] = useState<TurnMember[]>([]);
@@ -64,15 +66,15 @@ export default function ClubScreen() {
         sub={loading || error !== null ? undefined : clubSummary(members, turn)}
         right={
           <IconButton
-            variant="accent"
+            filled
             accessibilityLabel="Add member"
             onPress={() => router.push("/member/new")}
-            icon={<Plus size={20} color={colors.text.onAccent} strokeWidth={2.4} />}
+            icon={<Plus size={20} color={colors.text.secondary} strokeWidth={2} />}
           />
         }
       />
       {loading ? (
-        <ActivityIndicator style={styles.center} size="large" color={colors.accent.base} />
+        <ActivityIndicator style={styles.center} size="large" color={colors.text.secondary} />
       ) : error !== null ? (
         <Text style={[styles.center, styles.error]}>{`Couldn't load the club: ${error}`}</Text>
       ) : members.length === 0 ? (
@@ -84,25 +86,22 @@ export default function ClubScreen() {
           <SectionLabel>In rotation</SectionLabel>
           <View>
             {sections.inRotation.map((m, i) => (
-              <View
+              <MemberRow
                 key={m.id}
-                style={i < sections.inRotation.length - 1 ? styles.divider : undefined}
-              >
-                <MemberRow
-                  rank={i + 1}
-                  name={m.name}
-                  meta={pickerMeta(m)}
-                  spotlight={i === 0}
-                  onPress={() => open(m.id)}
-                  right={
-                    i === 0 ? (
-                      <Badge label="Next up" />
-                    ) : (
-                      <ChevronRight size={18} color={colors.text.tertiary} />
-                    )
-                  }
-                />
-              </View>
+                rank={i + 1}
+                name={m.name}
+                meta={pickerMeta(m)}
+                highlighted={i === 0}
+                divider={i < sections.inRotation.length - 1}
+                onPress={() => open(m.id)}
+                right={
+                  i === 0 ? (
+                    <Badge label="Next up" tone="solid" />
+                  ) : (
+                    <ChevronRight size={18} color={colors.text.tertiary} />
+                  )
+                }
+              />
             ))}
           </View>
 
@@ -111,16 +110,13 @@ export default function ClubScreen() {
               <SectionLabel>Guests · not in rotation</SectionLabel>
               <View>
                 {sections.guests.map((m, i) => (
-                  <View
+                  <MemberRow
                     key={m.id}
-                    style={i < sections.guests.length - 1 ? styles.divider : undefined}
-                  >
-                    <MemberRow
-                      name={m.name}
-                      onPress={() => open(m.id)}
-                      right={<Badge label="Guest" tone="neutral" />}
-                    />
-                  </View>
+                    name={m.name}
+                    divider={i < sections.guests.length - 1}
+                    onPress={() => open(m.id)}
+                    right={<Badge label="Guest" tone="neutral" />}
+                  />
                 ))}
               </View>
             </>
@@ -129,18 +125,16 @@ export default function ClubScreen() {
           {sections.inactive.length > 0 ? (
             <>
               <SectionLabel>Inactive</SectionLabel>
-              <View style={styles.dimmed}>
+              <View>
                 {sections.inactive.map((m, i) => (
-                  <View
+                  <MemberRow
                     key={m.id}
-                    style={i < sections.inactive.length - 1 ? styles.divider : undefined}
-                  >
-                    <MemberRow
-                      name={m.name}
-                      onPress={() => open(m.id)}
-                      right={<ChevronRight size={18} color={colors.text.tertiary} />}
-                    />
-                  </View>
+                    name={m.name}
+                    muted
+                    divider={i < sections.inactive.length - 1}
+                    onPress={() => open(m.id)}
+                    right={<ChevronRight size={18} color={colors.text.tertiary} />}
+                  />
                 ))}
               </View>
             </>
@@ -151,16 +145,11 @@ export default function ClubScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   center: { flex: 1, textAlignVertical: "center" },
   content: { paddingHorizontal: space[5] },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
-  divider: {
-    borderBottomWidth: borderWidth.hairline,
-    borderBottomColor: colors.border.hairline,
-  },
-  dimmed: { opacity: 0.55 },
   empty: { ...textPresets.body, color: colors.text.secondary },
   error: { ...textPresets.body, color: colors.text.danger, textAlign: "center", paddingHorizontal: space[5] },
-});
+}));

@@ -8,22 +8,22 @@ import { IdentityProvider } from "../components/IdentityProvider";
 import { ReminderTaps } from "../components/ReminderTaps";
 import { ToastProvider } from "../components/Toast";
 import { showRemindersInForeground } from "../pushDevice";
-import { colors } from "../theme";
+import { useColors } from "../theme";
 
 showRemindersInForeground();
 
 export default function RootLayout() {
+  const colors = useColors();
   // Brand faces for the Spotlight theme. The keys must match the fontFamily
   // names in theme/typography.ts exactly — RN has no font fallback stack.
   const [loaded] = useFonts({
-    InstrumentSerif: require("../assets/fonts/InstrumentSerif-Regular.ttf"),
-    "InstrumentSerif-Italic": require("../assets/fonts/InstrumentSerif-Italic.ttf"),
-    HankenGrotesk: require("../assets/fonts/HankenGrotesk-Regular.ttf"),
-    "HankenGrotesk-Medium": require("../assets/fonts/HankenGrotesk-Medium.ttf"),
-    "HankenGrotesk-SemiBold": require("../assets/fonts/HankenGrotesk-SemiBold.ttf"),
-    "HankenGrotesk-Bold": require("../assets/fonts/HankenGrotesk-Bold.ttf"),
-    SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
-    "SpaceMono-Bold": require("../assets/fonts/SpaceMono-Bold.ttf"),
+    SchibstedGrotesk: require("../assets/fonts/SchibstedGrotesk-Regular.ttf"),
+    "SchibstedGrotesk-Medium": require("../assets/fonts/SchibstedGrotesk-Medium.ttf"),
+    "SchibstedGrotesk-SemiBold": require("../assets/fonts/SchibstedGrotesk-SemiBold.ttf"),
+    "SchibstedGrotesk-Bold": require("../assets/fonts/SchibstedGrotesk-Bold.ttf"),
+    "SchibstedGrotesk-ExtraBold": require("../assets/fonts/SchibstedGrotesk-ExtraBold.ttf"),
+    "Newsreader-Italic": require("../assets/fonts/Newsreader-Italic.ttf"),
+    "Newsreader-MediumItalic": require("../assets/fonts/Newsreader-MediumItalic.ttf"),
   });
 
   if (!loaded) {
@@ -32,12 +32,12 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
+      <StatusBar style="auto" />
       <ToastProvider>
         <IdentityProvider>
           <Stack
             screenOptions={{
-              headerStyle: { backgroundColor: colors.surface.dark },
+              headerStyle: { backgroundColor: colors.surface.page },
               headerTintColor: colors.text.primary,
               contentStyle: { backgroundColor: colors.surface.page },
             }}

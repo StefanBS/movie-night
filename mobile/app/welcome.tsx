@@ -1,52 +1,26 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
+import { ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppButton, Banner, Logomark } from "../components";
-import {
-  colors,
-  fontFamily,
-  fontSize,
-  radius,
-  space,
-  textPresets,
-  trackPx,
-} from "../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, space, tabular, textPresets } from "../theme";
 
 // The house rules shown on the first-run marquee. Echoes the in-app house rule
 // (Settings) and FAIRNESS_NOTE (rotation), kept here as the screen's own copy.
 const RULES = [
   "One pick a night. No voting, no vetoing.",
-  "Fewest picks goes first — so everyone gets a fair turn.",
+  "Fewest picks goes first, so everyone gets a fair turn.",
   "Can't make it? Skip your turn and keep your place.",
 ];
-
-// EmberGlow is the top wash on the night-950 marquee — the same RadialGradient
-// pattern as the Tonight hero (app/(tabs)/index.tsx). It is the screen's only
-// ember (the disabled CTAs are not at ember rest).
-function EmberGlow() {
-  return (
-    <Svg style={[StyleSheet.absoluteFill, styles.noPointer]}>
-      <Defs>
-        <RadialGradient id="welcomeWash" cx="50%" cy="0%" rx="80%" ry="55%">
-          <Stop offset="0" stopColor={colors.accent.base} stopOpacity={0.22} />
-          <Stop offset="1" stopColor={colors.accent.base} stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <Rect x="0" y="0" width="100%" height="100%" fill="url(#welcomeWash)" />
-    </Svg>
-  );
-}
 
 // WelcomeScreen is the first-run marquee, shown when no group is resolved (see
 // resolveGroupId in lib/api.ts). Presentational this phase: group create/join
 // has no backend yet (unscheduled), so both CTAs are disabled behind a notice.
 // Reached directly at /welcome for review — not wired into routing yet.
 export default function WelcomeScreen() {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.screen}>
-      <EmberGlow />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -56,33 +30,24 @@ export default function WelcomeScreen() {
           },
         ]}
       >
-        <Logomark size={92} />
-        <Text style={styles.wordmark}>Movie Night</Text>
+        <View style={styles.marquee}>
+          <Logomark size={56} />
+          <Text style={styles.wordmark}>{"Movie\nNight"}</Text>
+          <Text style={styles.tagline}>Everyone gets their turn.</Text>
 
-        <View style={styles.card}>
-          <Text style={styles.cardLabel} allowFontScaling={false}>
-            HOW IT WORKS
-          </Text>
-          {RULES.map((rule, i) => (
-            <Text key={rule} style={[styles.rule, i > 0 && styles.ruleGap]}>
-              {rule}
-            </Text>
-          ))}
-        </View>
-
-        <View style={styles.banner}>
-          <Banner tone="info">
-            Creating and joining groups is coming soon.
-          </Banner>
+          <View style={styles.rules}>
+            {RULES.map((rule, i) => (
+              <View key={rule} style={styles.ruleRow}>
+                <Text style={styles.ruleNumber}>{i + 1}</Text>
+                <Text style={styles.rule}>{rule}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         <View style={styles.actions}>
-          <AppButton
-            title="Start a group  →"
-            fullWidth
-            disabled
-            onPress={() => {}}
-          />
+          <Banner tone="info">Creating and joining groups is coming soon.</Banner>
+          <AppButton title="Start a group" fullWidth disabled onPress={() => {}} />
           <AppButton
             title="Enter an invite code"
             variant="ghost"
@@ -96,38 +61,39 @@ export default function WelcomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.surface.dark },
-  content: {
-    flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: space[6],
-  },
+const TAGLINE = 24;
+
+const useStyles = createThemedStyles((colors) => ({
+  screen: { flex: 1, backgroundColor: colors.surface.page },
+  content: { flexGrow: 1, paddingHorizontal: 28 },
+  marquee: { flex: 1, justifyContent: "center" },
   wordmark: {
     ...textPresets.heroWordmark,
     color: colors.text.primary,
-    marginTop: space[4],
-    textAlign: "center",
+    marginTop: 26,
   },
-  card: {
-    alignSelf: "stretch",
-    backgroundColor: colors.surface.card,
-    borderRadius: radius.lg,
-    padding: space[5],
-    marginTop: space[8],
+  tagline: {
+    ...textPresets.filmTitle,
+    fontSize: TAGLINE,
+    lineHeight: Math.round(TAGLINE * 1.2),
+    color: colors.text.primary,
+    marginTop: 14,
   },
-  cardLabel: {
-    fontFamily: fontFamily.monoBold,
-    fontSize: fontSize.caption,
+  rules: { marginTop: space[8] },
+  ruleRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 14,
+    paddingVertical: space[3],
+    borderTopWidth: borderWidth.hairline,
+    borderTopColor: colors.border.hairline,
+  },
+  ruleNumber: {
+    fontFamily: fontFamily.sansBold,
+    ...tabular,
+    fontSize: fontSize.sm,
     color: colors.text.tertiary,
-    textTransform: "uppercase",
-    letterSpacing: trackPx(fontSize.caption, "caption"),
-    marginBottom: space[3],
   },
-  rule: { ...textPresets.body, color: colors.text.primary },
-  ruleGap: { marginTop: space[3] },
-  banner: { alignSelf: "stretch", marginTop: space[6] },
-  actions: { alignSelf: "stretch", marginTop: space[6], gap: space[3] },
-  noPointer: { pointerEvents: "none" },
-});
+  rule: { ...textPresets.body, color: colors.text.primary, flex: 1 },
+  actions: { marginTop: space[8], gap: space[3] },
+}));

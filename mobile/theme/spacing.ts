@@ -1,103 +1,76 @@
 // ============================================================
-// Movie Night — Spacing, radius, border, shadow, motion · "Spotlight"
-// Source of truth: design-system/tokens/spacing.css
-// 4px base grid.
+// Movie Night — Spacing, radius, border, shadow, motion · "Spotlight, refined"
+// Source of truth: docs/design-system/tokens.json (+ components/bundle.css
+// for motion). 4px base grid.
 // ============================================================
 
-import { Platform, type ViewStyle } from "react-native";
+import type { ViewStyle } from "react-native";
+
+import type { ColorSchemeName } from "./colors";
 
 // Spacing — 4px grid
 export const space = {
-  1: 4,
-  2: 8,
-  3: 12,
-  4: 16,
-  5: 20,
-  6: 24,
-  8: 32,
-  10: 40,
-  12: 48,
-  16: 64,
+  1: 4, // icon to label
+  2: 8, // inside buttons and badges
+  3: 12, // between row elements
+  4: 16, // card and row padding
+  5: 20, // screen gutters (narrow)
+  6: 24, // screen gutters; between sections
+  8: 32, // between stats; large section breaks
+  10: 40, // above a screen's first section
+  12: 48, // large vertical breaks
+  16: 64, // hero spacing on Tonight
 } as const;
 
 // Radius
 export const radius = {
-  sm: 6, // poster thumbnail, tags
-  md: 10, // buttons, inputs, rows
-  lg: 16, // cards
-  xl: 24, // sheets, hero panels
-  full: 999,
+  sm: 4, // posters
+  md: 12, // inputs, toasts, banners
+  lg: 18, // cards, settings groups
+  xl: 28, // sheets, hero cards
+  full: 999, // buttons, badges, avatars: pills and discs
 } as const;
 
 export const borderWidth = {
-  hairline: 1,
-  regular: 1.5,
+  hairline: 1, // between rows, input rings
+  regular: 1.5, // emphasised outlines
+  ring: 2, // today ring on the calendar; focus outlines
 } as const;
 
-// Shadows — iOS/Android use shadow* + elevation; web uses boxShadow (RN Web
-// deprecates shadow* style props). Each preset is an object you spread into a
-// style. The signature ember "spotlight" can't be a true glow in RN —
-// approximate with an ember shadowColor + border.
-type ShadowPreset = {
-  shadowColor: string;
-  shadowOffset: { width: number; height: number };
-  shadowOpacity: number;
-  shadowRadius: number;
-  elevation: number;
+// Shadows — quiet, theme-specific, floating surfaces only. Nothing glows.
+// RN (new architecture) and RN Web both render the CSS `boxShadow` string, so
+// these are the token values verbatim. Spread a preset into a style; read the
+// active theme's set through `createThemedStyles()` (theme/useColors.ts).
+export type Shadows = {
+  none: ViewStyle;
+  sm: ViewStyle; // small floating elements
+  md: ViewStyle; // toasts and menus
+  lg: ViewStyle; // sheets
+  focus: ViewStyle; // the halo around a focused input or control
 };
 
-function hexToRgba(hex: string, alpha: number): string {
-  const h = hex.replace("#", "");
-  const r = Number.parseInt(h.slice(0, 2), 16);
-  const g = Number.parseInt(h.slice(2, 4), 16);
-  const b = Number.parseInt(h.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function platformShadow(preset: ShadowPreset): ViewStyle {
-  if (Platform.OS === "web") {
-    const color = hexToRgba(preset.shadowColor, preset.shadowOpacity);
-    const { width, height } = preset.shadowOffset;
-    return {
-      boxShadow: `${width}px ${height}px ${preset.shadowRadius}px 0px ${color}`,
-    };
-  }
-  return preset;
-}
-
-export const shadow = {
-  none: {},
-  sm: platformShadow({
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 1,
-  }),
-  md: platformShadow({
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.42,
-    shadowRadius: 18,
-    elevation: 6,
-  }),
-  lg: platformShadow({
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.55,
-    shadowRadius: 44,
-    elevation: 12,
-  }),
-  // Spotlight — the ember glow on the active ("next up") element.
-  // Pair with a 1px ember border on the same view for the ring.
-  spotlight: platformShadow({
-    shadowColor: "#F68B36",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.32,
-    shadowRadius: 26,
-    elevation: 8,
-  }),
-} as const;
+export const shadow: Record<ColorSchemeName, Shadows> = {
+  dark: {
+    none: {},
+    sm: { boxShadow: "0 1px 2px rgba(0, 0, 0, 0.40)" },
+    md: { boxShadow: "0 8px 24px rgba(0, 0, 0, 0.45)" },
+    lg: { boxShadow: "0 20px 48px rgba(0, 0, 0, 0.55)" },
+    focus: { boxShadow: "0 0 0 3px rgba(200, 105, 63, 0.40)" },
+  },
+  light: {
+    none: {},
+    sm: { boxShadow: "0 1px 2px rgba(17, 16, 14, 0.08)" },
+    md: { boxShadow: "0 8px 24px rgba(17, 16, 14, 0.10)" },
+    lg: { boxShadow: "0 20px 48px rgba(17, 16, 14, 0.14)" },
+    focus: { boxShadow: "0 0 0 3px rgba(169, 85, 47, 0.28)" },
+  },
+};
 
 // Interaction
 export const pressedOpacity = 0.72;
+
+// Motion (ms) — ease-out; respect reduced motion.
+export const duration = {
+  fast: 130,
+  base: 220,
+} as const;

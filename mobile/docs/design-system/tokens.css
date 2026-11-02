@@ -1,0 +1,168 @@
+/* Movie Night Design System — generated from tokens.json */
+
+:root, [data-theme="dark"] {
+  --ink-0: #ffffff;
+  --ink-50: #f4f1ec;
+  --ink-100: #ede8e0;
+  --ink-150: #e4dfd6;
+  --ink-200: #d6d0c6;
+  --ink-300: #b5aea3;
+  --ink-400: #9c958a;
+  --ink-450: #857f76;
+  --ink-500: #7a7369;
+  --ink-600: #5c564e;
+  --ink-700: #3b3833;
+  --ink-800: #2a2824;
+  --ink-850: #221f1c;
+  --ink-900: #1a1816;
+  --ink-950: #11100e;
+  --ink-1000: #0a0908;
+  --ember-100: #f3d5c6;
+  --ember-200: #e6ae93;
+  --ember-300: #d47e57;
+  --ember-400: #c8693f;
+  --ember-500: #a9552f;
+  --ember-600: #934826;
+  --ember-700: #73381d;
+  --gold-300: #8e7b4c;
+  --gold-600: #7e6b3e;
+  --teal-300: #4e7a78;
+  --teal-600: #43706e;
+  --lilac-300: #6c6390;
+  --lilac-600: #5f5684;
+  --sage-300: #5e7c58;
+  --sage-600: #52704c;
+  --rose-300: #97605f;
+  --rose-600: #8a5352;
+  --sky-300: #566f93;
+  --sky-600: #4b6488;
+  --sand-300: #85705a;
+  --sand-600: #776350;
+  --red-400: #f0705f;
+  --red-600: #c23a2b;
+  --green-400: #7bc79a;
+  --green-600: #2f8a55;
+  --text-primary: var(--ink-100);
+  --text-secondary: var(--ink-400);
+  --text-tertiary: var(--ink-450);
+  --text-link: var(--ink-100);
+  --text-danger: var(--red-400);
+  --text-on-accent: var(--ink-950);
+  --text-on-dark: var(--ink-100);
+  --text-on-dark-secondary: var(--ink-400);
+  --text-on-dark-accent: var(--ember-400);
+  --surface-page: var(--ink-950);
+  --surface-card: var(--ink-900);
+  --surface-subtle: var(--ink-850);
+  --surface-raised: var(--ink-800);
+  --surface-spotlight: rgba(200, 105, 63, 0.14);
+  --surface-dark: var(--ink-1000);
+  --surface-tab-bar: rgba(17, 16, 14, 0.88);
+  --surface-danger: rgba(240, 112, 95, 0.12);
+  --surface-success: rgba(123, 199, 154, 0.12);
+  --accent: var(--ember-400);
+  --accent-hover: var(--ember-300);
+  --accent-pressed: var(--ember-500);
+  --accent-strong: var(--ember-400);
+  --accent-glow: rgba(200, 105, 63, 0.40);
+  --border-hairline: rgba(237, 232, 224, 0.10);
+  --border-strong: rgba(237, 232, 224, 0.22);
+  --border-focus: var(--ember-400);
+  --border-on-dark: var(--ink-800);
+  --danger: var(--red-400);
+  --success: var(--green-400);
+  --control-track-off: var(--ink-700);
+  --control-knob: var(--ink-100);
+  --sig-1: var(--gold-300);
+  --sig-2: var(--teal-300);
+  --sig-3: var(--lilac-300);
+  --sig-4: var(--sage-300);
+  --sig-5: var(--rose-300);
+  --sig-6: var(--sky-300);
+  --sig-7: var(--sand-300);
+  --text-on-sig: var(--ink-0);
+  --shadow-none: none;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.55);
+  --shadow-focus: 0 0 0 3px rgba(200, 105, 63, 0.40);
+}
+[data-theme="light"] {
+  --text-primary: var(--ink-950);
+  --text-secondary: var(--ink-600);
+  --text-tertiary: var(--ink-500);
+  --text-link: var(--ink-950);
+  --text-danger: var(--red-600);
+  --text-on-accent: var(--ink-0);
+  --text-on-dark: var(--ink-100);
+  --text-on-dark-secondary: var(--ink-400);
+  --text-on-dark-accent: var(--ember-400);
+  --surface-page: var(--ink-50);
+  --surface-card: var(--ink-0);
+  --surface-subtle: var(--ink-150);
+  --surface-raised: var(--ink-0);
+  --surface-spotlight: rgba(169, 85, 47, 0.10);
+  --surface-dark: var(--ink-950);
+  --surface-tab-bar: rgba(244, 241, 236, 0.90);
+  --surface-danger: rgba(194, 58, 43, 0.08);
+  --surface-success: rgba(47, 138, 85, 0.08);
+  --accent: var(--ember-500);
+  --accent-hover: var(--ember-600);
+  --accent-pressed: var(--ember-600);
+  --accent-strong: var(--ember-600);
+  --accent-glow: rgba(169, 85, 47, 0.28);
+  --border-hairline: rgba(17, 16, 14, 0.10);
+  --border-strong: rgba(17, 16, 14, 0.22);
+  --border-focus: var(--ember-500);
+  --border-on-dark: var(--ink-800);
+  --danger: var(--red-600);
+  --success: var(--green-600);
+  --control-track-off: var(--ink-200);
+  --control-knob: var(--ink-0);
+  --sig-1: var(--gold-600);
+  --sig-2: var(--teal-600);
+  --sig-3: var(--lilac-600);
+  --sig-4: var(--sage-600);
+  --sig-5: var(--rose-600);
+  --sig-6: var(--sky-600);
+  --sig-7: var(--sand-600);
+  --text-on-sig: var(--ink-0);
+  --shadow-sm: 0 1px 2px rgba(17, 16, 14, 0.08);
+  --shadow-md: 0 8px 24px rgba(17, 16, 14, 0.10);
+  --shadow-lg: 0 20px 48px rgba(17, 16, 14, 0.14);
+  --shadow-focus: 0 0 0 3px rgba(169, 85, 47, 0.28);
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --radius-sm: 4px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 28px;
+  --radius-full: 999px;
+  --border-width-hairline: 1px;
+  --border-width-regular: 1.5px;
+  --border-width-ring: 2px;
+  --pressed-opacity: 0.72;
+  --font-display: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Newsreader", Georgia, "Times New Roman", serif;
+}
+.display { font-family: var(--font-display); font-size: 96px; line-height: 0.9; font-weight: 800; letter-spacing: -0.045em; }
+.text-4xl { font-family: var(--font-display); font-size: 64px; line-height: 0.9; font-weight: 800; letter-spacing: -0.045em; }
+.text-3xl { font-family: var(--font-display); font-size: 44px; line-height: 1; font-weight: 800; letter-spacing: -0.045em; }
+.text-2xl { font-family: var(--font-sans); font-size: 30px; line-height: 1.15; font-weight: 800; letter-spacing: -0.025em; }
+.text-xl { font-family: var(--font-sans); font-size: 22px; line-height: 1.15; font-weight: 800; letter-spacing: -0.025em; }
+.text-lg { font-family: var(--font-sans); font-size: 18px; line-height: 1.45; font-weight: 600; }
+.text-base { font-family: var(--font-sans); font-size: 16px; line-height: 1.45; font-weight: 400; }
+.text-sm { font-family: var(--font-sans); font-size: 14px; line-height: 1.45; font-weight: 400; }
+.text-caption { font-family: var(--font-sans); font-size: 12px; line-height: 1.45; font-weight: 700; letter-spacing: 0.01em; }
+.film-title { font-family: var(--font-serif); font-size: 34px; line-height: 1.1; font-weight: 400; font-style: italic; }

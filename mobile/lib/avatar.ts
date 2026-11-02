@@ -1,15 +1,15 @@
-import { avatarTints } from "../theme/colors";
-
-// avatarTint maps a name to one of the seven logo-ring jewel tints, deterministically,
-// so a person is always the same color across the app. Sum of char codes keeps it
-// pure and stable (no Math.random / no persisted state).
-export function avatarTint(name: string): string {
+// signatureColor maps a name to one of the member signature colours (the
+// active theme's `colors.sig`), deterministically, so a person is always the
+// same colour across the app. Sum of char codes mod the palette size keeps it
+// pure and stable (no Math.random / no persisted state); the design system's
+// web Avatar uses the same hash.
+export function signatureColor(name: string, sig: readonly string[]): string {
   const key = name.trim();
   let hash = 0;
   for (let i = 0; i < key.length; i++) {
-    hash = (hash + key.charCodeAt(i)) % avatarTints.length;
+    hash = (hash + key.charCodeAt(i)) % sig.length;
   }
-  return avatarTints[hash];
+  return sig[hash];
 }
 
 // firstName returns the leading word of a name — the app's informal address in
