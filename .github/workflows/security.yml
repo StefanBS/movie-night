@@ -43,18 +43,14 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: backend/go.mod
-          cache-dependency-path: backend/go.sum
+          cache-dependency-path: |
+            backend/go.sum
+            backend/tools/gosec/go.sum
 
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
-      - name: Install gosec (pinned + checksum-verified)
-        run: |
-          curl -fsSL -o gosec.tar.gz "https://github.com/securego/gosec/releases/download/v2.26.1/gosec_2.26.1_linux_amd64.tar.gz"
-          echo "665f48c10b10251ab70ef06635c8522900e6d25b0e6902931a697af2f7646360  gosec.tar.gz" | sha256sum -c -
-          tar -xzf gosec.tar.gz gosec
-          chmod +x gosec
-          sudo mv gosec /usr/local/bin/
-
+      # gosec needs no install step: `just` runs it as a go tool from its own
+      # module (backend/tools/gosec), so go.sum pins + verifies it.
       - name: Security audit (govulncheck + gosec)
         run: just audit-sarif
 
@@ -86,12 +82,15 @@ jobs:
 
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
-      - name: Install osv-scanner (pinned + checksum-verified)
+      # Version + digest pinned in the Dockerfile (bumped by Dependabot).
+      - name: Install osv-scanner (pinned image digest)
         run: |
-          curl -fsSL -o osv-scanner "https://github.com/google/osv-scanner/releases/download/v2.3.8/osv-scanner_linux_amd64"
-          echo "bc98e15319ed0d515e3f9235287ba53cdc5535d576d24fd573978ecfe9ab92dc  osv-scanner" | sha256sum -c -
-          chmod +x osv-scanner
-          sudo mv osv-scanner /usr/local/bin/
+          img=$(awk '/^FROM/ {print $2}' "$GITHUB_WORKSPACE/.github/tools/osv-scanner/Dockerfile")
+          docker create --name osv-scanner "$img"
+          docker cp osv-scanner:/osv-scanner ./osv-scanner
+          docker rm osv-scanner
+          sudo install -m 0755 osv-scanner /usr/local/bin/osv-scanner && rm osv-scanner
+          osv-scanner --version
 
       - name: Dependency audit (osv-scanner)
         run: just audit-sarif
@@ -115,15 +114,18 @@ jobs:
         with:
           fetch-depth: 0 # full history — required for a history-wide scan
 
-      - name: Install betterleaks (pinned + checksum-verified)
+      # Version + digest pinned in the Dockerfile (bumped by Dependabot).
+      - name: Install betterleaks (pinned image digest)
         run: |
-          curl -fsSL -o betterleaks.tar.gz "https://github.com/betterleaks/betterleaks/releases/download/v1.3.1/betterleaks_1.3.1_linux_x64.tar.gz"
-          echo "7b241c80204538cbb210c94514dc7cdff86430938bd7d5b6e289207959530849  betterleaks.tar.gz" | sha256sum -c -
-          tar -xzf betterleaks.tar.gz betterleaks
-          chmod +x betterleaks
-          sudo mv betterleaks /usr/local/bin/
+          img=$(awk '/^FROM/ {print $2}' .github/tools/betterleaks/Dockerfile)
+          docker create --name betterleaks "$img"
+          docker cp betterleaks:/usr/bin/betterleaks ./betterleaks
+          docker rm betterleaks
+          sudo install -m 0755 betterleaks /usr/local/bin/betterleaks && rm betterleaks
+          betterleaks version
 
-      # betterleaks exits non-zero on a leak (no --exit-code override).
+      # betterleaks exits non-zero on a leak (no --exit-code override). Picks up
+      # the repo-root .betterleaks.toml (the dev-credential filter).
       - name: Secret scan (full history)
         run: betterleaks git --no-banner --report-format sarif --report-path betterleaks.sarif
 

@@ -12,6 +12,18 @@ updates:
         patterns:
           - "*"
 
+  # gosec lives in its own module so its heavy autofix deps (LLM/cloud SDKs)
+  # stay out of backend/go.mod; `just sast` runs it via `go tool -modfile=`.
+  - package-ecosystem: gomod
+    directory: /backend/tools/gosec
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      gosec:
+        patterns:
+          - "*"
+
   - package-ecosystem: npm
     directory: /mobile
     schedule:
@@ -112,5 +124,20 @@ updates:
       day: monday
     groups:
       actions:
+        patterns:
+          - "*"
+
+  # CI security scanners shipped as release binaries (not Go/npm deps). Each is
+  # pinned by tag + digest in a FROM-only Dockerfile that security.yml copies the
+  # binary out of; Dependabot bumps the tag and digest together.
+  - package-ecosystem: docker
+    directories:
+      - /.github/tools/osv-scanner
+      - /.github/tools/betterleaks
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      scanners:
         patterns:
           - "*"

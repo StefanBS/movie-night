@@ -1,0 +1,13 @@
+# Extends betterleaks' built-in rules. Used by the lefthook pre-commit hook and
+# the CI `secrets` job (both run from the repo root, where this file is picked up).
+title = "movie-night-app"
+
+# The local-dev Postgres credential (movie:movie@localhost, from compose.yaml /
+# .env.example) is a published throwaway, not a secret. Drop only findings whose
+# secret is exactly that password, so a real credential in the same shape still fails.
+filter = '''
+finding.secret == "movie"
+'''
+
+[extend]
+useDefault = true
