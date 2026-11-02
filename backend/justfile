@@ -59,9 +59,13 @@ test-integration:
 vuln:
     go tool govulncheck ./...
 
-# Static security analysis (skips sqlc-generated files). gosec is a pinned binary, not a go tool — see CLAUDE.md.
+# gosec is a go tool in its own module (tools/gosec/go.mod) so its heavy autofix
+# deps stay out of backend/go.mod; Dependabot bumps it like any other go dep.
+gosec := "go tool -modfile=tools/gosec/go.mod gosec"
+
+# Static security analysis (skips sqlc-generated files)
 sast:
-    gosec -exclude-generated ./...
+    {{gosec}} -exclude-generated ./...
 
 # Run all security scans, human-readable; fails if either scan does.
 audit:
@@ -81,7 +85,7 @@ audit-sarif:
     # exits 0, so gate on any reachable (error-level) finding — what text mode exits 3 for.
     set -uo pipefail
     rc=0
-    gosec -exclude-generated -fmt sarif -out gosec.sarif ./... || rc=1
+    {{gosec}} -exclude-generated -fmt sarif -out gosec.sarif ./... || rc=1
     go tool govulncheck -format sarif ./... > govulncheck.sarif || rc=1
     n=$(jq '[.runs[].results[] | select(.level == "error")] | length' govulncheck.sarif 2>/dev/null || echo 0)
     if [ "${n:-0}" -gt 0 ]; then
