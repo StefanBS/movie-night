@@ -73,8 +73,10 @@ updates:
       # matrix on the packages it deliberately leaves patch-flexible, and leaves
       # `just check-deps` demanding patches no bot is allowed to propose.
       #
-      # Re-derive both tiers after an SDK bump by diffing mobile/package.json
-      # against bundledNativeModules.json. Move anything held here with the SDK:
+      # `just check-deps` (mobile/scripts/check-dependabot-holds.ts) fails if a
+      # package in the matrix is missing here or held at the wrong tier, so
+      # adding an Expo-governed dependency means adding its hold in the same PR.
+      # It re-checks both tiers after an SDK bump. Move anything held here with the SDK:
       # `npx expo install --fix`, then regenerate the lockfile from scratch
       # rather than patching it.
       #
@@ -90,6 +92,8 @@ updates:
       - dependency-name: "react-native"
       - dependency-name: "react-native-svg"
       - dependency-name: "react-native-worklets"
+      # 9.2.1 -> 9.2.2, a patch, is how #165 broke.
+      - dependency-name: "@react-native-community/datetimepicker"
       # reanimated's peer range is locked to one worklets minor, so it moves
       # in lockstep with the worklets pin above: 4.7.1 wanting worklets 0.13.x
       # is how #130 broke.
