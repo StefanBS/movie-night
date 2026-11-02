@@ -5,14 +5,6 @@
 # package.json; ignore only what has no compatible fix.
 
 [[IgnoredVulns]]
-id = "GHSA-mrhx-c7xc-m3w5"
-ignoreUntil = 2027-01-31T00:00:00Z
-# zod@3.25.76 — expo > @expo/cli. Dev CLI only (validates local config); not in
-# the app bundle. Fixed only in zod 4.6.6, and @expo/cli (57 and 58) needs zod 3.
-# The zod@4 copy under eslint-plugin-react-hooks already resolves to a fixed 4.x.
-reason = "@expo/cli dev-time dep on zod 3; no zod 3 fix exists"
-
-[[IgnoredVulns]]
 id = "GHSA-gcqx-w48m-w2h4"
 ignoreUntil = 2027-01-31T00:00:00Z
 # deepmerge@4.3.1 — expo > @expo/config and react-native-svg-transformer >
@@ -20,3 +12,22 @@ ignoreUntil = 2027-01-31T00:00:00Z
 # SVGs in Metro); neither is in the app bundle (checked with `expo export`).
 # Prototype poisoning in mergeObject(); 4.3.1 is the latest release, no fix.
 reason = "build-time dep of @expo/config and svgr; no fixed deepmerge release"
+
+[[IgnoredVulns]]
+id = "GHSA-3g3m-2fjr-6pw4"
+ignoreUntil = 2027-01-31T00:00:00Z
+# glob@13.0.6 — expo > @expo/cli, @expo/config, @expo/config-plugins,
+# @expo/fingerprint, @expo/metro-config. All dev/build-time tooling walking the
+# local project tree; none is in the app bundle. An aborted walk keeps reading
+# directories — only matters when a caller bounds attacker-driven globs with an
+# AbortSignal. Fixed only in glob 14; every dependent pins ^13.
+reason = "Expo CLI/config build-time dep on glob 13; fix is glob 14 only"
+
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2027-01-31T00:00:00Z
+# minimatch@10.2.6 (glob, @expo/fingerprint, @typescript-eslint/typescript-estree)
+# and minimatch@3.1.5 (eslint and its plugins). CPU/memory DoS from an
+# attacker-supplied pattern; here patterns come from our own tooling config, and
+# none of these run in the app. Fixed only in minimatch 11; dependents pin ^3/^10.
+reason = "build/lint-time dep on minimatch 3/10; fix is minimatch 11 only"
