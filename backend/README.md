@@ -2,8 +2,9 @@
 
 Go HTTP API over PostgreSQL. Serves the group roster and "whose turn" ranking,
 handles membership churn (join / deactivate / reactivate / promote), runs the
-per-night lifecycle (create, edit, pick), and proxies movie search/attach
-through [TMDB](https://www.themoviedb.org).
+per-night lifecycle (create, edit, pick), proxies movie search/attach
+through [TMDB](https://www.themoviedb.org), and sends push reminders before
+each night.
 
 ## Stack
 
@@ -79,11 +80,13 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 
 ### Endpoints
 
-**Roster & turn order**
+**Group, roster & turn order**
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/healthz` | Liveness — `{"status":"ok"}`. |
+| `GET` | `/groups/{groupId}` | The group `{"name","createdOn"}` (`createdOn`: `YYYY-MM-DD`). |
+| `PATCH` | `/groups/{groupId}` | Rename the group. Body `{"name"}`; `400` if blank. Returns the group. |
 | `GET` | `/groups/{groupId}/members` | Active members in rotation order. |
 | `GET` | `/groups/{groupId}/turn` | Active core ranked least-served ([ADR-0005](../docs/adr/0005-least-served-turn-ranking.md)); element 0 is the picker. Optional `present=<uuid>,…` filters to tonight's attendees. Returns `[{"id","name","role","servedCount","lastPickedOn"}]` (`lastPickedOn`: `YYYY-MM-DD` or `null`). |
 
@@ -184,14 +187,17 @@ backend/
 ├── main.go            # server entrypoint, route table, withCORS, graceful shutdown
 ├── http.go            # shared HTTP plumbing (UUID parsing, JSON/error responses)
 ├── cors.go            # CORS middleware (parseAllowedOrigins, withCORS)
-├── roster.go          # roster + turn handlers and response mapping
+├── group.go           # group read + rename
+├── roster.go          # roster + turn handlers
 ├── turn.go            # least-served ranking response mapping
 ├── membership.go      # join / deactivate / reactivate / promote (churn)
+├── identity.go        # claimed identity, bearer tokens, push registration
 ├── nights.go          # night lifecycle handlers: create, read, edit, pick
-├── night_writes.go    # create/edit/pick writes: one transaction, Night row locked, ADR-0008 rules
+├── night_writes.go    # create/edit/pick writes, each in one transaction
 ├── tx.go              # withTx — one transaction for a multi-statement write
-├── movies.go          # movie DTO + search/attach handlers (TMDB-backed)
-├── tmdb.go            # TMDB client (search, fetch, poster URLs)
+├── movies.go          # movie search/attach handlers (TMDB-backed)
+├── tmdb.go            # TMDB client
+├── reminders.go       # once-a-minute reminder loop + Expo push sender
 ├── *_test.go          # table-driven unit tests (pure functions, no mocks)
 ├── *_integration_test.go  # testcontainers integration tests (//go:build integration)
 ├── seed.sql           # idempotent dev fixtures
