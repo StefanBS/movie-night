@@ -11,6 +11,8 @@ A monorepo with two independent components, each with its own toolchain, `justfi
 
 `just` is the single source of truth for commands: **CI workflows and the lefthook git hooks call the same recipes you run locally.** When you change how something builds/lints/tests, edit the relevant `justfile` — CI (`.github/workflows/*.yml`) and hooks (`lefthook.yml`) follow automatically. CI calls recipes via `extractions/setup-just`; all GitHub Actions are pinned to commit SHAs.
 
+CI is split by purpose, not by component: **`ci.yml`** ("did my change break anything?" — `backend-check`, `mobile-check`) and **`security.yml`** ("is there a known vuln or leak?" — `backend-audit`, `mobile-audit`, `secrets`, `codeql (<language>)`; the only workflow with the weekly cron and `security-events: write`). Job `name:`s are the required-check contexts in the `main-ruleset`, so renaming a job means updating the ruleset in the same change, or the PR blocks on a check that never reports.
+
 ## Commands
 
 Run these from the component directory (`backend/` or `mobile/`). `just --list` shows every recipe.

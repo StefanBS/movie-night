@@ -1,0 +1,86 @@
+name: CI
+
+# "Did my change break anything?" — build, lint, and test each component.
+# Security scanning (dependency audits, secrets, CodeQL) lives in security.yml.
+#
+# No path filter: these jobs are required status checks (main-ruleset), so they
+# must report on every PR. A path-filtered workflow that doesn't trigger leaves
+# its required check pending forever and blocks the merge.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-check:
+    name: backend-check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Format check
+        run: just fmt-check
+
+      - name: Vet
+        run: just vet
+
+      - name: Build
+        run: just build
+
+      - name: Unit tests
+        run: just test
+
+      - name: Integration tests
+        run: just test-integration
+
+  mobile-check:
+    name: mobile-check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: just lint
+
+      - name: Type-check
+        run: just typecheck
+
+      - name: Test
+        run: just test
+
+      # Guards against deps drifting off the Expo SDK compatibility matrix —
+      # invisible to lint/typecheck/test, since none of them touch the native
+      # layer. See the Expo holds in .github/dependabot.yml.
+      - name: Dependency matrix
+        run: just check-deps
