@@ -7,7 +7,7 @@
 // This file is the "what" (the precise shape). The ADRs are the "why".
 // Migrations remain the "how" and are owned by the project.
 //
-// Target engine: PostgreSQL. Last updated: 2026-05-28.
+// Target engine: PostgreSQL. Last updated: 2026-11-02.
 
 Project movie_night {
   database_type: 'PostgreSQL'
@@ -35,6 +35,12 @@ Enum membership_status {
 Enum reminder_audience {
   everyone [note: 'Every attendee gets the Night\'s reminders']
   picker   [note: 'Only the picker gets the Night\'s reminders (their nudge goes out regardless)']
+}
+
+Enum reminder_slot {
+  night_before
+  morning_of
+  two_hours_before [note: 'Only on a Night with a start time (ADR-0011)']
 }
 
 // ---------------------------------------------------------------------------
@@ -113,8 +119,10 @@ Table picks {
   is_credited   boolean      [not null, default: true, note: 'TRUE only for normal core picks; guest/free picks are FALSE so they never affect standings (ADR-0006)']
   scheduled_for date         [not null]
   created_at    timestamptz  [not null, default: `now()`]
+  start_time    time         [null, note: 'Zone-less wall-clock time, read on each device\'s own clock; NULL = none (ADR-0011)']
   remind_night_before boolean           [not null, default: true, note: 'Reminder at 6 PM the night before, on each recipient\'s clock (ADR-0010)']
   remind_morning_of   boolean           [not null, default: true, note: 'Reminder at 9 AM on the day (ADR-0010)']
+  remind_two_hours_before boolean       [not null, default: true, note: 'Reminder two hours before start_time; only fires when there is one (ADR-0011)']
   remind_audience     reminder_audience [not null, default: 'everyone', note: 'Who the reminders go to; the picker\'s nudge goes out regardless']
 
   Indexes {
@@ -122,7 +130,7 @@ Table picks {
     (picker_id, is_credited)  [name: 'ix_pick_picker_credited', note: 'Drives the least-served count']
   }
 
-  Note: 'One movie night, created with its picker. Whose turn is NEXT is derived from credited picks + attendance, not stored.'
+  Note: 'One movie night, created with its picker. Whose turn is NEXT is derived from credited picks + attendance, not stored. Reads go through the `nights` view (picks + its movie); writes go to picks.'
 }
 
 Table attendances {
@@ -135,6 +143,19 @@ Table attendances {
   }
 
   Note: 'Who was present on a given night. Feeds the "present tonight" set for the rotation (ADR-0004/0005).'
+}
+
+Table reminders_sent {
+  night_id uuid          [not null]
+  user_id  uuid          [not null]
+  slot     reminder_slot [not null]
+  sent_at  timestamptz   [not null, default: `now()`]
+
+  Indexes {
+    (night_id, user_id, slot) [pk]
+  }
+
+  Note: 'Every reminder already sent. Written before the send, so each goes out at most once per person, Night and slot (ADR-0010).'
 }
 
 // ---------------------------------------------------------------------------
@@ -183,6 +204,9 @@ Ref: memberships.user_id  > users.id  [delete: cascade]
 
 Ref: picks.group_id > groups.id [delete: cascade]
 Ref: picks.picker_id > users.id [delete: restrict]
+
+Ref: reminders_sent.night_id > picks.id [delete: cascade]
+Ref: reminders_sent.user_id  > users.id [delete: cascade]
 Ref: picks.movie_id  > movies.id [delete: restrict]
 
 Ref: attendances.pick_id > picks.id [delete: cascade]

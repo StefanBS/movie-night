@@ -1,12 +1,15 @@
 # Movie Night — Mobile
 
-Expo / React Native app for the Movie Night [backend](../backend). Three
-[expo-router](https://docs.expo.dev/router/introduction/) screens:
+Expo / React Native app for the Movie Night [backend](../backend). Four tabs,
+built with [expo-router](https://docs.expo.dev/router/introduction/):
 
-- **Whose turn?** (`app/index.tsx`) — least-served standings; element 0 is
-  flagged "Next up".
-- **Tonight** (`app/night.tsx`) — track attendees, attach a movie (TMDB), record
-  the pick.
+- **Tonight**: whose turn it is, who's on deck, and the next night.
+- **History**: every night, newest first.
+- **Club**: members in rotation, guests, and inactive members; add someone new.
+- **Settings**: your identity, the group name, and reminders.
+
+Planning a night (when, who, which film) and editing it are full-screen flows
+on top of the tabs. On first run, a welcome screen asks which member you are.
 
 The UI follows the "Spotlight" design system; tokens live in `theme/` and are
 documented in [`CLAUDE.md`](CLAUDE.md).
@@ -127,11 +130,11 @@ cd ../backend
 just db-up && just migrate && just seed && just run
 ```
 
-A failed request shows an inline error; an empty group shows "No members yet."
+A failed request shows an inline error on the screen that made it.
 
 ## Troubleshooting
 
-**"Couldn't load turn order: Network request failed" on a physical phone** —
+**"Couldn't load …: Network request failed" on a physical phone** —
 usually a stale Metro bundle serving old code that falls back to `localhost`.
 Restart with a cleared cache and reload in the dev client / restart Metro:
 
@@ -169,21 +172,21 @@ just android-clean
 ## Quality checks
 
 ```bash
-just check          # lint + typecheck + test (everything below)
+just check          # everything below
 
 just lint           # ESLint (eslint-config-expo)
 just typecheck      # tsc --noEmit
 just test           # unit + integration tests (node:test runner)
+just check-deps     # every dep matches the Expo SDK version matrix
 ```
 
 Tests run on Node's built-in runner via `tsx` (`lib/**/*.test.ts`), table-driven
 like the Go backend:
 
-- **Unit** (`*.test.ts`) — pure logic, no mocks: URL resolution (`api`), payload
-  validation (`members`, `turn`, `movies`, `nights`), dates (`date`), error
-  extraction (`errors`).
-- **Integration** (`*.integration.test.ts`) — fetch helpers (`http`, `members`,
-  `turn`, `movies`, `nights`) against a real local HTTP server, no mocking.
+- **Unit** (`*.test.ts`): pure logic with no mocks, such as payload validation,
+  dates, and night-editing rules.
+- **Integration** (`*.integration.test.ts`): the fetch helpers and night flows
+  against a real local HTTP server.
 
 No component/render tests yet.
 
@@ -207,22 +210,19 @@ lefthook install               # from the repo root
 
 ```
 mobile/
-├── app/               # expo-router screens (entry = expo-router/entry)
-│   ├── _layout.tsx    # root Stack + font loading + Spotlight theming
-│   ├── index.tsx      # "Whose turn?" — turn standings
-│   └── night.tsx      # "Tonight" — attendees, movie attach, record pick
-├── lib/               # framework-free logic + its tests (unit + integration)
-│   ├── api.ts         # resolveApiBaseUrl + GROUP_ID — picks the backend URL
-│   ├── http.ts        # shared fetch/JSON/error helper
-│   ├── turn.ts        # fetchTurn + validation
-│   ├── members.ts     # fetchMembers, joinMember, transitionMember
-│   ├── nights.ts      # night lifecycle calls (create/attendee/pick/movie)
-│   ├── movies.ts      # searchMovies + movie helpers
-│   ├── date.ts        # local-date helpers (todayLocalISO)
-│   └── errors.ts      # errorMessage — backend error extraction
-├── components/        # shared presentational components (AppButton)
+├── app/               # expo-router screens
+│   ├── _layout.tsx    # root stack, fonts, theming
+│   ├── (tabs)/        # Tonight, History, Club, Settings
+│   ├── night/         # plan, view, and edit a night
+│   ├── member/        # member profile, add a member
+│   ├── rotation.tsx   # the full turn order
+│   └── welcome.tsx    # first run: pick who you are
+├── lib/               # framework-free logic + its tests (no React Native imports)
+├── components/        # shared UI; night/ holds the night-flow steps
+├── *.ts               # thin native adapters (secure storage, push, calendar, API URL)
 ├── theme/             # "Spotlight" design tokens (colors, spacing, typography)
 ├── assets/            # icons, images, and brand fonts
+├── scripts/           # `just phone` driver, Android push setup wizard
 ├── app.json           # Expo app config
 ├── eslint.config.js   # ESLint flat config
 ├── justfile           # task recipes (just) — parity with the backend
