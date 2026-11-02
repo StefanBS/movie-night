@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Check } from "lucide-react-native";
 
-import { borderWidth, colors, fontFamily, radius, shadow, space, textPresets } from "../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, radius, space, useColors } from "../theme";
 
 // A short confirmation shown over whatever screen is up, e.g. "Reminder set"
 // after a save that also navigates away. One at a time; a new one replaces it.
@@ -19,6 +19,8 @@ export function useToast(): (message: ToastMessage) => void {
 }
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState<ToastMessage | null>(null);
   const [opacity] = useState(() => new Animated.Value(0));
@@ -59,7 +61,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           style={[styles.wrap, { bottom: insets.bottom + space[6], opacity }]}
         >
           <View style={styles.card}>
-            <Check size={18} color={colors.accent.coolStrong} strokeWidth={2.5} />
+            <View style={styles.check}>
+              <Check size={12} color={colors.surface.page} strokeWidth={3.2} />
+            </View>
             <View style={styles.text}>
               <Text style={styles.title}>{message.title}</Text>
               <Text style={styles.body}>{message.body}</Text>
@@ -71,20 +75,40 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors, shadow) => ({
   wrap: { position: "absolute", left: space[5], right: space[5] },
   card: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: space[3],
-    padding: space[4],
-    borderRadius: radius.lg,
-    backgroundColor: colors.surface.card,
+    paddingVertical: 14,
+    paddingHorizontal: space[4],
+    borderRadius: radius.md,
+    backgroundColor: colors.surface.raised,
     borderWidth: borderWidth.hairline,
-    borderColor: colors.border.strong,
+    borderColor: colors.border.hairline,
     ...shadow.md,
   },
-  text: { flex: 1, gap: space[1] },
-  title: { ...textPresets.body, fontFamily: fontFamily.sansSemibold, color: colors.text.primary },
-  body: { ...textPresets.meta, color: colors.text.secondary },
-});
+  check: {
+    width: 22,
+    height: 22,
+    marginTop: 1,
+    borderRadius: radius.full,
+    backgroundColor: colors.text.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  text: { flex: 1, gap: 2 },
+  title: {
+    fontFamily: fontFamily.sansBold,
+    fontSize: fontSize.base,
+    lineHeight: Math.round(fontSize.base * 1.3),
+    color: colors.text.primary,
+  },
+  body: {
+    fontFamily: fontFamily.sans,
+    fontSize: fontSize.sm,
+    lineHeight: Math.round(fontSize.sm * 1.4),
+    color: colors.text.secondary,
+  },
+}));

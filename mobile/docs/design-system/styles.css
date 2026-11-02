@@ -1,0 +1,11 @@
+/* ============================================================
+   Movie Night — Design System
+   Global entry point. Consumers link THIS file. Keep it a
+   list of @import lines only — all real declarations live in
+   the imported token files.
+   ============================================================ */
+
+@import "tokens/fonts.css";
+@import "tokens/colors.css";
+@import "tokens/typography.css";
+@import "tokens/spacing.css";

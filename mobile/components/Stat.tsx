@@ -1,9 +1,9 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
-import { colors, fontFamily, fontSize, space, trackPx } from "../theme";
+import { createThemedStyles, fontFamily, fontSize, tabular, textPresets, trackPx } from "../theme";
 
-// Stat is a ticket-stub metric: mono value over a mono uppercase caption.
-// `accent` turns the value ember (the "Loved" count, "in line" rank).
+// Stat is a metric: a big tabular number over a small sentence-case label.
+// `accent` turns the value terracotta (the "In line" rank on a member's page).
 export function Stat({
   value,
   label,
@@ -13,6 +13,7 @@ export function Stat({
   label: string;
   accent?: boolean;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.base}>
       <Text style={[styles.value, accent && styles.accent]} allowFontScaling={false}>
@@ -25,20 +26,16 @@ export function Stat({
   );
 }
 
-const styles = StyleSheet.create({
-  base: { gap: space[1] },
+const useStyles = createThemedStyles((colors) => ({
+  base: { gap: 2 },
   value: {
-    fontFamily: fontFamily.monoBold,
-    fontSize: fontSize.xl,
+    fontFamily: fontFamily.display,
+    ...tabular,
+    fontSize: fontSize["2xl"],
+    lineHeight: fontSize["2xl"] + 2,
+    letterSpacing: trackPx(fontSize["2xl"], "title"),
     color: colors.text.primary,
-    letterSpacing: -0.22,
   },
   accent: { color: colors.accent.strong },
-  label: {
-    fontFamily: fontFamily.mono,
-    fontSize: 11,
-    color: colors.text.tertiary,
-    textTransform: "uppercase",
-    letterSpacing: trackPx(fontSize.caption, "caption"),
-  },
-});
+  label: { ...textPresets.meta, color: colors.text.secondary },
+}));

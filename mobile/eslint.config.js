@@ -5,7 +5,7 @@ const expoConfig = require("eslint-config-expo/flat");
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*", ".expo/*", "node_modules/*"],
+    ignores: ["dist/*", ".expo/*", "node_modules/*", "docs/*"],
   },
   {
     // tsc already checks namespace members. This rule reads the compiled JS and

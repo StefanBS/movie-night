@@ -1,0 +1,171 @@
+/* ============================================================
+   Movie Night — Color tokens · "Spotlight" (refined, 2026-11)
+   Warm true-black (dark) and warm off-white (light). One terracotta
+   ("ember") accent, rationed to the picker and the main action. Each member
+   owns a signature colour (--sig-1…7). Posters carry the rest.
+   Dark is the default; set data-theme="light" on any element to
+   switch that subtree. Semantic aliases are redefined per theme.
+   ============================================================ */
+
+:root {
+  /* --- Ink (warm neutrals) --- */
+  --ink-0:    #FFFFFF;
+  --ink-50:   #F4F1EC; /* light page */
+  --ink-100:  #EDE8E0; /* dark-mode primary text */
+  --ink-150:  #E4DFD6;
+  --ink-200:  #D6D0C6;
+  --ink-300:  #B5AEA3;
+  --ink-400:  #9C958A; /* dark-mode secondary text */
+  --ink-450:  #857F76; /* dark-mode tertiary text */
+  --ink-500:  #7A7369; /* light-mode tertiary text */
+  --ink-600:  #5C564E; /* light-mode secondary text */
+  --ink-700:  #3B3833;
+  --ink-800:  #2A2824;
+  --ink-850:  #221F1C;
+  --ink-900:  #1A1816; /* dark card */
+  --ink-950:  #11100E; /* dark page · light-mode text */
+  --ink-1000: #0A0908;
+
+  /* --- Ember (the one accent) --- */
+  /* "Terracotta" — ember pulled toward the Film stock palette (2026-11) */
+  --ember-100: #F3D5C6;
+  --ember-200: #E6AE93;
+  --ember-300: #D47E57; /* hover on dark */
+  --ember-400: #C8693F; /* brand (dark) */
+  --ember-500: #A9552F; /* brand (light) · pressed on dark */
+  --ember-600: #934826; /* hover/pressed + accent text on light */
+  --ember-700: #73381D;
+
+  /* --- Signature colours · "Film stock" (one per member; -300 dark, -600 light)
+     Dusty, desaturated mid-tones; white initials on both themes. --- */
+  --gold-300:  #8E7B4C; --gold-600:  #7E6B3E;
+  --teal-300:  #4E7A78; --teal-600:  #43706E;
+  --lilac-300: #6C6390; --lilac-600: #5F5684;
+  --sage-300:  #5E7C58; --sage-600:  #52704C;
+  --rose-300:  #97605F; --rose-600:  #8A5352;
+  --sky-300:   #566F93; --sky-600:   #4B6488;
+  --sand-300:  #85705A; --sand-600:  #776350;
+
+  /* --- Feedback --- */
+  --red-400:   #F0705F; --red-600:   #C23A2B;
+  --green-400: #7BC79A; --green-600: #2F8A55;
+
+  /* --- Deprecated aliases (pre-2026-11 names; do not use in new work) --- */
+  --night-950: var(--ink-1000); --night-900: var(--ink-950); --night-850: var(--ink-900); --night-800: var(--ink-900);
+  --night-700: var(--ink-850); --night-600: var(--ink-800); --night-500: var(--ink-700); --night-400: var(--ink-600);
+  --haze-100: var(--ink-100); --haze-200: var(--ink-200); --haze-300: var(--ink-400); --haze-400: var(--ink-450);
+  --moon-400: var(--ink-300); --moon-300: var(--ink-200); --moon-200: var(--ink-150); --moon-100: var(--ink-100);
+  --red-500: var(--red-400); --green-500: var(--green-400);
+}
+
+:root, [data-theme="dark"] {
+  color-scheme: dark;
+  /* Text */
+  --text-primary:   var(--ink-100);
+  --text-secondary: var(--ink-400);
+  --text-tertiary:  var(--ink-450);
+  --text-link:      var(--ink-100);
+  --text-danger:    var(--red-400);
+  --text-on-accent: var(--ink-950); /* ink on terracotta in dark; white in light */
+  --text-on-dark:           var(--ink-100);
+  --text-on-dark-secondary: var(--ink-400);
+  --text-on-dark-accent:    var(--ember-400);
+
+  /* Surfaces */
+  --surface-page:      var(--ink-950);
+  --surface-card:      var(--ink-900);
+  --surface-subtle:    var(--ink-850);
+  --surface-raised:    var(--ink-800);
+  --surface-spotlight: rgba(200, 105, 63, 0.14); /* selected tint only — never a glow */
+  --surface-dark:      var(--ink-1000);
+  --surface-tab-bar:   rgba(17, 16, 14, 0.88);
+  --surface-danger:    rgba(240, 112, 95, 0.12);
+  --surface-success:   rgba(123, 199, 154, 0.12);
+
+  /* Accent */
+  --accent:         var(--ember-400);
+  --accent-hover:   var(--ember-300);
+  --accent-pressed: var(--ember-500);
+  --accent-strong:  var(--ember-400); /* ember text/icons */
+  --accent-glow:    rgba(200, 105, 63, 0.40);
+  --accent-cool:        var(--ink-300); /* deprecated — the moon accent is retired */
+  --accent-cool-strong: var(--ink-200); /* deprecated */
+  --moon-glow:          transparent;    /* deprecated */
+
+  /* Borders */
+  --border-hairline: rgba(237, 232, 224, 0.10);
+  --border-strong:   rgba(237, 232, 224, 0.22);
+  --border-focus:    var(--ember-400);
+  --border-on-dark:  var(--ink-800);
+
+  /* Feedback */
+  --danger:  var(--red-400);
+  --success: var(--green-400);
+
+  /* Controls */
+  --control-track-off: var(--ink-700);
+  --control-knob:      var(--ink-100);
+
+  /* Signature colours */
+  --sig-1: var(--gold-300); --sig-2: var(--teal-300); --sig-3: var(--lilac-300); --sig-4: var(--sage-300);
+  --sig-5: var(--rose-300); --sig-6: var(--sky-300);  --sig-7: var(--sand-300);
+  --text-on-sig: var(--ink-0);
+
+  /* Elevation (theme-dependent) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.55);
+  --shadow-focus: 0 0 0 3px rgba(200, 105, 63, 0.40);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --text-primary:   var(--ink-950);
+  --text-secondary: var(--ink-600);
+  --text-tertiary:  var(--ink-500);
+  --text-link:      var(--ink-950);
+  --text-danger:    var(--red-600);
+  --text-on-accent: var(--ink-0); /* white on terracotta in light */
+  --text-on-dark:           var(--ink-100);
+  --text-on-dark-secondary: var(--ink-400);
+  --text-on-dark-accent:    var(--ember-400);
+
+  --surface-page:      var(--ink-50);
+  --surface-card:      var(--ink-0);
+  --surface-subtle:    var(--ink-150);
+  --surface-raised:    var(--ink-0);
+  --surface-spotlight: rgba(169, 85, 47, 0.10);
+  --surface-dark:      var(--ink-950);
+  --surface-tab-bar:   rgba(244, 241, 236, 0.90);
+  --surface-danger:    rgba(194, 58, 43, 0.08);
+  --surface-success:   rgba(47, 138, 85, 0.08);
+
+  --accent:         var(--ember-500);
+  --accent-hover:   var(--ember-600);
+  --accent-pressed: var(--ember-600);
+  --accent-strong:  var(--ember-600);
+  --accent-glow:    rgba(169, 85, 47, 0.28);
+  --accent-cool:        var(--ink-600);
+  --accent-cool-strong: var(--ink-700);
+  --moon-glow:          transparent;
+
+  --border-hairline: rgba(17, 16, 14, 0.10);
+  --border-strong:   rgba(17, 16, 14, 0.22);
+  --border-focus:    var(--ember-500);
+  --border-on-dark:  var(--ink-800);
+
+  --danger:  var(--red-600);
+  --success: var(--green-600);
+
+  --control-track-off: var(--ink-200);
+  --control-knob:      var(--ink-0);
+
+  --sig-1: var(--gold-600); --sig-2: var(--teal-600); --sig-3: var(--lilac-600); --sig-4: var(--sage-600);
+  --sig-5: var(--rose-600); --sig-6: var(--sky-600);  --sig-7: var(--sand-600);
+  --text-on-sig: var(--ink-0);
+
+  --shadow-sm: 0 1px 2px rgba(17, 16, 14, 0.08);
+  --shadow-md: 0 8px 24px rgba(17, 16, 14, 0.10);
+  --shadow-lg: 0 20px 48px rgba(17, 16, 14, 0.14);
+  --shadow-focus: 0 0 0 3px rgba(169, 85, 47, 0.28);
+}

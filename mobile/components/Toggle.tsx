@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, View } from "react-native";
 
-import { colors, radius, shadow } from "../theme";
+import { createThemedStyles, radius } from "../theme";
 
 // Toggle is the 44×26 on/off pill for settings rows: ember when on, velvet
 // when off, with a white knob. The row's label names it for screen readers.
@@ -15,6 +15,7 @@ export function Toggle({
   label: string;
   disabled?: boolean;
 }) {
+  const styles = useStyles();
   return (
     <Pressable
       onPress={() => onChange(!value)}
@@ -30,7 +31,7 @@ export function Toggle({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors, shadow) => ({
   track: { width: 44, height: 26, borderRadius: radius.full, padding: 3 },
   on: { backgroundColor: colors.accent.base },
   off: { backgroundColor: colors.control.trackOff },
@@ -43,4 +44,4 @@ const styles = StyleSheet.create({
     ...shadow.sm,
   },
   knobOn: { transform: [{ translateX: 18 }] },
-});
+}));

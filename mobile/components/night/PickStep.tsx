@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 
-import { AppButton, Avatar, Badge, Input, Poster, SectionLabel } from "../";
+import { AppButton, Avatar, Badge, Input, PickerHero, Poster, SectionLabel } from "../";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
 import { firstName } from "../../lib/avatar";
@@ -9,7 +9,7 @@ import type { Member } from "../../lib/members";
 import type { Movie } from "../../lib/movies";
 import { nightWording } from "../../lib/nightLifecycle";
 import type { Night } from "../../lib/nights";
-import { borderWidth, colors, fontFamily, fontSize, pressedOpacity, radius, shadow, space, textPresets } from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, pressedOpacity, space, tabular, textPresets, useColors } from "../../theme";
 
 // PickStep — the picker spotlight (with a correction reveal over present
 // attendees), then film search. Selecting a result attaches the movie and
@@ -41,6 +41,8 @@ export function PickStep({
   onChangePicker: (memberId: string) => Promise<Night | null>;
   onSkip?: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [movieQuery, setMovieQuery] = useState("");
   const [changingPicker, setChangingPicker] = useState(false);
   const choosePicker = async (memberId: string) => {
@@ -56,14 +58,8 @@ export function PickStep({
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Stepper current={2} />
 
-        <View style={styles.pickerCard}>
-          <Avatar name={pickerName} size={44} glow />
-          <View style={styles.rowText}>
-            <Text style={styles.pickingTag}>{wording.pickingTag}</Text>
-            <Text style={styles.pickerName} numberOfLines={1}>
-              {pickerName}
-            </Text>
-          </View>
+        <View style={styles.hero}>
+          <PickerHero name={pickerName} meta={wording.pickingTag} line="it's your call." size={60} />
         </View>
 
         <View style={styles.changeRow}>
@@ -112,7 +108,7 @@ export function PickStep({
           <Text style={[styles.hint, styles.error]}>{searchError}</Text>
         ) : null}
         {searching ? (
-          <ActivityIndicator style={styles.searchSpinner} color={colors.accent.base} />
+          <ActivityIndicator style={styles.searchSpinner} color={colors.text.secondary} />
         ) : null}
 
         {results.map((mv) => (
@@ -149,7 +145,7 @@ export function PickStep({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   flex: { flex: 1 },
   content: {
     paddingHorizontal: space[5],
@@ -162,21 +158,7 @@ const styles = StyleSheet.create({
   name: { ...textPresets.rowName, color: colors.text.primary },
   tag: { ...textPresets.tag, color: colors.text.secondary },
   rowPressed: { opacity: pressedOpacity },
-  pickerCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space[3],
-    paddingVertical: space[3],
-    paddingHorizontal: space[4],
-    marginTop: space[4],
-    backgroundColor: colors.surface.spotlight,
-    borderRadius: radius.md,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.accent.base,
-    ...shadow.spotlight,
-  },
-  pickingTag: { ...textPresets.tag, color: colors.accent.strong },
-  pickerName: { ...textPresets.screenTitle, color: colors.text.primary, marginTop: space[1] },
+  hero: { marginTop: space[6], marginBottom: space[2] },
   changeRow: { marginTop: space[2], alignItems: "flex-start" },
   chooseRow: {
     flexDirection: "row",
@@ -197,15 +179,16 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border.hairline,
   },
   resultTitle: {
-    fontFamily: fontFamily.display,
-    fontSize: 20,
-    lineHeight: 22,
+    fontFamily: fontFamily.serifItalic,
+    fontSize: 19,
+    lineHeight: 21,
     color: colors.text.primary,
   },
   resultYear: {
-    fontFamily: fontFamily.mono,
-    fontSize: fontSize.caption,
+    fontFamily: fontFamily.sans,
+    ...tabular,
+    fontSize: 13,
     color: colors.text.tertiary,
-    marginTop: space[1],
+    marginTop: 2,
   },
-});
+}));

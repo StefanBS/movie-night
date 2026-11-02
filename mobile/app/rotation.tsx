@@ -1,29 +1,24 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
-import { AppButton, Badge, MemberRow, TopBar } from "../components";
+import { AppButton, Badge, Banner, MemberRow, TopBar } from "../components";
 import { API_URL } from "../apiUrl";
 import { firstName } from "../lib/avatar";
 import { GROUP_ID } from "../lib/api";
 import { errorMessage } from "../lib/errors";
 import { fetchTurn, pickerMeta, type TurnMember } from "../lib/turn";
-import {
-  borderWidth,
-  colors,
-  radius,
-  space,
-  textPresets,
-} from "../theme";
+import { createThemedStyles, space, textPresets, useColors } from "../theme";
 
 // The fairness rule, stated plainly — the same logic the backend's turn query
 // implements (fewest picks first, ties broken by who picked longest ago).
 const FAIRNESS_NOTE =
-  "Fewest picks goes first. Ties go to whoever picked longest ago — so everyone gets a fair turn. No voting.";
+  "Fewest picks goes first. Ties go to whoever picked longest ago, so everyone gets a fair turn. No voting.";
 
-// Rank 1 is the picker — it gets the ember spotlight and the NEXT UP badge. The
-// rest are plain rows separated by hairlines, in turn order.
+// Rank 1 is the picker — a highlighted name and the Next up badge. The rest
+// follow in turn order; every row sits flush with a hairline below it.
 function RotationList({ order }: { order: TurnMember[] }) {
+  const styles = useStyles();
   const [picker, ...rest] = order;
   return (
     <View style={styles.list}>
@@ -31,22 +26,26 @@ function RotationList({ order }: { order: TurnMember[] }) {
         rank={1}
         name={picker.name}
         meta={pickerMeta(picker)}
-        spotlight
-        right={<Badge label="Next up" />}
+        highlighted
+        divider={rest.length > 0}
+        right={<Badge label="Next up" tone="solid" />}
       />
       {rest.map((m, i) => (
-        <View
+        <MemberRow
           key={m.id}
-          style={[styles.rest, i < rest.length - 1 && styles.divider]}
-        >
-          <MemberRow rank={i + 2} name={m.name} meta={pickerMeta(m)} />
-        </View>
+          rank={i + 2}
+          name={m.name}
+          meta={pickerMeta(m)}
+          divider={i < rest.length - 1}
+        />
       ))}
     </View>
   );
 }
 
 export default function RotationScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const [order, setOrder] = useState<TurnMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +82,7 @@ export default function RotationScreen() {
         <ActivityIndicator
           style={styles.center}
           size="large"
-          color={colors.accent.base}
+          color={colors.text.secondary}
         />
       ) : error !== null ? (
         <Text style={[styles.center, styles.error]}>
@@ -95,9 +94,7 @@ export default function RotationScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.infoStrip}>
-            <Text style={styles.infoText}>{FAIRNESS_NOTE}</Text>
-          </View>
+          <Banner>{FAIRNESS_NOTE}</Banner>
 
           <RotationList order={order} />
 
@@ -119,7 +116,7 @@ export default function RotationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
   center: { marginTop: space[8], textAlign: "center" },
@@ -130,23 +127,7 @@ const styles = StyleSheet.create({
     paddingTop: space[4],
     paddingBottom: space[10],
   },
-  infoStrip: {
-    backgroundColor: colors.surface.subtle,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
-    borderRadius: radius.md,
-    paddingVertical: space[3],
-    paddingHorizontal: space[4],
-  },
-  infoText: { ...textPresets.meta, color: colors.text.secondary },
-  list: { marginTop: space[4] },
-  // Non-spotlight rows sit flush with a hairline between them. MemberRow owns
-  // its own horizontal padding, so the divider spans the full row.
-  rest: { paddingHorizontal: space[2] },
-  divider: {
-    borderBottomWidth: borderWidth.hairline,
-    borderBottomColor: colors.border.hairline,
-  },
+  list: { marginTop: space[3] },
   skipRow: { marginTop: space[5], alignItems: "center" },
   footer: {
     ...textPresets.meta,
@@ -154,4 +135,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: space[6],
   },
-});
+}));

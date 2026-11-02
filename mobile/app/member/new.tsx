@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Check } from "lucide-react-native";
 
@@ -8,15 +8,7 @@ import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import { joinMember } from "../../lib/members";
-import {
-  borderWidth,
-  colors,
-  fontFamily,
-  fontSize,
-  radius,
-  space,
-  textPresets,
-} from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, radius, space, tabular, textPresets, useColors } from "../../theme";
 
 type Role = "core" | "guest";
 
@@ -36,6 +28,8 @@ function RoleCard({
   selected: boolean;
   onPress: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -45,7 +39,7 @@ function RoleCard({
     >
       <View style={styles.cardTop}>
         <Text style={styles.cardLabel}>{label}</Text>
-        {selected ? <Check size={17} color={colors.accent.strong} strokeWidth={2.4} /> : null}
+        {selected ? <Check size={17} color={colors.text.primary} strokeWidth={2.4} /> : null}
       </View>
       <Text style={styles.cardNote}>{note}</Text>
     </Pressable>
@@ -53,6 +47,7 @@ function RoleCard({
 }
 
 export default function AddMemberScreen() {
+  const styles = useStyles();
   const router = useRouter();
   const [name, setName] = useState("");
   const [role, setRole] = useState<Role>("core");
@@ -123,7 +118,7 @@ export default function AddMemberScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   content: { paddingHorizontal: space[5], paddingBottom: space[10] },
   cards: { flexDirection: "row", gap: space[3] },
@@ -134,23 +129,24 @@ const styles = StyleSheet.create({
     borderColor: colors.border.hairline,
   },
   cardOn: {
-    backgroundColor: colors.surface.spotlight,
-    borderWidth: 1.5,
-    borderColor: colors.accent.base,
+    backgroundColor: colors.surface.card,
+    borderWidth: borderWidth.ring,
+    borderColor: colors.text.primary,
   },
   cardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   cardLabel: { ...textPresets.rowName, color: colors.text.primary },
   cardNote: {
-    fontFamily: fontFamily.mono,
+    fontFamily: fontFamily.sans,
+    ...tabular,
     fontSize: fontSize.caption,
     color: colors.text.secondary,
     marginTop: space[2],
   },
   helper: { ...textPresets.body, color: colors.text.tertiary, marginTop: space[5] },
-  error: { ...textPresets.body, color: colors.accent.strong, marginTop: space[4] },
+  error: { ...textPresets.body, color: colors.text.danger, marginTop: space[4] },
   footer: {
     paddingHorizontal: space[5],
     paddingTop: space[3],
     paddingBottom: space[8],
   },
-});
+}));

@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { IdentitySession, IdentitySessionState } from "../lib/identity";
-import { colors, radius, space, textPresets } from "../theme";
+import { createThemedStyles, space, textPresets, useColors } from "../theme";
 import { AppButton } from "./AppButton";
 import { Input } from "./Input";
 import { Logomark } from "./Logomark";
@@ -21,6 +21,8 @@ export function ClaimIdentityScreen({
   session: IdentitySession;
   state: IdentitySessionState;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -56,12 +58,13 @@ export function ClaimIdentityScreen({
           </View>
         ) : (
           <>
-            <View style={styles.card}>
-              {state.members.map((m) => (
+            <View>
+              {state.members.map((m, i) => (
                 <MemberRow
                   key={m.id}
                   name={m.name}
                   meta={m.role === "guest" ? "Guest" : undefined}
+                  divider={i < state.members.length - 1}
                   onPress={state.busy ? undefined : () => void session.claim(m.id)}
                 />
               ))}
@@ -101,19 +104,14 @@ export function ClaimIdentityScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.surface.dark },
+const useStyles = createThemedStyles((colors) => ({
+  screen: { flex: 1, backgroundColor: colors.surface.page },
   content: { flexGrow: 1, paddingHorizontal: space[5] },
   header: { alignItems: "center", marginBottom: space[6] },
   title: { ...textPresets.screenTitle, color: colors.text.primary, marginTop: space[4], textAlign: "center" },
   subtitle: { ...textPresets.body, color: colors.text.secondary, marginTop: space[2], textAlign: "center" },
   loading: { marginTop: space[8] },
-  card: {
-    backgroundColor: colors.surface.card,
-    borderRadius: radius.lg,
-    overflow: "hidden",
-  },
   block: { marginTop: space[5], gap: space[3] },
   helper: { ...textPresets.body, color: colors.text.tertiary },
   errorText: { ...textPresets.body, color: colors.text.danger, marginTop: space[4] },
-});
+}));

@@ -1,18 +1,13 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { TextInput, View } from "react-native";
 
-import {
-  borderWidth,
-  colors,
-  fontFamily,
-  pressedOpacity,
-  radius,
-  space,
-  textPresets,
-} from "../theme";
+import { AppButton } from "./AppButton";
+import { createThemedStyles, radius, space, textPresets, useColors } from "../theme";
 
-// Input is the Spotlight text field. With `addonLabel` it grows a trailing ember
-// button (the "Search" affordance on the film-search field).
+// Input is the single-line text field: the card surface, a 12px radius, a
+// hairline ring that turns into the accent focus ring. With `addonLabel` a
+// primary button sits beside it (the "Search" on the film-search field), so
+// only use it where that button is the screen's main action.
 export function Input({
   value,
   onChangeText,
@@ -30,11 +25,13 @@ export function Input({
   addonLabel?: string;
   onAddonPress?: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [focused, setFocused] = useState(false);
   return (
-    <View style={[styles.field, focused && styles.focused]}>
+    <View style={styles.wrap}>
       <TextInput
-        style={styles.input}
+        style={[styles.input, focused ? styles.focused : styles.idle]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -45,49 +42,25 @@ export function Input({
         onBlur={() => setFocused(false)}
         returnKeyType={addonLabel ? "search" : "done"}
       />
-      {addonLabel ? (
-        <Pressable
-          onPress={onAddonPress}
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.addon, pressed && styles.pressed]}
-        >
-          <Text style={styles.addonLabel}>{addonLabel}</Text>
-        </Pressable>
-      ) : null}
+      {addonLabel && onAddonPress ? <AppButton title={addonLabel} onPress={onAddonPress} /> : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  field: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surface.subtle,
-    borderRadius: radius.md,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
-    paddingLeft: space[4],
-    paddingRight: space[1],
-    minHeight: 48,
-  },
-  focused: { borderColor: colors.border.focus },
+// The rings are inset box shadows (as in the DS), so focusing doesn't shift
+// the layout the way a thicker border would.
+const useStyles = createThemedStyles((colors, shadow) => ({
+  wrap: { flexDirection: "row", alignItems: "center", gap: space[2] },
   input: {
     flex: 1,
+    minWidth: 0,
+    height: 48,
     ...textPresets.body,
     color: colors.text.primary,
-    paddingVertical: space[3],
-  },
-  addon: {
-    backgroundColor: colors.accent.base,
-    borderRadius: radius.sm,
+    backgroundColor: colors.surface.card,
     paddingHorizontal: space[4],
-    paddingVertical: space[2],
-    marginLeft: space[2],
+    borderRadius: radius.md,
   },
-  pressed: { opacity: pressedOpacity },
-  addonLabel: {
-    ...textPresets.meta,
-    fontFamily: fontFamily.sansSemibold,
-    color: colors.text.onAccent,
-  },
-});
+  idle: { boxShadow: `inset 0 0 0 1px ${colors.border.hairline}` },
+  focused: { boxShadow: `inset 0 0 0 1.5px ${colors.border.focus}, ${String(shadow.focus.boxShadow)}` },
+}));

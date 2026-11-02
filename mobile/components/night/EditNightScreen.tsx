@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Calendar as CalendarIcon, ChevronRight } from "lucide-react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { ChevronRight } from "lucide-react-native";
 
 import {
   AppButton,
   Avatar,
-  Badge,
   Calendar,
   SectionLabel,
   SettingsRow,
@@ -13,6 +12,7 @@ import {
   useToast,
 } from "../";
 import { useSession } from "../useSession";
+import { AttendCheck } from "./AttendCheck";
 import { RemindersView } from "./RemindersView";
 import { StartTimeRow } from "./StartTimeRow";
 import { WizardFooter } from "./WizardFooter";
@@ -28,24 +28,14 @@ import {
 import type { Member } from "../../lib/members";
 import { createNightEdit } from "../../lib/nightEdit";
 import { nightWording } from "../../lib/nightLifecycle";
+import { capitalize } from "../../lib/text";
 import type { Night } from "../../lib/nights";
 import {
   formatRemindersSummary,
   reminderConfirmation,
   sameReminders,
 } from "../../lib/reminders";
-import {
-  borderWidth,
-  colors,
-  fontFamily,
-  fontSize,
-  pressedOpacity,
-  radius,
-  shadow,
-  space,
-  textPresets,
-  trackPx,
-} from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, radius, lh, space, textPresets, useColors } from "../../theme";
 
 // EditNightScreen renders the edit module (lib/nightEdit) from the home
 // Up-next card: change the date and start time, toggle who's coming, then save both in one
@@ -69,6 +59,8 @@ export function EditNightScreen({
   onSaved: () => void;
   onCancelled: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [edit, state] = useSession(() =>
     createNightEdit({ baseUrl: API_URL, groupId: GROUP_ID, night, members }),
   );
@@ -154,24 +146,21 @@ export function EditNightScreen({
             <Text style={styles.error}>{actionError}</Text>
           ) : null}
 
-          <View style={styles.heroRow}>
-            <View style={styles.heroTile}>
-              <CalendarIcon size={22} color={colors.accent.strong} strokeWidth={2} />
-            </View>
-            <View style={styles.heroText}>
-              <Text style={styles.heroDate} numberOfLines={1}>
-                {formatWeekdayDate(date)}
-              </Text>
-              <Text style={styles.heroMeta} allowFontScaling={false}>
-                {[
+          <View style={styles.hero}>
+            <Text style={styles.heroDate} numberOfLines={1}>
+              {formatWeekdayDate(date)}
+            </Text>
+            <Text style={styles.heroMeta}>
+              {capitalize(
+                [
                   wording.countdown,
                   startTime !== null ? formatStartTime(startTime) : null,
                   picker !== null ? wording.pickerTitle(firstName(picker.name)) : null,
                 ]
                   .filter((part) => part !== null)
-                  .join(" · ")}
-              </Text>
-            </View>
+                  .join(" · "),
+              )}
+            </Text>
           </View>
 
           <SectionLabel>Night settings</SectionLabel>
@@ -211,28 +200,21 @@ export function EditNightScreen({
                   style={({ pressed }) => [
                     styles.attendRow,
                     i < rows.length - 1 && styles.attendDivider,
-                    !here && styles.dimmed,
                     pressed && styles.rowPressed,
                   ]}
                 >
-                  <Avatar name={m.name} size={40} />
-                  <View style={styles.memberText}>
+                  <View style={!here && styles.avatarOut}>
+                    <Avatar name={m.name} size={32} />
+                  </View>
+                  <View style={[styles.memberText, !here && styles.textOut]}>
                     <Text style={styles.memberName} numberOfLines={1}>
                       {m.name}
                     </Text>
                     {isPicker ? (
-                      <Text style={styles.pickerHint} allowFontScaling={false}>
-                        PICKER · CHANGE THE PICKER FIRST
-                      </Text>
+                      <Text style={styles.pickerHint}>Picker · change the picker first</Text>
                     ) : null}
                   </View>
-                  {here ? (
-                    <Badge label="✓ In" tone="solid" uppercase={false} />
-                  ) : (
-                    <Text style={styles.outTag} allowFontScaling={false}>
-                      OUT
-                    </Text>
-                  )}
+                  <AttendCheck on={here} size={22} />
                 </Pressable>
               );
             })}
@@ -260,46 +242,21 @@ export function EditNightScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   flex: { flex: 1 },
   content: { paddingHorizontal: space[5], paddingTop: space[2], paddingBottom: space[6] },
   dateContent: { paddingHorizontal: space[5], paddingTop: space[4], paddingBottom: space[6] },
   error: { ...textPresets.body, color: colors.text.danger, marginBottom: space[3] },
-  heroRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space[3],
-    marginTop: space[2],
-    marginBottom: space[1],
-  },
-  heroTile: {
-    width: 46,
-    height: 46,
-    borderRadius: radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface.spotlight,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.accent.glow,
-    ...shadow.spotlight,
-  },
-  heroText: { flex: 1, minWidth: 0 },
+  hero: { marginTop: space[3], marginBottom: space[1] },
   heroDate: {
     fontFamily: fontFamily.display,
-    fontSize: 26,
-    lineHeight: 30,
-    letterSpacing: trackPx(26, "display"),
+    fontSize: 32,
+    lineHeight: 32,
+    letterSpacing: 32 * -0.04,
     color: colors.text.primary,
   },
-  heroMeta: {
-    fontFamily: fontFamily.mono,
-    fontSize: fontSize.caption,
-    color: colors.accent.strong,
-    textTransform: "uppercase",
-    letterSpacing: trackPx(fontSize.caption, "caption"),
-    marginTop: space[1],
-  },
+  heroMeta: { ...textPresets.meta, color: colors.text.secondary, marginTop: space[2] },
   card: {
     backgroundColor: colors.surface.card,
     borderRadius: radius.lg,
@@ -315,19 +272,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: space[3],
-    paddingVertical: space[3],
-    paddingHorizontal: space[2],
+    paddingVertical: 10,
   },
   attendDivider: {
     borderBottomWidth: borderWidth.hairline,
     borderBottomColor: colors.border.hairline,
   },
-  dimmed: { opacity: 0.5 },
+  avatarOut: { opacity: 0.4 },
+  textOut: { opacity: 0.5 },
   rowPressed: { opacity: pressedOpacity },
   memberText: { flex: 1 },
-  memberName: { ...textPresets.rowName, color: colors.text.primary },
-  pickerHint: { ...textPresets.tag, color: colors.text.tertiary, marginTop: space[1] },
-  outTag: { ...textPresets.tag, color: colors.text.tertiary },
+  memberName: { fontFamily: fontFamily.sansMedium, fontSize: fontSize.base, lineHeight: lh(fontSize.base, "snug"), color: colors.text.primary },
+  pickerHint: { ...textPresets.meta, fontSize: 13, color: colors.text.tertiary, marginTop: 2 },
   calendarCard: {
     padding: space[4],
     backgroundColor: colors.surface.card,
@@ -336,4 +292,4 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
   },
   cancelWrap: { alignItems: "center" },
-});
+}));

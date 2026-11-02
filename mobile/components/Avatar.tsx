@@ -1,20 +1,15 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
-import { borderWidth, colors, fontFamily, radius, shadow } from "../theme";
-import { avatarTint, initials } from "../lib/avatar";
+import { createThemedStyles, fontFamily, radius, useColors } from "../theme";
+import { initials, signatureColor } from "../lib/avatar";
 
-// Avatar is a deterministic initials chip (no photos): the name hashes to one of the
-// logo-ring jewel tints. `glow` gives it the ember "next up" ring used on the picker.
-export function Avatar({
-  name,
-  size = 40,
-  glow = false,
-}: {
-  name: string;
-  size?: number;
-  glow?: boolean;
-}) {
-  const tint = avatarTint(name);
+// Avatar is a deterministic initials chip (no photos) on the member's signature
+// colour, hashed from the name. It never marks the picker: no ring, glow or
+// accent. That's the job of the picker's name and the Next up badge.
+export function Avatar({ name, size = 40 }: { name: string; size?: number }) {
+  const styles = useStyles();
+  const colors = useColors();
+  const fontSize = Math.round(size * 0.36);
   return (
     <View
       style={[
@@ -22,14 +17,12 @@ export function Avatar({
         {
           width: size,
           height: size,
-          borderRadius: radius.full,
-          backgroundColor: tint,
+          backgroundColor: signatureColor(name, colors.sig),
         },
-        glow && styles.glow,
       ]}
     >
       <Text
-        style={[styles.label, { fontSize: Math.round(size * 0.42) }]}
+        style={[styles.label, { fontSize, letterSpacing: fontSize * -0.01 }]}
         numberOfLines={1}
         allowFontScaling={false}
       >
@@ -39,15 +32,14 @@ export function Avatar({
   );
 }
 
-const styles = StyleSheet.create({
-  base: { alignItems: "center", justifyContent: "center" },
-  glow: {
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.accent.base,
-    ...shadow.spotlight,
+const useStyles = createThemedStyles((colors) => ({
+  base: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.full,
   },
   label: {
     fontFamily: fontFamily.sansBold,
-    color: colors.text.onAccent, // deep-night ink reads on every jewel tint
+    color: colors.text.onSig,
   },
-});
+}));

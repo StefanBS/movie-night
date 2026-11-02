@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { AppButton, Calendar } from "../";
 import { StartTimeRow } from "./StartTimeRow";
@@ -8,20 +8,11 @@ import { WizardFooter } from "./WizardFooter";
 import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
 import { relativeLabel } from "../../lib/date";
 import { nightWording } from "../../lib/nightLifecycle";
-import {
-  borderWidth,
-  colors,
-  fontFamily,
-  fontSize,
-  pressedOpacity,
-  radius,
-  space,
-  textPresets,
-} from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, radius, space, textPresets } from "../../theme";
 
 // WhenStep is the wizard's first step: a "Tonight" chip + the Calendar and an
 // optional start time, with a sticky footer that names the plan
-// (PLANNING/TONIGHT/RECORDING) and its relative date. It owns its own selection/month —
+// (Planning/Tonight/Recording) and its relative date. It owns its own selection/month —
 // it reports the chosen date and start time on "Next". `initial` and
 // `initialStartTime` restore them when the user comes back.
 export function WhenStep({
@@ -39,6 +30,7 @@ export function WhenStep({
   busy: string | null;
   onNext: (iso: string, startTime: string | null) => void;
 }) {
+  const styles = useStyles();
   const [selected, setSelected] = useState(initial);
   const [startTime, setStartTime] = useState(initialStartTime);
   const [month, setMonth] = useState<YearMonth>(() => yearMonthOf(initial));
@@ -103,7 +95,7 @@ export function WhenStep({
           </Text>
         </View>
         <AppButton
-          title="Next: who's coming  →"
+          title="Next: who's coming →"
           fullWidth
           disabled={busy !== null}
           onPress={() => onNext(selected, startTime)}
@@ -113,22 +105,18 @@ export function WhenStep({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   flex: { flex: 1 },
   content: { paddingHorizontal: space[5], paddingTop: space[3], paddingBottom: space[6] },
   heading: { ...textPresets.screenTitle, color: colors.text.primary, marginTop: space[4] },
   hint: { ...textPresets.meta, color: colors.text.secondary, marginTop: space[2] },
   chips: { flexDirection: "row", gap: space[2], marginTop: space[4] },
   chip: { paddingVertical: space[2], paddingHorizontal: space[4], borderRadius: radius.full },
-  chipOn: { backgroundColor: colors.accent.base },
-  chipOff: {
-    backgroundColor: colors.surface.card,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
-  },
+  chipOn: { backgroundColor: colors.text.primary },
+  chipOff: { backgroundColor: colors.surface.subtle },
   chipPressed: { opacity: pressedOpacity },
-  chipText: { fontFamily: fontFamily.sansSemibold, fontSize: fontSize.sm, color: colors.text.secondary },
-  chipTextOn: { color: colors.text.onAccent },
+  chipText: { fontFamily: fontFamily.sansSemibold, fontSize: fontSize.sm, color: colors.text.primary },
+  chipTextOn: { color: colors.surface.page },
   calendarCard: {
     marginTop: space[4],
     padding: space[4],
@@ -146,6 +134,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   footerMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  planTag: { ...textPresets.tag, color: colors.text.tertiary },
-  relLabel: { fontFamily: fontFamily.sansSemibold, fontSize: fontSize.sm, color: colors.accent.strong },
-});
+  planTag: { ...textPresets.meta, color: colors.text.secondary },
+  relLabel: { ...textPresets.meta, fontFamily: fontFamily.sansBold, color: colors.text.primary },
+}));

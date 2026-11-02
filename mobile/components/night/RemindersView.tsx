@@ -1,22 +1,12 @@
 import { type ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { BellRing, Check, Clock, Moon, Sunrise } from "lucide-react-native";
 
-import { AppButton, SectionLabel, Toggle, TopBar } from "../";
+import { AppButton, Banner, SectionLabel, Toggle, TopBar } from "../";
 import { WizardFooter } from "./WizardFooter";
 import { formatStartTime, startTimeMinus } from "../../lib/date";
 import type { ReminderAudience, Reminders } from "../../lib/reminders";
-import {
-  borderWidth,
-  colors,
-  fontFamily,
-  fontSize,
-  pressedOpacity,
-  radius,
-  space,
-  textPresets,
-  trackPx,
-} from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, radius, space, tabular, textPresets, trackPx, useColors } from "../../theme";
 
 const AUDIENCES: { id: ReminderAudience; label: string; note: string }[] = [
   { id: "everyone", label: "Everyone coming", note: "The whole group" },
@@ -38,6 +28,8 @@ export function RemindersView({
   onChange: (next: Reminders) => void;
   onDone: () => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <View style={styles.screen}>
       <TopBar kind="title" title="Reminders" back={{ label: "Edit", onPress: onDone }} />
@@ -97,7 +89,7 @@ export function RemindersView({
                 >
                   <View style={styles.audienceHead}>
                     <Text style={styles.audienceLabel}>{a.label}</Text>
-                    {selected ? <Check size={16} color={colors.accent.strong} strokeWidth={2.5} /> : null}
+                    {selected ? <Check size={16} color={colors.text.primary} strokeWidth={2.5} /> : null}
                   </View>
                   <Text style={styles.audienceNote} allowFontScaling={false}>
                     {a.note}
@@ -108,11 +100,9 @@ export function RemindersView({
           </View>
 
           <View style={styles.note}>
-            <BellRing size={17} color={colors.accent.strong} />
-            <Text style={styles.noteText}>
-              The picker always gets a personal “it&apos;s your turn” nudge the night before, even if
-              reminders are off for everyone else.
-            </Text>
+            <Banner icon={<BellRing size={17} color={colors.text.secondary} />}>
+              {"The picker always gets a personal “it's your turn” nudge the night before, even if reminders are off for everyone else."}
+            </Banner>
           </View>
         </ScrollView>
         <WizardFooter>
@@ -140,6 +130,7 @@ function SlotRow({
   divider?: boolean;
   disabled?: boolean;
 }) {
+  const styles = useStyles();
   return (
     <View style={[styles.slot, divider && styles.divider]}>
       {icon}
@@ -154,7 +145,7 @@ function SlotRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   flex: { flex: 1 },
   content: { paddingHorizontal: space[5], paddingTop: space[2], paddingBottom: space[6] },
@@ -177,7 +168,8 @@ const styles = StyleSheet.create({
   slotText: { flex: 1 },
   slotLabel: { ...textPresets.body, color: colors.text.primary },
   slotTime: {
-    fontFamily: fontFamily.mono,
+    fontFamily: fontFamily.sans,
+    ...tabular,
     fontSize: fontSize.caption,
     color: colors.text.tertiary,
     letterSpacing: trackPx(fontSize.caption, "normal"),
@@ -193,29 +185,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border.hairline,
   },
   audienceSelected: {
-    backgroundColor: colors.surface.spotlight,
-    borderWidth: borderWidth.regular,
-    borderColor: colors.accent.base,
+    borderWidth: borderWidth.ring,
+    borderColor: colors.text.primary,
   },
   pressed: { opacity: pressedOpacity },
   audienceHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   audienceLabel: { ...textPresets.body, fontFamily: fontFamily.sansSemibold, color: colors.text.primary },
   audienceNote: {
-    fontFamily: fontFamily.mono,
+    fontFamily: fontFamily.sans,
+    ...tabular,
     fontSize: fontSize.caption,
     color: colors.text.secondary,
     marginTop: space[2],
   },
-  note: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: space[3],
-    marginTop: space[5],
-    padding: space[4],
-    borderRadius: radius.md,
-    backgroundColor: colors.surface.subtle,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
-  },
-  noteText: { ...textPresets.meta, color: colors.text.secondary, flex: 1 },
-});
+  note: { marginTop: space[5] },
+}));

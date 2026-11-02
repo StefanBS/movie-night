@@ -1,13 +1,13 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
+import { ActivityIndicator, Text, View } from "react-native";
 import { Settings } from "lucide-react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 
 import {
   AppButton,
-  Avatar,
   IconButton,
+  MemberRow,
+  PickerHero,
   SectionLabel,
   TabScrollView,
   TopBar,
@@ -18,89 +18,26 @@ import { firstName } from "../../lib/avatar";
 import { GROUP_ID } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import { fetchGroup } from "../../lib/group";
-import { fetchTurn, pickerMeta, picksLabel, type TurnMember } from "../../lib/turn";
+import { fetchTurn, pickerSummary, picksLabel, type TurnMember } from "../../lib/turn";
 import { listNights, type Night } from "../../lib/nights";
 import { upNext } from "../../lib/nightLifecycle";
 import { todayLocalISO } from "../../lib/date";
-import {
-  borderWidth,
-  colors,
-  fontFamily,
-  fontSize,
-  radius,
-  shadow,
-  space,
-  textPresets,
-} from "../../theme";
+import { createThemedStyles, space, textPresets, useColors } from "../../theme";
 
-const AVATAR = 64; // hero avatar diameter
-const HALO = 96; // radial bloom box behind the hero avatar
-const HALO_OFFSET = (AVATAR - HALO) / 2; // center the halo on the avatar
-
-// SpotlightHero is the rationed-ember card — the one place ember means "whose
-// turn it is". Both glows are react-native-svg RadialGradients: a top wash on
-// the card and a circular halo behind the 64px avatar (the "bonfire halo").
-function SpotlightHero({ member }: { member: TurnMember }) {
-  return (
-    <View style={styles.hero}>
-      <Svg style={[StyleSheet.absoluteFill, styles.noPointer]}>
-        <Defs>
-          <RadialGradient id="heroWash" cx="50%" cy="0%" rx="80%" ry="60%">
-            <Stop offset="0" stopColor={colors.accent.base} stopOpacity={0.26} />
-            <Stop offset="1" stopColor={colors.accent.base} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#heroWash)" />
-      </Svg>
-
-      <Text style={styles.nextUp} allowFontScaling={false}>
-        {"✦ Next up"}
-      </Text>
-
-      <View style={styles.avatarWrap}>
-        <Svg width={HALO} height={HALO} style={[styles.halo, styles.noPointer]}>
-          <Defs>
-            <RadialGradient id="avatarHalo" cx="50%" cy="50%" rx="50%" ry="50%">
-              <Stop offset="0" stopColor={colors.accent.base} stopOpacity={0.45} />
-              <Stop offset="1" stopColor={colors.accent.base} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Rect x="0" y="0" width={HALO} height={HALO} fill="url(#avatarHalo)" />
-        </Svg>
-        <Avatar name={member.name} size={AVATAR} glow />
-      </View>
-
-      <Text style={styles.heroName} numberOfLines={1}>
-        {member.name}
-      </Text>
-      <Text style={styles.heroMeta}>{pickerMeta(member)}</Text>
-    </View>
-  );
-}
-
-// OnDeck lists the next members after the picker (turn elements 1–3). Ranks are
-// offset by 2 because the picker is rank 1 and lives in the hero above.
-function OnDeck({ members }: { members: TurnMember[] }) {
+// OnDeck lists the next members after the picker (turn elements 1–3) as flush
+// rows with their pick counts.
+function OnDeck({ label, members }: { label: string; members: TurnMember[] }) {
   return (
     <>
-      <SectionLabel>On deck</SectionLabel>
+      <SectionLabel>{label}</SectionLabel>
       <View>
         {members.map((m, i) => (
-          <View
+          <MemberRow
             key={m.id}
-            style={[styles.deckRow, i < members.length - 1 && styles.deckDivider]}
-          >
-            <Text style={styles.deckRank} allowFontScaling={false}>
-              {i + 2}
-            </Text>
-            <Avatar name={m.name} size={32} />
-            <Text style={styles.deckName} numberOfLines={1}>
-              {m.name}
-            </Text>
-            <Text style={styles.deckPicks} allowFontScaling={false}>
-              {picksLabel(m.servedCount)}
-            </Text>
-          </View>
+            name={m.name}
+            right={picksLabel(m.servedCount)}
+            divider={i < members.length - 1}
+          />
         ))}
       </View>
     </>
@@ -108,6 +45,8 @@ function OnDeck({ members }: { members: TurnMember[] }) {
 }
 
 export default function TonightScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const [order, setOrder] = useState<TurnMember[]>([]);
   const [nights, setNights] = useState<Night[]>([]);
@@ -168,10 +107,10 @@ export default function TonightScreen() {
 
   const gear = (
     <IconButton
-      icon={<Settings size={22} color={colors.text.secondary} strokeWidth={2} />}
+      icon={<Settings size={19} color={colors.text.secondary} strokeWidth={2} />}
       onPress={() => router.navigate("/settings")}
       accessibilityLabel="Settings"
-      variant="ghost"
+      filled
     />
   );
 
@@ -200,7 +139,7 @@ export default function TonightScreen() {
         <ActivityIndicator
           style={styles.center}
           size="large"
-          color={colors.accent.base}
+          color={colors.text.secondary}
         />
       ) : error !== null ? (
         <Text style={[styles.center, styles.error]}>
@@ -220,37 +159,43 @@ export default function TonightScreen() {
                 onStart={openScheduled}
                 onEdit={openEdit}
               />
-              {onDeck.length > 0 ? <OnDeck members={onDeck} /> : null}
-              <View style={styles.rotationRow}>
+              {onDeck.length > 0 ? <OnDeck label="Then" members={onDeck} /> : null}
+              <View style={styles.linkRow}>
                 <AppButton
-                  title="Plan another night  →"
+                  title="Plan another night →"
                   variant="ghost"
+                  size="sm"
+                  strong
                   onPress={() => router.navigate("/night/new")}
                 />
               </View>
             </>
           ) : (
             <>
-              <SpotlightHero member={picker} />
-              <View style={styles.planRow}>
+              <View style={styles.hero}>
+                <PickerHero name={picker.name} meta="Next up · no night planned yet" />
+                <Text style={styles.heroSummary}>{pickerSummary(picker)}</Text>
+              </View>
+              <View style={styles.actions}>
                 <AppButton
-                  title="Plan a night  →"
-                  fullWidth
+                  title="Plan a night"
                   onPress={() => router.navigate("/night/new")}
                 />
-              </View>
-              <View style={styles.skipRow}>
                 <AppButton
-                  title={`${pickerFirstName} can't make it — skip turn`}
+                  title={`${pickerFirstName} can't make it`}
                   variant="ghost"
                   onPress={() => {}}
                 />
               </View>
-              {onDeck.length > 0 ? <OnDeck members={onDeck} /> : null}
-              <View style={styles.rotationRow}>
+              {onDeck.length > 0 ? (
+                <OnDeck label={`After ${pickerFirstName}`} members={onDeck} />
+              ) : null}
+              <View style={styles.linkRow}>
                 <AppButton
-                  title="See full rotation  →"
+                  title="See full rotation →"
                   variant="ghost"
+                  size="sm"
+                  strong
                   onPress={() => router.navigate("/rotation")}
                 />
               </View>
@@ -262,7 +207,7 @@ export default function TonightScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
   center: { marginTop: space[8], textAlign: "center" },
@@ -272,62 +217,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: space[5],
     paddingTop: space[4],
   },
-  planRow: { marginTop: space[5] },
-  skipRow: { marginTop: space[3], marginBottom: space[5] },
-  rotationRow: { marginTop: space[5] },
-  // The ember spotlight card — surface.dark + the bonfire halo shadow.
-  hero: {
-    borderRadius: radius.xl,
-    paddingTop: space[6],
-    paddingBottom: space[5],
-    paddingHorizontal: space[5],
-    backgroundColor: colors.surface.dark,
-    alignItems: "center",
-    overflow: "hidden",
-    ...shadow.spotlight,
-  },
-  nextUp: { ...textPresets.tag, color: colors.accent.strong },
-  avatarWrap: {
+  hero: { marginTop: space[6] },
+  heroSummary: {
+    ...textPresets.body,
+    color: colors.text.secondary,
     marginTop: space[4],
-    width: AVATAR,
-    height: AVATAR,
-    alignItems: "center",
-    justifyContent: "center",
+    maxWidth: 290,
   },
-  halo: { position: "absolute", top: HALO_OFFSET, left: HALO_OFFSET },
-  noPointer: { pointerEvents: "none" },
-  heroName: {
-    ...textPresets.screenTitle,
-    color: colors.text.primary,
-    marginTop: space[3],
-    textAlign: "center",
-  },
-  heroMeta: {
-    fontFamily: fontFamily.mono,
-    fontSize: fontSize.caption,
-    color: colors.text.tertiary,
-    marginTop: space[2],
-  },
-  deckRow: {
+  actions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: space[3],
-    paddingVertical: space[3],
+    flexWrap: "wrap",
+    gap: space[2],
+    marginTop: space[6],
+    marginBottom: space[3],
   },
-  deckDivider: {
-    borderBottomWidth: borderWidth.hairline,
-    borderBottomColor: colors.border.hairline,
-  },
-  deckRank: {
-    fontFamily: fontFamily.mono,
-    fontSize: fontSize.caption,
-    color: colors.text.tertiary,
-    width: 16,
-  },
-  deckName: { ...textPresets.rowName, color: colors.text.primary, flex: 1 },
-  deckPicks: {
-    fontFamily: fontFamily.mono,
-    fontSize: fontSize.caption,
-    color: colors.text.tertiary,
-  },
-});
+  linkRow: { marginTop: space[2], alignItems: "flex-start" },
+}));

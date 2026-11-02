@@ -1,18 +1,18 @@
 import { useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Film } from "lucide-react-native";
 
-import { borderWidth, colors, fontFamily, radius, trackPx } from "../theme";
+import { createThemedStyles, fontFamily, radius, space, tabular } from "../theme";
 
-// Poster shows a real TMDB image when given a `uri`, and otherwise (or while loading /
-// on error) the offline hue-per-title gradient tile from the prototype. `hue` is a
-// stable 0–360 derived from the title by the caller.
+// Poster shows a real TMDB image when given a `uri`, untreated at 2:3, and
+// otherwise (or on error) the hue-per-title gradient tile. The tile is always
+// dark, whatever the theme; from 104px tall it carries the title in Newsreader
+// Italic. `hue` is a stable 0–360 derived from the title by the caller.
 export function Poster({
   uri,
   title = "—",
   year,
-  hue = 250,
+  hue = 30,
   w = 56,
   h = 84,
 }: {
@@ -23,6 +23,7 @@ export function Poster({
   w?: number;
   h?: number;
 }) {
+  const styles = useStyles();
   const [failed, setFailed] = useState(false);
   const showImage = !!uri && !failed;
   const withTitle = h >= 104;
@@ -38,10 +39,11 @@ export function Poster({
         />
       ) : (
         <>
+          {/* 160deg, as in the DS */}
           <LinearGradient
-            colors={[`hsl(${hue} 42% 17%)`, `hsl(${hue} 48% 8%)`]}
-            start={{ x: 0.2, y: 0 }}
-            end={{ x: 0.8, y: 1 }}
+            colors={[`hsl(${hue} 30% 26%)`, `hsl(${hue} 34% 12%)`]}
+            start={{ x: 0.33, y: 0 }}
+            end={{ x: 0.67, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
           {withTitle ? (
@@ -51,46 +53,33 @@ export function Poster({
               </Text>
               {year ? <Text style={styles.year}>{year}</Text> : null}
             </View>
-          ) : (
-            <View style={styles.center}>
-              <Film size={16} color="rgba(241,238,250,0.4)" />
-            </View>
-          )}
+          ) : null}
         </>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   base: {
     borderRadius: radius.sm,
     overflow: "hidden",
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
-    backgroundColor: colors.surface.card,
+    backgroundColor: colors.surface.dark,
+    // A faint inner edge so a fallback tile doesn't melt into a dark page.
+    boxShadow: `inset 0 0 0 1px ${colors.border.hairline}`,
   },
-  center: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  caption: { position: "absolute", left: 0, right: 0, bottom: 0, padding: 9 },
+  caption: { position: "absolute", left: 10, right: 10, bottom: 10 },
   title: {
-    fontFamily: fontFamily.display,
+    fontFamily: fontFamily.serifItalic,
     fontSize: 16,
-    lineHeight: 17,
-    color: colors.text.primary,
-    letterSpacing: trackPx(16, "display"),
+    lineHeight: Math.round(16 * 1.1),
+    color: colors.text.onDark,
   },
   year: {
-    fontFamily: fontFamily.mono,
-    fontSize: 10,
-    color: colors.text.secondary,
-    marginTop: 3,
+    fontFamily: fontFamily.sans,
+    ...tabular,
+    fontSize: 11,
+    color: colors.text.onDarkSecondary,
+    marginTop: space[1],
   },
-});
+}));

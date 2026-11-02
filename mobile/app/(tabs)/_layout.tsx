@@ -14,7 +14,7 @@ import {
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { borderWidth, colors, fontFamily, space, textPresets } from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, space, textPresets, useColors, useScheme } from "../../theme";
 
 type IconProps = { size: number; color: string; strokeWidth?: number };
 
@@ -27,6 +27,9 @@ const TABS: { name: string; label: string; Icon: ComponentType<IconProps> }[] = 
 ];
 
 function SpotlightTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
+  const colors = useColors();
+  const scheme = useScheme();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   // The bar is absolutely positioned, so it overlays screen content. Report its
   // real measured height up the tree so screens can read useBottomTabBarHeight()
@@ -38,14 +41,14 @@ function SpotlightTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
       style={[styles.bar, { paddingBottom: insets.bottom + space[2] }]}
       onLayout={(e) => onHeightChange?.(e.nativeEvent.layout.height)}
     >
-      <BlurView intensity={24} tint="dark" style={StyleSheet.absoluteFill} />
+      <BlurView intensity={24} tint={scheme} style={StyleSheet.absoluteFill} />
       <View style={styles.tint} />
       <View accessibilityRole="tablist" style={styles.items}>
         {state.routes.map((route, index) => {
           const tab = TABS.find((t) => t.name === route.name);
           if (!tab) return null;
           const focused = state.index === index;
-          const color = focused ? colors.accent.strong : colors.text.tertiary;
+          const color = focused ? colors.text.primary : colors.text.tertiary;
           const onPress = () => {
             const event = emitter.emit({
               type: "tabPress",
@@ -94,7 +97,7 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   bar: {
     position: "absolute",
     left: 0,
@@ -114,4 +117,4 @@ const styles = StyleSheet.create({
   item: { alignItems: "center", gap: space[1], width: 64 },
   label: { ...textPresets.tabLabel },
   labelActive: { fontFamily: fontFamily.sansBold },
-});
+}));

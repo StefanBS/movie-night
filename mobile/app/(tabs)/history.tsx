@@ -2,7 +2,6 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -23,18 +22,11 @@ import { errorMessage } from "../../lib/errors";
 import { buildHistoryMonths, historyStats } from "../../lib/history";
 import { historyNights } from "../../lib/nightLifecycle";
 import { listNights, type Night } from "../../lib/nights";
-import {
-  borderWidth,
-  colors,
-  fontFamily,
-  fontSize,
-  pressedOpacity,
-  radius,
-  space,
-  textPresets,
-} from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, radius, space, tabular, textPresets, useColors } from "../../theme";
 
 export default function HistoryScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const [nights, setNights] = useState<Night[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +62,7 @@ export default function HistoryScreen() {
         <ActivityIndicator
           style={styles.center}
           size="large"
-          color={colors.accent.base}
+          color={colors.text.secondary}
         />
       </View>
     );
@@ -158,7 +150,7 @@ export default function HistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
   empty: { ...textPresets.body, color: colors.text.secondary },
@@ -195,15 +187,16 @@ const styles = StyleSheet.create({
   rowPressed: { opacity: pressedOpacity },
   rowText: { flex: 1 },
   rowTitle: {
-    fontFamily: fontFamily.display,
+    fontFamily: fontFamily.serifItalic,
     fontSize: 20,
     lineHeight: 22,
     color: colors.text.primary,
   },
   rowMeta: {
-    fontFamily: fontFamily.mono,
+    fontFamily: fontFamily.sans,
+    ...tabular,
     fontSize: fontSize.caption,
     color: colors.text.tertiary,
     marginTop: space[1],
   },
-});
+}));

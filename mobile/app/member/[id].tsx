@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
 import { AppButton, Avatar, Badge, SectionLabel, Stat, TopBar } from "../../components";
@@ -17,13 +17,7 @@ import {
 import { fetchTurn } from "../../lib/turn";
 import { memberProfile, type MemberProfile } from "../../lib/club";
 import { formatMonthYear, formatShortDate } from "../../lib/date";
-import {
-  borderWidth,
-  colors,
-  radius,
-  space,
-  textPresets,
-} from "../../theme";
+import { borderWidth, createThemedStyles, radius, space, textPresets, useColors } from "../../theme";
 
 const ACTION_LABEL: Record<MemberAction, string> = {
   deactivate: "Deactivate",
@@ -32,6 +26,7 @@ const ACTION_LABEL: Record<MemberAction, string> = {
 };
 
 function StatsCard({ profile }: { profile: MemberProfile }) {
+  const styles = useStyles();
   const t = profile.turn;
   const picks = t ? String(t.servedCount) : "—";
   const last = t && t.lastPickedOn ? formatShortDate(t.lastPickedOn) : "—";
@@ -54,6 +49,8 @@ function StatsCard({ profile }: { profile: MemberProfile }) {
 }
 
 export default function MemberProfileScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [profile, setProfile] = useState<MemberProfile | null>(null);
@@ -104,7 +101,7 @@ export default function MemberProfileScreen() {
     <View style={styles.screen}>
       <TopBar kind="title" title="" back={back} />
       {loading ? (
-        <ActivityIndicator style={styles.center} size="large" color={colors.accent.base} />
+        <ActivityIndicator style={styles.center} size="large" color={colors.text.secondary} />
       ) : error !== null ? (
         <Text style={[styles.center, styles.error]}>{`Couldn't load the member: ${error}`}</Text>
       ) : member === undefined || profile === null ? (
@@ -151,7 +148,7 @@ export default function MemberProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   center: { flex: 1, textAlignVertical: "center" },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
@@ -189,4 +186,4 @@ const styles = StyleSheet.create({
   },
   empty: { ...textPresets.body, color: colors.text.secondary },
   error: { ...textPresets.body, color: colors.text.danger, textAlign: "center", paddingHorizontal: space[5] },
-});
+}));

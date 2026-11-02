@@ -75,7 +75,7 @@ export function picksLabel(n: number): string {
   return `${n} pick${n === 1 ? "" : "s"}`;
 }
 
-// pickerMeta is the spotlight hero's mono meta line. A member who has never
+// pickerMeta is the meta line under a member's name in the rotation rows. A member who has never
 // picked (servedCount 0, or no recorded date) shows the first-turn copy;
 // otherwise their pick count and the short date of their last pick.
 export function pickerMeta(member: TurnMember): string {
@@ -83,4 +83,14 @@ export function pickerMeta(member: TurnMember): string {
     return "First turn · hasn't picked yet";
   }
   return `${picksLabel(member.servedCount)} · last ${formatShortDate(member.lastPickedOn)}`;
+}
+
+// pickerSummary is the sentence under the picker's name on Tonight. A member
+// who has never picked (servedCount 0, or no recorded date) gets the
+// first-turn line; otherwise their pick count and the date of their last pick.
+export function pickerSummary(member: TurnMember): string {
+  if (member.servedCount === 0 || member.lastPickedOn === null) {
+    return "Their first turn. Whatever they choose, we watch.";
+  }
+  return `${picksLabel(member.servedCount)} so far, last on ${formatShortDate(member.lastPickedOn)}.`;
 }

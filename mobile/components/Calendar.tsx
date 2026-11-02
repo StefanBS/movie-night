@@ -1,20 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
 
 import { IconButton } from "./IconButton";
 import { dayState, monthGrid, type YearMonth } from "../lib/calendar";
 import { formatWeekdayDate } from "../lib/date";
-import {
-  borderWidth,
-  colors,
-  fontFamily,
-  fontSize,
-  pressedOpacity,
-  radius,
-  shadow,
-  space,
-  textPresets,
-} from "../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, radius, space, tabular, textPresets, useColors } from "../theme";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -22,7 +12,8 @@ const MONTH_NAMES = [
 ];
 const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"];
 
-// Calendar is the bonfire-styled month date picker. It is purely presentational:
+// Calendar is the month date picker: the selected day is an accent disc, today
+// a text-colour ring, a day with a night gets a dot, past days dim. It is purely presentational:
 // it computes its cells from `month` via monthGrid, classifies each day with
 // dayState, and reports taps. The owner holds `value` (selected ISO) and `month`.
 export function Calendar({
@@ -40,23 +31,30 @@ export function Calendar({
   onPick: (iso: string) => void;
   onMonth: (dir: -1 | 1) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const cells = monthGrid(month.year, month.month);
   return (
     <View>
       <View style={styles.header}>
         <Text style={styles.monthName} allowFontScaling={false}>
-          {`${MONTH_NAMES[month.month - 1]} ${month.year}`}
+          {`${MONTH_NAMES[month.month - 1]} `}
+          <Text style={styles.year}>{month.year}</Text>
         </Text>
         <View style={styles.chevrons}>
           <IconButton
-            icon={<ChevronLeft size={17} color={colors.text.secondary} />}
+            icon={<ChevronLeft size={18} color={colors.text.primary} strokeWidth={2.2} />}
             onPress={() => onMonth(-1)}
             accessibilityLabel="Previous month"
+            size="sm"
+            filled
           />
           <IconButton
-            icon={<ChevronRight size={17} color={colors.text.secondary} />}
+            icon={<ChevronRight size={18} color={colors.text.primary} strokeWidth={2.2} />}
             onPress={() => onMonth(1)}
             accessibilityLabel="Next month"
+            size="sm"
+            filled
           />
         </View>
       </View>
@@ -95,6 +93,7 @@ export function Calendar({
                   style={[
                     styles.dayText,
                     state.past && !state.selected && styles.pastText,
+                    state.today && styles.todayText,
                     state.selected && styles.selectedText,
                   ]}
                   allowFontScaling={false}
@@ -113,44 +112,41 @@ export function Calendar({
 
 const COLUMN = "14.2857%"; // 100% / 7
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: space[3],
+    marginBottom: space[4],
   },
-  monthName: { ...textPresets.barTitle, color: colors.text.primary },
+  monthName: { ...textPresets.sectionHeading, color: colors.text.primary },
+  year: { fontFamily: fontFamily.sansSemibold, color: colors.text.tertiary },
   chevrons: { flexDirection: "row", gap: space[2] },
-  weekdays: { flexDirection: "row", marginBottom: space[1] },
+  weekdays: { flexDirection: "row" },
   weekday: {
     width: COLUMN,
     textAlign: "center",
-    fontFamily: fontFamily.monoBold,
+    fontFamily: fontFamily.sansSemibold,
     fontSize: fontSize.caption,
     color: colors.text.tertiary,
+    paddingBottom: 6,
   },
-  grid: { flexDirection: "row", flexWrap: "wrap" },
-  cell: { width: COLUMN, alignItems: "center", paddingVertical: space[1] },
+  grid: { flexDirection: "row", flexWrap: "wrap", rowGap: 2 },
+  cell: { width: COLUMN, alignItems: "center", gap: 3, paddingVertical: 3 },
   pressed: { opacity: pressedOpacity },
   circle: {
-    width: 34,
-    height: 34,
+    width: 38,
+    height: 38,
     borderRadius: radius.full,
     alignItems: "center",
     justifyContent: "center",
   },
-  todayRing: { borderWidth: borderWidth.regular, borderColor: colors.accent.strong },
-  selectedCircle: { backgroundColor: colors.accent.base, ...shadow.spotlight },
-  dayText: { fontFamily: fontFamily.sans, fontSize: fontSize.base, color: colors.text.primary },
+  todayRing: { boxShadow: `inset 0 0 0 ${borderWidth.regular}px ${colors.text.primary}` },
+  selectedCircle: { backgroundColor: colors.accent.base },
+  dayText: { fontFamily: fontFamily.sans, ...tabular, fontSize: fontSize.base, color: colors.text.primary },
   pastText: { color: colors.text.tertiary },
+  todayText: { fontFamily: fontFamily.sansBold },
   selectedText: { fontFamily: fontFamily.sansBold, color: colors.text.onAccent },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: radius.full,
-    marginTop: space[1],
-    backgroundColor: "transparent",
-  },
-  dotOn: { backgroundColor: colors.accent.strong },
-});
+  dot: { width: 4, height: 4, borderRadius: radius.full },
+  dotOn: { backgroundColor: colors.text.primary },
+}));

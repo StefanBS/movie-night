@@ -1,26 +1,18 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import { colors, fontFamily, fontSize, radius, space, trackPx } from "../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, radius, tabular, trackPx } from "../theme";
 
-type Tone = "solid" | "ember" | "neutral" | "muted" | "danger";
+type Tone = "solid" | "accent" | "neutral" | "muted" | "danger";
 
-// Badge is the mono ticket-stub status tag (NEXT UP, CORE, RECORDED ✓, Guest, OUT).
-// Uppercase mono is the app's only uppercase. `solid` is the filled ember pill.
-export function Badge({
-  label,
-  tone = "ember",
-  uppercase = true,
-}: {
-  label: string;
-  tone?: Tone;
-  uppercase?: boolean;
-}) {
+// Badge is the small sentence-case status pill (Next up, Recorded ✓, Guest).
+// `solid` is the filled accent pill, for the picker only; `accent` is the
+// tinted one. Never uppercase.
+export function Badge({ label, tone = "accent" }: { label: string; tone?: Tone }) {
+  const tones = useTones();
+  const texts = useTexts();
   return (
-    <View style={[styles.base, fills[tone]]}>
-      <Text
-        style={[styles.label, texts[tone], uppercase && styles.uppercase]}
-        allowFontScaling={false}
-      >
+    <View style={[styles.base, tones[tone]]}>
+      <Text style={[styles.label, texts[tone]]} allowFontScaling={false} numberOfLines={1}>
         {label}
       </Text>
     </View>
@@ -30,30 +22,36 @@ export function Badge({
 const styles = StyleSheet.create({
   base: {
     alignSelf: "flex-start",
-    paddingHorizontal: space[2],
-    paddingVertical: space[1],
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: radius.full,
+    borderWidth: borderWidth.hairline,
+    borderColor: "transparent",
   },
   label: {
-    fontFamily: fontFamily.monoBold,
+    fontFamily: fontFamily.sansBold,
+    ...tabular,
     fontSize: fontSize.caption,
+    lineHeight: Math.round(fontSize.caption * 1.2),
     letterSpacing: trackPx(fontSize.caption, "caption"),
   },
-  uppercase: { textTransform: "uppercase" },
 });
 
-const fills = StyleSheet.create({
+const useTones = createThemedStyles((colors) => ({
   solid: { backgroundColor: colors.accent.base },
-  ember: { backgroundColor: colors.surface.spotlight },
+  accent: { backgroundColor: colors.surface.spotlight },
   neutral: { backgroundColor: colors.surface.subtle },
-  muted: { backgroundColor: "transparent" },
+  muted: { borderColor: colors.border.hairline },
   danger: { backgroundColor: colors.surface.danger },
-});
+}));
 
-const texts = StyleSheet.create({
+const useTexts = createThemedStyles((colors) => ({
   solid: { color: colors.text.onAccent },
-  ember: { color: colors.accent.strong },
+  accent: { color: colors.accent.strong },
   neutral: { color: colors.text.secondary },
   muted: { color: colors.text.tertiary },
-  danger: { color: colors.feedback.danger },
-});
+  danger: { color: colors.text.danger },
+}));

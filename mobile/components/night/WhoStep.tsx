@@ -1,13 +1,14 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 
 import { AppButton, Avatar, Badge, SectionLabel } from "../";
+import { AttendCheck } from "./AttendCheck";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
 import { firstName } from "../../lib/avatar";
 import { formatWeekdayDate, relativeLabel } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import { nightWording } from "../../lib/nightLifecycle";
-import { borderWidth, colors, pressedOpacity, radius, shadow, space, textPresets } from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, pressedOpacity, space, textPresets, trackPx } from "../../theme";
 
 // WhoStep — attendance toggles for the full roster, for a plan that is not yet
 // a Night (ADR-0008). The picker (pickerId — next up among those in, unless the
@@ -34,6 +35,7 @@ export function WhoStep({
   onChoosePicker: (memberId: string) => void;
   onNext: () => void;
 }) {
+  const styles = useStyles();
   const wording = nightWording(scheduledFor, today);
   const picker = members.find((m) => m.id === pickerId) ?? null;
   return (
@@ -44,14 +46,14 @@ export function WhoStep({
           <Text style={styles.heading} numberOfLines={1}>
             {formatWeekdayDate(scheduledFor)}
           </Text>
-          <Badge label={relativeLabel(scheduledFor, today)} uppercase={false} />
+          <Badge label={relativeLabel(scheduledFor, today)} tone="neutral" />
         </View>
         <Text style={styles.hint}>
           {wording.whoHint}
         </Text>
 
         <SectionLabel>{wording.whoSection}</SectionLabel>
-        {members.map((m) => {
+        {members.map((m, i) => {
           const here = attendeeIds.has(m.id);
           const isPicker = picker?.id === m.id;
           return (
@@ -61,17 +63,18 @@ export function WhoStep({
               disabled={busy !== null}
               style={({ pressed }) => [
                 styles.attendRow,
-                isPicker ? styles.pickerRow : styles.attendDivider,
-                !here && styles.dimmed,
+                i < members.length - 1 && styles.attendDivider,
                 pressed && styles.rowPressed,
               ]}
             >
-              <Avatar name={m.name} size={40} glow={isPicker} />
-              <View style={styles.rowText}>
-                <Text style={styles.name} numberOfLines={1}>
+              <View style={!here && styles.avatarOut}>
+                <Avatar name={m.name} />
+              </View>
+              <View style={[styles.rowText, !here && styles.textOut]}>
+                <Text style={[styles.name, isPicker && styles.namePicker]} numberOfLines={1}>
                   {m.name}
                 </Text>
-                {isPicker ? <Text style={styles.getsPick}>GETS THE PICK</Text> : null}
+                {isPicker ? <Text style={styles.getsPick}>Gets the pick</Text> : null}
               </View>
               {here && !isPicker ? (
                 <Pressable
@@ -80,15 +83,13 @@ export function WhoStep({
                   hitSlop={space[2]}
                   accessibilityLabel={`Make ${m.name} the picker`}
                 >
-                  <Text style={styles.makePicker}>MAKE PICKER</Text>
+                  <Text style={styles.makePicker}>Make picker</Text>
                 </Pressable>
               ) : null}
               {busy === m.id ? (
                 <Text style={styles.tag}>…</Text>
-              ) : here ? (
-                <Badge label="✓ In" tone="solid" uppercase={false} />
               ) : (
-                <Text style={styles.outTag}>OUT</Text>
+                <AttendCheck on={here} />
               )}
             </Pressable>
           );
@@ -98,10 +99,10 @@ export function WhoStep({
         <AppButton
           title={
             picker
-              ? `Next — ${firstName(picker.name)} picks  →`
+              ? `Next: ${firstName(picker.name)} picks →`
               : attendeeIds.size > 0
-                ? "Choose who picks  →"
-                : "Add who's here  →"
+                ? "Choose who picks →"
+                : "Add who's here →"
           }
           fullWidth
           disabled={busy !== null || picker === null}
@@ -112,7 +113,7 @@ export function WhoStep({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   flex: { flex: 1 },
   content: {
     paddingHorizontal: space[5],
@@ -132,26 +133,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: space[3],
-    paddingVertical: space[3],
-    paddingHorizontal: space[2],
+    paddingVertical: 11,
   },
   attendDivider: {
     borderBottomWidth: borderWidth.hairline,
     borderBottomColor: colors.border.hairline,
   },
-  pickerRow: {
-    backgroundColor: colors.surface.spotlight,
-    borderRadius: radius.md,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.accent.base,
-    ...shadow.spotlight,
-  },
-  dimmed: { opacity: 0.5 },
+  avatarOut: { opacity: 0.4 },
+  textOut: { opacity: 0.5 },
   rowPressed: { opacity: pressedOpacity },
   rowText: { flex: 1 },
-  name: { ...textPresets.rowName, color: colors.text.primary },
-  getsPick: { ...textPresets.tag, color: colors.accent.strong, marginTop: space[1] },
-  outTag: { ...textPresets.tag, color: colors.text.tertiary },
-  makePicker: { ...textPresets.tag, color: colors.accent.cool },
+  name: { fontFamily: fontFamily.sansMedium, fontSize: fontSize.base, lineHeight: lh(fontSize.base, "snug"), color: colors.text.primary },
+  namePicker: {
+    fontFamily: fontFamily.display,
+    fontSize: fontSize.lg,
+    lineHeight: lh(fontSize.lg, "snug"),
+    letterSpacing: trackPx(fontSize.lg, "title"),
+  },
+  getsPick: { ...textPresets.meta, fontFamily: fontFamily.sansSemibold, fontSize: 13, color: colors.accent.strong, marginTop: 2 },
+  makePicker: { ...textPresets.meta, fontFamily: fontFamily.sansSemibold, fontSize: 13, color: colors.text.link },
   tag: { ...textPresets.tag, color: colors.text.secondary },
-});
+}));

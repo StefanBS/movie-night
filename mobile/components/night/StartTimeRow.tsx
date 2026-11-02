@@ -4,7 +4,7 @@ import { ChevronRight } from "lucide-react-native";
 
 import { SettingsRow } from "../";
 import { formatStartTime, startTimeDate, toStartTime } from "../../lib/date";
-import { colors } from "../../theme";
+import { useColors } from "../../theme";
 
 // The time the OS clock opens at for a Night with no start time yet.
 const DIAL_DEFAULT = "19:30";
@@ -22,6 +22,7 @@ export function StartTimeRow({
   onChange: (startTime: string | null) => void;
   disabled?: boolean;
 }) {
+  const colors = useColors();
   if (Platform.OS !== "android") {
     return null;
   }

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -16,16 +15,14 @@ import { todayLocalISO } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import { createNightPlan } from "../../lib/nightPlan";
 import type { Night } from "../../lib/nights";
-import {
-  colors,
-  textPresets,
-  space,
-} from "../../theme";
+import { createThemedStyles, space, textPresets, useColors } from "../../theme";
 
 // NightScreen renders the Plan module (lib/nightPlan) — When, then Who — and,
 // once the Plan is saved as a Night, hands that Night to the editor on its
 // film step. Nothing is saved before "Next", so backing out leaves nothing.
 export default function NightScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const router = useRouter();
   const [today] = useState(todayLocalISO);
   const [plan, state] = useSession(() =>
@@ -47,7 +44,7 @@ export default function NightScreen() {
   if (state.loading) {
     return (
       <View style={styles.screen}>
-        <ActivityIndicator style={styles.center} size="large" color={colors.accent.base} />
+        <ActivityIndicator style={styles.center} size="large" color={colors.text.secondary} />
       </View>
     );
   }
@@ -121,9 +118,9 @@ export default function NightScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   center: { marginTop: space[8], textAlign: "center" },
   error: { ...textPresets.body, color: colors.text.danger },
   banner: { paddingVertical: space[2], paddingHorizontal: space[5], textAlign: "center" },
-});
+}));

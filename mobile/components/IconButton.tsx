@@ -1,24 +1,30 @@
 import { ReactNode } from "react";
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable } from "react-native";
 
-import { borderWidth, colors, pressedOpacity, radius, shadow } from "../theme";
+import { createThemedStyles, pressedOpacity, radius } from "../theme";
 
-// IconButton is a square tappable surface for a single lucide icon (the gear in the
-// home bar, calendar chevrons, the add-member plus). The icon element is passed in so
-// the caller controls glyph, size, and color.
+const SIZES = { sm: 32, md: 40 } as const;
+
+// IconButton is a round, borderless tap target for a single lucide icon (the
+// gear in the home bar, calendar chevrons, the add-member plus). The icon
+// element is passed in so the caller controls glyph, size and colour (usually
+// text.secondary, 2px stroke). `filled` gives it a subtle surface, for top-bar
+// actions.
 export function IconButton({
   icon,
   onPress,
   accessibilityLabel,
-  size = 34,
-  variant = "card",
+  size = "md",
+  filled = false,
 }: {
   icon: ReactNode;
   onPress: () => void;
   accessibilityLabel: string;
-  size?: number;
-  variant?: "card" | "ghost" | "accent";
+  size?: keyof typeof SIZES;
+  filled?: boolean;
 }) {
+  const styles = useStyles();
+  const dim = SIZES[size];
   return (
     <Pressable
       onPress={onPress}
@@ -26,9 +32,8 @@ export function IconButton({
       accessibilityLabel={accessibilityLabel}
       style={({ pressed }) => [
         styles.base,
-        { width: size, height: size },
-        variant === "card" && styles.card,
-        variant === "accent" && styles.accent,
+        { width: dim, height: dim },
+        filled && styles.filled,
         pressed && styles.pressed,
       ]}
     >
@@ -37,20 +42,12 @@ export function IconButton({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   base: {
-    borderRadius: radius.md,
+    borderRadius: radius.full,
     alignItems: "center",
     justifyContent: "center",
   },
-  card: {
-    backgroundColor: colors.surface.card,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
-  },
-  accent: {
-    backgroundColor: colors.accent.base,
-    ...shadow.spotlight,
-  },
+  filled: { backgroundColor: colors.surface.subtle },
   pressed: { opacity: pressedOpacity },
-});
+}));
