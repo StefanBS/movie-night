@@ -11,11 +11,11 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/tonight.png" width="250" alt="Tonight: Esme is next up to pick, with Dev, Ada and Cleo on deck">
+  <img src="docs/screenshots/tonight.png" width="250" alt="Tonight: Dev picks the film tonight, with Ada, Cleo and Blake up next">
   &nbsp;
-  <img src="docs/screenshots/plan-who.png" width="250" alt="Planning a night: Esme is out, so Dev gets the pick">
+  <img src="docs/screenshots/plan-who.png" width="250" alt="Planning a night: marking who's coming on Friday, and Ada gets the pick">
   &nbsp;
-  <img src="docs/screenshots/history.png" width="250" alt="History: past nights grouped by month, with posters, pickers and dates">
+  <img src="docs/screenshots/history.png" width="250" alt="History: nights grouped by month, with posters, pickers and dates">
 </p>
 
 Most movie apps help a group *agree* on a film. Movie Night does the opposite:
