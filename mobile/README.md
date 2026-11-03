@@ -82,8 +82,9 @@ connect to the Metro bundler. Use `just ios` (macOS) or `just web` for those tar
 
 ```bash
 just phone launch [port]    # force-stop, open the dev client on http://<lan-ip>:<port> (8081), wait for load
-just phone dump             # visible text of our app, with bounds
-just phone tap "History"    # tap the first element whose text matches exactly
+just phone dump             # visible text and accessibility labels of our app, with bounds
+just phone tap "Watched"    # tap the first element whose text matches exactly,
+                            # else whose accessibility label does (e.g. "Settings", the gear)
 just phone shot screen.png  # screenshot
 just phone has "someText"   # exit 0 if the text is in the phone's JS bundle, 1 if not
 ```
