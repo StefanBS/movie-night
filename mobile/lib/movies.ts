@@ -104,3 +104,13 @@ export function movieDetails(movie: Movie): MovieDetail[] {
   }
   return lines;
 }
+
+// formatYearRuntime is the "2023 · 1h 46m" line under a recorded film: its
+// year and runtime lines from movieDetails, joined, with any we don't have
+// left out ("" when neither is known).
+export function formatYearRuntime(movie: Movie): string {
+  return movieDetails(movie)
+    .filter((d) => d.kind !== "genres")
+    .map((d) => d.text)
+    .join(" · ");
+}

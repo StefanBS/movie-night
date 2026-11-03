@@ -15,6 +15,7 @@ export function Poster({
   hue = 30,
   w = 56,
   h = 84,
+  rounded = radius.sm,
 }: {
   uri?: string | null;
   title?: string;
@@ -22,6 +23,9 @@ export function Poster({
   hue?: number;
   w?: number;
   h?: number;
+  // rounded is the corner radius: posters are radius.sm, except where a
+  // screen's spec sets another (the Done screen's radius.md).
+  rounded?: number;
 }) {
   const styles = useStyles();
   const [failed, setFailed] = useState(false);
@@ -29,7 +33,7 @@ export function Poster({
   const withTitle = h >= 104;
 
   return (
-    <View style={[styles.base, { width: w, height: h }]}>
+    <View style={[styles.base, { width: w, height: h, borderRadius: rounded }]}>
       {showImage ? (
         <Image
           source={{ uri: uri! }}

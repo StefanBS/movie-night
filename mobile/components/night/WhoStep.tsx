@@ -13,7 +13,9 @@ import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, pressedOpaci
 // WhoStep — attendance toggles for the full roster, for a plan that is not yet
 // a Night (ADR-0008). The picker (pickerId — next up among those in, unless the
 // user chose someone) is spotlighted; any other attendee can be made picker,
-// which is how a guest-only night gets one. The footer creates the Night.
+// which is how a guest-only night gets one. The footer creates the Night. The
+// "We watched it" flow reuses it for a saved Night: pre-filled attendeeIds, no
+// Stepper (it isn't the New night wizard), and its own nextLabel.
 export function WhoStep({
   scheduledFor,
   today,
@@ -24,6 +26,8 @@ export function WhoStep({
   onToggle,
   onChoosePicker,
   onNext,
+  stepper = true,
+  nextLabel = (first) => `Next: ${first} picks →`,
 }: {
   scheduledFor: string;
   today: string;
@@ -34,6 +38,9 @@ export function WhoStep({
   onToggle: (m: Member) => void;
   onChoosePicker: (memberId: string) => void;
   onNext: () => void;
+  stepper?: boolean;
+  // nextLabel is the footer button's label once someone gets the pick.
+  nextLabel?: (first: string) => string;
 }) {
   const styles = useStyles();
   const wording = nightWording(scheduledFor, today);
@@ -41,7 +48,7 @@ export function WhoStep({
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Stepper current={1} />
+        {stepper ? <Stepper current={1} /> : null}
         <View style={styles.headingRow}>
           <Text style={styles.heading} numberOfLines={1}>
             {formatWeekdayDate(scheduledFor)}
@@ -99,7 +106,7 @@ export function WhoStep({
         <AppButton
           title={
             picker
-              ? `Next: ${firstName(picker.name)} picks →`
+              ? nextLabel(firstName(picker.name))
               : attendeeIds.size > 0
                 ? "Choose who picks →"
                 : "Add who's here →"

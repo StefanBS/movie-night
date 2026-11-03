@@ -110,6 +110,22 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 	})
 
+	run("present ranks a draft attendee set, still ignoring the night's own pick", func(t *testing.T) {
+		// Ada is credited for this night. Ranked over a draft of Ada + Cleo
+		// (Blake left, Cleo came), Ada still comes first: her own pick doesn't count.
+		n := createNight(t, nightBody("2026-06-12", ada, blake))
+		code, got := doJSON[[]turnResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID+"/turn?present="+ada+","+cleo, "")
+		if code != http.StatusOK {
+			t.Fatalf("turn status = %d, want 200", code)
+		}
+		if order := names(got); len(order) != 2 || order[0] != "Ada" || order[1] != "Cleo" {
+			t.Fatalf("order = %v, want [Ada Cleo]", order)
+		}
+		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID+"/turn?present=nope", ""); code != http.StatusBadRequest {
+			t.Fatalf("bad present status = %d, want 400", code)
+		}
+	})
+
 	run("guest attendee is recorded but absent from the pick order", func(t *testing.T) {
 		n := createNight(t, nightBody("2026-06-12", ada, frankie))
 		var sawGuest bool
