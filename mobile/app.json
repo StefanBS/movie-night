@@ -49,7 +49,19 @@
           "remindersPermission": false
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon-light.png",
+          "backgroundColor": "#F4F1EC",
+          "imageWidth": 200,
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#11100E"
+          }
+        }
+      ]
     ],
     "extra": {
       "router": {},

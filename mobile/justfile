@@ -28,6 +28,26 @@ android-clean:
     rm -rf android
     npm run android
 
+# Render the PNG icons and splash images from the brand SVGs in assets/brand/
+# (needs Inkscape and ImageMagick). Re-run after refreshing the SVGs from
+# docs/design-system/assets/, then rebuild the dev client: they're native.
+icons:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    b=assets/brand
+    render() { inkscape "$1" --export-width="$2" --export-height="$2" --export-filename="$3"; }
+    render $b/app-icon.svg 1024 assets/icon.png
+    magick assets/icon.png -alpha off -define png:exclude-chunks=date,time assets/icon.png # iOS rejects icons with alpha
+    render $b/app-icon.svg 48 assets/favicon.png
+    render $b/app-icon-foreground.svg 1024 assets/android-icon-foreground.png
+    # Monochrome (Android 13+ themed icon): the single-ink mark on the
+    # foreground's canvas and scale. app-icon-foreground.svg draws the 32-unit
+    # mark at scale(13), so a 416px mark centred on 1024 lines up exactly.
+    render $b/logomark-mono.svg 416 assets/android-icon-monochrome.png
+    magick assets/android-icon-monochrome.png -background none -gravity center -extent 1024x1024 -define png:exclude-chunks=date,time assets/android-icon-monochrome.png
+    render $b/logomark.svg 1024 assets/splash-icon.png
+    render $b/logomark-light.svg 1024 assets/splash-icon-light.png
+
 # Launch on the iOS simulator (macOS only)
 ios:
     npm run ios
