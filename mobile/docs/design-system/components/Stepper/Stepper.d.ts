@@ -1,10 +1,10 @@
 import * as React from "react";
 
-/** Wizard progress — segmented bar with labels (When · Here · Pick · Done). */
+/** Wizard progress — segmented bar with labels (Date · People · Movie · Done). */
 export interface StepperProps {
   /** Zero-based current step. @default 0 */
   current?: number;
-  /** @default ["When","Here","Pick","Done"] */
+  /** @default ["Date","People","Movie","Done"] */
   steps?: string[];
   style?: React.CSSProperties;
 }

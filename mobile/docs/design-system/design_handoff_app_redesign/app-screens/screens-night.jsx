@@ -1,4 +1,4 @@
-// Movie Night — "running the night" flow: When → Who's here → The pick → Recorded / Scheduled.
+// Movie Night — new-night flow: Date → People → Movie → Done (Recorded / Scheduled).
 
 const _night_DS = window.MovieNightDesignSystem_b54ad3;
 const { Avatar: NAvatar, Badge: NBadge, Button: NButton, Input: NInput, Stepper: NStepper } = _night_DS;
@@ -35,11 +35,17 @@ function NightDateScreen() {
         <div style={{ marginTop: 18, padding: "18px 16px 10px", background: "var(--surface-card)", borderRadius: "var(--radius-lg)" }}>
           <window.Calendar value={sel} month={month} onPick={setSel} onMonth={moveMonth} />
         </div>
+        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 13, padding: "14px 16px", background: "var(--surface-card)", borderRadius: "var(--radius-lg)", cursor: "pointer" }}>
+          <i data-lucide="clock" style={{ width: 19, height: 19, color: "var(--text-secondary)", flex: "none" }}></i>
+          <span style={{ flex: 1, fontSize: 16, fontWeight: 500 }}>Start time</span>
+          <span style={{ fontSize: 15, color: "var(--text-secondary)" }}>8:00 pm</span>
+          <i data-lucide="chevron-right" style={{ width: 18, height: 18, color: "var(--text-tertiary)" }}></i>
+        </div>
       </window.Screen>
       <window.Footer>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 6 }}>
-          <span style={{ color: "var(--text-secondary)" }}>{future ? "Planning ahead" : "Tonight"}</span>
-          <span style={{ fontWeight: 700 }}>{_ND.relativeLabel(sel)}</span>
+        {/* One summary line of what's chosen, never the same word twice. */}
+        <div style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 6, fontVariantNumeric: "tabular-nums" }}>
+          <b style={{ color: "var(--text-primary)", fontWeight: 700 }}>{_ND.fmtWeekdayDate(sel)}</b> · 8:00 pm{future ? " · " + _ND.countdownLabel(sel) : ""}
         </div>
         <NButton fullWidth>Next: who's coming →</NButton>
       </window.Footer>
@@ -57,7 +63,7 @@ function NightAttendanceScreen() {
   const picker = _ND.turnOrder().find((m) => present.has(m.id));
   return (
     <window.Phone>
-      <window.TopBar title="New night" back="When" />
+      <window.TopBar title="New night" back="Date" />
       <window.Screen tabbar={false}>
         <Stepper step={2} />
         <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
@@ -90,36 +96,46 @@ function NightAttendanceScreen() {
   );
 }
 
-// ── Step 3: Choose the film (tonight only) ─────────────────────
+// ── Step 3: Movie ──────────────────────────────────────────────
+// Search first: results appear as you type, no Search button. The picker is
+// a credit line with a quiet "Change" beside it; already-watched films say so.
 function NightChooseScreen() {
   const picker = _ND.turnOrder()[0];
-  const results = ["past-lives", "perfect-days", "fallen", "strangers", "aftersun"];
+  const first = picker.name.split(" ")[0];
+  const results = ["worst-person", "banshees", "zone", "strangers"];
+  const watched = Object.fromEntries(_ND.nights.map((n) => [n.movie, n]));
   return (
     <window.Phone>
-      <window.TopBar title="The pick" back="Back" />
+      <window.TopBar title="New night" back="People" />
       <window.Screen tabbar={false}>
         <Stepper step={3} />
-        <div style={{ marginTop: 26 }}>
-          <window.PickerHero name={picker.name} line="it's your call." size={60} />
+        <H1>What are we watching?</H1>
+        <window.Credit name={picker.name} pending style={{ marginTop: 14 }} action={<NButton variant="ghost" size="sm" style={{ color: "var(--text-primary)" }}>Change</NButton>} />
+        <div style={{ marginTop: 18 }}>
+          <NInput value="the" onChange={() => {}} placeholder="Search a film title…" />
         </div>
-        <window.SectionLabel style={{ marginTop: 26 }}>Find a film</window.SectionLabel>
-        <NInput placeholder="Search a film title…" />
-        <div style={{ marginTop: 8 }}>
+        <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 12 }}>{results.length} films · tap one to make it {first}'s pick</div>
+        <div style={{ marginTop: 4 }}>
           {results.map((id, i) => {
             const mv = _ND.movies[id];
+            const seen = watched[id];
             return (
               <div key={id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 0", borderBottom: i < results.length - 1 ? "1px solid var(--border-hairline)" : "none", cursor: "pointer" }}>
-                <window.Poster id={id} w={40} h={60} showTitle={false} />
+                <window.Poster id={id} w={44} h={66} showTitle={false} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <window.Film size={19}>{mv.title}</window.Film>
-                  <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{mv.year} · {mv.runtime}</div>
+                  <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><window.Film size={19}>{mv.title}</window.Film></div>
+                  <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
+                    {mv.year} · {mv.runtime}{seen ? " · watched " + _ND.fmtDate(seen.date) : ""}
+                  </div>
                 </div>
-                <i data-lucide="chevron-right" style={{ width: 18, height: 18, color: "var(--text-tertiary)" }}></i>
               </div>
             );
           })}
         </div>
       </window.Screen>
+      <window.Footer>
+        <div style={{ display: "flex", justifyContent: "center" }}><NButton variant="ghost">{`Skip for now · ${first} can pick later`}</NButton></div>
+      </window.Footer>
     </window.Phone>
   );
 }
@@ -137,7 +153,7 @@ function NightRecordedScreen() {
           <div style={{ marginTop: 22 }}><NBadge>Recorded ✓</NBadge></div>
           <window.Film size={40} style={{ marginTop: 12, display: "block" }}>Past Lives</window.Film>
           <div style={{ fontSize: 14, color: "var(--text-tertiary)", marginTop: 6 }}>2023 · 1h 46m</div>
-          <div style={{ fontSize: 15, color: "var(--text-secondary)", marginTop: 18 }}><b style={{ color: "var(--text-primary)", fontWeight: 700 }}>{picker.name.split(" ")[0]}</b>'s pick · {_ND.fmtDate(_ND.today)}</div>
+          <div style={{ fontSize: 15, color: "var(--text-secondary)", marginTop: 18 }}>Picked by <b style={{ color: "var(--text-primary)", fontWeight: 600 }}>{picker.name.split(" ")[0]}</b> · {_ND.fmtDate(_ND.today)}</div>
         </div>
         <window.SectionLabel style={{ textAlign: "center", marginTop: 28 }}>Who watched</window.SectionLabel>
         <div style={{ display: "flex", justifyContent: "center" }}><window.Stack ids={present} size={36} /></div>
@@ -161,7 +177,7 @@ function NightScheduledScreen() {
         <div style={{ marginTop: 30 }}>
           <NBadge>Scheduled ✓</NBadge>
           <div style={{ fontWeight: 800, fontSize: 64, lineHeight: 0.92, letterSpacing: "-0.05em", marginTop: 18 }}>{_ND.weekday(s.date, true)}</div>
-          <div style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: 30, marginTop: 6 }}>{_ND.fmtDate(s.date, true)}</div>
+          <div style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 30, marginTop: 6 }}>{_ND.fmtDate(s.date, true)}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 18 }}>
             <window.DateChip>{_ND.countdownLabel(s.date)}</window.DateChip>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: "var(--radius-full)", background: "var(--surface-subtle)", fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}><i data-lucide="repeat" style={{ width: 14, height: 14 }}></i>{s.repeat.label}</span>

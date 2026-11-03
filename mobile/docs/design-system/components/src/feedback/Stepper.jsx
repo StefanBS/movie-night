@@ -4,7 +4,7 @@ import React from "react";
  * Stepper — the new-night wizard's progress: four segments with labels.
  * Done segments are solid text colour, the current one ember, the rest hairline.
  */
-export function Stepper({ current = 0, steps = ["When", "Here", "Pick", "Done"], style }) {
+export function Stepper({ current = 0, steps = ["Date", "People", "Movie", "Done"], style }) {
   return (
     <div role="progressbar" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={current + 1} style={{ display: "grid", gridTemplateColumns: "repeat(" + steps.length + ", minmax(0,1fr))", gap: 6, ...style }}>
       {steps.map((label, i) => {

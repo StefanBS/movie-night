@@ -2,13 +2,13 @@ import * as React from "react";
 
 /**
  * App top bar. `home` (logomark + wordmark + group), `tab` (big left title +
- * italic sub), `title` (centered title + back link, for pushed screens).
+ * serif sub), `title` (centered title + back link, for pushed screens).
  */
 export interface TopBarProps {
   /** @default "tab" */
   kind?: "home" | "tab" | "title";
   title?: string;
-  /** tab: italic line under the title. */
+  /** tab: serif line under the title. */
   sub?: string;
   /** home: the group name. */
   group?: string;

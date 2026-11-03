@@ -6,4 +6,6 @@ Logo files. Use them as they are; never redraw or recolour the mark.
 - `app-icon.svg` — 1024px iOS app icon.
 - `app-icon-foreground.svg` — Android adaptive-icon foreground, placed on `#11100E` (`ink-950`).
 
+All files are centred on the calendar body, so the binder tabs sit above centre and the square reads as centred in a tile or beside text.
+
 In UI, prefer the `Logomark` component: its frame follows `currentColor` and its play button is always `accent`.

@@ -1,15 +1,13 @@
 /* Movie Night — values tokens.json does not hold (type-scale variables,
-   weights, leading, tracking, motion, deprecated aliases). Everything else
-   comes from tokens.css, which loads first. */
+   weights, leading, tracking, motion). Everything else comes from
+   tokens.css, which loads first. */
 
-@import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap');
 
 :root, [data-theme="dark"] { color-scheme: dark; }
 [data-theme="light"] { color-scheme: light; }
 
 :root {
-  --font-mono:    var(--font-sans); /* deprecated — use --font-sans + tabular-nums */
-
   /* Weights */
   --weight-regular:  400;
   --weight-medium:   500;
@@ -25,7 +23,7 @@
   --text-xl:      22px; /* section headings, film title in rows */
   --text-2xl:     30px; /* bar titles */
   --text-3xl:     44px; /* tab titles */
-  --text-4xl:     64px; /* card hero name */
+  --text-4xl:     64px; /* large name headlines */
   --text-display: 96px; /* the picker's name on Tonight */
 
   /* Line heights */
@@ -39,31 +37,9 @@
   --tracking-caption:  0.01em;
   --tracking-normal:   0;
 
-  /* Deprecated: the glow is retired. Kept so old screens don't break. */
-  --glow-spotlight: 0 0 0 0 transparent;
-
   /* Motion */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out:      cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 130ms;
   --duration-base: 220ms;
-
-  /* --- Deprecated aliases (pre-2026-11 names; do not use in new work) --- */
-  --night-950: var(--ink-1000); --night-900: var(--ink-950); --night-850: var(--ink-900); --night-800: var(--ink-900);
-  --night-700: var(--ink-850); --night-600: var(--ink-800); --night-500: var(--ink-700); --night-400: var(--ink-600);
-  --haze-100: var(--ink-100); --haze-200: var(--ink-200); --haze-300: var(--ink-400); --haze-400: var(--ink-450);
-  --moon-400: var(--ink-300); --moon-300: var(--ink-200); --moon-200: var(--ink-150); --moon-100: var(--ink-100);
-  --red-500: var(--red-400); --green-500: var(--green-400);
-}
-
-:root, [data-theme="dark"] {
-  --accent-cool:        var(--ink-300); /* deprecated — the moon accent is retired */
-  --accent-cool-strong: var(--ink-200); /* deprecated */
-  --moon-glow:          transparent;    /* deprecated */
-}
-
-[data-theme="light"] {
-  --accent-cool:        var(--ink-600);
-  --accent-cool-strong: var(--ink-700);
-  --moon-glow:          transparent;
 }

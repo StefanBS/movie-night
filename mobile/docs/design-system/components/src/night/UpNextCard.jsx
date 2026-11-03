@@ -3,8 +3,10 @@ import { Avatar } from "../data/Avatar.jsx";
 import { Button } from "../core/Button.jsx";
 
 /**
- * UpNextCard — the home's scheduled-night card. The picker's first name is
- * the headline; the film (once chosen) is set in Newsreader Italic.
+ * UpNextCard — the home's scheduled-night card. The film is the headline,
+ * set large in Newsreader (upright, medium); the picker is a quiet credit line under it
+ * ("Picked by Tomas"). Before the film is chosen, the headline slot holds
+ * "Not picked yet." in tertiary text and the credit reads "Tomas is picking".
  */
 export function UpNextCard({ date, countdown, time, picker, film, coming = [], onStart, onEdit, style }) {
   const first = (picker || "").trim().split(/\s+/)[0];
@@ -14,12 +16,12 @@ export function UpNextCard({ date, countdown, time, picker, film, coming = [], o
         <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }}></span>
         <span>{[countdown, date, time].filter(Boolean).join(" · ")}</span>
       </div>
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginTop: "var(--space-4)" }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: "var(--font-display)", fontWeight: "var(--weight-heavy)", fontSize: "var(--text-4xl)", lineHeight: "var(--leading-tight)", letterSpacing: "var(--tracking-display)", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{first}</div>
-          <div style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: 26, lineHeight: 1.15, color: "var(--text-primary)", marginTop: 6 }}>{film ? film + "." : "picks the film."}</div>
-        </div>
-        <Avatar name={picker} size={48} />
+      <div style={{ fontFamily: "var(--font-serif)", fontWeight: "var(--weight-medium)", fontSize: "var(--text-3xl)", lineHeight: 1.05, letterSpacing: "-0.015em", color: film ? "var(--text-primary)" : "var(--text-tertiary)", marginTop: "var(--space-4)", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{film ? film : "Not picked yet."}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginTop: "var(--space-4)", fontFamily: "var(--font-sans)", fontSize: "var(--text-base)", color: "var(--text-secondary)", minWidth: 0 }}>
+        <Avatar name={picker} size={28} />
+        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {film ? <>Picked by <strong style={{ fontWeight: "var(--weight-semibold)", color: "var(--text-primary)" }}>{first}</strong></> : <><strong style={{ fontWeight: "var(--weight-semibold)", color: "var(--text-primary)" }}>{first}</strong> is picking</>}
+        </span>
       </div>
       {coming.length ? (
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: "var(--space-5)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--border-hairline)" }}>

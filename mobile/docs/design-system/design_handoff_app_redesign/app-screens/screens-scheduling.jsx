@@ -49,9 +49,12 @@ function EditNightScreen() {
   const core = _KD.members.filter((m) => m.status === "active");
   const [present, setPresent] = React.useState(() => new Set(s.presentIds));
   const toggle = (id) => setPresent((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  // Save stays disabled until something changes (neutral, never faded ember).
+  const dirty = present.size !== s.presentIds.length || s.presentIds.some((id) => !present.has(id));
   return (
     <window.Phone>
-      <window.TopBar title="Edit night" back="Up next" />
+      {/* Back names the screen you came from: "Tonight" or "Night", never "Up next". */}
+      <window.TopBar title="Edit night" back="Tonight" />
       <window.Screen tabbar={false}>
         <div style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 800, fontSize: 32, lineHeight: 1, letterSpacing: "-0.04em" }}>{_KD.fmtWeekdayDate(s.date)}</div>
@@ -60,6 +63,7 @@ function EditNightScreen() {
         <window.SectionLabel style={{ marginTop: 26 }}>Night settings</window.SectionLabel>
         <Group>
           <Row icon="calendar" label="Date" value={_KD.fmtDate(s.date, true)} trailing={<Chevron />} />
+          <Row icon="clock" label="Start time" value="8:00 pm" trailing={<Chevron />} />
           <Row icon="repeat" label="Repeat" value={s.repeat.label} trailing={<Chevron />} />
           <Row icon="bell" label="Reminders" value="Day before, morning" trailing={<Chevron />} last />
         </Group>
@@ -69,14 +73,17 @@ function EditNightScreen() {
           return (
             <div key={m.id} onClick={() => toggle(m.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", cursor: "pointer", borderBottom: i < core.length - 1 ? "1px solid var(--border-hairline)" : "none" }}>
               <div style={{ opacity: here ? 1 : 0.4 }}><KAvatar name={m.name} size="sm" /></div>
-              <span style={{ flex: 1, fontSize: 16, fontWeight: 500, opacity: here ? 1 : 0.5 }}>{m.name}</span>
+              <div style={{ flex: 1, minWidth: 0, opacity: here ? 1 : 0.5 }}>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{m.name}</div>
+                {m.id === s.pickerId && <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 2 }}>Picker</div>}
+              </div>
               <Radio on={here} />
             </div>
           );
         })}
       </window.Screen>
       <window.Footer>
-        <KButton fullWidth>Save changes</KButton>
+        <KButton fullWidth disabled={!dirty}>Save changes</KButton>
         <div style={{ display: "flex", justifyContent: "center" }}><KButton variant="danger" size="sm">Cancel this night</KButton></div>
       </window.Footer>
     </window.Phone>

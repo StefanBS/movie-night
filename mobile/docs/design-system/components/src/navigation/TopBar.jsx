@@ -28,7 +28,7 @@ export function TopBar({ kind = "tab", title, sub, group, back, right, style }) 
       <div style={{ ...wrap, alignItems: "flex-end", paddingTop: "var(--space-4)" }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: "var(--font-display)", fontWeight: "var(--weight-heavy)", fontSize: "var(--text-3xl)", lineHeight: 1, letterSpacing: "var(--tracking-display)", color: "var(--text-primary)" }}>{title}</div>
-          {sub ? <div style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: 19, color: "var(--text-secondary)", marginTop: 6 }}>{sub}</div> : null}
+          {sub ? <div style={{ fontFamily: "var(--font-serif)", fontWeight: "var(--weight-medium)", fontSize: 19, color: "var(--text-secondary)", marginTop: 6 }}>{sub}</div> : null}
         </div>
         {right}
       </div>

@@ -1,4 +1,4 @@
-<!-- @dsCard group="Mobile App" viewport="1340x980" name="Proposed app screens" subtitle="All 20 screens in Spotlight, refined · dark and light" -->
+<!-- @dsCard group="Mobile App" viewport="1340x980" name="Proposed app screens" subtitle="All 26 screens in Spotlight, refined · dark and light" -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,11 +22,11 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
 <body>
 <div id="stage"></div>
 
-<script src="../../_ds_bundle.js"></script>
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="../../components/bundle.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 
 <script src="./data.js"></script>
 <script type="text/babel" src="./chrome.jsx"></script>
@@ -36,6 +36,7 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
 <script type="text/babel" src="./screens-group.jsx"></script>
 <script type="text/babel" src="./screens-setup.jsx"></script>
 <script type="text/babel" src="./screens-scheduling.jsx"></script>
+<script type="text/babel" src="./screens-upcoming.jsx"></script>
 
 <script type="text/babel">
   const paint = () => window.lucide && window.lucide.createIcons();
@@ -63,10 +64,10 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
       desc: "A focused flow launched from Tonight — when, who's here, what we're watching, locked in. It now opens with a date, so a night can be tonight or planned ahead. Replaces the old overloaded “Tonight” screen.",
       flow: true,
       screens: [
-        { comp: "NightDateScreen", name: "When", role: "Step 1. Pick a date — tonight, a quick chip, or any day on the calendar. Dots mark nights already on the books." },
-        { comp: "NightAttendanceScreen", name: "Who's here", role: "Step 2. Mark who's in; the next-up member attending gets the pick. Copy adapts for a future date (“Who's coming?”)." },
-        { comp: "NightChooseScreen", name: "The pick", role: "Step 3. The picker searches and chooses the film — their call, no vote." },
-        { comp: "NightRecordedScreen", name: "Recorded", role: "Step 4. Tonight's night is saved to history — movie, picker, and who watched." },
+        { comp: "NightDateScreen", name: "Date", role: "Step 1. Pick a date and a start time. The footer sums up what you chose in one line: “Friday, Jun 19 · 8:00 pm · in 4 days”." },
+        { comp: "NightAttendanceScreen", name: "People", role: "Step 2. Mark who's in; the next-up member attending gets the pick. Copy adapts for a future date (“Who's coming?”)." },
+        { comp: "NightChooseScreen", name: "Movie", role: "Step 3, redesigned. Search first: results appear as you type, no Search button. The picker is a credit line with “Change”; films you’ve already watched say when." },
+        { comp: "NightRecordedScreen", name: "Done", role: "Step 4. Tonight's night is saved to history — movie, picker, and who watched." },
       ],
     },
     {
@@ -76,6 +77,7 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
       flow: true,
       screens: [
         { comp: "PlannedHomeScreen", name: "Tonight · planned", role: "Home once a night is on the calendar — an “Up next” card with the date, countdown, the picker, and who's coming." },
+        { comp: "NightUpcomingScreen", name: "Night · upcoming", role: "New. A night that hasn't happened yet, from Tonight, Upcoming or a reminder. Film slot first, “Tomas is picking” under it, one action: Choose the film. Edit night and Add to calendar sit behind ⋯." },
         { comp: "NightScheduledScreen", name: "Scheduled", role: "The future-night confirmation — the date, a countdown, the locked picker, and a nudge to remind the group." },
       ],
     },
@@ -85,7 +87,7 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
       desc: "Once a night is on the calendar you can change it, put it on a cadence, and decide how the group gets nudged — plus what that nudge actually looks like.",
       flow: true,
       screens: [
-        { comp: "EditNightScreen", name: "Edit night", role: "From the home's “Edit”. Change the date, recurrence, reminders and who's coming — or cancel the night." },
+        { comp: "EditNightScreen", name: "Edit night", role: "From Tonight's “Edit”. Back names where you came from. Date, start time, repeat and reminders; who's coming, with the picker marked. Save stays disabled (neutral grey) until something changes." },
         { comp: "RepeatScreen", name: "Repeat", role: "Put movie night on a cadence (every week / 2 weeks / month), with a live preview of the next dates." },
         { comp: "RemindersScreen", name: "Reminders", role: "When to nudge (night before / morning of / 2h before) and who — the picker always gets a personal one." },
         { comp: "NotificationsScreen", name: "The nudge", role: "How a reminder lands — the picker's “it's your turn” push and the group heads-up on the lock screen." },
@@ -95,29 +97,40 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
     },
     {
       eyebrow: "Tab 2",
-      title: "History — the shelf",
-      desc: "The product's promise made visible — “remembers what you watched and who picked.” The biggest gap in the original three screens.",
+      title: "Upcoming — the calendar",
+      desc: "Every night ahead, next first. The scheduled night shows its picker; later dates in a repeating series show whose turn it will be if the order holds. The one action is “Plan a night”.",
       screens: [
-        { comp: "HistoryScreen", name: "History", role: "History tab. Every night, newest first, grouped by month with posters and who picked." },
-        { comp: "NightDetailScreen", name: "Night detail", role: "One night in full — the film, who picked it, and everyone who was there." },
+        { comp: "UpcomingScreen", name: "Upcoming", role: "Upcoming tab. The next night with its picker and who's coming, then the rest of the series in quieter type." },
+        { comp: "UpcomingEmptyScreen", name: "Upcoming · empty", role: "Nothing planned: one honest line, who would pick, and Plan a night." },
       ],
     },
     {
       eyebrow: "Tab 3",
-      title: "The Club — the group",
-      desc: "Members reframed around the rotation: who's in line, their pick counts, and a real profile per person. Folds in the old “Manage members”.",
+      title: "Watched — the shelf",
+      desc: "The product's promise made visible — “remembers what you watched and who picked.” The biggest gap in the original three screens.",
       screens: [
-        { comp: "MembersScreen", name: "The Club", role: "Members tab. In-rotation order, guests, and inactive — each with pick stats." },
-        { comp: "MemberProfileScreen", name: "Member profile", role: "One member — their stats, place in line, and every film they've picked." },
-        { comp: "AddMemberScreen", name: "Add member", role: "Add someone as core (enters rotation) or guest (watches only)." },
+        { comp: "HistoryScreen", name: "Watched", role: "Watched tab. Every night, newest first, grouped by month with posters and who picked." },
+        { comp: "NightDetailScreen", name: "Night · past", role: "Redesigned. The film leads, the picker is a credit line, then who watched. A recorded night has no main button; its actions are behind ⋯." },
+        { comp: "NightMoreScreen", name: "Night · ⋯", role: "The ⋯ sheet: Change film, Edit night, and Clear film (in red, with what it does)." },
       ],
     },
     {
       eyebrow: "Tab 4",
+      title: "Club — the group",
+      desc: "Members reframed around the rotation: who's in line, their pick counts, and a real profile per person. Folds in the old “Manage members”.",
+      screens: [
+        { comp: "MembersScreen", name: "Club", role: "Club tab. In-rotation order, guests, and inactive — each with pick stats." },
+        { comp: "MemberProfileScreen", name: "Member", role: "Redesigned. Left-aligned like every other screen: stats on a hairline, place in line in plain text, their picks as the content. Deactivate is a quiet red action at the end." },
+        { comp: "MemberNewScreen", name: "Member · no picks", role: "The empty state says something true: “No picks yet. Tomas is next up, so the first one is coming.”" },
+        { comp: "AddMemberScreen", name: "Add member", role: "Add someone as core (enters rotation) or guest (watches only)." },
+      ],
+    },
+    {
+      eyebrow: "From the gear",
       title: "Settings & rules",
       desc: "The group's controls and the house rule restated — skipping, who can pick, reminders.",
       screens: [
-        { comp: "SettingsScreen", name: "Settings", role: "Settings tab. Group, rotation behavior, notifications, and the danger zone." },
+        { comp: "SettingsScreen", name: "Settings", role: "Opened from the gear on Tonight. Group, rotation behavior, notifications, and the danger zone." },
       ],
     },
   ];
@@ -148,13 +161,13 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
           <div className="eyebrow">Movie Night · Spotlight, refined</div>
           <h1 style={{ fontSize: 60, lineHeight: 0.95, letterSpacing: "-0.05em", margin: "14px 0 0", fontWeight: 800 }}>The screens the app should have</h1>
           <p style={{ fontSize: 17, lineHeight: 1.6, color: "var(--text-secondary)", marginTop: 18 }}>
-            The current three screens each map to a feature, but never formed an app — and they skip the product's own promise to <em>remember what you watched</em>. This is a coherent architecture built on the ritual itself: <b style={{ color: "var(--text-primary)" }}>see whose turn → run the night → it's remembered → the rotation advances</b>. Four tabs hold it together.
+            The current three screens each map to a feature, but never formed an app — and they skip the product's own promise to <em>remember what you watched</em>. This is a coherent architecture built on the ritual itself: <b style={{ color: "var(--text-primary)" }}>see whose turn → run the night → it's remembered → the rotation advances</b>. Four tabs hold it together: Tonight, Upcoming, Watched and Club. Settings sits behind the gear.
           </p>
           <div className="map">
             <span className="map-pill"><i data-lucide="clapperboard"></i><b>Tonight</b> · whose turn + start</span>
-            <span className="map-pill"><i data-lucide="history"></i><b>History</b> · the shelf</span>
-            <span className="map-pill"><i data-lucide="users-round"></i><b>The Club</b> · members</span>
-            <span className="map-pill"><i data-lucide="settings"></i><b>Settings</b> · rules</span>
+            <span className="map-pill"><i data-lucide="calendar-days"></i><b>Upcoming</b> · planned and repeating nights</span>
+            <span className="map-pill"><i data-lucide="library"></i><b>Watched</b> · the shelf</span>
+            <span className="map-pill"><i data-lucide="users-round"></i><b>Club</b> · members</span>
           </div>
         </div>
 

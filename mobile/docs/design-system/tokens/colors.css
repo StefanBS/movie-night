@@ -1,5 +1,5 @@
 /* ============================================================
-   Movie Night — Color tokens · "Spotlight" (refined, 2026-11)
+   Movie Night — Color tokens · "Spotlight, refined"
    Warm true-black (dark) and warm off-white (light). One terracotta
    ("ember") accent, rationed to the picker and the main action. Each member
    owns a signature colour (--sig-1…7). Posters carry the rest.
@@ -27,7 +27,7 @@
   --ink-1000: #0A0908;
 
   /* --- Ember (the one accent) --- */
-  /* "Terracotta" — ember pulled toward the Film stock palette (2026-11) */
+  /* "Terracotta": tokens keep the ember-* name */
   --ember-100: #F3D5C6;
   --ember-200: #E6AE93;
   --ember-300: #D47E57; /* hover on dark */
@@ -49,13 +49,6 @@
   /* --- Feedback --- */
   --red-400:   #F0705F; --red-600:   #C23A2B;
   --green-400: #7BC79A; --green-600: #2F8A55;
-
-  /* --- Deprecated aliases (pre-2026-11 names; do not use in new work) --- */
-  --night-950: var(--ink-1000); --night-900: var(--ink-950); --night-850: var(--ink-900); --night-800: var(--ink-900);
-  --night-700: var(--ink-850); --night-600: var(--ink-800); --night-500: var(--ink-700); --night-400: var(--ink-600);
-  --haze-100: var(--ink-100); --haze-200: var(--ink-200); --haze-300: var(--ink-400); --haze-400: var(--ink-450);
-  --moon-400: var(--ink-300); --moon-300: var(--ink-200); --moon-200: var(--ink-150); --moon-100: var(--ink-100);
-  --red-500: var(--red-400); --green-500: var(--green-400);
 }
 
 :root, [data-theme="dark"] {
@@ -88,9 +81,6 @@
   --accent-pressed: var(--ember-500);
   --accent-strong:  var(--ember-400); /* ember text/icons */
   --accent-glow:    rgba(200, 105, 63, 0.40);
-  --accent-cool:        var(--ink-300); /* deprecated — the moon accent is retired */
-  --accent-cool-strong: var(--ink-200); /* deprecated */
-  --moon-glow:          transparent;    /* deprecated */
 
   /* Borders */
   --border-hairline: rgba(237, 232, 224, 0.10);
@@ -145,9 +135,6 @@
   --accent-pressed: var(--ember-600);
   --accent-strong:  var(--ember-600);
   --accent-glow:    rgba(169, 85, 47, 0.28);
-  --accent-cool:        var(--ink-600);
-  --accent-cool-strong: var(--ink-700);
-  --moon-glow:          transparent;
 
   --border-hairline: rgba(17, 16, 14, 0.10);
   --border-strong:   rgba(17, 16, 14, 0.22);
