@@ -4,12 +4,15 @@ const _shelf_DS = window.MovieNightDesignSystem_b54ad3;
 const { Avatar: SAvatar, Badge: SBadge, Button: SButton } = _shelf_DS;
 const _SD = window.MNData;
 
-function groupByMonth(nights) {
+// One continuous list, newest first. Each row already carries its date
+// ("May 30"), so months get no headers: with one night a month they would put
+// a big gap and a label above every row. Only an earlier year gets a label.
+function groupByYear(nights) {
   const out = [];
   let cur = null;
   for (const n of nights) {
-    const label = _SD.monthLabel(n.date);
-    if (!cur || cur.label !== label) { cur = { label, items: [] }; out.push(cur); }
+    const y = n.date.slice(0, 4);
+    if (!cur || cur.year !== y) { cur = { year: y, items: [] }; out.push(cur); }
     cur.items.push(n);
   }
   return out;
@@ -39,17 +42,20 @@ function NightRow({ n, last }) {
 // ── Watched (tab) ──────────────────────────────────────────────
 function HistoryScreen() {
   // No counters: the list itself is the record. (Reactions aren't planned yet.)
-  const groups = groupByMonth(_SD.nights);
+  const groups = groupByYear(_SD.nights);
+  const thisYear = _SD.today.slice(0, 4);
   return (
     <window.Phone>
       <window.TopBar kind="tab" title="Watched" group={`${_SD.nights.length} nights since ${_SD.fmtDate(_SD.group.since, true).replace(/,.*/, "")} 2025.`} />
       <window.Screen>
-        {groups.map((g, gi) => (
-          <div key={g.label}>
-            <window.SectionLabel style={{ marginTop: gi ? 28 : 20 }}>{g.label}</window.SectionLabel>
-            {g.items.map((n, i) => <NightRow key={n.id} n={n} last={i === g.items.length - 1} />)}
-          </div>
-        ))}
+        <div style={{ marginTop: 12 }}>
+          {groups.map((g) => (
+            <div key={g.year}>
+              {g.year !== thisYear && <window.SectionLabel style={{ marginTop: 24 }}>{g.year}</window.SectionLabel>}
+              {g.items.map((n, i) => <NightRow key={n.id} n={n} last={i === g.items.length - 1} />)}
+            </div>
+          ))}
+        </div>
       </window.Screen>
       <window.TabBar active="watched" />
     </window.Phone>

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildHistoryMonths, watchedOn, watchedSub } from "./history";
+import { buildHistory, watchedOn, watchedSub } from "./history";
 import type { Night } from "./nights";
 
 // night is a Night recorded as watched unless `watched` is false.
@@ -22,21 +22,39 @@ function night(id: string, scheduledFor: string, tmdbId: number | null, watched 
   };
 }
 
-test("buildHistoryMonths groups by month, newest first within and across", () => {
-  const nights = [
-    night("old", "2026-05-02", 1),
-    night("newest", "2026-06-20", 2),
-    night("mid", "2026-06-05", 3),
-  ];
-  const months = buildHistoryMonths(nights);
-  assert.deepEqual(months.map((m) => m.label), ["Jun 2026", "May 2026"]);
-  assert.deepEqual(months[0].nights.map((n) => n.id), ["newest", "mid"]);
-  assert.deepEqual(months[1].nights.map((n) => n.id), ["old"]);
-});
-
-test("buildHistoryMonths on an empty list is empty", () => {
-  assert.deepEqual(buildHistoryMonths([]), []);
-});
+const historyCases: [string, string[], [string | null, string[]][]][] = [
+  ["no nights", [], []],
+  [
+    "this year's nights are one unlabelled run, newest first across months",
+    ["2026-05-02", "2026-06-20", "2026-06-05"],
+    [[null, ["2026-06-20", "2026-06-05", "2026-05-02"]]],
+  ],
+  [
+    "an earlier year gets its own labelled section",
+    ["2025-11-14", "2026-01-09", "2025-12-12"],
+    [
+      [null, ["2026-01-09"]],
+      ["2025", ["2025-12-12", "2025-11-14"]],
+    ],
+  ],
+  [
+    "each earlier year is labelled, even with no nights this year",
+    ["2024-12-06", "2025-03-07"],
+    [
+      ["2025", ["2025-03-07"]],
+      ["2024", ["2024-12-06"]],
+    ],
+  ],
+];
+for (const [name, dates, want] of historyCases) {
+  test(`buildHistory: ${name}`, () => {
+    const sections = buildHistory(dates.map((d) => night(d, d, 1)), "2026-11-03");
+    assert.deepEqual(
+      sections.map((s) => [s.label, s.nights.map((n) => n.id)]),
+      want,
+    );
+  });
+}
 
 const watchedCases: [string, Night[], [number, string][]][] = [
   ["no nights", [], []],
