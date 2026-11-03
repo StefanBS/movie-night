@@ -23,6 +23,7 @@ new record that supersedes the old one rather than editing history.
 - [ADR-0010](0010-server-push-reminders.md) — Reminders are server push, computed each minute and sent at most once · *Accepted*
 - [ADR-0011](0011-night-start-time-wall-clock.md) — A Night's start time is a zone-less wall-clock time, read on each device · *Accepted*
 - [ADR-0012](0012-night-recorded-as-watched.md) — A Night is history only once the group records it as watched · *Accepted*
+- [ADR-0013](0013-watched-night-date-bound.md) — A Night can't be recorded as watched more than a day past the UTC date · *Accepted*
 
 Open and deferred decisions are tracked in [backlog.md](backlog.md).
 

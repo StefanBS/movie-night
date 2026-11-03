@@ -26,9 +26,12 @@ ORDER BY scheduled_for DESC;
 
 -- name: LockNight :one
 -- Locks the night row for the rest of the write's transaction and returns its
--- picker and whether it has a film, so no other write can change them or the
--- attendees until it commits.
-SELECT picker_id, (movie_id IS NOT NULL)::boolean AS has_movie FROM picks
+-- picker, whether it has a film and whether it is recorded as watched, so no
+-- other write can change them or the attendees until it commits.
+SELECT picker_id,
+       (movie_id IS NOT NULL)::boolean AS has_movie,
+       (watched_at IS NOT NULL)::boolean AS is_watched
+FROM picks
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
 FOR UPDATE;
 
