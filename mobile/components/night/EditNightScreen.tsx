@@ -37,8 +37,8 @@ import {
 } from "../../lib/reminders";
 import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, radius, lh, space, textPresets, useColors } from "../../theme";
 
-// EditNightScreen renders the edit module (lib/nightEdit) from the home
-// Up-next card: change the date and start time, toggle who's coming, then save both in one
+// EditNightScreen renders the edit module (lib/nightEdit), opened from Tonight
+// or a Night; `back` names that screen. Change the date and start time, toggle who's coming, then save both in one
 // request, or cancel the night. Date and Reminders are steps over the same
 // draft, so they save (or are discarded) with it. Mount with key={night.id}
 // when the loaded night changes.
@@ -47,7 +47,7 @@ export function EditNightScreen({
   members,
   today,
   nightDates,
-  onBack,
+  back,
   onSaved,
   onCancelled,
 }: {
@@ -55,7 +55,7 @@ export function EditNightScreen({
   members: Member[];
   today: string;
   nightDates: Set<string>;
-  onBack: () => void;
+  back: { label: string; onPress: () => void };
   onSaved: () => void;
   onCancelled: () => void;
 }) {
@@ -139,7 +139,7 @@ export function EditNightScreen({
 
   return (
     <View style={styles.screen}>
-      <TopBar kind="title" title="Edit night" back={{ label: "Up next", onPress: onBack }} />
+      <TopBar kind="title" title="Edit night" back={back} />
       <View style={styles.flex}>
         <ScrollView contentContainerStyle={styles.content}>
           {actionError !== null ? (
@@ -211,7 +211,7 @@ export function EditNightScreen({
                       {m.name}
                     </Text>
                     {isPicker ? (
-                      <Text style={styles.pickerHint}>Picker · change the picker first</Text>
+                      <Text style={styles.pickerHint}>Picker</Text>
                     ) : null}
                   </View>
                   <AttendCheck on={here} size={22} />
@@ -257,12 +257,11 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.text.primary,
   },
   heroMeta: { ...textPresets.meta, color: colors.text.secondary, marginTop: space[2] },
+  // Cards sit on the page by fill alone, as on the board: no hairline edge.
   card: {
     backgroundColor: colors.surface.card,
     borderRadius: radius.lg,
     overflow: "hidden",
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
   },
   divider: {
     borderBottomWidth: borderWidth.hairline,
@@ -287,8 +286,6 @@ const useStyles = createThemedStyles((colors) => ({
   calendarCard: {
     padding: space[4],
     backgroundColor: colors.surface.card,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
     borderRadius: radius.lg,
   },
   cancelWrap: { alignItems: "center" },

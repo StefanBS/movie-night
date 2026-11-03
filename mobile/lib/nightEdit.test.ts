@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { editRows } from "./nightEdit";
+import { editRows, isDirty, type Draft } from "./nightEdit";
 import type { Member } from "./members";
 import type { Night } from "./nights";
 
@@ -52,4 +52,29 @@ test("editRows names attendees who left the roster from the Night itself", () =>
     { id: "ada", name: "Ada" },
     { id: "frankie", name: "Frankie" },
   ]);
+});
+
+test("isDirty is false until the draft differs from the stored Night", () => {
+  const stored: Night = { ...night("ada", "blake"), startTime: "20:00" };
+  const clean: Draft = {
+    date: stored.scheduledFor,
+    startTime: stored.startTime,
+    attendees: new Set(["ada", "blake"]),
+    reminders: stored.reminders,
+  };
+  const cases: { name: string; draft: Partial<Draft>; want: boolean }[] = [
+    { name: "unchanged", draft: {}, want: false },
+    { name: "same attendees in another order", draft: { attendees: new Set(["blake", "ada"]) }, want: false },
+    { name: "an equal reminders copy", draft: { reminders: { ...stored.reminders } }, want: false },
+    { name: "another date", draft: { date: "2026-06-27" }, want: true },
+    { name: "another start time", draft: { startTime: "19:30" }, want: true },
+    { name: "start time cleared", draft: { startTime: null }, want: true },
+    { name: "someone added", draft: { attendees: new Set(["ada", "blake", "frankie"]) }, want: true },
+    { name: "someone removed", draft: { attendees: new Set(["ada"]) }, want: true },
+    { name: "someone swapped (same count)", draft: { attendees: new Set(["ada", "frankie"]) }, want: true },
+    { name: "reminders changed", draft: { reminders: { ...stored.reminders, morningOf: false } }, want: true },
+  ];
+  for (const c of cases) {
+    assert.equal(isDirty(stored, { ...clean, ...c.draft }), c.want, c.name);
+  }
 });

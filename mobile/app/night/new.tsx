@@ -69,7 +69,7 @@ export default function NightScreen() {
         initialStep="pick"
         back={{ label: from, onPress: () => router.back() }}
         onEdit={() =>
-          router.push({ pathname: "/night/edit/[id]", params: { id: created.id } })
+          router.push({ pathname: "/night/edit/[id]", params: { id: created.id, from: "Night" } })
         }
       />
     );

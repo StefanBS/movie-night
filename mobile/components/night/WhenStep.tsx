@@ -6,13 +6,12 @@ import { StartTimeRow } from "./StartTimeRow";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
 import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
-import { relativeLabel } from "../../lib/date";
-import { nightWording } from "../../lib/nightLifecycle";
-import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, radius, space, textPresets } from "../../theme";
+import { nightSummary } from "../../lib/date";
+import { createThemedStyles, fontFamily, fontSize, pressedOpacity, radius, space, textPresets } from "../../theme";
 
 // WhenStep is the wizard's first step: a "Tonight" chip + the Calendar and an
-// optional start time, with a sticky footer that names the plan
-// (Planning/Tonight/Recording) and its relative date. It owns its own selection/month —
+// optional start time, with a sticky footer that sums up the choice in one
+// line ("Friday, Jun 19 · 8:00 PM · in 4 days", lib/date nightSummary). It owns its own selection/month —
 // it reports the chosen date and start time on "Next". `initial` and
 // `initialStartTime` restore them when the user comes back.
 export function WhenStep({
@@ -35,7 +34,7 @@ export function WhenStep({
   const [startTime, setStartTime] = useState(initialStartTime);
   const [month, setMonth] = useState<YearMonth>(() => yearMonthOf(initial));
   const isToday = selected === today;
-  const wording = nightWording(selected, today);
+  const [summaryDate, ...summaryRest] = nightSummary(selected, startTime, today);
 
   const pickToday = () => {
     setSelected(today);
@@ -86,14 +85,10 @@ export function WhenStep({
       </ScrollView>
 
       <WizardFooter>
-        <View style={styles.footerMeta}>
-          <Text style={styles.planTag} allowFontScaling={false}>
-            {wording.planTag}
-          </Text>
-          <Text style={styles.relLabel} allowFontScaling={false}>
-            {relativeLabel(selected, today)}
-          </Text>
-        </View>
+        <Text style={styles.summary} allowFontScaling={false}>
+          <Text style={styles.summaryDate}>{summaryDate}</Text>
+          {summaryRest.map((part) => ` · ${part}`).join("")}
+        </Text>
         <AppButton
           title="Next: who's coming →"
           fullWidth
@@ -117,23 +112,20 @@ const useStyles = createThemedStyles((colors) => ({
   chipPressed: { opacity: pressedOpacity },
   chipText: { fontFamily: fontFamily.sansSemibold, fontSize: fontSize.sm, color: colors.text.primary },
   chipTextOn: { color: colors.surface.page },
+  // Cards sit on the page by fill alone, as on the board: no hairline edge.
   calendarCard: {
     marginTop: space[4],
     padding: space[4],
     backgroundColor: colors.surface.card,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
     borderRadius: radius.lg,
   },
   timeCard: {
     marginTop: space[3],
     backgroundColor: colors.surface.card,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
     borderRadius: radius.lg,
     overflow: "hidden",
   },
-  footerMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  planTag: { ...textPresets.meta, color: colors.text.secondary },
-  relLabel: { ...textPresets.meta, fontFamily: fontFamily.sansBold, color: colors.text.primary },
+  // No `tabular`: Schibsted's tabular figures widen the comma ("Friday , Nov 13").
+  summary: { ...textPresets.meta, color: colors.text.secondary },
+  summaryDate: { fontFamily: fontFamily.sansBold, color: colors.text.primary },
 }));

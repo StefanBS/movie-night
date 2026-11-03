@@ -54,9 +54,12 @@ export function editRows(night: Night, members: Member[]): EditRow[] {
   return rows;
 }
 
-type Draft = Pick<NightEditState, "date" | "startTime" | "attendees" | "reminders">;
+export type Draft = Pick<NightEditState, "date" | "startTime" | "attendees" | "reminders">;
 
-function isDirty(night: Night, { date, startTime, attendees, reminders }: Draft): boolean {
+// isDirty reports whether the draft differs from the stored Night, so Save
+// stays disabled until something changes. Attendees compare as a set (order
+// doesn't matter), and undoing a change makes the draft clean again. Pure.
+export function isDirty(night: Night, { date, startTime, attendees, reminders }: Draft): boolean {
   return (
     date !== night.scheduledFor ||
     startTime !== night.startTime ||

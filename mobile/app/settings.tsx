@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
+  Avatar,
   Input,
   SectionLabel,
   SettingsRow,
@@ -23,6 +24,7 @@ export default function SettingsScreen() {
   const colors = useColors();
   const styles = useStyles();
   const identity = useIdentity();
+  const me = identity.state.identity;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [group, setGroup] = useState<Group | null>(null);
@@ -153,10 +155,16 @@ export default function SettingsScreen() {
         <SectionLabel>You</SectionLabel>
         <View style={styles.card}>
           <View style={styles.divider}>
-            <SettingsRow label={identity.state.identity?.name ?? ""} value="On this phone" />
+            {/* IdentityProvider only shows Settings once this phone is claimed. */}
+            <SettingsRow
+              label={me?.name ?? ""}
+              sub="This phone belongs to you"
+              right={me ? <Avatar name={me.name} size={28} /> : undefined}
+            />
           </View>
           <SettingsRow
             label="Not you? Switch"
+            right={<ChevronRight size={18} color={colors.text.tertiary} />}
             disabled={identity.state.busy}
             onPress={() => void identity.session.release()}
           />

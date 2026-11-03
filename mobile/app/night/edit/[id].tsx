@@ -16,15 +16,17 @@ import { createNightLoad, nightLoadView } from "../../../lib/nightLoad";
 import { createThemedStyles, space, textPresets, useColors } from "../../../theme";
 
 export default function NightEditRoute() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  return <NightEditLoader key={id} id={id} />;
+  // `from` names the screen that opened Edit night ("Tonight", "Night"), for
+  // the back link.
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
+  return <NightEditLoader key={id} id={id} from={from ?? "Night"} />;
 }
 
 // NightEditLoader loads the Night on every focus (lib/nightLoad). Only the
 // first load shows the spinner: the editor holds unsaved drafts, so a refocus
 // refresh must not unmount it. The draft keeps the Night it opened with; a
 // refresh only updates the calendar's dots.
-function NightEditLoader({ id }: { id: string }) {
+function NightEditLoader({ id, from }: { id: string; from: string }) {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -34,6 +36,7 @@ function NightEditLoader({ id }: { id: string }) {
   const { night, members, nightDates, error } = state;
   const view = nightLoadView(state);
   const today = todayLocalISO();
+  const back = { label: from, onPress: () => router.back() };
 
   useFocusEffect(
     useCallback(() => {
@@ -47,7 +50,7 @@ function NightEditLoader({ id }: { id: string }) {
         <TopBar
           kind="title"
           title="Edit night"
-          back={{ label: "Up next", onPress: () => router.back() }}
+          back={back}
         />
         <ActivityIndicator style={styles.center} size="large" color={colors.text.secondary} />
       </View>
@@ -60,7 +63,7 @@ function NightEditLoader({ id }: { id: string }) {
         <TopBar
           kind="title"
           title="Edit night"
-          back={{ label: "Up next", onPress: () => router.back() }}
+          back={back}
         />
         <Text style={[styles.center, styles.error]}>
           {`Couldn't load night: ${error}`}
@@ -75,7 +78,7 @@ function NightEditLoader({ id }: { id: string }) {
         <TopBar
           kind="title"
           title="Edit night"
-          back={{ label: "Up next", onPress: () => router.back() }}
+          back={back}
         />
         <View style={styles.body}>
           <Text style={styles.muted}>{"Couldn't find that night."}</Text>
@@ -91,7 +94,7 @@ function NightEditLoader({ id }: { id: string }) {
       members={members}
       today={today}
       nightDates={nightDates}
-      onBack={() => router.back()}
+      back={back}
       onSaved={() => router.back()}
       onCancelled={() => router.replace("/")}
     />
