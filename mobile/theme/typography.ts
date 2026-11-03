@@ -151,11 +151,12 @@ export const textPresets = {
     fontSize: 15,
     lineHeight: lh(15, "normal"),
   },
-  // Bottom tab-bar item label (inactive weight; active swaps to sansBold).
+  // Bottom tab-bar item label (12, line-height 1.2; inactive weight, active
+  // swaps to sansSemibold).
   tabLabel: {
     fontFamily: fontFamily.sansMedium,
-    fontSize: 11,
-    lineHeight: lh(11, "normal"),
+    fontSize: fontSize.caption,
+    lineHeight: Math.round(fontSize.caption * 1.2),
   },
   // Group name under the home wordmark.
   barMeta: {

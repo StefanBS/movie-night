@@ -1,27 +1,30 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Linking, Text, View } from "react-native";
+import { ActivityIndicator, Linking, ScrollView, Text, View } from "react-native";
 import { ChevronRight } from "lucide-react-native";
+import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   Input,
   SectionLabel,
   SettingsRow,
-  TabScrollView,
   Toggle,
   TopBar,
-} from "../../components";
-import { useIdentity } from "../../components/IdentityProvider";
-import { API_URL } from "../../apiUrl";
-import { GROUP_ID } from "../../lib/api";
-import { formatMonthYear } from "../../lib/date";
-import { errorMessage } from "../../lib/errors";
-import { fetchGroup, renameGroup, type Group } from "../../lib/group";
-import { borderWidth, createThemedStyles, fontFamily, radius, space, textPresets, useColors } from "../../theme";
+} from "../components";
+import { useIdentity } from "../components/IdentityProvider";
+import { API_URL } from "../apiUrl";
+import { GROUP_ID } from "../lib/api";
+import { formatMonthYear } from "../lib/date";
+import { errorMessage } from "../lib/errors";
+import { fetchGroup, renameGroup, type Group } from "../lib/group";
+import { borderWidth, createThemedStyles, fontFamily, radius, space, textPresets, useColors } from "../theme";
 
 export default function SettingsScreen() {
   const colors = useColors();
   const styles = useStyles();
   const identity = useIdentity();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [group, setGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,8 +90,19 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.screen}>
-      <TopBar kind="tab" title="Settings" />
-      <TabScrollView contentContainerStyle={styles.content}>
+      <TopBar
+        kind="title"
+        title="Settings"
+        // Settings is pushed from the Tonight gear. A deep link can open it with
+        // nothing beneath, so fall back to Tonight rather than a dead back.
+        back={{
+          label: "Tonight",
+          onPress: () => (router.canGoBack() ? router.back() : router.replace("/")),
+        }}
+      />
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space[10] }]}
+      >
         <View style={styles.rule}>
           <Text style={styles.ruleKicker}>The house rule</Text>
           <Text style={styles.ruleText}>One pick a night.</Text>
@@ -185,7 +199,7 @@ export default function SettingsScreen() {
           </View>
           <SettingsRow label="Leave group" danger disabled />
         </View>
-      </TabScrollView>
+      </ScrollView>
     </View>
   );
 }

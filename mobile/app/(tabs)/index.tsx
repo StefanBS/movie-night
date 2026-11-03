@@ -87,7 +87,7 @@ export default function TonightScreen() {
   );
 
   // The group name is secondary header chrome, fetched independently of the
-  // turn. Refetch on focus (not just mount) so a rename on the Settings tab
+  // turn. Refetch on focus (not just mount) so a rename in Settings
   // shows here when the user returns — tab screens stay mounted. A failure just
   // leaves the header line blank rather than driving the screen's error state.
   useFocusEffect(
