@@ -21,6 +21,13 @@ export function formatShortDate(iso: string): string {
   return `${SHORT_MONTHS[month - 1]} ${day}`;
 }
 
+// formatShortDateYear turns a YYYY-MM-DD string into "Sep 12 2025" (no
+// comma), splitting by hand like formatShortDate. Used for the Watched sub.
+export function formatShortDateYear(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  return `${SHORT_MONTHS[month - 1]} ${day} ${year}`;
+}
+
 // formatMonthYear turns a YYYY-MM-DD string into a "Jun 2024" label. Like
 // formatShortDate, it splits the ISO string by hand so it stays timezone-
 // independent. Used for the member profile's "since" line.

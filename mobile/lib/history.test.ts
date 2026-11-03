@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildHistoryMonths, historyStats, watchedOn } from "./history";
+import { buildHistoryMonths, watchedOn, watchedSub } from "./history";
 import type { Night } from "./nights";
 
 function night(id: string, scheduledFor: string, tmdbId: number | null): Night {
@@ -18,24 +18,6 @@ function night(id: string, scheduledFor: string, tmdbId: number | null): Night {
     attendees: [],
   };
 }
-
-test("historyStats counts nights and distinct films", () => {
-  const nights = [
-    night("a", "2026-06-12", 10),
-    night("b", "2026-05-30", 20),
-    night("c", "2026-05-02", 10), // same film as a → not a distinct film
-  ];
-  assert.deepEqual(historyStats(nights), { nights: 3, films: 2 });
-});
-
-test("historyStats counts a movie-less night but not as a film", () => {
-  const nights = [night("a", "2026-06-12", 10), night("b", "2026-06-01", null)];
-  assert.deepEqual(historyStats(nights), { nights: 2, films: 1 });
-});
-
-test("historyStats on an empty list is all zeros", () => {
-  assert.deepEqual(historyStats([]), { nights: 0, films: 0 });
-});
 
 test("buildHistoryMonths groups by month, newest first within and across", () => {
   const nights = [
@@ -71,5 +53,14 @@ const watchedCases: [string, Night[], [number, string][]][] = [
 for (const [name, nights, want] of watchedCases) {
   test(`watchedOn: ${name}`, () => {
     assert.deepEqual([...watchedOn(nights, "self", TODAY)], want);
+  });
+}
+
+for (const [name, count, since, want] of [
+  ["many nights", 11, "2025-09-12", "11 nights since Sep 12 2025."],
+  ["one night is singular", 1, "2026-01-03", "1 night since Jan 3 2026."],
+] as const) {
+  test(`watchedSub: ${name}`, () => {
+    assert.equal(watchedSub(count, since), want);
   });
 }

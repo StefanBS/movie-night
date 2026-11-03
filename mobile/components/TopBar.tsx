@@ -4,7 +4,7 @@ import { ChevronLeft } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Logomark } from "./Logomark";
-import { createThemedStyles, fontFamily, lh, pressedOpacity, space, textPresets, useColors } from "../theme";
+import { createThemedStyles, fontFamily, lh, pressedOpacity, space, tabular, textPresets, useColors } from "../theme";
 
 // The app's shared top-bar chrome, in the three kinds the redesign uses:
 //   home  — logomark + "Movie Night" wordmark + group name + right slot (Tonight)
@@ -13,7 +13,15 @@ import { createThemedStyles, fontFamily, lh, pressedOpacity, space, textPresets,
 // `back` couples its label and handler so a title bar can't render a dead button.
 type TopBarProps =
   | { kind: "home"; group: string; right?: ReactNode }
-  | { kind: "tab"; title: string; sub?: string; right?: ReactNode }
+  | {
+      kind: "tab";
+      title: string;
+      sub?: string;
+      // subTabular sets tabular figures on a sub that is a count or date line
+      // ("11 nights since Sep 12 2025."); prose subs leave it off.
+      subTabular?: boolean;
+      right?: ReactNode;
+    }
   | {
       kind: "title";
       title: string;
@@ -62,7 +70,9 @@ export function TopBar(props: TopBarProps) {
           <Text style={styles.tabTitle} allowFontScaling={false} numberOfLines={1}>
             {props.title}
           </Text>
-          {props.sub ? <Text style={styles.sub}>{props.sub}</Text> : null}
+          {props.sub ? (
+            <Text style={[styles.sub, props.subTabular && styles.subTabular]}>{props.sub}</Text>
+          ) : null}
         </View>
         {props.right}
       </View>
@@ -109,6 +119,7 @@ const useStyles = createThemedStyles((colors) => ({
   flexShrink: { flexShrink: 1 },
   wordmark: { ...textPresets.wordmark, color: colors.text.primary },
   group: { ...textPresets.barMeta, color: colors.text.secondary },
+  subTabular: tabular,
   tabTitle: { ...textPresets.tabTitle, color: colors.text.primary },
   sub: {
     fontFamily: fontFamily.serifMedium,

@@ -3,11 +3,18 @@ import { Text } from "react-native";
 import { createThemedStyles, fontFamily, lh, space } from "../theme";
 
 // SectionLabel is the small group heading above a list: sentence case, 13px
-// semibold, secondary colour. Never uppercase.
-export function SectionLabel({ children }: { children: string }) {
+// semibold, secondary colour. Never uppercase. `marginTop` overrides the
+// default gap above it (Watched spaces its months 20, then 28).
+export function SectionLabel({
+  children,
+  marginTop,
+}: {
+  children: string;
+  marginTop?: number;
+}) {
   const styles = useStyles();
   return (
-    <Text style={styles.label} accessibilityRole="header">
+    <Text style={[styles.label, marginTop !== undefined && { marginTop }]} accessibilityRole="header">
       {children}
     </Text>
   );
