@@ -35,8 +35,8 @@ export function upNext(nights: Night[], today: string = todayLocalISO()): Night 
   return upcomingNights(nights, today)[0] ?? null;
 }
 
-// upcomingNights is the Upcoming tab's selector: every Night dated today or
-// later, soonest first. Its head is upNext.
+// upcomingNights is every Night dated today or later, soonest first. Its head
+// is upNext and its tail is alsoPlanned.
 export function upcomingNights(nights: Night[], today: string = todayLocalISO()): Night[] {
   return nights
     .filter((n) => nightTiming(n.scheduledFor, today) !== "past")

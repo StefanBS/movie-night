@@ -1,10 +1,10 @@
 # Movie Night — Mobile
 
-Expo / React Native app for the Movie Night [backend](../backend). Four tabs,
+Expo / React Native app for the Movie Night [backend](../backend). Three tabs,
 built with [expo-router](https://docs.expo.dev/router/introduction/):
 
-- **Tonight**: whose turn it is, who's on deck, and the next night.
-- **Upcoming**: every night on the calendar, soonest first.
+- **Tonight**: whose turn it is, who's on deck, the next night, and any
+  other nights already planned.
 - **Watched**: every night the group has had, newest first, by month.
 - **Club**: members in rotation, guests, and inactive members; add someone new.
 
@@ -225,7 +225,7 @@ light page, the dark mark on `#11100E`.
 mobile/
 ├── app/               # expo-router screens
 │   ├── _layout.tsx    # root stack, fonts, theming
-│   ├── (tabs)/        # Tonight, Upcoming, Watched, Club
+│   ├── (tabs)/        # Tonight, Watched, Club
 │   ├── night/         # plan, view, and edit a night
 │   ├── member/        # member profile, add a member
 │   ├── rotation.tsx   # the full turn order
