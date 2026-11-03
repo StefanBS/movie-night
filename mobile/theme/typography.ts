@@ -10,7 +10,8 @@
 
 // Family keys must match the names passed to useFonts() in _layout.tsx.
 // Roles: `display` = names and titles (800), `sans*` = UI and body,
-// `serif*` = film titles and the one italic line under a title (italic only).
+// `serif*` = film titles and the one serif line under a title (upright; 500
+// in use, per the spec).
 // There is no mono face: counts and dates use `sans` with `tabular`.
 export const fontFamily = {
   display: "SchibstedGrotesk-ExtraBold",
@@ -18,8 +19,8 @@ export const fontFamily = {
   sansMedium: "SchibstedGrotesk-Medium",
   sansSemibold: "SchibstedGrotesk-SemiBold",
   sansBold: "SchibstedGrotesk-Bold",
-  serifItalic: "Newsreader-Italic",
-  serifMediumItalic: "Newsreader-MediumItalic",
+  serif: "Newsreader",
+  serifMedium: "Newsreader-Medium",
 } as const;
 
 // Weight is carried by the named static faces above — switch fontFamily rather
@@ -116,10 +117,10 @@ export const textPresets = {
     letterSpacing: trackPx(fontSize.caption, "caption"),
     ...tabular,
   },
-  // Film titles and the one italic line under a title (34 / 1.1, italic).
+  // Film titles and the one serif line under a title (34 / 1.1, upright 500).
   // Size it 26–44px; smaller in rows and on posters.
   filmTitle: {
-    fontFamily: fontFamily.serifItalic,
+    fontFamily: fontFamily.serifMedium,
     fontSize: 34,
     lineHeight: Math.round(34 * 1.1),
   },

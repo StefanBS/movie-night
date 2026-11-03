@@ -2,10 +2,10 @@ import { Text, View } from "react-native";
 
 import { createThemedStyles, fontFamily, lh, space } from "../../theme";
 
-const STEP_LABELS = ["When", "Here", "Pick", "Done"] as const;
+const STEP_LABELS = ["Date", "People", "Movie", "Done"] as const;
 
 // Stepper is the wizard's progress: four segments with sentence-case labels
-// (When · Here · Pick · Done). Done segments are solid text colour, the current
+// (Date · People · Movie · Done). Done segments are solid text colour, the current
 // one the accent, the rest a strong hairline.
 export function Stepper({ current }: { current: number }) {
   const styles = useStyles();

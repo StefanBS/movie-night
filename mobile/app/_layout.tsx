@@ -22,8 +22,8 @@ export default function RootLayout() {
     "SchibstedGrotesk-SemiBold": require("../assets/fonts/SchibstedGrotesk-SemiBold.ttf"),
     "SchibstedGrotesk-Bold": require("../assets/fonts/SchibstedGrotesk-Bold.ttf"),
     "SchibstedGrotesk-ExtraBold": require("../assets/fonts/SchibstedGrotesk-ExtraBold.ttf"),
-    "Newsreader-Italic": require("../assets/fonts/Newsreader-Italic.ttf"),
-    "Newsreader-MediumItalic": require("../assets/fonts/Newsreader-MediumItalic.ttf"),
+    Newsreader: require("../assets/fonts/Newsreader-Regular.ttf"),
+    "Newsreader-Medium": require("../assets/fonts/Newsreader-Medium.ttf"),
   });
 
   if (!loaded) {
