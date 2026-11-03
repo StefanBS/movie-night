@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { calendarEntry } from "./calendarEntry";
+import { calendarEntry, calendarRecurrence, seriesNote, type CalendarRecurrence } from "./calendarEntry";
 import type { Movie } from "./movies";
 import type { Night } from "./nights";
+import type { Repeat } from "./repeat";
 
 const ID = "11111111-2222-3333-4444-555555555555";
 
@@ -65,5 +66,29 @@ test("calendarEntry runs 3 hours from the start time, or 7:30 PM, local time", (
     const entry = calendarEntry(night({ scheduledFor: c.scheduledFor, startTime: c.startTime }));
     assert.deepEqual(entry.startDate, c.start, `${c.scheduledFor} ${c.startTime}`);
     assert.deepEqual(entry.endDate, c.end, `${c.scheduledFor} ${c.startTime}`);
+  }
+});
+
+test("calendarRecurrence: a weekly repeat becomes an open-ended weekly rule; others add the one night", () => {
+  const cases: { name: string; repeat: Repeat | null; want: CalendarRecurrence | null }[] = [
+    { name: "one-off", repeat: null, want: null },
+    { name: "every week", repeat: { freq: "weekly", intervalWeeks: 1 }, want: { interval: 1 } },
+    { name: "every 2 weeks", repeat: { freq: "weekly", intervalWeeks: 2 }, want: { interval: 2 } },
+    // expo-calendar can't pass a monthly "Nth weekday" rule to either OS form.
+    { name: "third Friday", repeat: { freq: "monthly", week: 3 }, want: null },
+    { name: "last Friday", repeat: { freq: "monthly", week: -1 }, want: null },
+  ];
+  for (const c of cases) {
+    assert.deepEqual(calendarRecurrence(c.repeat), c.want, c.name);
+  }
+});
+
+test("seriesNote describes the cadence mid-sentence", () => {
+  const cases: { name: string; repeat: Repeat; date: string; want: string }[] = [
+    { name: "every week", repeat: { freq: "weekly", intervalWeeks: 1 }, date: "2026-11-20", want: "every Friday" },
+    { name: "every 2 weeks", repeat: { freq: "weekly", intervalWeeks: 2 }, date: "2026-11-20", want: "every 2 weeks" },
+  ];
+  for (const c of cases) {
+    assert.equal(seriesNote(c.repeat, c.date), c.want, c.name);
   }
 });
