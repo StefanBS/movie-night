@@ -19,7 +19,7 @@ import { firstName } from "../../lib/avatar";
 import { GROUP_ID } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import { fetchGroup } from "../../lib/group";
-import { fetchTurn, pickerSummary, picksLabel, type TurnMember } from "../../lib/turn";
+import { fetchTurn, nextPickers, pickerSummary, picksLabel, type TurnMember } from "../../lib/turn";
 import { listNights, nightPicker, type Night } from "../../lib/nights";
 import { alsoPlanned, upNext } from "../../lib/nightLifecycle";
 import { alsoPlannedPicks, alsoPlannedWhen } from "../../lib/alsoPlanned";
@@ -36,7 +36,7 @@ import {
   useColors,
 } from "../../theme";
 
-// OnDeck lists the next members after the picker (turn elements 1–3) as flush
+// OnDeck lists the next members after the picker (see nextPickers) as flush
 // rows with their pick counts.
 function OnDeck({ label, members }: { label: string; members: TurnMember[] }) {
   return (
@@ -177,10 +177,12 @@ export default function TonightScreen() {
   );
 
   const picker = order[0] ?? null;
-  const onDeck = order.slice(1, 4);
   const pickerFirstName = picker ? firstName(picker.name) : "";
   const today = todayLocalISO();
   const scheduled = upNext(nights);
+  // Who's on deck follows whoever picks the next Night: the planned Night's
+  // own picker when there is one, else the head of the ranking.
+  const onDeck = nextPickers(order, scheduled?.pickerId ?? picker?.id ?? "");
   const later = alsoPlanned(nights);
   const openNight = (night: Night) => {
     router.navigate({ pathname: "/night/[id]", params: { id: night.id, from: "Tonight" } });

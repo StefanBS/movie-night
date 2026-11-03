@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { parseTurn, picksLabel, pickerMeta, pickerSummary, type TurnMember } from "./turn";
+import { nextPickers, parseTurn, picksLabel, pickerMeta, pickerSummary, type TurnMember } from "./turn";
 
 // parseTurn validates an untrusted JSON payload from the backend and returns
 // typed TurnMembers, or throws a descriptive error. Pure, table-driven.
@@ -85,5 +85,25 @@ for (const c of summaryCases) {
   test(`pickerSummary: ${c.name}`, () => {
     const m: TurnMember = { id: "x", name: "Ada", role: "core", servedCount: c.servedCount, lastPickedOn: c.lastPickedOn };
     assert.equal(pickerSummary(m), c.want);
+  });
+}
+
+// nextPickers is who picks after a given picker: the ranking minus them, up to
+// three. A planned Night's picker is already counted, so they sit at the bottom
+// of the ranking, not the top: the head of the ranking is next, not skipped.
+const rank = (...names: string[]): TurnMember[] =>
+  names.map((name) => ({ id: name, name, role: "core", servedCount: 0, lastPickedOn: null }));
+const nextPickersCases: { name: string; order: TurnMember[]; pickerId: string; want: string[] }[] = [
+  { name: "picker at the head (no night planned)", order: rank("Blake", "Ada", "Dev", "Esme", "Cleo"), pickerId: "Blake", want: ["Ada", "Dev", "Esme"] },
+  { name: "planned picker counted, at the bottom", order: rank("Blake", "Ada", "Dev", "Esme", "Cleo"), pickerId: "Cleo", want: ["Blake", "Ada", "Dev"] },
+  { name: "picker chosen out of turn, mid-ranking", order: rank("Blake", "Ada", "Dev", "Esme", "Cleo"), pickerId: "Dev", want: ["Blake", "Ada", "Esme"] },
+  { name: "picker not in the rotation (a guest)", order: rank("Blake", "Ada", "Dev", "Esme"), pickerId: "Gus", want: ["Blake", "Ada", "Dev"] },
+  { name: "fewer than three others", order: rank("Blake", "Ada"), pickerId: "Ada", want: ["Blake"] },
+  { name: "picker is the only member", order: rank("Ada"), pickerId: "Ada", want: [] },
+  { name: "empty ranking", order: [], pickerId: "Ada", want: [] },
+];
+for (const c of nextPickersCases) {
+  test(`nextPickers: ${c.name}`, () => {
+    assert.deepEqual(nextPickers(c.order, c.pickerId).map((m) => m.name), c.want);
   });
 }
