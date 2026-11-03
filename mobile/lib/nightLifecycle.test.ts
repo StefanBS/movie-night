@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { historyNights, nightDates, nightMeta, nightTiming, nightWording, upcomingNights, upNext, type NightTiming } from "./nightLifecycle";
+import { alsoPlanned, historyNights, nightDates, nightMeta, nightTiming, nightWording, upcomingNights, upNext, type NightTiming } from "./nightLifecycle";
 import type { Night } from "./nights";
 
 const TODAY = "2026-06-22";
@@ -56,6 +56,25 @@ const upNextCases: [string, Night[], string | null][] = [
 for (const [name, nights, want] of upNextCases) {
   test(`upNext: ${name}`, () => {
     assert.equal(upNext(nights, TODAY)?.id ?? null, want);
+  });
+}
+
+// alsoPlanned
+
+const alsoPlannedCases: [string, Night[], string[]][] = [
+  ["no nights", [], []],
+  ["one planned night is up next, so nothing else", [night("u", "2026-06-26")], []],
+  [
+    "the rest after up next, soonest first",
+    [night("far", "2026-07-10"), night("soon", "2026-06-26"), night("mid", "2026-06-30")],
+    ["mid", "far"],
+  ],
+  ["tonight is up next, so the upcoming one is also planned", [night("u", "2026-06-23"), night("t", TODAY)], ["u"]],
+  ["past nights are never listed", [night("p", "2026-06-10"), night("u", "2026-06-26"), night("v", "2026-07-01")], ["v"]],
+];
+for (const [name, nights, want] of alsoPlannedCases) {
+  test(`alsoPlanned: ${name}`, () => {
+    assert.deepEqual(ids(alsoPlanned(nights, TODAY)), want);
   });
 }
 

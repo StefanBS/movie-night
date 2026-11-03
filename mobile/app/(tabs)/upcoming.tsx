@@ -10,9 +10,9 @@ import { GROUP_ID } from "../../lib/api";
 import { todayLocalISO, weekday } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { upcomingNights } from "../../lib/nightLifecycle";
-import { listNights, type Night } from "../../lib/nights";
+import { listNights, nightPicker, type Night } from "../../lib/nights";
 import { fetchTurn } from "../../lib/turn";
-import { upcomingMeta, upcomingPicker, upcomingSub, upcomingTitle } from "../../lib/upcoming";
+import { upcomingMeta, upcomingSub, upcomingTitle } from "../../lib/upcoming";
 import {
   borderWidth,
   createThemedStyles,
@@ -145,7 +145,7 @@ export default function UpcomingScreen() {
 function UpcomingRow({ night, last, onPress }: { night: Night; last: boolean; onPress: () => void }) {
   const colors = useColors();
   const styles = useStyles();
-  const picker = upcomingPicker(night);
+  const picker = nightPicker(night);
   return (
     <Pressable
       onPress={onPress}

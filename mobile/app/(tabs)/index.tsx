@@ -1,10 +1,11 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
-import { Settings } from "lucide-react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ChevronRight, Settings } from "lucide-react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 
 import {
   AppButton,
+  Avatar,
   IconButton,
   MemberRow,
   PickerHero,
@@ -19,10 +20,21 @@ import { GROUP_ID } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import { fetchGroup } from "../../lib/group";
 import { fetchTurn, pickerSummary, picksLabel, type TurnMember } from "../../lib/turn";
-import { listNights, type Night } from "../../lib/nights";
-import { upNext } from "../../lib/nightLifecycle";
+import { listNights, nightPicker, type Night } from "../../lib/nights";
+import { alsoPlanned, upNext } from "../../lib/nightLifecycle";
+import { alsoPlannedPicks, alsoPlannedWhen } from "../../lib/alsoPlanned";
 import { todayLocalISO } from "../../lib/date";
-import { createThemedStyles, space, textPresets, useColors } from "../../theme";
+import {
+  borderWidth,
+  createThemedStyles,
+  fontFamily,
+  fontSize,
+  lh,
+  pressedOpacity,
+  space,
+  textPresets,
+  useColors,
+} from "../../theme";
 
 // OnDeck lists the next members after the picker (turn elements 1–3) as flush
 // rows with their pick counts.
@@ -39,6 +51,56 @@ function OnDeck({ label, members }: { label: string; members: TurnMember[] }) {
             divider={i < members.length - 1}
           />
         ))}
+      </View>
+    </>
+  );
+}
+
+// AlsoPlanned lists the planned Nights after the UpNextCard, soonest first, as
+// flush rows with hairlines between them: the picker's avatar, the date (and
+// start time) over "Priya picks", and a chevron. A row opens its Night. No
+// accent: the picker is only marked on the card above. Renders nothing when
+// there are no other planned Nights.
+function AlsoPlanned({ nights, onOpen }: { nights: Night[]; onOpen: (night: Night) => void }) {
+  const colors = useColors();
+  const styles = useStyles();
+  if (nights.length === 0) {
+    return null;
+  }
+  return (
+    <>
+      <SectionLabel marginTop={ALSO_PLANNED_GAP}>Also planned</SectionLabel>
+      <View>
+        {nights.map((n, i) => {
+          const picker = nightPicker(n);
+          const picks = alsoPlannedPicks(n);
+          return (
+            <Pressable
+              key={n.id}
+              onPress={() => onOpen(n)}
+              accessibilityRole="button"
+              accessibilityLabel={[alsoPlannedWhen(n), picks].filter((t) => t !== null).join(", ")}
+              style={({ pressed }) => [
+                styles.plannedRow,
+                i < nights.length - 1 && styles.plannedDivider,
+                pressed && styles.pressed,
+              ]}
+            >
+              {picker !== null ? <Avatar name={picker.name} size={28} /> : null}
+              <View style={styles.plannedText}>
+                <Text style={styles.plannedWhen} numberOfLines={1}>
+                  {alsoPlannedWhen(n)}
+                </Text>
+                {picks !== null ? (
+                  <Text style={styles.plannedPicks} numberOfLines={1}>
+                    {picks}
+                  </Text>
+                ) : null}
+              </View>
+              <ChevronRight size={18} color={colors.text.tertiary} />
+            </Pressable>
+          );
+        })}
       </View>
     </>
   );
@@ -119,6 +181,10 @@ export default function TonightScreen() {
   const pickerFirstName = picker ? firstName(picker.name) : "";
   const today = todayLocalISO();
   const scheduled = upNext(nights, today);
+  const later = alsoPlanned(nights, today);
+  const openNight = (night: Night) => {
+    router.navigate({ pathname: "/night/[id]", params: { id: night.id, from: "Tonight" } });
+  };
   const openScheduled = () => {
     if (scheduled === null) {
       return;
@@ -159,6 +225,7 @@ export default function TonightScreen() {
                 onStart={openScheduled}
                 onEdit={openEdit}
               />
+              <AlsoPlanned nights={later} onOpen={openNight} />
               {onDeck.length > 0 ? <OnDeck label="Then" members={onDeck} /> : null}
             </>
           ) : (
@@ -198,6 +265,10 @@ export default function TonightScreen() {
   );
 }
 
+// "Also planned" sits 28px under the UpNextCard (off the 4px-step scale's
+// named stops, like Watched's later sections).
+const ALSO_PLANNED_GAP = space[6] + space[1];
+
 const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
@@ -224,4 +295,25 @@ const useStyles = createThemedStyles((colors) => ({
     marginBottom: space[3],
   },
   linkRow: { marginTop: space[2], alignItems: "flex-start" },
+  plannedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space[3],
+    paddingVertical: space[3],
+  },
+  plannedDivider: {
+    borderBottomWidth: borderWidth.hairline,
+    borderBottomColor: colors.border.hairline,
+  },
+  pressed: { opacity: pressedOpacity },
+  // minWidth 0 lets a long line truncate instead of pushing the chevron out.
+  plannedText: { flex: 1, minWidth: 0, gap: 2 },
+  // No tabular figures: the date line is prose ("Sat 27 Jun · 8:00 PM").
+  plannedWhen: {
+    fontFamily: fontFamily.sansSemibold,
+    fontSize: fontSize.base,
+    lineHeight: lh(fontSize.base),
+    color: colors.text.primary,
+  },
+  plannedPicks: { ...textPresets.meta, color: colors.text.secondary },
 }));

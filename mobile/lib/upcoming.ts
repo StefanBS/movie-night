@@ -1,6 +1,6 @@
 import { firstName } from "./avatar";
 import { countdownLabel, formatStartTime, formatWeekdayDate, todayLocalISO } from "./date";
-import type { Night } from "./nights";
+import { nightPicker, type Night } from "./nights";
 
 // What the Upcoming tab says about the Nights on the calendar. Pure, so the
 // screen only lays it out. `today` and `locale` are injectable for tests.
@@ -21,16 +21,10 @@ export function upcomingTitle(night: Night, locale?: string): string {
   return night.startTime === null ? date : `${date} · ${formatStartTime(night.startTime, locale)}`;
 }
 
-// upcomingPicker is the Night's picker among its attendees, or null if the
-// payload somehow lacks them (every Night has one, ADR-0008).
-export function upcomingPicker(night: Night): { id: string; name: string } | null {
-  return night.attendees.find((a) => a.id === night.pickerId) ?? null;
-}
-
 // upcomingMeta is a row's line under the date: who picks and how many are
 // coming ("Ada picks · 3 coming").
 export function upcomingMeta(night: Night): string {
   const coming = `${night.attendees.length} coming`;
-  const picker = upcomingPicker(night);
+  const picker = nightPicker(night);
   return picker === null ? coming : `${firstName(picker.name)} picks · ${coming}`;
 }
