@@ -21,6 +21,9 @@ export type Night = {
   movie: Movie | null;
   attendees: Attendee[];
   reminders: Reminders;
+  // watchedAt is when the group recorded the Night as watched (an ISO
+  // timestamp), or null until then (ADR-0012).
+  watchedAt: string | null;
 };
 
 function parseAttendee(raw: unknown, index: number): Attendee {
@@ -54,7 +57,7 @@ export function parseNight(raw: unknown): Night {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("expected a night object");
   }
-  const { id, scheduledFor, startTime, pickerId, movie, attendees, reminders } = raw as Record<string, unknown>;
+  const { id, scheduledFor, startTime, pickerId, movie, attendees, reminders, watchedAt } = raw as Record<string, unknown>;
   if (typeof id !== "string") {
     throw new Error("night: id must be a string");
   }
@@ -70,6 +73,9 @@ export function parseNight(raw: unknown): Night {
   if (!Array.isArray(attendees)) {
     throw new Error("night: attendees must be an array");
   }
+  if (watchedAt !== undefined && watchedAt !== null && typeof watchedAt !== "string") {
+    throw new Error("night: watchedAt must be a string or null");
+  }
   const parsedMovie = movie === undefined || movie === null ? null : parseMovie(movie);
   return {
     id,
@@ -79,6 +85,7 @@ export function parseNight(raw: unknown): Night {
     movie: parsedMovie,
     attendees: attendees.map(parseAttendee),
     reminders: parseReminders(reminders),
+    watchedAt: watchedAt ?? null,
   };
 }
 

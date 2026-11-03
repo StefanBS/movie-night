@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"slices"
 	"strings"
@@ -27,6 +28,7 @@ func TestNightEditsIntegration(t *testing.T) {
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(q))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, client))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/movie", clearNightMovieHandler(q))
+	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
 
 	do := func(t *testing.T, method, path, body string) (int, []byte) {
 		t.Helper()
@@ -96,7 +98,7 @@ func TestNightEditsIntegration(t *testing.T) {
 		_, after := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+before.ID, "")
 		if after.ScheduledFor != before.ScheduledFor || after.PickerID != before.PickerID ||
 			!slices.Equal(attendeeIDs(after), attendeeIDs(before)) || after.Reminders != before.Reminders ||
-			!equalPtr(after.StartTime, deref(before.StartTime)) {
+			!equalPtr(after.StartTime, deref(before.StartTime)) || !equalPtr(after.WatchedAt, deref(before.WatchedAt)) {
 			t.Fatalf("night after rejected edit = %+v, want unchanged %+v", after, before)
 		}
 	}
@@ -301,6 +303,126 @@ func TestNightEditsIntegration(t *testing.T) {
 				got.Movie.ReleaseYear == nil || *got.Movie.ReleaseYear != 2021 || got.Movie.PosterURL == nil {
 				t.Fatalf("%s movie = %+v, want Dune (2021) with a poster", step.name, got.Movie)
 			}
+		}
+	})
+
+	// Recording a Night (ADR-0012): "We watched it" confirms who came and who
+	// picked, and records the Night, in one PATCH.
+	t.Run("a new night is not watched", func(t *testing.T) {
+		if n := mkNight(t); n.WatchedAt != nil {
+			t.Fatalf("watchedAt = %q, want null", *n.WatchedAt)
+		}
+	})
+
+	t.Run("PATCH watched records the night with its attendees and picker", func(t *testing.T) {
+		n := mkNight(t) // Ada picks, alone
+		if code, _ := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":438631}`); code != http.StatusOK {
+			t.Fatalf("attach status = %d, want 200", code)
+		}
+		code, got := doJSON[nightResponse](t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			editBody(t, n, func(r *updateNightRequest) {
+				r.Attendees, r.PickerID, r.Watched = []string{blake, cleo}, str(blake), true
+			}))
+		if code != http.StatusOK {
+			t.Fatalf("patch status = %d, want 200", code)
+		}
+		if got.WatchedAt == nil {
+			t.Fatal("watchedAt = null, want set")
+		}
+		if got.PickerID != blake || !slices.Equal(attendeeIDs(got), []string{blake, cleo}) {
+			t.Fatalf("night = %+v, want Blake picking with [Blake Cleo]", got)
+		}
+		if _, read := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, ""); !equalPtr(read.WatchedAt, *got.WatchedAt) {
+			t.Fatalf("stored watchedAt = %v, want %q", read.WatchedAt, *got.WatchedAt)
+		}
+	})
+
+	t.Run("PATCH watched without a film yields 422 and changes nothing", func(t *testing.T) {
+		n := mkNight(t)
+		code, body := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			editBody(t, n, func(r *updateNightRequest) {
+				r.Attendees, r.PickerID, r.Watched = []string{blake, cleo}, str(blake), true
+			}))
+		if code != http.StatusUnprocessableEntity {
+			t.Fatalf("patch status = %d, want 422 (body %s)", code, body)
+		}
+		unchanged(t, n)
+	})
+
+	t.Run("PATCH with a picker who isn't attending yields 422 and changes nothing", func(t *testing.T) {
+		n := mkNight(t)
+		code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			editBody(t, n, func(r *updateNightRequest) { r.Attendees, r.PickerID = []string{ada, cleo}, str(blake) }))
+		if code != http.StatusUnprocessableEntity {
+			t.Fatalf("patch status = %d, want 422", code)
+		}
+		unchanged(t, n)
+	})
+
+	t.Run("PATCH watched onto a taken date changes nothing", func(t *testing.T) {
+		n := mkNight(t)
+		if code, _ := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":438631}`); code != http.StatusOK {
+			t.Fatalf("attach status = %d, want 200", code)
+		}
+		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-07-04", blake)); code != http.StatusCreated {
+			t.Fatalf("create second night = %d, want 201", code)
+		}
+		code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			editBody(t, n, func(r *updateNightRequest) {
+				r.ScheduledFor, r.Attendees, r.PickerID, r.Watched = "2026-07-04", []string{ada, cleo}, str(cleo), true
+			}))
+		if code != http.StatusConflict {
+			t.Fatalf("patch status = %d, want 409", code)
+		}
+		unchanged(t, n)
+	})
+
+	t.Run("recording twice keeps the first watchedAt", func(t *testing.T) {
+		n := mkNight(t)
+		if code, _ := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":438631}`); code != http.StatusOK {
+			t.Fatalf("attach status = %d, want 200", code)
+		}
+		path := "/groups/" + seededGroup + "/nights/" + n.ID
+		record := editBody(t, n, func(r *updateNightRequest) { r.Watched = true })
+		_, first := doJSON[nightResponse](t, mux, http.MethodPatch, path, record)
+		if first.WatchedAt == nil {
+			t.Fatal("first watchedAt = null, want set")
+		}
+		// Push the stored time back, so a second recording that overwrote it
+		// would be visible even within the same second.
+		if _, err := pool.Exec(context.Background(), "UPDATE picks SET watched_at = watched_at - interval '1 day' WHERE id = $1", n.ID); err != nil {
+			t.Fatalf("age watched_at: %v", err)
+		}
+		_, before := doJSON[nightResponse](t, mux, http.MethodGet, path, "")
+		code, second := doJSON[nightResponse](t, mux, http.MethodPatch, path, record)
+		if code != http.StatusOK {
+			t.Fatalf("second record status = %d, want 200", code)
+		}
+		if !equalPtr(second.WatchedAt, deref(before.WatchedAt)) {
+			t.Fatalf("watchedAt after recording again = %v, want %v kept", second.WatchedAt, before.WatchedAt)
+		}
+		// An edit without watched leaves the record alone; there is no un-recording.
+		if _, edited := doJSON[nightResponse](t, mux, http.MethodPatch, path, editBody(t, second, func(*updateNightRequest) {})); !equalPtr(edited.WatchedAt, deref(before.WatchedAt)) {
+			t.Fatalf("watchedAt after a plain edit = %v, want %v kept", edited.WatchedAt, before.WatchedAt)
+		}
+	})
+
+	t.Run("recording a night leaves the turn order and served counts as they were", func(t *testing.T) {
+		clearAllPicks(t, pool, seededGroup)
+		_, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-06-12", ada, blake, cleo))
+		if code, _ := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":438631}`); code != http.StatusOK {
+			t.Fatalf("attach status = %d, want 200", code)
+		}
+		_, before := doJSON[[]turnResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/turn", "")
+		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			editBody(t, n, func(r *updateNightRequest) { r.PickerID, r.Watched = str(ada), true })); code != http.StatusOK {
+			t.Fatalf("record status = %d, want 200", code)
+		}
+		_, after := doJSON[[]turnResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/turn", "")
+		if len(before) == 0 || !slices.EqualFunc(before, after, func(a, b turnResponse) bool {
+			return a.ID == b.ID && a.ServedCount == b.ServedCount && equalPtr(a.LastPickedOn, deref(b.LastPickedOn))
+		}) {
+			t.Fatalf("turn after recording = %+v, want unchanged %+v", after, before)
 		}
 	})
 

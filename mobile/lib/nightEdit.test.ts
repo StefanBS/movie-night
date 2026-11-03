@@ -26,6 +26,7 @@ const night = (...ids: string[]): Night => ({
   startTime: null,
   pickerId: ids[0],
   reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
+  watchedAt: null,
   movie: null,
   attendees: ids.map((id) => ({ id, name: id[0].toUpperCase() + id.slice(1), role: id === "frankie" ? "guest" : "core" })),
 });

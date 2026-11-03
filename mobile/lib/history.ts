@@ -1,5 +1,5 @@
-import { formatMonthYear, formatShortDateYear, todayLocalISO } from "./date";
-import { historyNights } from "./nightLifecycle";
+import { formatMonthYear, formatShortDateYear } from "./date";
+import { watchedNights } from "./nightLifecycle";
 import type { Night } from "./nights";
 
 export type HistoryMonth = { label: string; nights: Night[] };
@@ -36,15 +36,12 @@ export function buildHistoryMonths(nights: Night[]): HistoryMonth[] {
 
 // watchedOn maps each film the group has already watched (by tmdbId) to the
 // last date they watched it, for "watched May 2" in the film search. Watched
-// means a Night dated today or earlier, as in History; `exceptNightId` leaves
-// out the Night whose film is being chosen, so its own film doesn't count.
-export function watchedOn(
-  nights: Night[],
-  exceptNightId: string,
-  today: string = todayLocalISO(),
-): Map<number, string> {
+// means a Night recorded as watched, as on the Watched tab; `exceptNightId`
+// leaves out the Night whose film is being chosen, so its own film doesn't
+// count.
+export function watchedOn(nights: Night[], exceptNightId: string): Map<number, string> {
   const watched = new Map<number, string>();
-  for (const n of historyNights(nights, today)) {
+  for (const n of watchedNights(nights)) {
     if (n.id === exceptNightId || n.movie === null) continue;
     const last = watched.get(n.movie.tmdbId);
     if (last === undefined || n.scheduledFor > last) {

@@ -180,8 +180,8 @@ export default function TonightScreen() {
   const onDeck = order.slice(1, 4);
   const pickerFirstName = picker ? firstName(picker.name) : "";
   const today = todayLocalISO();
-  const scheduled = upNext(nights, today);
-  const later = alsoPlanned(nights, today);
+  const scheduled = upNext(nights);
+  const later = alsoPlanned(nights);
   const openNight = (night: Night) => {
     router.navigate({ pathname: "/night/[id]", params: { id: night.id, from: "Tonight" } });
   };

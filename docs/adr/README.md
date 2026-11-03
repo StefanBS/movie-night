@@ -7,7 +7,7 @@ decision, consequences). Records are append-only: when a decision changes, add a
 new record that supersedes the old one rather than editing history.
 
 **Status legend:** Proposed · Accepted · Superseded · Deprecated
-**Last updated:** 2026-10-28
+**Last updated:** 2026-11-03
 
 ## Index
 
@@ -22,6 +22,7 @@ new record that supersedes the old one rather than editing history.
 - [ADR-0009](0009-claimed-identity-device-tokens.md) — An install claims its identity from the roster and holds a device token · *Accepted*
 - [ADR-0010](0010-server-push-reminders.md) — Reminders are server push, computed each minute and sent at most once · *Accepted*
 - [ADR-0011](0011-night-start-time-wall-clock.md) — A Night's start time is a zone-less wall-clock time, read on each device · *Accepted*
+- [ADR-0012](0012-night-recorded-as-watched.md) — A Night is history only once the group records it as watched · *Accepted*
 
 Open and deferred decisions are tracked in [backlog.md](backlog.md).
 
@@ -36,8 +37,9 @@ schema definition.
   (active/inactive), `baseline_picks`, `rotation_position`, join/leave timestamps.
 - **picks** — one per movie night (at most one per group per date); references the
   group, the picker (always an attendee — [ADR-0008](0008-night-always-has-a-picker.md)),
-  and the chosen movie; carries `is_credited`, the scheduled date, and an optional start time
-  ([ADR-0011](0011-night-start-time-wall-clock.md)).
+  and the chosen movie; carries `is_credited`, the scheduled date, an optional start time
+  ([ADR-0011](0011-night-start-time-wall-clock.md)), and when it was recorded as watched
+  ([ADR-0012](0012-night-recorded-as-watched.md)).
 - **attendances** — who was present at a given night (linked to that night's pick).
 - **movies** — metadata cached from TMDB.
 - **reviews** — a person's rating/notes for a given night's pick.

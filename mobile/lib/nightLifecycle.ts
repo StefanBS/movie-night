@@ -9,12 +9,14 @@ import {
 } from "./date";
 import type { Night } from "./nights";
 
-// The Night lifecycle: the one owner of a Night's date-relative state and the
-// selectors built on it (see GLOSSARY.md). Every Night has a picker (ADR-0008)
-// and attaching a film never changes its state, so the state is a function of
-// the date alone. It lives on the client because the backend has no group
-// timezone. ISO YYYY-MM-DD compares chronologically as text, so there is no
-// Date parsing. `today` is injectable for deterministic tests (mirrors date.ts).
+// The Night lifecycle: the one owner of a Night's state and the selectors
+// built on it (see GLOSSARY.md). Every Night has a picker (ADR-0008) and
+// attaching a film never changes its state. Its timing is a function of the
+// date alone, and lives on the client because the backend has no group
+// timezone. Whether it has happened is the group's call: a Night stays planned
+// until it is recorded as watched (watchedAt, ADR-0012). ISO YYYY-MM-DD
+// compares chronologically as text, so there is no Date parsing. `today` is
+// injectable for deterministic tests (mirrors date.ts).
 
 export type NightTiming = "upcoming" | "tonight" | "past";
 
@@ -28,32 +30,44 @@ export function nightTiming(scheduledFor: string, today: string = todayLocalISO(
   return "past";
 }
 
-// upNext is the home "Up next" selector: the soonest Night dated today or
-// later, or null when none (the spotlight is then the fallback). Tonight's
-// Night stays up next all day, film or not.
-export function upNext(nights: Night[], today: string = todayLocalISO()): Night | null {
-  return upcomingNights(nights, today)[0] ?? null;
+// isWatched is whether the group has recorded the Night as watched.
+export function isWatched(night: Night): boolean {
+  return night.watchedAt !== null;
 }
 
-// upcomingNights is every Night dated today or later, soonest first. Its head
-// is upNext and its tail is alsoPlanned.
-export function upcomingNights(nights: Night[], today: string = todayLocalISO()): Night[] {
+// isDue is a Night waiting on "We watched it": dated today or earlier and not
+// recorded yet.
+export function isDue(night: Night, today: string = todayLocalISO()): boolean {
+  return !isWatched(night) && nightTiming(night.scheduledFor, today) !== "upcoming";
+}
+
+// plannedNights is every Night not yet recorded as watched, soonest first. A
+// due Night from an earlier day comes first, so it stays on Tonight until it is
+// recorded. Its head is upNext and its tail is alsoPlanned.
+export function plannedNights(nights: Night[]): Night[] {
   return nights
-    .filter((n) => nightTiming(n.scheduledFor, today) !== "past")
+    .filter((n) => !isWatched(n))
     .sort((a, b) => a.scheduledFor.localeCompare(b.scheduledFor));
 }
 
-// alsoPlanned is Tonight's "Also planned" selector: the upcoming Nights after
-// upNext, soonest first. Empty when at most one Night is planned.
-export function alsoPlanned(nights: Night[], today: string = todayLocalISO()): Night[] {
-  return upcomingNights(nights, today).slice(1);
+// upNext is the home "Up next" selector: the soonest planned Night, or null
+// when none (the spotlight is then the fallback). Tonight's Night stays up
+// next, film or not, until it is recorded.
+export function upNext(nights: Night[]): Night | null {
+  return plannedNights(nights)[0] ?? null;
 }
 
-// historyNights is the History selector: Nights dated today or earlier, in the
-// order given. Tonight's Night shows here as soon as it exists (as well as in
-// Up next); upcoming Nights never do.
-export function historyNights(nights: Night[], today: string = todayLocalISO()): Night[] {
-  return nights.filter((n) => nightTiming(n.scheduledFor, today) !== "upcoming");
+// alsoPlanned is Tonight's "Also planned" selector: the planned Nights after
+// upNext, soonest first. Empty when at most one Night is planned.
+export function alsoPlanned(nights: Night[]): Night[] {
+  return plannedNights(nights).slice(1);
+}
+
+// watchedNights is the Watched selector: the Nights recorded as watched, in
+// the order given. A Night joins it only once it is recorded, whatever its
+// date.
+export function watchedNights(nights: Night[]): Night[] {
+  return nights.filter(isWatched);
 }
 
 // nightDates is the calendar-dots selector: the dates that already hold a

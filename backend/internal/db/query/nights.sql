@@ -26,8 +26,9 @@ ORDER BY scheduled_for DESC;
 
 -- name: LockNight :one
 -- Locks the night row for the rest of the write's transaction and returns its
--- picker, so no other write can change the picker or attendees until it commits.
-SELECT picker_id FROM picks
+-- picker and whether it has a film, so no other write can change them or the
+-- attendees until it commits.
+SELECT picker_id, (movie_id IS NOT NULL)::boolean AS has_movie FROM picks
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
 FOR UPDATE;
 
@@ -65,6 +66,13 @@ SET scheduled_for           = sqlc.arg(scheduled_for),
     remind_morning_of       = sqlc.arg(remind_morning_of),
     remind_two_hours_before = sqlc.arg(remind_two_hours_before),
     remind_audience         = sqlc.arg(remind_audience)
+WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
+
+-- name: RecordNightWatched :exec
+-- Records the night as watched (ADR-0012). Recording again keeps the first
+-- watched_at.
+UPDATE picks
+SET watched_at = COALESCE(watched_at, now())
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
 
 -- name: DeleteNight :exec

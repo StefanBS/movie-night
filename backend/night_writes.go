@@ -58,19 +58,29 @@ func recordPick(ctx context.Context, q *db.Queries, gid, nightID, picker uuid.UU
 	})
 }
 
-// editNight replaces a Night's editable fields and attendee set. The picker
-// must stay an attendee; it is changed only by recordPick. A taken date fails
-// on the last statement, after the attendee writes; the rollback undoes them.
+// editNight replaces a Night's editable fields and attendee set, and when the
+// edit says so changes its picker and records it as watched (ADR-0012). The
+// picker, new or kept, must be an attendee, and only a Night with a film can
+// be recorded. A taken date fails on the UpdateNight statement, after the
+// attendee writes; the rollback undoes them.
 func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit nightEdit) error {
-	picker, err := q.LockNight(ctx, db.LockNightParams{NightID: nightID, GroupID: gid})
+	locked, err := q.LockNight(ctx, db.LockNightParams{NightID: nightID, GroupID: gid})
 	if err != nil {
 		return err
+	}
+	picker := locked.PickerID
+	if edit.Picker.Valid {
+		picker = edit.Picker.Bytes
 	}
 	if !slices.Contains(edit.Attendees, picker) {
 		return errPickerNotAttendee
 	}
-	if _, err := memberRoles(ctx, q, gid, edit.Attendees); err != nil {
+	roles, err := memberRoles(ctx, q, gid, edit.Attendees)
+	if err != nil {
 		return err
+	}
+	if edit.Watched && !locked.HasMovie {
+		return errWatchedWithoutFilm
 	}
 	if err := q.RemoveAttendeesNotIn(ctx, db.RemoveAttendeesNotInParams{PickID: nightID, Keep: edit.Attendees}); err != nil {
 		return err
@@ -78,7 +88,17 @@ func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit 
 	if err := q.AddAttendees(ctx, db.AddAttendeesParams{PickID: nightID, UserIds: edit.Attendees}); err != nil {
 		return err
 	}
-	return q.UpdateNight(ctx, db.UpdateNightParams{
+	if edit.Picker.Valid {
+		if err := q.SetNightPicker(ctx, db.SetNightPickerParams{
+			NightID:    nightID,
+			GroupID:    gid,
+			PickerID:   picker,
+			IsCredited: creditedForRole(roles[picker]),
+		}); err != nil {
+			return err
+		}
+	}
+	if err := q.UpdateNight(ctx, db.UpdateNightParams{
 		NightID:              nightID,
 		GroupID:              gid,
 		ScheduledFor:         edit.ScheduledFor,
@@ -87,7 +107,13 @@ func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit 
 		RemindMorningOf:      edit.Reminders.MorningOf,
 		RemindTwoHoursBefore: edit.Reminders.TwoHoursBefore,
 		RemindAudience:       edit.Reminders.Audience,
-	})
+	}); err != nil {
+		return err
+	}
+	if !edit.Watched {
+		return nil
+	}
+	return q.RecordNightWatched(ctx, db.RecordNightWatchedParams{NightID: nightID, GroupID: gid})
 }
 
 // memberRoles returns each attendee's role in the group, or errNotMember for
@@ -111,13 +137,13 @@ func attendeeRole(attendees []db.ListNightAttendeesRow, picker uuid.UUID) (db.Me
 }
 
 // writeNightError maps a failed Night write to its response: a missing Night is
-// a 404, a broken ADR-0008 rule a 422, a date another Night holds a 409, and
-// anything else a 500.
+// a 404, a broken ADR-0008 rule or recording a Night with no film a 422, a date
+// another Night holds a 409, and anything else a 500.
 func writeNightError(w http.ResponseWriter, gid uuid.UUID, op string, err error) {
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		writeJSONError(w, http.StatusNotFound, "night not found")
-	case errors.Is(err, errPickerNotAttendee), errors.Is(err, errNotMember):
+	case errors.Is(err, errPickerNotAttendee), errors.Is(err, errNotMember), errors.Is(err, errWatchedWithoutFilm):
 		writeJSONError(w, http.StatusUnprocessableEntity, err.Error())
 	case isUniqueViolation(err):
 		writeJSONError(w, http.StatusConflict, errNightDateTaken)

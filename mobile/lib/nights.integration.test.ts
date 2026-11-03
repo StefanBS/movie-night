@@ -39,6 +39,7 @@ const night: Night = {
   startTime: null,
   pickerId: ADA,
   reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
+  watchedAt: null,
   movie: null,
   attendees: [{ id: ADA, name: "Ada", role: "core" }],
 };
