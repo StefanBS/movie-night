@@ -8,6 +8,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { TopBar } from "../../components";
 import { WhenStep, WhoStep, ExistingNightEditor } from "../../components/night";
+import { useHardwareBack } from "../../components/useHardwareBack";
 import { useSession } from "../../components/useSession";
 import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
@@ -24,14 +25,17 @@ export default function NightScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
-  // `from` names the screen that opened the flow; the saved Night's back link
-  // returns there.
+  // `from` names the screen that opened the flow; the When step's and the
+  // saved Night's back links return there.
   const { from = "Tonight" } = useLocalSearchParams<{ from?: string }>();
   const [today] = useState(todayLocalISO);
   const [plan, state] = useSession(() =>
     createNightPlan({ baseUrl: API_URL, groupId: GROUP_ID, today }),
   );
   const [created, setCreated] = useState<Night | null>(null);
+  // Who returns to When, on Android's back button too. Once the Night is
+  // saved, the editor handles its own steps.
+  useHardwareBack(created === null && state.step === "who" ? plan.back : null);
 
   useEffect(() => {
     void plan.load();
@@ -105,7 +109,7 @@ export default function NightScreen() {
       <TopBar
         kind="title"
         title="New night"
-        back={{ label: "Cancel", onPress: () => router.back() }}
+        back={{ label: from, onPress: () => router.back() }}
       />
       {banner}
       <WhenStep

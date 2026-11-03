@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 
@@ -11,6 +11,7 @@ import {
   TopBar,
   useToast,
 } from "../";
+import { useHardwareBack } from "../useHardwareBack";
 import { useSession } from "../useSession";
 import { AttendCheck } from "./AttendCheck";
 import { RemindersView } from "./RemindersView";
@@ -66,6 +67,10 @@ export function EditNightScreen({
   );
   const showToast = useToast();
   const [mode, setMode] = useState<"main" | "date" | "reminders">("main");
+  // Date and Reminders return to the form, on screen and on Android's back
+  // button, so the draft survives.
+  const toMain = useCallback(() => setMode("main"), []);
+  useHardwareBack(mode === "main" ? null : toMain);
   const [month, setMonth] = useState<YearMonth>(() =>
     yearMonthOf(night.scheduledFor),
   );
@@ -99,7 +104,7 @@ export function EditNightScreen({
         reminders={reminders}
         startTime={startTime}
         onChange={edit.setReminders}
-        onDone={() => setMode("main")}
+        onDone={toMain}
       />
     );
   }
@@ -110,7 +115,7 @@ export function EditNightScreen({
         <TopBar
           kind="title"
           title="Date"
-          back={{ label: "Edit night", onPress: () => setMode("main") }}
+          back={{ label: "Edit night", onPress: toMain }}
         />
         <View style={styles.flex}>
           <ScrollView contentContainerStyle={styles.dateContent}>
@@ -129,7 +134,7 @@ export function EditNightScreen({
             <AppButton
               title="Done"
               fullWidth
-              onPress={() => setMode("main")}
+              onPress={toMain}
             />
           </WizardFooter>
         </View>
