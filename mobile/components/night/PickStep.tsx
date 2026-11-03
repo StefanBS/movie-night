@@ -11,7 +11,7 @@ import { watchedOn } from "../../lib/history";
 import type { Member } from "../../lib/members";
 import type { Movie } from "../../lib/movies";
 import { nightWording } from "../../lib/nightLifecycle";
-import type { Night } from "../../lib/nights";
+import { nightPickerName, type Night } from "../../lib/nights";
 import { borderWidth, createThemedStyles, fontFamily, lh, pressedOpacity, space, tabular, textPresets, useColors } from "../../theme";
 
 // How long typing has to pause before the search runs.
@@ -69,10 +69,7 @@ export function PickStep({
       setChangingPicker(false);
     }
   };
-  const pickerName =
-    night.attendees.find((a) => a.id === night.pickerId)?.name ??
-    members.find((m) => m.id === night.pickerId)?.name ??
-    "";
+  const pickerName = nightPickerName(night, members);
   const first = firstName(pickerName);
   const wording = nightWording(night.scheduledFor, today);
   const query = movieQuery.trim();

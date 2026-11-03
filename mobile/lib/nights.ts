@@ -1,4 +1,5 @@
 import { requestJson, requestJsonOrNull, requestNoContent } from "./http";
+import type { Member } from "./members";
 import { parseMovie, type Movie } from "./movies";
 import { parseReminders, type Reminders } from "./reminders";
 import { parseTurn, type TurnMember } from "./turn";
@@ -49,6 +50,12 @@ const START_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 // payload somehow lacks them (every Night has one, ADR-0008).
 export function nightPicker(night: Night): Attendee | null {
   return night.attendees.find((a) => a.id === night.pickerId) ?? null;
+}
+
+// nightPickerName is the picker's full name: from the Night's attendees, else
+// from the group's members, else "" when neither has them.
+export function nightPickerName(night: Night, members: Pick<Member, "id" | "name">[]): string {
+  return nightPicker(night)?.name ?? members.find((m) => m.id === night.pickerId)?.name ?? "";
 }
 
 // parseNight validates an untrusted JSON payload and returns a typed Night,

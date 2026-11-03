@@ -1,5 +1,5 @@
 import { firstName } from "./avatar";
-import type { Night } from "./nights";
+import { nightPicker, type Night } from "./nights";
 
 // A Calendar entry starts at the Night's start time, or this default evening
 // when it has none (ADR-0011), and runs DURATION_HOURS; the person can change
@@ -21,8 +21,7 @@ export type CalendarEntry = {
 // 7:30 PM is 7:30 PM on the phone that saves it; a late start's end rolls into
 // the next day. Pure.
 export function calendarEntry(night: Night): CalendarEntry {
-  const picker = night.attendees.find((a) => a.id === night.pickerId);
-  const pickerName = firstName(picker?.name ?? "");
+  const pickerName = firstName(nightPicker(night)?.name ?? "");
   const url = `movienight://night/${night.id}`;
 
   const lines = [`Coming: ${night.attendees.map((a) => a.name).join(", ")}`];
