@@ -207,6 +207,16 @@ sudo dnf install betterleaks   # or: brew install betterleaks (also: docker / re
 lefthook install               # from the repo root
 ```
 
+## App icons and splash
+
+The launcher icons, Android adaptive layers, splash images and favicon in
+`assets/*.png` are rendered from the brand SVGs in `assets/brand/`, which are
+copied byte for byte from `docs/design-system/assets/`. After refreshing the
+SVGs, re-render with `just icons` (needs Inkscape and ImageMagick) and rebuild
+the dev client (`just android-clean`): icons and splash are native, so Metro
+won't pick them up. The splash follows the OS theme: the light mark on the
+light page, the dark mark on `#11100E`.
+
 ## Project layout
 
 ```
@@ -222,7 +232,7 @@ mobile/
 ├── components/        # shared UI; night/ holds the night-flow steps
 ├── *.ts               # thin native adapters (secure storage, push, calendar, API URL)
 ├── theme/             # "Spotlight" design tokens (colors, spacing, typography)
-├── assets/            # icons, images, and brand fonts
+├── assets/            # brand SVGs, the icon/splash PNGs rendered from them, fonts
 ├── scripts/           # `just phone` driver, Android push setup wizard
 ├── app.json           # Expo app config
 ├── eslint.config.js   # ESLint flat config
