@@ -27,30 +27,40 @@ function night(opts: Partial<Night> = {}): Night {
   };
 }
 
+const WEEKLY: Repeat = { freq: "weekly", intervalWeeks: 1 };
+const SERIES_NOTES = (cadence: string) => `${cadence}. Open Movie Night for who's picking, who's coming and the film.`;
+
 const movie = (releaseYear: number | null): Movie => ({ tmdbId: 949, title: "Heat", releaseYear, posterUrl: null, genres: [], runtimeMinutes: null });
 
-test("calendarEntry titles the entry after the picker's first name", () => {
-  const cases: { name: string; night: Night; want: string }[] = [
-    { name: "core picker", night: night(), want: "🎬 Movie Night — Bea picks" },
-    { name: "guest picker", night: night({ pickerId: "g" }), want: "🎬 Movie Night — Gus picks" },
-    { name: "picker missing from attendees", night: night({ pickerId: "zz" }), want: "🎬 Movie Night" },
+test("calendarEntry titles the entry after the club, never the picker", () => {
+  const cases: { name: string; groupName: string | null; want: string }[] = [
+    { name: "club name", groupName: "Friday Film Club", want: "Friday Film Club · Movie night" },
+    { name: "name not loaded", groupName: null, want: "Movie night" },
+    { name: "blank name", groupName: "  ", want: "Movie night" },
   ];
   for (const c of cases) {
-    assert.equal(calendarEntry(c.night).title, c.want, c.name);
+    assert.equal(calendarEntry(night(), c.groupName, null).title, c.want, c.name);
+    assert.equal(calendarEntry(night({ repeat: WEEKLY }), c.groupName, { interval: 1 }).title, c.want, `${c.name}, series`);
   }
 });
 
-test("calendarEntry notes list who's coming, the film if chosen, and the link back", () => {
+test("calendarEntry notes: a one-off lists who's coming, the film and its link; a series only what holds every week", () => {
   const link = `movienight://night/${ID}`;
-  const cases: { name: string; night: Night; want: string }[] = [
-    { name: "no film", night: night(), want: `Coming: Alex Moreno, Bea Lind, Gus\n${link}` },
-    { name: "film with year", night: night({ movie: movie(1995) }), want: `Coming: Alex Moreno, Bea Lind, Gus\nFilm: Heat (1995)\n${link}` },
-    { name: "film without year", night: night({ movie: movie(null) }), want: `Coming: Alex Moreno, Bea Lind, Gus\nFilm: Heat\n${link}` },
+  const cases: { name: string; night: Night; recurrence: CalendarRecurrence | null; notes: string; url: string | null }[] = [
+    { name: "no film", night: night(), recurrence: null, notes: `Coming: Alex Moreno, Bea Lind, Gus\n${link}`, url: link },
+    { name: "film with year", night: night({ movie: movie(1995) }), recurrence: null, notes: `Coming: Alex Moreno, Bea Lind, Gus\nFilm: Heat (1995)\n${link}`, url: link },
+    { name: "film without year", night: night({ movie: movie(null) }), recurrence: null, notes: `Coming: Alex Moreno, Bea Lind, Gus\nFilm: Heat\n${link}`, url: link },
+    // A weekly night added as just this night is a one-off entry.
+    { name: "weekly, just this night", night: night({ repeat: WEEKLY }), recurrence: null, notes: `Coming: Alex Moreno, Bea Lind, Gus\n${link}`, url: link },
+    // 2026-11-06 is a Friday. The film, the people and the night change week to week.
+    { name: "weekly series", night: night({ repeat: WEEKLY, movie: movie(1995) }), recurrence: { interval: 1 }, notes: SERIES_NOTES("Every Friday"), url: null },
+    { name: "fortnightly series", night: night({ repeat: { freq: "weekly", intervalWeeks: 2 } }), recurrence: { interval: 2 }, notes: SERIES_NOTES("Every 2 weeks"), url: null },
   ];
   for (const c of cases) {
-    assert.equal(calendarEntry(c.night).notes, c.want, c.name);
+    const entry = calendarEntry(c.night, "Friday Film Club", c.recurrence);
+    assert.equal(entry.notes, c.notes, c.name);
+    assert.equal(entry.url, c.url, c.name);
   }
-  assert.equal(calendarEntry(night()).url, link);
 });
 
 test("calendarEntry runs 3 hours from the start time, or 7:30 PM, local time", () => {
@@ -63,7 +73,7 @@ test("calendarEntry runs 3 hours from the start time, or 7:30 PM, local time", (
     { scheduledFor: "2026-12-31", startTime: "22:45", start: new Date(2026, 11, 31, 22, 45), end: new Date(2027, 0, 1, 1, 45) },
   ];
   for (const c of cases) {
-    const entry = calendarEntry(night({ scheduledFor: c.scheduledFor, startTime: c.startTime }));
+    const entry = calendarEntry(night({ scheduledFor: c.scheduledFor, startTime: c.startTime }), null, null);
     assert.deepEqual(entry.startDate, c.start, `${c.scheduledFor} ${c.startTime}`);
     assert.deepEqual(entry.endDate, c.end, `${c.scheduledFor} ${c.startTime}`);
   }

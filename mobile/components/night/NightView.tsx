@@ -23,11 +23,13 @@ type SheetAction = Omit<ComponentProps<typeof SheetRow>, "last">;
 // the film"; a night with one has none. The secondary actions (Change film,
 // Edit night, Add to calendar, Clear film) sit in the sheet behind the ⋯
 // button, which the editor's top bar opens through moreOpen. On a weekly
-// night, Add to calendar first asks: the whole series, or just this night.
-// `today` is passed in (mirrors lib/date.ts) for deterministic date framing.
+// night, Add to calendar first asks: the whole series, or just this night;
+// `groupName` titles the entry. `today` is passed in (mirrors lib/date.ts)
+// for deterministic date framing.
 export function NightView({
   night,
   members,
+  groupName,
   today,
   moreOpen,
   onCloseMore,
@@ -37,6 +39,7 @@ export function NightView({
 }: {
   night: Night;
   members: Member[];
+  groupName: string | null;
   today: string;
   moreOpen: boolean;
   onCloseMore: () => void;
@@ -55,7 +58,7 @@ export function NightView({
   const [calendarOpen, setCalendarOpen] = useState(false);
   const onAddToCalendar = async (rule: CalendarRecurrence | null) => {
     setCalendarOpen(false);
-    if ((await addToCalendar(night, rule)) === "saved") {
+    if ((await addToCalendar(night, groupName, rule)) === "saved") {
       const recurring = rule !== null && night.repeat !== null ? `Recurring ${seriesNote(night.repeat, night.scheduledFor)}. ` : "";
       toast({ title: "Added to your calendar", body: `${recurring}It won't follow later changes to the night.` });
     }

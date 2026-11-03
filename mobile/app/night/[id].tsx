@@ -32,7 +32,7 @@ function NightDetailLoader({ id, from, pick }: { id: string; from: string; pick:
   const [load, state] = useSession(() =>
     createNightLoad({ baseUrl: API_URL, groupId: GROUP_ID, nightId: id }),
   );
-  const { night, members, error, loadStartedAt } = state;
+  const { night, members, groupName, error, loadStartedAt } = state;
   const view = nightLoadView(state);
   const today = todayLocalISO();
 
@@ -94,6 +94,7 @@ function NightDetailLoader({ id, from, pick }: { id: string; from: string; pick:
       key={night.id}
       night={night}
       members={members}
+      groupName={groupName}
       loadStartedAt={loadStartedAt}
       today={today}
       initialStep={pick ? "pick" : undefined}

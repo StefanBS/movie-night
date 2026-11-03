@@ -9,12 +9,17 @@ import type { Night } from "./lib/nights";
 
 // addToCalendar opens the OS's own new-event form prefilled with the Night's
 // Calendar entry, where the person picks a calendar and can adjust the time.
-// Given a recurrence (lib/calendarEntry calendarRecurrence), the entry is the
+// groupName titles the entry (null falls back to "Movie night"). Given a
+// recurrence (lib/calendarEntry calendarRecurrence), the entry is the
 // Night's whole weekly series.
 // Like pushDevice.ts it lives outside lib/ because it needs native modules.
 // Resolves "saved" only when the OS reports a save (iOS); Android's form always
 // reports done, so there it resolves "unknown".
-export async function addToCalendar(night: Night, recurrence: CalendarRecurrence | null = null): Promise<"saved" | "unknown" | "failed"> {
+export async function addToCalendar(
+  night: Night,
+  groupName: string | null,
+  recurrence: CalendarRecurrence | null,
+): Promise<"saved" | "unknown" | "failed"> {
   try {
     // iOS before 17 presents the form in-process and needs calendar access.
     if (Platform.OS === "ios" && Number.parseInt(String(Platform.Version), 10) < 17) {
@@ -27,11 +32,11 @@ export async function addToCalendar(night: Night, recurrence: CalendarRecurrence
         return "failed";
       }
     }
-    const { title, notes, url, startDate, endDate } = calendarEntry(night);
+    const { title, notes, url, startDate, endDate } = calendarEntry(night, groupName, recurrence);
     const result = await Calendar.createEventInCalendarAsync({
       title,
       notes,
-      url,
+      ...(url !== null ? { url } : {}),
       startDate,
       endDate,
       ...(recurrence !== null

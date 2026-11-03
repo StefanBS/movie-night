@@ -69,6 +69,7 @@ export default function NightScreen() {
         key={created.id}
         night={created}
         members={state.members}
+        groupName={state.groupName}
         today={today}
         initialStep="pick"
         back={{ label: from, onPress: () => router.back() }}
