@@ -4,15 +4,17 @@ Expo / React Native app for the Movie Night [backend](../backend). Four tabs,
 built with [expo-router](https://docs.expo.dev/router/introduction/):
 
 - **Tonight**: whose turn it is, who's on deck, and the next night.
-- **History**: every night, newest first.
+- **Upcoming**: every night on the calendar, soonest first.
+- **Watched**: every night the group has had, newest first, by month.
 - **Club**: members in rotation, guests, and inactive members; add someone new.
-- **Settings**: your identity, the group name, and reminders.
 
-Planning a night (when, who, which film) and editing it are full-screen flows
-on top of the tabs. On first run, a welcome screen asks which member you are.
+Settings (your identity, the group name, and reminders) opens from the gear on
+Tonight. Planning a night (when, who, which film) and editing it are
+full-screen flows on top of the tabs. On first run, a welcome screen asks
+which member you are.
 
-The UI follows the "Spotlight" design system; tokens live in `theme/` and are
-documented in [`CLAUDE.md`](CLAUDE.md).
+The UI follows the "Spotlight, refined" design system; tokens live in `theme/`
+and the rules are in [`CLAUDE.md`](CLAUDE.md).
 
 ## Stack
 
@@ -223,15 +225,16 @@ light page, the dark mark on `#11100E`.
 mobile/
 ├── app/               # expo-router screens
 │   ├── _layout.tsx    # root stack, fonts, theming
-│   ├── (tabs)/        # Tonight, History, Club, Settings
+│   ├── (tabs)/        # Tonight, Upcoming, Watched, Club
 │   ├── night/         # plan, view, and edit a night
 │   ├── member/        # member profile, add a member
 │   ├── rotation.tsx   # the full turn order
+│   ├── settings.tsx   # identity, group name, reminders (from Tonight's gear)
 │   └── welcome.tsx    # first run: pick who you are
 ├── lib/               # framework-free logic + its tests (no React Native imports)
 ├── components/        # shared UI; night/ holds the night-flow steps
 ├── *.ts               # thin native adapters (secure storage, push, calendar, API URL)
-├── theme/             # "Spotlight" design tokens (colors, spacing, typography)
+├── theme/             # "Spotlight, refined" design tokens (colors, spacing, typography)
 ├── assets/            # brand SVGs, the icon/splash PNGs rendered from them, fonts
 ├── scripts/           # `just phone` driver, Android push setup wizard
 ├── app.json           # Expo app config

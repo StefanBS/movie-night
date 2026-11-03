@@ -11,11 +11,11 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/tonight.png" width="250" alt="Tonight: Dev picks the film tonight, with Ada, Cleo and Blake up next">
+  <img src="docs/screenshots/tonight.png" width="250" alt="Tonight: Paddington 2 on Friday, picked by Ada, with Cleo, Blake and Dev up next">
   &nbsp;
-  <img src="docs/screenshots/plan-who.png" width="250" alt="Planning a night: marking who's coming on Friday, and Ada gets the pick">
+  <img src="docs/screenshots/plan-who.png" width="250" alt="Planning a night: marking who's coming next Friday, and Esme gets the pick">
   &nbsp;
-  <img src="docs/screenshots/history.png" width="250" alt="History: nights grouped by month, with posters, pickers and dates">
+  <img src="docs/screenshots/watched.png" width="250" alt="Watched: nights grouped by month, with posters, pickers and dates">
 </p>
 
 Most movie apps help a group *agree* on a film. Movie Night does the opposite:
@@ -29,8 +29,8 @@ whose turn it is.
 - **Plan a night.** Pick a date, mark who's coming, and the turn goes to the
   next person in line who's there. Then find the film, with posters from
   [TMDB](https://www.themoviedb.org).
-- **History.** Every night the group has had: the film, who picked it, and who
-  came.
+- **Upcoming and Watched.** Every night on the calendar, and every night the
+  group has had: the film, who picked it, and who came.
 - **Members and guests.** Guests can join and pick sometimes without entering
   the rotation.
 - **Reminders** before each night.

@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A monorepo with two independent components, each with its own toolchain, `justfile`, and README:
 
 - **`backend/`** — Go HTTP API over PostgreSQL. See [`backend/README.md`](backend/README.md).
-- **`mobile/`** — Expo / React Native app (expo-router tabs: Tonight, History, Club, Settings, plus the night plan/edit flows). See [`mobile/README.md`](mobile/README.md).
+- **`mobile/`** — Expo / React Native app (expo-router tabs: Tonight, Upcoming, Watched, Club; Settings and the night plan/edit flows are stack screens). See [`mobile/README.md`](mobile/README.md).
 
 `just` is the single source of truth for commands: **CI workflows and the lefthook git hooks call the same recipes you run locally.** When you change how something builds/lints/tests, edit the relevant `justfile` — CI (`.github/workflows/*.yml`) and hooks (`lefthook.yml`) follow automatically. CI calls recipes via `extractions/setup-just`; all GitHub Actions are pinned to commit SHAs.
 
