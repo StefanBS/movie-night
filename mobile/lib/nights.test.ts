@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { nightPicker, parseNight, parseNights, type Night } from "./nights";
+import { nightPicker, nightPickerName, parseNight, parseNights, type Night } from "./nights";
 
 const reminders = { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" };
 
@@ -166,5 +166,23 @@ const pickerCases: [string, Night, string | null][] = [
 for (const [name, n, want] of pickerCases) {
   test(`nightPicker: ${name}`, () => {
     assert.equal(nightPicker(n)?.name ?? null, want);
+  });
+}
+
+// nightPickerName
+
+const pickerMembers = [
+  { id: "p", name: "Priya R." },
+  { id: "t", name: "Tomas Berg" },
+];
+
+const pickerNameCases: [string, Night, string][] = [
+  ["found among the attendees, ahead of the members", pickerNight, "Priya Raman"],
+  ["found only among the members", { ...pickerNight, pickerId: "t" }, "Tomas Berg"],
+  ["in neither", { ...pickerNight, pickerId: "zzz" }, ""],
+];
+for (const [name, n, want] of pickerNameCases) {
+  test(`nightPickerName: ${name}`, () => {
+    assert.equal(nightPickerName(n, pickerMembers), want);
   });
 }

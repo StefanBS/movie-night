@@ -21,7 +21,7 @@ import { errorMessage } from "../../lib/errors";
 import { fetchGroup } from "../../lib/group";
 import { buildHistoryMonths, watchedSub } from "../../lib/history";
 import { watchedNights } from "../../lib/nightLifecycle";
-import { listNights, type Night } from "../../lib/nights";
+import { listNights, nightPicker, type Night } from "../../lib/nights";
 import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, space, tabular, textPresets, useColors } from "../../theme";
 
 export default function WatchedScreen() {
@@ -114,8 +114,7 @@ export default function WatchedScreen() {
               {month.label}
             </SectionLabel>
             {month.nights.map((n, i) => {
-              const picker =
-                n.attendees.find((a) => a.id === n.pickerId) ?? null;
+              const picker = nightPicker(n);
               return (
                 <Pressable
                   key={n.id}
