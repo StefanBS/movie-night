@@ -7,7 +7,6 @@ import {
 } from "expo-router/js-tabs";
 import { BlurView } from "expo-blur";
 import {
-  CalendarDays,
   Clapperboard,
   Library,
   UsersRound,
@@ -18,11 +17,10 @@ import { borderWidth, createThemedStyles, fontFamily, space, textPresets, useCol
 
 type IconProps = { size: number; color: string; strokeWidth?: number };
 
-// Route name → tab glyph + label. Order here drives the bar order: now, next,
-// past, people. Settings is not a tab; it opens from the gear on Tonight.
+// Route name → tab glyph + label. Order here drives the bar order: now, past,
+// people. Settings is not a tab; it opens from the gear on Tonight.
 const TABS: { name: string; label: string; Icon: ComponentType<IconProps> }[] = [
   { name: "index", label: "Tonight", Icon: Clapperboard },
-  { name: "upcoming", label: "Upcoming", Icon: CalendarDays },
   { name: "watched", label: "Watched", Icon: Library },
   { name: "club", label: "Club", Icon: UsersRound },
 ];

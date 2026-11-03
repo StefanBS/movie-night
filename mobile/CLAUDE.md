@@ -41,8 +41,8 @@ semantic groups (`colors.text.*`, `colors.surface.*`, `colors.accent.*`,
 - **Shape.** 4px grid. Buttons and badges are pills, inputs 12px, cards
   18px, hero cards and sheets 28px, posters 4px. Lists sit flush on the page
   with hairline dividers. Cards are only for discrete objects.
-- **Navigation.** Four tabs: Tonight, Upcoming, Watched, Club, with Lucide
-  icons; the active tab is `text.primary`, never accent. Settings is a stack
+- **Navigation.** Three tabs: Tonight, Watched, Club, with Lucide icons;
+  the active tab is `text.primary`, never accent. Settings is a stack
   screen opened from the gear in Tonight's top bar. Back links name the
   previous screen (`TopBar`'s `back.label`). Flow footers (`WizardFooter`)
   are solid with a hairline top edge and carry one summary line.

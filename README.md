@@ -29,8 +29,8 @@ whose turn it is.
 - **Plan a night.** Pick a date, mark who's coming, and the turn goes to the
   next person in line who's there. Then find the film, with posters from
   [TMDB](https://www.themoviedb.org).
-- **Upcoming and Watched.** Every night on the calendar, and every night the
-  group has had: the film, who picked it, and who came.
+- **Tonight and Watched.** The next night and any others planned, and every
+  night the group has had: the film, who picked it, and who came.
 - **Members and guests.** Guests can join and pick sometimes without entering
   the rotation.
 - **Reminders** before each night.
