@@ -43,6 +43,11 @@ Enum reminder_slot {
   two_hours_before [note: 'Only on a Night with a start time (ADR-0011)']
 }
 
+Enum repeat_freq {
+  weekly  [note: 'Every repeat_interval_weeks weeks on the Night\'s weekday']
+  monthly [note: 'On the repeat_week_of_month-th (or last) of the Night\'s weekday']
+}
+
 // ---------------------------------------------------------------------------
 // People & groups
 // ---------------------------------------------------------------------------
@@ -127,6 +132,9 @@ Table picks {
   remind_two_hours_before boolean       [not null, default: true, note: 'Reminder two hours before start_time; only fires when there is one (ADR-0011)']
   remind_audience     reminder_audience [not null, default: 'everyone', note: 'Who the reminders go to; the picker\'s nudge goes out regardless']
   watched_at          timestamptz       [null, note: 'When the group recorded the night as watched; NULL = still planned. Needs a film; set once (ADR-0012)']
+  repeat_freq           repeat_freq     [null, note: 'NULL = a one-off. Recording or cancelling a repeating Night opens the next (ADR-0014)']
+  repeat_interval_weeks smallint        [null, note: 'Weekly only: 1 or 2']
+  repeat_week_of_month  smallint        [null, note: 'Monthly only: 1–4, or -1 for the last']
 
   Indexes {
     (group_id, scheduled_for) [unique, name: 'uq_night_per_group_date', note: 'At most one night per group per date']

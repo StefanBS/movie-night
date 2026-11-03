@@ -2,10 +2,11 @@ import { errorMessage } from "./errors";
 import type { Member } from "./members";
 import { deleteNight, updateNight, type Night } from "./nights";
 import { sameReminders, type Reminders } from "./reminders";
+import { reconcileRepeat, sameRepeat, type Repeat } from "./repeat";
 import { createSessionCore, type Session } from "./session";
 
 // The Edit screen's module for a saved Night: a draft of its date, start time,
-// attendees and reminder settings, saved in one request that either fully applies or changes nothing,
+// attendees, reminder settings and repeat, saved in one request that either fully applies or changes nothing,
 // and cancelling the Night. The picker is always an attendee (ADR-0008), so the
 // draft never drops them — change the picker from the Night first. Writes are
 // one at a time: while one runs (busy), the others return without a request.
@@ -20,6 +21,7 @@ export type NightEditState = {
   startTime: string | null;
   attendees: ReadonlySet<string>;
   reminders: Reminders;
+  repeat: Repeat | null;
   rows: EditRow[];
   dirty: boolean;
   busy: "save" | "cancel" | null;
@@ -32,6 +34,8 @@ export type NightEdit = Session<NightEditState> & {
   setStartTime(startTime: string | null): void;
   toggle(memberId: string): void;
   setReminders(reminders: Reminders): void;
+  // setRepeat sets the series rule, or makes the Night a one-off with null.
+  setRepeat(repeat: Repeat | null): void;
   // save returns the saved Night, or null when nothing was sent or it failed.
   save(): Promise<Night | null>;
   // cancelNight deletes the Night; true once it's gone.
@@ -54,16 +58,17 @@ export function editRows(night: Night, members: Member[]): EditRow[] {
   return rows;
 }
 
-export type Draft = Pick<NightEditState, "date" | "startTime" | "attendees" | "reminders">;
+export type Draft = Pick<NightEditState, "date" | "startTime" | "attendees" | "reminders" | "repeat">;
 
 // isDirty reports whether the draft differs from the stored Night, so Save
 // stays disabled until something changes. Attendees compare as a set (order
 // doesn't matter), and undoing a change makes the draft clean again. Pure.
-export function isDirty(night: Night, { date, startTime, attendees, reminders }: Draft): boolean {
+export function isDirty(night: Night, { date, startTime, attendees, reminders, repeat }: Draft): boolean {
   return (
     date !== night.scheduledFor ||
     startTime !== night.startTime ||
     !sameReminders(reminders, night.reminders) ||
+    !sameRepeat(repeat, night.repeat) ||
     attendees.size !== night.attendees.length ||
     night.attendees.some((a) => !attendees.has(a.id))
   );
@@ -77,6 +82,7 @@ function fromNight(night: Night, members: Member[]) {
     startTime: night.startTime,
     attendees: new Set(night.attendees.map((a) => a.id)),
     reminders: night.reminders,
+    repeat: night.repeat,
     rows: editRows(night, members),
     dirty: false,
   };
@@ -101,8 +107,8 @@ export function createNightEdit({
   });
 
   const setDraft = (change: Partial<Draft>) => {
-    const { date, startTime, attendees, reminders } = core.state;
-    const draft = { date, startTime, attendees, reminders, ...change };
+    const { date, startTime, attendees, reminders, repeat } = core.state;
+    const draft = { date, startTime, attendees, reminders, repeat, ...change };
     core.set({ ...draft, dirty: isDirty(core.state.night, draft) });
   };
 
@@ -115,8 +121,10 @@ export function createNightEdit({
     subscribe: core.subscribe,
     dispose: core.dispose,
 
+    // A monthly repeat moves to the new date's week of the month when the
+    // date leaves its own (lib/repeat reconcileRepeat).
     setDate(date) {
-      setDraft({ date });
+      setDraft({ date, repeat: reconcileRepeat(core.state.repeat, date) });
     },
 
     setStartTime(startTime) {
@@ -138,8 +146,12 @@ export function createNightEdit({
       setDraft({ reminders });
     },
 
+    setRepeat(repeat) {
+      setDraft({ repeat });
+    },
+
     async save() {
-      const { busy, dirty, date, startTime, attendees, reminders } = core.state;
+      const { busy, dirty, date, startTime, attendees, reminders, repeat } = core.state;
       if (busy !== null || !dirty) {
         return null;
       }
@@ -150,7 +162,7 @@ export function createNightEdit({
             baseUrl,
             groupId,
             nightId,
-            { scheduledFor: date, startTime, attendees: [...attendees], reminders },
+            { scheduledFor: date, startTime, attendees: [...attendees], reminders, repeat },
             signal,
           ),
         );

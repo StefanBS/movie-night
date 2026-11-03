@@ -18,19 +18,21 @@ import (
 
 // createNightRequest is the JSON body of POST /groups/{groupId}/nights.
 type createNightRequest struct {
-	ScheduledFor string   `json:"scheduledFor"`
-	StartTime    *string  `json:"startTime"`
-	Attendees    []string `json:"attendees"`
-	PickerID     string   `json:"pickerId"`
+	ScheduledFor string     `json:"scheduledFor"`
+	StartTime    *string    `json:"startTime"`
+	Attendees    []string   `json:"attendees"`
+	PickerID     string     `json:"pickerId"`
+	Repeat       *repeatDTO `json:"repeat"`
 }
 
 // parsedCreateNight is a validated createNightRequest. Attendees is deduped,
-// first-seen order, and always contains Picker.
+// first-seen order, and always contains Picker. Repeat is nil for a one-off.
 type parsedCreateNight struct {
 	ScheduledFor pgtype.Date
 	StartTime    pgtype.Time
 	Attendees    []uuid.UUID
 	Picker       uuid.UUID
+	Repeat       *repeatRule
 }
 
 // errPickerNotAttendee is the 422 shared by create, record-pick and edit: a
@@ -56,6 +58,11 @@ func recordableAsWatched(scheduledFor pgtype.Date, now time.Time) bool {
 	latest := time.Date(y, m, d+1, 0, 0, 0, 0, time.UTC)
 	return !scheduledFor.Time.After(latest)
 }
+
+// errWatchedRepeats is the 422 for setting a repeat on a Watched Night: a
+// series moves on from a Night when it's recorded, so a recorded Night can't
+// carry one (ADR-0014).
+var errWatchedRepeats = errors.New("a watched night can't repeat")
 
 // errNotMember is the 422 for an attendee who has no membership in the group;
 // attendeeRoles wraps it with the offending id.
@@ -126,8 +133,9 @@ func formatStartTimeWire(t pgtype.Time) *string {
 
 // validateCreateNightRequest validates a decoded body: scheduledFor must be an
 // ISO (YYYY-MM-DD) date, startTime (optional) an HH:MM time, every attendee and
-// the picker must be UUIDs, and the picker must be among the attendees
-// (errPickerNotAttendee). Pure — no DB, no clock.
+// the picker must be UUIDs, the picker must be among the attendees
+// (errPickerNotAttendee), and a repeat (optional) must match the date. Pure —
+// no DB, no clock.
 func validateCreateNightRequest(req createNightRequest) (parsedCreateNight, error) {
 	scheduledFor, err := parseScheduledFor(req.ScheduledFor)
 	if err != nil {
@@ -145,6 +153,10 @@ func validateCreateNightRequest(req createNightRequest) (parsedCreateNight, erro
 	if err != nil {
 		return parsedCreateNight{}, fmt.Errorf("invalid picker id")
 	}
+	repeat, err := parseRepeat(req.Repeat, scheduledFor.Time)
+	if err != nil {
+		return parsedCreateNight{}, err
+	}
 	if !slices.Contains(attendees, picker) {
 		return parsedCreateNight{}, errPickerNotAttendee
 	}
@@ -153,6 +165,7 @@ func validateCreateNightRequest(req createNightRequest) (parsedCreateNight, erro
 		StartTime:    startTime,
 		Attendees:    attendees,
 		Picker:       picker,
+		Repeat:       repeat,
 	}, nil
 }
 
@@ -175,7 +188,8 @@ type remindersDTO struct {
 
 // nightResponse is the JSON shape for a night and its current attendees. Every
 // night has a picker (ADR-0008); Movie is null until a film is attached, and
-// WatchedAt (RFC 3339) until the night is recorded as watched (ADR-0012).
+// WatchedAt (RFC 3339) until the night is recorded as watched (ADR-0012), and
+// Repeat while it doesn't repeat (ADR-0014).
 type nightResponse struct {
 	ID           string       `json:"id"`
 	ScheduledFor string       `json:"scheduledFor"`
@@ -185,6 +199,7 @@ type nightResponse struct {
 	Attendees    []attendee   `json:"attendees"`
 	Reminders    remindersDTO `json:"reminders"`
 	WatchedAt    *string      `json:"watchedAt"`
+	Repeat       *repeatDTO   `json:"repeat"`
 }
 
 // toAttendee builds the attendee DTO. The single-night query and the grouped
@@ -216,6 +231,7 @@ func newNightResponse(night nightRow, atts []attendee) nightResponse {
 			Audience:       string(night.RemindAudience),
 		},
 		WatchedAt: formatTimestampWire(night.WatchedAt),
+		Repeat:    toRepeatDTO(repeatFromColumns(night.RepeatFreq, night.RepeatIntervalWeeks, night.RepeatWeekOfMonth)),
 	}
 }
 
@@ -335,7 +351,6 @@ type nightStore interface {
 	UpsertMovie(ctx context.Context, arg db.UpsertMovieParams) (uuid.UUID, error)
 	SetNightMovie(ctx context.Context, arg db.SetNightMovieParams) error
 	ClearNightMovie(ctx context.Context, arg db.ClearNightMovieParams) (uuid.UUID, error)
-	DeleteNight(ctx context.Context, arg db.DeleteNightParams) error
 	ListNights(ctx context.Context, groupID uuid.UUID) ([]db.Night, error)
 	ListNightsAttendees(ctx context.Context, arg db.ListNightsAttendeesParams) ([]db.ListNightsAttendeesRow, error)
 }
@@ -347,7 +362,8 @@ type recordPickRequest struct {
 
 // updateNightRequest is the JSON body of PATCH .../nights/{nightId}: the whole
 // editable Night, which replaces the stored one. A null (or omitted) startTime
-// clears it; attendees replace the whole set. Two fields are optional: a
+// clears it; attendees replace the whole set, and a null (or omitted) repeat
+// ends the series (ADR-0014). Two fields are optional: a
 // pickerId changes the picker in the same edit, and watched: true records the
 // Night (ADR-0012). Omitted, they leave the picker and the record as they are;
 // there is no un-recording.
@@ -356,6 +372,7 @@ type updateNightRequest struct {
 	StartTime    *string      `json:"startTime"`
 	Attendees    []string     `json:"attendees"`
 	Reminders    remindersDTO `json:"reminders"`
+	Repeat       *repeatDTO   `json:"repeat"`
 	PickerID     *string      `json:"pickerId"`
 	Watched      bool         `json:"watched"`
 }
@@ -370,12 +387,13 @@ type nightReminders struct {
 
 // nightEdit is a validated updateNightRequest. Attendees is deduped; StartTime
 // is not Valid when the Night has none, and Picker not Valid when the edit
-// keeps the stored picker.
+// keeps the stored picker. Repeat is nil when the Night doesn't repeat.
 type nightEdit struct {
 	ScheduledFor pgtype.Date
 	StartTime    pgtype.Time
 	Attendees    []uuid.UUID
 	Reminders    nightReminders
+	Repeat       *repeatRule
 	Picker       pgtype.UUID
 	Watched      bool
 }
@@ -413,6 +431,10 @@ func validateUpdateNightRequest(req updateNightRequest) (nightEdit, error) {
 	if err != nil {
 		return nightEdit{}, err
 	}
+	repeat, err := parseRepeat(req.Repeat, scheduledFor.Time)
+	if err != nil {
+		return nightEdit{}, err
+	}
 	var picker pgtype.UUID
 	if req.PickerID != nil {
 		id, err := uuid.Parse(*req.PickerID)
@@ -426,6 +448,7 @@ func validateUpdateNightRequest(req updateNightRequest) (nightEdit, error) {
 		StartTime:    startTime,
 		Attendees:    attendees,
 		Reminders:    reminders,
+		Repeat:       repeat,
 		Picker:       picker,
 		Watched:      req.Watched,
 	}, nil
@@ -625,8 +648,9 @@ func recordNightPickHandler(pool *pgxpool.Pool) http.HandlerFunc {
 // Night in the same edit (ADR-0012). The picker must stay an attendee (422),
 // every attendee must be a member (422), a Night can only be recorded once it
 // has a film (422), a Watched Night (or one being recorded) can't be dated
-// past recordableAsWatched's bound (422, ADR-0013), and a date another night
-// already holds is a 409.
+// past recordableAsWatched's bound (422, ADR-0013), a Watched Night can't
+// repeat (422), and a date another night already holds is a 409. Recording a
+// repeating Night opens the next Night in its series (ADR-0014).
 func updateNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
@@ -653,20 +677,22 @@ func updateNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	}
 }
 
-// deleteNightHandler serves DELETE /groups/{groupId}/nights/{nightId}. It
-// removes the night and its attendances (CASCADE). Idempotent: deleting a
-// missing night still returns 204.
-func deleteNightHandler(store nightStore) http.HandlerFunc {
+// deleteNightHandler serves DELETE /groups/{groupId}/nights/{nightId}
+// ("Cancel this night"). It removes the night and its attendances (CASCADE);
+// cancelling a repeating Night moves its series on to the next date in the
+// same transaction (ADR-0014). Idempotent: deleting a missing night still
+// returns 204.
+func deleteNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
-		if err := store.DeleteNight(r.Context(), db.DeleteNightParams{
-			NightID: nightID,
-			GroupID: gid,
-		}); err != nil {
-			internalError(w, gid, "delete night", err)
+		err := withTx(r.Context(), pool, func(q *db.Queries) error {
+			return cancelNight(r.Context(), q, gid, nightID, time.Now())
+		})
+		if err != nil {
+			writeNightError(w, gid, "delete night", err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

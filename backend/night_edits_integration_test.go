@@ -26,7 +26,7 @@ func TestNightEditsIntegration(t *testing.T) {
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(pool))
-	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(q))
+	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(pool))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, client))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/movie", clearNightMovieHandler(q))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))

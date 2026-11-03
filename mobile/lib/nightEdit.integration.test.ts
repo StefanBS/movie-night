@@ -6,6 +6,7 @@ import { createNightEdit } from "./nightEdit";
 import type { Member } from "./members";
 import type { Night } from "./nights";
 import type { Reminders } from "./reminders";
+import type { Repeat } from "./repeat";
 
 // Integration tests: the Edit screen's session against a real local HTTP
 // server over real fetch. No mocks — the test drives the session only through
@@ -55,6 +56,7 @@ const SAVED: Night = {
   pickerId: "ada",
   reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
   watchedAt: null,
+  repeat: null,
   movie: null,
   attendees: [
     { id: "ada", name: "Ada", role: "core" },
@@ -62,7 +64,7 @@ const SAVED: Night = {
   ],
 };
 
-type Edit = { scheduledFor: string; startTime: string | null; attendees: string[]; reminders: Reminders };
+type Edit = { scheduledFor: string; startTime: string | null; attendees: string[]; reminders: Reminders; repeat: Repeat | null };
 
 // backend fakes the two routes the session touches, recording every request
 // and applying a PATCH to its one Night in memory.
@@ -84,6 +86,7 @@ function backend(over: Partial<Record<string, Handler>> = {}) {
         scheduledFor: edit.scheduledFor,
         startTime: edit.startTime,
         reminders: edit.reminders,
+        repeat: edit.repeat,
         attendees: edit.attendees.map((id) => {
           const m = MEMBERS.find((x) => x.id === id);
           return { id, name: m?.name ?? id, role: m?.role ?? "core" };
@@ -188,6 +191,47 @@ test("save sends the reminder settings with the rest of the draft", async () => 
     assert.deepEqual(saved?.reminders, reminders);
     assert.deepEqual(edit.state.reminders, reminders);
     assert.equal(edit.state.dirty, false);
+  });
+});
+
+test("setting a repeat makes the draft dirty; setting it back doesn't", async () => {
+  await withEdit(backend().handler, async (edit) => {
+    assert.equal(edit.state.repeat, null);
+    edit.setRepeat({ freq: "weekly", intervalWeeks: 2 });
+    assert.deepEqual(edit.state.repeat, { freq: "weekly", intervalWeeks: 2 });
+    assert.equal(edit.state.dirty, true);
+    edit.setRepeat(null);
+    assert.equal(edit.state.dirty, false);
+  });
+});
+
+test("save sends the repeat with the rest of the draft, and null once cleared", async () => {
+  const { handler, requests } = backend();
+  await withEdit(handler, async (edit) => {
+    // Jun 26 2026 is the fourth and last Friday of June.
+    edit.setRepeat({ freq: "monthly", week: -1 });
+    const saved = await edit.save();
+    assert.deepEqual((JSON.parse(requests[0].body) as Edit).repeat, { freq: "monthly", week: -1 });
+    assert.deepEqual(saved?.repeat, { freq: "monthly", week: -1 });
+    assert.equal(edit.state.dirty, false);
+
+    edit.setRepeat(null);
+    await edit.save();
+    assert.equal((JSON.parse(requests[1].body) as Edit).repeat, null);
+    assert.equal(edit.state.repeat, null);
+  });
+});
+
+test("moving the date keeps a monthly repeat on the new date's week", async () => {
+  const { handler, requests } = backend();
+  await withEdit(handler, async (edit) => {
+    edit.setRepeat({ freq: "monthly", week: -1 });
+    edit.setDate("2026-07-17"); // the third Friday of July
+    assert.deepEqual(edit.state.repeat, { freq: "monthly", week: 3 });
+    await edit.save();
+    const sent = JSON.parse(requests[0].body) as Edit;
+    assert.equal(sent.scheduledFor, "2026-07-17");
+    assert.deepEqual(sent.repeat, { freq: "monthly", week: 3 });
   });
 });
 

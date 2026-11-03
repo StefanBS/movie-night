@@ -62,6 +62,7 @@ const EXISTING: Night = {
   attendees: [],
   reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
   watchedAt: null,
+  repeat: null,
 };
 
 // backend is a small fake of the routes a Plan touches. The turn ranking is
@@ -90,6 +91,7 @@ function backend(over: Partial<Record<string, Handler>> = {}): Handler {
         pickerId: req.pickerId,
         reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
         watchedAt: null,
+        repeat: null,
         movie: null,
         attendees: req.attendees.map((id) => ({ id, name: id, role: id === "frankie" ? "guest" : "core" })),
       };

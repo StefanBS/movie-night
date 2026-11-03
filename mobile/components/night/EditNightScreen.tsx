@@ -15,6 +15,7 @@ import { useHardwareBack } from "../useHardwareBack";
 import { useSession } from "../useSession";
 import { AttendCheck } from "./AttendCheck";
 import { RemindersView } from "./RemindersView";
+import { RepeatView } from "./RepeatView";
 import { StartTimeRow } from "./StartTimeRow";
 import { WizardFooter } from "./WizardFooter";
 import { API_URL } from "../../apiUrl";
@@ -28,9 +29,10 @@ import {
 } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import { createNightEdit } from "../../lib/nightEdit";
-import { nightWording } from "../../lib/nightLifecycle";
+import { isWatched, nightWording } from "../../lib/nightLifecycle";
 import { capitalize } from "../../lib/text";
 import type { Night } from "../../lib/nights";
+import { formatRepeatLabel } from "../../lib/repeat";
 import {
   formatRemindersSummary,
   reminderConfirmation,
@@ -40,7 +42,7 @@ import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, 
 
 // EditNightScreen renders the edit module (lib/nightEdit), opened from Tonight
 // or a Night; `back` names that screen. Change the date and start time, toggle who's coming, then save both in one
-// request, or cancel the night. Date and Reminders are steps over the same
+// request, or cancel the night. Date, Repeat and Reminders are steps over the same
 // draft, so they save (or are discarded) with it. Mount with key={night.id}
 // when the loaded night changes.
 export function EditNightScreen({
@@ -66,15 +68,15 @@ export function EditNightScreen({
     createNightEdit({ baseUrl: API_URL, groupId: GROUP_ID, night, members }),
   );
   const showToast = useToast();
-  const [mode, setMode] = useState<"main" | "date" | "reminders">("main");
-  // Date and Reminders return to the form, on screen and on Android's back
+  const [mode, setMode] = useState<"main" | "date" | "repeat" | "reminders">("main");
+  // Date, Repeat and Reminders return to the form, on screen and on Android's back
   // button, so the draft survives.
   const toMain = useCallback(() => setMode("main"), []);
   useHardwareBack(mode === "main" ? null : toMain);
   const [month, setMonth] = useState<YearMonth>(() =>
     yearMonthOf(night.scheduledFor),
   );
-  const { date, startTime, attendees, reminders, rows, dirty, actionError } = state;
+  const { date, startTime, attendees, reminders, repeat, rows, dirty, actionError } = state;
   const busy = state.busy !== null;
   const pickerId = state.night.pickerId;
   const picker = members.find((m) => m.id === pickerId) ?? null;
@@ -104,6 +106,18 @@ export function EditNightScreen({
         reminders={reminders}
         startTime={startTime}
         onChange={edit.setReminders}
+        onDone={toMain}
+      />
+    );
+  }
+
+  if (mode === "repeat") {
+    return (
+      <RepeatView
+        date={date}
+        today={today}
+        repeat={repeat}
+        onChange={edit.setRepeat}
         onDone={toMain}
       />
     );
@@ -181,6 +195,17 @@ export function EditNightScreen({
             <View style={styles.divider}>
               <StartTimeRow startTime={startTime} onChange={edit.setStartTime} disabled={busy} />
             </View>
+            {/* A Watched Night can't repeat (ADR-0014): its series has moved on. */}
+            {!isWatched(state.night) ? (
+              <View style={styles.divider}>
+                <SettingsRow
+                  label="Repeat"
+                  value={formatRepeatLabel(repeat, date)}
+                  right={<ChevronRight size={18} color={colors.text.tertiary} />}
+                  onPress={() => setMode("repeat")}
+                />
+              </View>
+            ) : null}
             <SettingsRow
               label="Reminders"
               value={formatRemindersSummary(reminders, startTime)}

@@ -40,6 +40,13 @@ test("parses when a night was watched, or not yet", () => {
   assert.throws(() => parseNight({ ...valid, watchedAt: true }), /watchedAt/);
 });
 
+test("parses a night's repeat, or none", () => {
+  assert.equal(parseNight(valid).repeat, null);
+  assert.equal(parseNight({ ...valid, repeat: null }).repeat, null);
+  assert.deepEqual(parseNight({ ...valid, repeat: { freq: "monthly", week: -1 } }).repeat, { freq: "monthly", week: -1 });
+  assert.throws(() => parseNight({ ...valid, repeat: { freq: "daily" } }), /repeat/);
+});
+
 test("parses a night with no attendees", () => {
   const n = parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId: "u1", attendees: [], reminders });
   assert.deepEqual(n.attendees, []);
@@ -157,6 +164,7 @@ const pickerNight: Night = {
   ],
   reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
   watchedAt: null,
+  repeat: null,
 };
 
 const pickerCases: [string, Night, string | null][] = [

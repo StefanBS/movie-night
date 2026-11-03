@@ -24,6 +24,7 @@ new record that supersedes the old one rather than editing history.
 - [ADR-0011](0011-night-start-time-wall-clock.md) — A Night's start time is a zone-less wall-clock time, read on each device · *Accepted*
 - [ADR-0012](0012-night-recorded-as-watched.md) — A Night is history only once the group records it as watched · *Accepted*
 - [ADR-0013](0013-watched-night-date-bound.md) — A Night can't be recorded as watched more than a day past the UTC date · *Accepted*
+- [ADR-0014](0014-repeating-nights.md) — A repeating Night carries its rule and opens the next when recorded or cancelled · *Accepted*
 
 Open and deferred decisions are tracked in [backlog.md](backlog.md).
 
@@ -39,8 +40,9 @@ schema definition.
 - **picks** — one per movie night (at most one per group per date); references the
   group, the picker (always an attendee — [ADR-0008](0008-night-always-has-a-picker.md)),
   and the chosen movie; carries `is_credited`, the scheduled date, an optional start time
-  ([ADR-0011](0011-night-start-time-wall-clock.md)), and when it was recorded as watched
-  ([ADR-0012](0012-night-recorded-as-watched.md)).
+  ([ADR-0011](0011-night-start-time-wall-clock.md)), when it was recorded as watched
+  ([ADR-0012](0012-night-recorded-as-watched.md)), and an optional repeat
+  ([ADR-0014](0014-repeating-nights.md)).
 - **attendances** — who was present at a given night (linked to that night's pick).
 - **movies** — metadata cached from TMDB.
 - **reviews** — a person's rating/notes for a given night's pick.

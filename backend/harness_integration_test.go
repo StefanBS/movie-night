@@ -240,6 +240,7 @@ func editBody(t *testing.T, n nightResponse, change func(*updateNightRequest)) s
 		StartTime:    n.StartTime,
 		Attendees:    attendeeIDs(n),
 		Reminders:    n.Reminders,
+		Repeat:       n.Repeat,
 	}
 	change(&req)
 	b, err := json.Marshal(req)

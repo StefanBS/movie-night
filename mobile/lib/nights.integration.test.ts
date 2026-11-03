@@ -41,6 +41,7 @@ const night: Night = {
   pickerId: ADA,
   reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
   watchedAt: null,
+  repeat: null,
   movie: null,
   attendees: [{ id: ADA, name: "Ada", role: "core" }],
 };
@@ -248,12 +249,12 @@ test("getNightTurn with a present set ranks that draft, and an empty one is [] w
   }
 });
 
-test("recordWatched PATCHes the night as it is, with the confirmed attendees, picker and watched", async () => {
+test("recordWatched PATCHes the night as it is, repeat included, with the confirmed attendees, picker and watched", async () => {
   let path = "";
   let method = "";
   let body = "";
   const BLAKE = "a0000000-0000-0000-0000-000000000002";
-  const planned: Night = { ...night, startTime: "20:00", attendees: [...night.attendees, { id: BLAKE, name: "Blake", role: "core" }] };
+  const planned: Night = { ...night, startTime: "20:00", repeat: { freq: "weekly", intervalWeeks: 1 }, attendees: [...night.attendees, { id: BLAKE, name: "Blake", role: "core" }] };
   const recorded: Night = { ...planned, pickerId: BLAKE, watchedAt: "2026-06-12T22:00:00Z" };
   const server = await startServer(async (req, res) => {
     path = req.url ?? "";
@@ -272,6 +273,7 @@ test("recordWatched PATCHes the night as it is, with the confirmed attendees, pi
       startTime: "20:00",
       attendees: [BLAKE],
       reminders: planned.reminders,
+      repeat: { freq: "weekly", intervalWeeks: 1 },
       pickerId: BLAKE,
       watched: true,
     });
