@@ -41,6 +41,19 @@ export function isDue(night: Night, today: string = todayLocalISO()): boolean {
   return !isWatched(night) && nightTiming(night.scheduledFor, today) !== "upcoming";
 }
 
+// UpNextAction is the UpNextCard's primary button: the next thing the group
+// has to do for the Night, or null when there is nothing to do yet.
+export type UpNextAction = "chooseFilm" | "watched" | null;
+
+// upNextAction picks it: with no film yet, choose the film (whatever the
+// date); with a film and the Night due, record it as watched; with a film and
+// the Night still ahead, nothing.
+export function upNextAction(night: Night, today: string = todayLocalISO()): UpNextAction {
+  if (night.movie === null) return "chooseFilm";
+  if (isDue(night, today)) return "watched";
+  return null;
+}
+
 // plannedNights is every Night not yet recorded as watched, soonest first. A
 // due Night from an earlier day comes first, so it stays on Tonight until it is
 // recorded. Its head is upNext and its tail is alsoPlanned.
