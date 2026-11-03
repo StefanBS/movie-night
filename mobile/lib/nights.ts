@@ -42,6 +42,12 @@ function parseAttendee(raw: unknown, index: number): Attendee {
 
 const START_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+// nightPicker is the Night's picker among its attendees, or null if the
+// payload somehow lacks them (every Night has one, ADR-0008).
+export function nightPicker(night: Night): Attendee | null {
+  return night.attendees.find((a) => a.id === night.pickerId) ?? null;
+}
+
 // parseNight validates an untrusted JSON payload and returns a typed Night,
 // throwing a descriptive error if the shape is wrong.
 export function parseNight(raw: unknown): Night {

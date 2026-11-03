@@ -43,6 +43,12 @@ export function upcomingNights(nights: Night[], today: string = todayLocalISO())
     .sort((a, b) => a.scheduledFor.localeCompare(b.scheduledFor));
 }
 
+// alsoPlanned is Tonight's "Also planned" selector: the upcoming Nights after
+// upNext, soonest first. Empty when at most one Night is planned.
+export function alsoPlanned(nights: Night[], today: string = todayLocalISO()): Night[] {
+  return upcomingNights(nights, today).slice(1);
+}
+
 // historyNights is the History selector: Nights dated today or earlier, in the
 // order given. Tonight's Night shows here as soon as it exists (as well as in
 // Up next); upcoming Nights never do.

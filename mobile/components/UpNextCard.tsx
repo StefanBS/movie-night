@@ -7,7 +7,7 @@ import { firstName } from "../lib/avatar";
 import { formatStartTime, formatWeekdayDate } from "../lib/date";
 import { movieDetails } from "../lib/movies";
 import { nightWording } from "../lib/nightLifecycle";
-import type { Night } from "../lib/nights";
+import { nightPicker, type Night } from "../lib/nights";
 import { capitalize } from "../lib/text";
 import { borderWidth, createThemedStyles, fontFamily, fontSize, radius, space, tabular, textPresets, trackPx } from "../theme";
 
@@ -39,7 +39,7 @@ export function UpNextCard({
   const styles = useStyles();
   const movie = night.movie;
   const details = movie !== null ? movieDetails(movie) : [];
-  const picker = night.attendees.find((a) => a.id === night.pickerId) ?? null;
+  const picker = nightPicker(night);
   const wording = nightWording(night.scheduledFor, today);
   const when = [
     wording.countdown,

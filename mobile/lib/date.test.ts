@@ -9,6 +9,7 @@ import {
   formatShortDate,
   formatStartTime,
   formatWeekdayDate,
+  formatWeekdayDayMonth,
   nightSummary,
   relativeLabel,
   startTimeDate,
@@ -105,6 +106,17 @@ test("formatWeekdayDate does not zero-pad the day", () => {
 test("formatWeekdayDate handles a December date", () => {
   assert.equal(formatWeekdayDate("2025-12-31"), "Wednesday, Dec 31");
 });
+
+const weekdayDayMonthCases: [string, string, string][] = [
+  ["a Saturday in June", "2026-06-27", "Sat 27 Jun"],
+  ["no zero-padded day", "2026-01-05", "Mon 5 Jan"],
+  ["a December date", "2025-12-31", "Wed 31 Dec"],
+];
+for (const [name, iso, want] of weekdayDayMonthCases) {
+  test(`formatWeekdayDayMonth: ${name}`, () => {
+    assert.equal(formatWeekdayDayMonth(iso), want);
+  });
+}
 
 test("relativeLabel says Tonight for today", () => {
   assert.equal(relativeLabel("2026-06-19", "2026-06-19"), "Tonight");

@@ -73,6 +73,14 @@ export function formatWeekdayDate(iso: string): string {
   return `${weekday(iso, true)}, ${formatShortDate(iso)}`;
 }
 
+// formatWeekdayDayMonth renders a YYYY-MM-DD string as a compact "Sat 27 Jun"
+// label (short weekday, unpadded day, short month), for list rows such as
+// Tonight's "Also planned".
+export function formatWeekdayDayMonth(iso: string): string {
+  const [, month, day] = iso.split("-").map(Number);
+  return `${weekday(iso)} ${day} ${SHORT_MONTHS[month - 1]}`;
+}
+
 // nightSummary is the new-night Date step's footer line, as parts to join
 // with " · ": the full weekday date, then the start time when set, then a
 // countdown for a future date ("in 4 days"). Tonight and past dates get no
