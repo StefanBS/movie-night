@@ -3,6 +3,7 @@ import { View, Text } from "react-native";
 import { Ellipsis } from "lucide-react-native";
 
 import { IconButton, TopBar } from "../";
+import { useHardwareBack } from "../useHardwareBack";
 import { useSession } from "../useSession";
 import { PickStep } from "./PickStep";
 import { NightView } from "./NightView";
@@ -50,6 +51,8 @@ export function ExistingNightEditor({
   const current = state.night;
 
   const picking = state.step === "pick";
+  // The Pick step returns to the Night view, on Android's back button too.
+  useHardwareBack(picking ? editor.toNight : null);
 
   return (
     <View style={styles.screen}>

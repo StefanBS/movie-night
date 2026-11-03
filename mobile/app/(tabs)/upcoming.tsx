@@ -70,7 +70,7 @@ export default function UpcomingScreen() {
     }, []),
   );
 
-  const plan = () => router.navigate("/night/new");
+  const plan = () => router.navigate({ pathname: "/night/new", params: { from: "Upcoming" } });
 
   if (loading) {
     return (
