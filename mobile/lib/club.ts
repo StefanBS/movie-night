@@ -1,4 +1,9 @@
+import { firstName } from "./avatar";
+import { formatMonthYear, todayLocalISO } from "./date";
+import { capitalize } from "./text";
 import type { Member } from "./members";
+import { historyNights } from "./nightLifecycle";
+import type { Night } from "./nights";
 import type { TurnMember } from "./turn";
 
 // The Club screen's three sections. `inRotation` is the turn ranking as-is
@@ -54,4 +59,49 @@ export function memberProfile(
     return { member, turn: null, rank: null };
   }
   return { member, turn: turn[index], rank: index + 1 };
+}
+
+// ordinal renders a 1-based place in line: "1st", "2nd", "3rd", "4th", with
+// the teens ("11th", "12th", "13th") as the exception.
+export function ordinal(n: number): string {
+  const teen = n % 100 >= 11 && n % 100 <= 13;
+  const suffix = teen ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[n % 10] ?? "th";
+  return `${n}${suffix}`;
+}
+
+// memberSince is the line under a member's first name: their full name, role
+// and the month they joined ("Ada Lovelace · core since Jan 2024"). A one-word
+// name is already the heading, so it isn't repeated ("Core since Jan 2024").
+export function memberSince(member: Member): string {
+  const since = `${member.role} since ${formatMonthYear(member.joinedOn)}`;
+  if (member.name.trim() === firstName(member.name)) {
+    return capitalize(since);
+  }
+  return `${member.name} · ${since}`;
+}
+
+// memberPicks is a member's picks list: the Nights they picked that have
+// happened (today or earlier, as in Watched), newest first.
+export function memberPicks(
+  nights: Night[],
+  memberId: string,
+  today: string = todayLocalISO(),
+): Night[] {
+  return historyNights(nights, today)
+    .filter((n) => n.pickerId === memberId)
+    .sort((a, b) => b.scheduledFor.localeCompare(a.scheduledFor));
+}
+
+// noPicksLine is the picks list's empty state. It says where the member stands
+// in the rotation when they're in it; guests and inactive members get the
+// plain line.
+export function noPicksLine(name: string, rank: number | null): string {
+  const first = firstName(name);
+  if (rank === 1) {
+    return `No picks yet. ${first} is next up, so the first one is coming.`;
+  }
+  if (rank !== null) {
+    return `No picks yet. ${first} is ${ordinal(rank)} in line.`;
+  }
+  return "No picks yet.";
 }

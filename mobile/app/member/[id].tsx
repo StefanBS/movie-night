@@ -1,8 +1,8 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
-import { AppButton, Avatar, Badge, SectionLabel, Stat, TopBar } from "../../components";
+import { AppButton, Avatar, Badge, Poster, SectionLabel, Stat, TopBar } from "../../components";
 import { API_URL } from "../../apiUrl";
 import { firstName } from "../../lib/avatar";
 import { GROUP_ID } from "../../lib/api";
@@ -14,37 +14,71 @@ import {
   type Member,
   type MemberAction,
 } from "../../lib/members";
+import { listNights, type Night } from "../../lib/nights";
 import { fetchTurn } from "../../lib/turn";
-import { memberProfile, type MemberProfile } from "../../lib/club";
-import { formatMonthYear, formatShortDate } from "../../lib/date";
-import { borderWidth, createThemedStyles, radius, space, textPresets, useColors } from "../../theme";
+import {
+  memberPicks,
+  memberProfile,
+  memberSince,
+  noPicksLine,
+  ordinal,
+  type MemberProfile,
+} from "../../lib/club";
+import { formatShortDate } from "../../lib/date";
+import {
+  borderWidth,
+  createThemedStyles,
+  fontFamily,
+  pressedOpacity,
+  space,
+  tabular,
+  textPresets,
+  trackPx,
+  useColors,
+} from "../../theme";
 
-const ACTION_LABEL: Record<MemberAction, string> = {
-  deactivate: "Deactivate",
-  reactivate: "Reactivate",
-  promote: "Promote to core",
+const ACTION_LABEL: Record<MemberAction, (first: string) => string> = {
+  deactivate: (first) => `Deactivate ${first}`,
+  reactivate: (first) => `Reactivate ${first}`,
+  promote: () => "Promote to core",
 };
 
-function StatsCard({ profile }: { profile: MemberProfile }) {
+// Stats sits on a hairline, not in a card. The place in line is plain text:
+// the accent stays with the picker.
+function Stats({ profile }: { profile: MemberProfile }) {
   const styles = useStyles();
   const t = profile.turn;
-  const picks = t ? String(t.servedCount) : "—";
-  const last = t && t.lastPickedOn ? formatShortDate(t.lastPickedOn) : "—";
-  const inLine = profile.rank != null ? `#${profile.rank}` : "—";
   return (
     <View style={styles.stats}>
-      <View style={styles.statCell}>
-        <Stat value={picks} label="Picks" />
-      </View>
-      <View style={styles.statDivider} />
-      <View style={styles.statCell}>
-        <Stat value={last} label="Last pick" />
-      </View>
-      <View style={styles.statDivider} />
-      <View style={styles.statCell}>
-        <Stat value={inLine} label="In line" accent />
-      </View>
+      <Stat value={t ? t.servedCount : "—"} label={t?.servedCount === 1 ? "Pick" : "Picks"} />
+      <Stat value={t?.lastPickedOn ? formatShortDate(t.lastPickedOn) : "—"} label="Last pick" />
+      <Stat value={profile.rank !== null ? ordinal(profile.rank) : "—"} label="In line" />
     </View>
+  );
+}
+
+// PickRow is one Night the member picked: the film, its year and how many
+// watched, and the date.
+function PickRow({ night, last, onPress }: { night: Night; last: boolean; onPress: () => void }) {
+  const styles = useStyles();
+  const meta = [night.movie?.releaseYear, `${night.attendees.length} watched`].filter((x) => x != null).join(" · ");
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.pick, !last && styles.divider, pressed && styles.pressed]}
+    >
+      <Poster uri={night.movie?.posterUrl} title={night.movie?.title} w={40} h={60} />
+      <View style={styles.pickText}>
+        <Text style={styles.pickTitle} numberOfLines={1}>
+          {night.movie ? night.movie.title : "Untitled night"}
+        </Text>
+        <Text style={styles.pickMeta} numberOfLines={1}>
+          {meta}
+        </Text>
+      </View>
+      <Text style={styles.pickDate}>{formatShortDate(night.scheduledFor)}</Text>
+    </Pressable>
   );
 }
 
@@ -54,6 +88,7 @@ export default function MemberProfileScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [profile, setProfile] = useState<MemberProfile | null>(null);
+  const [picks, setPicks] = useState<Night[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -63,11 +98,15 @@ export default function MemberProfileScreen() {
       const controller = new AbortController();
       (async () => {
         try {
-          const [m, t] = await Promise.all([
+          // The picks are the page's content, so a failed nights load fails
+          // the screen like the roster does.
+          const [m, t, n] = await Promise.all([
             fetchMembers(API_URL, GROUP_ID, controller.signal),
             fetchTurn(API_URL, GROUP_ID, controller.signal),
+            listNights(API_URL, GROUP_ID, controller.signal),
           ]);
           setProfile(memberProfile(m, t, id));
+          setPicks(memberPicks(n, id));
           setError(null);
         } catch (e) {
           if (!controller.signal.aborted) {
@@ -109,81 +148,107 @@ export default function MemberProfileScreen() {
           <Text style={styles.empty}>{"That member isn't in the club."}</Text>
         </View>
       ) : (
-        <>
-          <ScrollView contentContainerStyle={styles.content}>
-            <View style={styles.header}>
-              <Avatar name={member.name} size={76} />
-              <Text style={styles.name}>{member.name}</Text>
-              <View style={styles.subRow}>
-                <Badge label={member.role === "core" ? "Core" : "Guest"} tone="neutral" />
-                <Text style={styles.since}>{`since ${formatMonthYear(member.joinedOn)}`}</Text>
-              </View>
-            </View>
-
-            <StatsCard profile={profile} />
-
-            <SectionLabel>{`${firstName(member.name)}'s picks`}</SectionLabel>
-            <View style={styles.placeholder}>
-              <Text style={styles.placeholderText}>
-                {"Their picks will appear here once night history lands."}
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.header}>
+            <Avatar name={member.name} size={64} />
+            <View style={styles.headerText}>
+              <Text style={styles.name} numberOfLines={1}>
+                {firstName(member.name)}
               </Text>
+              <Text style={styles.since}>{memberSince(member)}</Text>
             </View>
-          </ScrollView>
+          </View>
+          {profile.rank === 1 ? (
+            <View style={styles.nextUp}>
+              <Badge label="Next up" tone="solid" />
+            </View>
+          ) : null}
 
-          <View style={styles.footer}>
+          <Stats profile={profile} />
+
+          <View style={styles.picksLabel}>
+            <SectionLabel>{`${firstName(member.name)}'s picks`}</SectionLabel>
+          </View>
+          {picks.length === 0 ? (
+            <Text style={styles.noPicks}>{noPicksLine(member.name, profile.rank)}</Text>
+          ) : (
+            picks.map((n, i) => (
+              <PickRow
+                key={n.id}
+                night={n}
+                last={i === picks.length - 1}
+                onPress={() =>
+                  router.push({ pathname: "/night/[id]", params: { id: n.id, from: firstName(member.name) } })
+                }
+              />
+            ))
+          )}
+
+          <View style={styles.actions}>
             {memberActions(member).map((action) => (
               <AppButton
                 key={action}
-                title={ACTION_LABEL[action]}
-                variant={action === "deactivate" ? "secondary" : "primary"}
-                fullWidth
+                title={ACTION_LABEL[action](firstName(member.name))}
+                variant={action === "deactivate" ? "danger" : "secondary"}
+                size="sm"
                 disabled={busy}
                 onPress={() => act(member, action)}
               />
             ))}
+            {member.status === "active" && member.role === "core" ? (
+              <Text style={styles.note}>Leaves the rotation. Their picks stay in Watched.</Text>
+            ) : null}
           </View>
-        </>
+        </ScrollView>
       )}
     </View>
   );
 }
+
+const NAME = 40;
 
 const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   center: { flex: 1, textAlignVertical: "center" },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
   content: { paddingHorizontal: space[5], paddingBottom: space[10] },
-  header: { alignItems: "center", marginTop: space[2] },
-  name: { ...textPresets.screenTitle, color: colors.text.primary, marginTop: space[3] },
-  subRow: { flexDirection: "row", alignItems: "center", gap: space[2], marginTop: space[2] },
-  since: { ...textPresets.barMeta, color: colors.text.tertiary },
+  header: { flexDirection: "row", alignItems: "center", gap: space[4], marginTop: 14 },
+  headerText: { flex: 1, minWidth: 0 },
+  name: {
+    fontFamily: fontFamily.display,
+    fontSize: NAME,
+    lineHeight: Math.round(NAME * 1.05),
+    letterSpacing: trackPx(NAME, "display"),
+    color: colors.text.primary,
+  },
+  since: { ...textPresets.meta, color: colors.text.secondary, marginTop: space[2] },
+  nextUp: { flexDirection: "row", marginTop: 18 },
   stats: {
     flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surface.card,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
-    borderRadius: radius.lg,
-    paddingVertical: space[4],
-    paddingHorizontal: space[4],
-    marginTop: space[5],
+    gap: 30,
+    marginTop: 22,
+    paddingTop: 18,
+    borderTopWidth: borderWidth.hairline,
+    borderTopColor: colors.border.hairline,
   },
-  statCell: { flex: 1, alignItems: "center" },
-  statDivider: { width: borderWidth.hairline, alignSelf: "stretch", backgroundColor: colors.border.hairline },
-  placeholder: {
-    backgroundColor: colors.surface.card,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
-    borderRadius: radius.md,
-    padding: space[4],
-  },
-  placeholderText: { ...textPresets.body, color: colors.text.tertiary },
-  footer: {
-    paddingHorizontal: space[5],
-    paddingTop: space[3],
-    paddingBottom: space[8],
+  picksLabel: { marginTop: space[1] },
+  noPicks: { ...textPresets.body, color: colors.text.secondary, paddingTop: space[1] },
+  pick: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 10 },
+  divider: { borderBottomWidth: borderWidth.hairline, borderBottomColor: colors.border.hairline },
+  pressed: { opacity: pressedOpacity },
+  pickText: { flex: 1, minWidth: 0 },
+  pickTitle: { fontFamily: fontFamily.serifMedium, fontSize: 19, lineHeight: 22, color: colors.text.primary },
+  pickMeta: { ...textPresets.barMeta, ...tabular, color: colors.text.tertiary, marginTop: 2 },
+  pickDate: { ...textPresets.barMeta, ...tabular, color: colors.text.tertiary },
+  actions: {
+    marginTop: 36,
+    paddingTop: space[4],
+    borderTopWidth: borderWidth.hairline,
+    borderTopColor: colors.border.hairline,
+    alignItems: "flex-start",
     gap: space[2],
   },
+  note: { ...textPresets.barMeta, lineHeight: Math.round(13 * 1.45), color: colors.text.tertiary, marginTop: 2 },
   empty: { ...textPresets.body, color: colors.text.secondary },
   error: { ...textPresets.body, color: colors.text.danger, textAlign: "center", paddingHorizontal: space[5] },
 }));

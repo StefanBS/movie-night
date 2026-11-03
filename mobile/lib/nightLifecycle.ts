@@ -32,14 +32,15 @@ export function nightTiming(scheduledFor: string, today: string = todayLocalISO(
 // later, or null when none (the spotlight is then the fallback). Tonight's
 // Night stays up next all day, film or not.
 export function upNext(nights: Night[], today: string = todayLocalISO()): Night | null {
-  let soonest: Night | null = null;
-  for (const n of nights) {
-    if (nightTiming(n.scheduledFor, today) === "past") continue;
-    if (soonest === null || n.scheduledFor < soonest.scheduledFor) {
-      soonest = n;
-    }
-  }
-  return soonest;
+  return upcomingNights(nights, today)[0] ?? null;
+}
+
+// upcomingNights is the Upcoming tab's selector: every Night dated today or
+// later, soonest first. Its head is upNext.
+export function upcomingNights(nights: Night[], today: string = todayLocalISO()): Night[] {
+  return nights
+    .filter((n) => nightTiming(n.scheduledFor, today) !== "past")
+    .sort((a, b) => a.scheduledFor.localeCompare(b.scheduledFor));
 }
 
 // historyNights is the History selector: Nights dated today or earlier, in the
