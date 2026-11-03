@@ -74,7 +74,7 @@ export default function AddMemberScreen() {
       <TopBar
         kind="title"
         title="Add member"
-        back={{ label: "The Club", onPress: () => router.back() }}
+        back={{ label: "Club", onPress: () => router.back() }}
       />
       <ScrollView contentContainerStyle={styles.content}>
         <SectionLabel>Their name</SectionLabel>

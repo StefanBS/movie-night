@@ -94,7 +94,7 @@ export default function MemberProfileScreen() {
     }
   };
 
-  const back = { label: "The Club", onPress: () => router.back() };
+  const back = { label: "Club", onPress: () => router.back() };
   const member = profile?.member;
 
   return (

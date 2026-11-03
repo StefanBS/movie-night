@@ -62,7 +62,7 @@ export default function ClubScreen() {
     <View style={styles.screen}>
       <TopBar
         kind="tab"
-        title="The Club"
+        title="Club"
         sub={loading || error !== null ? undefined : clubSummary(members, turn)}
         right={
           <IconButton

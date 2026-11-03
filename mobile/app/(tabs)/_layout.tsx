@@ -7,9 +7,9 @@ import {
 } from "expo-router/js-tabs";
 import { BlurView } from "expo-blur";
 import {
+  CalendarDays,
   Clapperboard,
-  History,
-  Settings,
+  Library,
   UsersRound,
 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,12 +18,13 @@ import { borderWidth, createThemedStyles, fontFamily, space, textPresets, useCol
 
 type IconProps = { size: number; color: string; strokeWidth?: number };
 
-// Route name → tab glyph + label. Order here drives the bar order.
+// Route name → tab glyph + label. Order here drives the bar order: now, next,
+// past, people. Settings is not a tab; it opens from the gear on Tonight.
 const TABS: { name: string; label: string; Icon: ComponentType<IconProps> }[] = [
   { name: "index", label: "Tonight", Icon: Clapperboard },
-  { name: "history", label: "History", Icon: History },
-  { name: "club", label: "The Club", Icon: UsersRound },
-  { name: "settings", label: "Settings", Icon: Settings },
+  { name: "upcoming", label: "Upcoming", Icon: CalendarDays },
+  { name: "watched", label: "Watched", Icon: Library },
+  { name: "club", label: "Club", Icon: UsersRound },
 ];
 
 function SpotlightTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
@@ -48,7 +49,8 @@ function SpotlightTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
           const tab = TABS.find((t) => t.name === route.name);
           if (!tab) return null;
           const focused = state.index === index;
-          const color = focused ? colors.text.primary : colors.text.tertiary;
+          // Never the accent, and no badges or dots: weight and ink carry state.
+          const color = focused ? colors.text.primary : colors.text.secondary;
           const onPress = () => {
             const event = emitter.emit({
               type: "tabPress",
@@ -68,7 +70,7 @@ function SpotlightTabBar({ state, emitter, navigateToTab }: BottomTabBarProps) {
               accessibilityLabel={tab.label}
               style={styles.item}
             >
-              <tab.Icon size={23} color={color} strokeWidth={2} />
+              <tab.Icon size={24} color={color} strokeWidth={2} />
               <Text
                 allowFontScaling={false}
                 style={[styles.label, { color }, focused && styles.labelActive]}
@@ -89,10 +91,9 @@ export default function TabsLayout() {
       screenOptions={{ headerShown: false }}
       tabBar={(props) => <SpotlightTabBar {...props} />}
     >
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="history" />
-      <Tabs.Screen name="club" />
-      <Tabs.Screen name="settings" />
+      {TABS.map((t) => (
+        <Tabs.Screen key={t.name} name={t.name} />
+      ))}
     </Tabs>
   );
 }
@@ -111,10 +112,18 @@ const useStyles = createThemedStyles((colors) => ({
   tint: { ...StyleSheet.absoluteFill, backgroundColor: colors.surface.tabBar },
   items: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    alignItems: "flex-end",
+    paddingHorizontal: space[2],
   },
-  item: { alignItems: "center", gap: space[1], width: 64 },
+  // Equal-width tabs, each a tap target at least 48 tall.
+  item: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space[1],
+    paddingVertical: space[1],
+  },
   label: { ...textPresets.tabLabel },
-  labelActive: { fontFamily: fontFamily.sansBold },
+  labelActive: { fontFamily: fontFamily.sansSemibold },
 }));

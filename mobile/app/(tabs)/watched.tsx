@@ -24,7 +24,7 @@ import { historyNights } from "../../lib/nightLifecycle";
 import { listNights, type Night } from "../../lib/nights";
 import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, radius, space, tabular, textPresets, useColors } from "../../theme";
 
-export default function HistoryScreen() {
+export default function WatchedScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -58,7 +58,7 @@ export default function HistoryScreen() {
   if (loading) {
     return (
       <View style={styles.screen}>
-        <TopBar kind="tab" title="History" />
+        <TopBar kind="tab" title="Watched" />
         <ActivityIndicator
           style={styles.center}
           size="large"
@@ -71,9 +71,9 @@ export default function HistoryScreen() {
   if (error !== null) {
     return (
       <View style={styles.screen}>
-        <TopBar kind="tab" title="History" />
+        <TopBar kind="tab" title="Watched" />
         <View style={styles.body}>
-          <Text style={styles.errorText}>{`Couldn't load history: ${error}`}</Text>
+          <Text style={styles.errorText}>{`Couldn't load: ${error}`}</Text>
         </View>
       </View>
     );
@@ -82,7 +82,7 @@ export default function HistoryScreen() {
   if (nights.length === 0) {
     return (
       <View style={styles.screen}>
-        <TopBar kind="tab" title="History" />
+        <TopBar kind="tab" title="Watched" />
         <View style={styles.body}>
           <Text style={styles.empty}>No nights yet — start one.</Text>
         </View>
@@ -97,7 +97,7 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.screen}>
-      <TopBar kind="tab" title="History" />
+      <TopBar kind="tab" title="Watched" />
       <TabScrollView contentContainerStyle={styles.content}>
         <View style={styles.stats}>
           <View style={styles.statCell}>
