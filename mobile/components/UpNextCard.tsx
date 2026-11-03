@@ -7,15 +7,17 @@ import { formatStartTime, formatWeekdayDate } from "../lib/date";
 import { nightWording } from "../lib/nightLifecycle";
 import type { Night } from "../lib/nights";
 import { capitalize } from "../lib/text";
-import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, radius, space, tabular, textPresets, trackPx } from "../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, radius, space, tabular, textPresets } from "../theme";
 
 const MAX_AVATARS = 4; // overlapping "coming" faces
 
 // UpNextCard is the home's scheduled-night card: when a night is on the
-// calendar, the home leads with it instead of the whose-turn hero. The
-// picker's first name is the headline, with the film (once chosen) in
-// Newsreader Italic below it. A small accent dot marks the date line; nothing
-// glows. Edit routes to /night/edit/[id].
+// calendar, the home leads with it instead of the whose-turn hero. The film is
+// the headline (textPresets.filmTitle at text-3xl), with the picker credited
+// on one body-size line beneath it ("Picked by Tomas"). Before the film is
+// chosen the headline reads "Not picked yet." in tertiary text and the credit
+// reads "Tomas is picking". The accent is only the date-line dot and "Start
+// the night"; nothing glows. Edit routes to /night/edit/[id].
 export function UpNextCard({
   night,
   today,
@@ -46,17 +48,29 @@ export function UpNextCard({
         </Text>
       </View>
 
+      <Text
+        style={[styles.title, night.movie === null && styles.titlePending]}
+        numberOfLines={3}
+      >
+        {night.movie !== null ? night.movie.title : "Not picked yet."}
+      </Text>
+
       {picker !== null ? (
-        <View style={styles.pickerRow}>
-          <View style={styles.pickerText}>
-            <Text style={styles.pickerName} numberOfLines={1} allowFontScaling={false}>
-              {firstName(picker.name)}
-            </Text>
-            <Text style={styles.film} numberOfLines={2}>
-              {night.movie !== null ? `${night.movie.title}.` : "picks the film."}
-            </Text>
-          </View>
-          <Avatar name={picker.name} size={48} />
+        <View style={styles.creditRow}>
+          <Avatar name={picker.name} size={28} />
+          <Text style={styles.credit} numberOfLines={1}>
+            {night.movie !== null ? (
+              <>
+                {"Picked by "}
+                <Text style={styles.creditName}>{firstName(picker.name)}</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.creditName}>{firstName(picker.name)}</Text>
+                {" is picking"}
+              </>
+            )}
+          </Text>
         </View>
       ) : null}
 
@@ -101,29 +115,20 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.text.secondary,
     flexShrink: 1,
   },
-  pickerRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: space[3],
+  // The film leads. Sized up from the filmTitle preset so the face (and its
+  // Phase 2 change to upright Newsreader 500) comes from one place.
+  title: {
+    ...textPresets.filmTitle,
+    fontSize: fontSize["3xl"],
+    lineHeight: lh(fontSize["3xl"], "snug"),
+    color: colors.text.primary,
     marginTop: space[4],
   },
-  pickerText: { flex: 1, minWidth: 0 },
-  pickerName: {
-    fontFamily: fontFamily.display,
-    fontSize: fontSize["4xl"],
-    // leading-tight (0.9) clips the name's ascenders in RN, so it sits at 1.
-    lineHeight: lh(fontSize["4xl"], "none"),
-    letterSpacing: trackPx(fontSize["4xl"], "display"),
-    color: colors.text.primary,
-  },
-  film: {
-    fontFamily: fontFamily.serifItalic,
-    fontSize: 26,
-    lineHeight: Math.round(26 * 1.15),
-    color: colors.text.primary,
-    marginTop: 6,
-  },
+  titlePending: { color: colors.text.tertiary },
+  creditRow: { flexDirection: "row", alignItems: "center", gap: space[2], marginTop: space[4] },
+  // The picker's name stays at body size here; it's a credit, not a headline.
+  credit: { ...textPresets.body, color: colors.text.secondary, flexShrink: 1 },
+  creditName: { fontFamily: fontFamily.sansSemibold, color: colors.text.primary },
   comingRow: {
     flexDirection: "row",
     alignItems: "center",

@@ -160,15 +160,6 @@ export default function TonightScreen() {
                 onEdit={openEdit}
               />
               {onDeck.length > 0 ? <OnDeck label="Then" members={onDeck} /> : null}
-              <View style={styles.linkRow}>
-                <AppButton
-                  title="Plan another night →"
-                  variant="ghost"
-                  size="sm"
-                  strong
-                  onPress={() => router.navigate("/night/new")}
-                />
-              </View>
             </>
           ) : (
             <>
