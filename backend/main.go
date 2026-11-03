@@ -76,7 +76,7 @@ func main() {
 	mux.Handle("GET /groups/{groupId}/nights", listNightsHandler(queries))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(queries))
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
-	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(queries))
+	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(pool))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}/turn", nightTurnHandler(queries))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(pool))
 	mux.Handle("GET /movies/search", searchMoviesHandler(tmdb))

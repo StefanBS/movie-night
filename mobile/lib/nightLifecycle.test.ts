@@ -17,6 +17,7 @@ function night(id: string, scheduledFor: string, opts: Partial<Night> = {}): Nig
     attendees: [],
     reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
     watchedAt: null,
+    repeat: null,
     ...opts,
   };
 }

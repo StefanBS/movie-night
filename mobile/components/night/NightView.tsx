@@ -1,6 +1,6 @@
 import { type ComponentProps } from "react";
 import { Platform, ScrollView, Text, View } from "react-native";
-import { CalendarPlus, Clapperboard, Film, Pencil, X } from "lucide-react-native";
+import { CalendarPlus, Clapperboard, Film, Pencil, Repeat, X } from "lucide-react-native";
 
 import { AppButton, Avatar, Poster, SectionLabel, Sheet, SheetRow, useToast } from "../";
 import { Credit } from "./Credit";
@@ -11,6 +11,7 @@ import { formatShortDate, formatWeekdayDate } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import { nightMeta, nightWording } from "../../lib/nightLifecycle";
 import { nightPickerName, type Night } from "../../lib/nights";
+import { formatRepeatLabel } from "../../lib/repeat";
 import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, radius, space, tabular, textPresets, useColors } from "../../theme";
 
 type SheetAction = Omit<ComponentProps<typeof SheetRow>, "last">;
@@ -108,6 +109,14 @@ export function NightView({
             {movie !== null && movie.releaseYear !== null ? (
               <Text style={styles.year}>{movie.releaseYear}</Text>
             ) : null}
+            {night.repeat !== null ? (
+              <View style={styles.repeatChip}>
+                <Repeat size={14} color={colors.text.secondary} />
+                <Text style={styles.repeatText} numberOfLines={1}>
+                  {formatRepeatLabel(night.repeat, night.scheduledFor)}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -168,6 +177,20 @@ const useStyles = createThemedStyles((colors) => ({
   filmTitle: { ...textPresets.filmTitle, fontSize: 32, lineHeight: 36, color: colors.text.primary, marginTop: space[2] },
   notPicked: { color: colors.text.tertiary },
   year: { ...textPresets.meta, ...tabular, color: colors.text.tertiary, marginTop: space[2] },
+  // A repeating night's cadence ("Every Friday", ADR-0014): a quiet pill, not
+  // the accent.
+  repeatChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    marginTop: space[3],
+    paddingVertical: 6,
+    paddingHorizontal: space[3],
+    borderRadius: radius.full,
+    backgroundColor: colors.surface.subtle,
+  },
+  repeatText: { fontFamily: fontFamily.sansSemibold, fontSize: 13, lineHeight: lh(13, "snug"), color: colors.text.secondary },
   credit: {
     marginTop: 22,
     paddingTop: space[4],

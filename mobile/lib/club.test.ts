@@ -94,6 +94,7 @@ function night(id: string, scheduledFor: string, pickerId: string, watched = tru
     attendees: [],
     reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
     watchedAt: watched ? `${scheduledFor}T22:00:00Z` : null,
+    repeat: null,
   };
 }
 const nights: Night[] = [

@@ -8,12 +8,14 @@ import { formatStartTime, formatWeekdayDate } from "../lib/date";
 import { movieDetails } from "../lib/movies";
 import { nightWording, upNextAction } from "../lib/nightLifecycle";
 import { nightPicker, type Night } from "../lib/nights";
+import { formatRepeatShort } from "../lib/repeat";
 import { capitalize } from "../lib/text";
 import {
   borderWidth,
   createThemedStyles,
   fontFamily,
   fontSize,
+  lh,
   pressedOpacity,
   radius,
   space,
@@ -43,8 +45,10 @@ const POSTER_H = 132;
 // Tapping the card outside the buttons opens the night: the body is one
 // Pressable and the button row its sibling, so a button press never reaches
 // it and TalkBack still sees each button. The body has no explicit label, so
-// TalkBack reads all of its text: date, film, credit and who's coming. The
-// accent is only the date-line dot and the primary button; nothing glows.
+// TalkBack reads all of its text: date, film, credit and who's coming. A
+// repeating night's date line ends with its cadence ("Weekly") and may wrap
+// to a second line rather than cut it off. The accent is only the date-line
+// dot and the primary button; nothing glows.
 export function UpNextCard({
   night,
   today,
@@ -69,6 +73,7 @@ export function UpNextCard({
     wording.countdown,
     formatWeekdayDate(night.scheduledFor),
     night.startTime !== null ? formatStartTime(night.startTime) : null,
+    night.repeat !== null ? formatRepeatShort(night.repeat) : null,
   ]
     .filter((part) => part !== null)
     .join(" · ");
@@ -89,7 +94,7 @@ export function UpNextCard({
       >
         <View style={styles.whenRow}>
           <View style={styles.dot} />
-          <Text style={styles.when} numberOfLines={1}>
+          <Text style={styles.when} numberOfLines={2}>
             {capitalize(when)}
           </Text>
         </View>
@@ -182,8 +187,15 @@ const useStyles = createThemedStyles((colors, shadow) => ({
     backgroundColor: colors.surface.card,
   },
   pressed: { opacity: pressedOpacity },
-  whenRow: { flexDirection: "row", alignItems: "center", gap: space[2] },
-  dot: { width: 8, height: 8, borderRadius: radius.full, backgroundColor: colors.accent.base },
+  // The dot sits on the first line's centre, should the line wrap.
+  whenRow: { flexDirection: "row", alignItems: "flex-start", gap: space[2] },
+  dot: {
+    width: 8,
+    height: 8,
+    marginTop: (lh(fontSize.sm, "normal") - 8) / 2,
+    borderRadius: radius.full,
+    backgroundColor: colors.accent.base,
+  },
   // No tabular figures: this line is prose ("Monday, Nov 2") and Schibsted's
   // tabular comma would open a gap before it.
   when: {

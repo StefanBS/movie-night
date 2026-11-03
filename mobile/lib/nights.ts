@@ -2,6 +2,7 @@ import { requestJson, requestJsonOrNull, requestNoContent } from "./http";
 import type { Member } from "./members";
 import { parseMovie, type Movie } from "./movies";
 import { parseReminders, type Reminders } from "./reminders";
+import { parseRepeat, type Repeat } from "./repeat";
 import { parseTurn, type TurnMember } from "./turn";
 
 export type Attendee = {
@@ -25,6 +26,8 @@ export type Night = {
   // watchedAt is when the group recorded the Night as watched (an ISO
   // timestamp), or null until then (ADR-0012).
   watchedAt: string | null;
+  // repeat is the Night's series rule, or null for a one-off (ADR-0014).
+  repeat: Repeat | null;
 };
 
 function parseAttendee(raw: unknown, index: number): Attendee {
@@ -64,7 +67,7 @@ export function parseNight(raw: unknown): Night {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("expected a night object");
   }
-  const { id, scheduledFor, startTime, pickerId, movie, attendees, reminders, watchedAt } = raw as Record<string, unknown>;
+  const { id, scheduledFor, startTime, pickerId, movie, attendees, reminders, watchedAt, repeat } = raw as Record<string, unknown>;
   if (typeof id !== "string") {
     throw new Error("night: id must be a string");
   }
@@ -93,6 +96,7 @@ export function parseNight(raw: unknown): Night {
     attendees: attendees.map(parseAttendee),
     reminders: parseReminders(reminders),
     watchedAt: watchedAt ?? null,
+    repeat: parseRepeat(repeat),
   };
 }
 
@@ -228,16 +232,17 @@ export function detachMovie(
 }
 
 // NightChanges is a saved Night's date and start time (null clears it), its
-// whole attendee set (which must still include the picker) and its reminder
-// settings.
+// whole attendee set (which must still include the picker), its reminder
+// settings and its repeat (null ends the series).
 export type NightChanges = {
   scheduledFor: string;
   startTime: string | null;
   attendees: string[];
   reminders: Reminders;
+  repeat: Repeat | null;
 };
 
-// updateNight saves a Night's date, start time, attendees and reminders in one request that either
+// updateNight saves a Night's date, start time, attendees, reminders and repeat in one request that either
 // fully applies or changes nothing. The backend rejects dropping the picker or
 // a non-member (422) and a date that already has a Night (409).
 export function updateNight(
@@ -276,9 +281,10 @@ export type Attendance = {
 
 // recordWatched records a Night as watched (ADR-0012) with the attendees and
 // picker the group confirmed, in the one PATCH that either fully applies or
-// changes nothing. Its date, start time and reminders are sent as they are.
-// The backend rejects a Night with no film (422); recording again keeps the
-// first watchedAt.
+// changes nothing. Its date, start time, reminders and repeat are sent as they
+// are, so a repeating Night opens the next one in its series (ADR-0014). The
+// backend rejects a Night with no film (422); recording again keeps the first
+// watchedAt.
 export function recordWatched(
   baseUrl: string,
   groupId: string,
@@ -291,6 +297,7 @@ export function recordWatched(
     startTime: night.startTime,
     attendees,
     reminders: night.reminders,
+    repeat: night.repeat,
   };
   return fetchNight(`${baseUrl}/groups/${groupId}/nights/${night.id}`, {
     method: "PATCH",

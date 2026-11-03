@@ -18,6 +18,7 @@ function night(id: string, scheduledFor: string, tmdbId: number | null, watched 
         : { tmdbId, title: `Film ${tmdbId}`, releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null },
     attendees: [],
     watchedAt: watched ? `${scheduledFor}T22:00:00Z` : null,
+    repeat: null,
   };
 }
 

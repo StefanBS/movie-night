@@ -181,6 +181,48 @@ func (ns NullReminderSlot) Value() (driver.Value, error) {
 	return string(ns.ReminderSlot), nil
 }
 
+type RepeatFreq string
+
+const (
+	RepeatFreqWeekly  RepeatFreq = "weekly"
+	RepeatFreqMonthly RepeatFreq = "monthly"
+)
+
+func (e *RepeatFreq) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RepeatFreq(s)
+	case string:
+		*e = RepeatFreq(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RepeatFreq: %T", src)
+	}
+	return nil
+}
+
+type NullRepeatFreq struct {
+	RepeatFreq RepeatFreq `json:"repeat_freq"`
+	Valid      bool       `json:"valid"` // Valid is true if RepeatFreq is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRepeatFreq) Scan(value interface{}) error {
+	if value == nil {
+		ns.RepeatFreq, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RepeatFreq.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRepeatFreq) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RepeatFreq), nil
+}
+
 type Attendance struct {
 	ID     uuid.UUID `json:"id"`
 	PickID uuid.UUID `json:"pick_id"`
@@ -245,6 +287,9 @@ type Night struct {
 	MovieGenres          []string           `json:"movie_genres"`
 	MovieRuntimeMinutes  pgtype.Int4        `json:"movie_runtime_minutes"`
 	WatchedAt            pgtype.Timestamptz `json:"watched_at"`
+	RepeatFreq           NullRepeatFreq     `json:"repeat_freq"`
+	RepeatIntervalWeeks  pgtype.Int2        `json:"repeat_interval_weeks"`
+	RepeatWeekOfMonth    pgtype.Int2        `json:"repeat_week_of_month"`
 }
 
 type Pick struct {
@@ -261,6 +306,9 @@ type Pick struct {
 	StartTime            pgtype.Time        `json:"start_time"`
 	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
 	WatchedAt            pgtype.Timestamptz `json:"watched_at"`
+	RepeatFreq           NullRepeatFreq     `json:"repeat_freq"`
+	RepeatIntervalWeeks  pgtype.Int2        `json:"repeat_interval_weeks"`
+	RepeatWeekOfMonth    pgtype.Int2        `json:"repeat_week_of_month"`
 }
 
 type RemindersSent struct {

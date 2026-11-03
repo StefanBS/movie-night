@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -27,13 +28,17 @@ func createNight(ctx context.Context, q *db.Queries, gid uuid.UUID, night parsed
 	if err != nil {
 		return uuid.Nil, err
 	}
+	freq, intervalWeeks, weekOfMonth := repeatColumns(night.Repeat)
 	return q.CreateNight(ctx, db.CreateNightParams{
-		GroupID:      gid,
-		ScheduledFor: night.ScheduledFor,
-		StartTime:    night.StartTime,
-		PickerID:     night.Picker,
-		IsCredited:   creditedForRole(roles[night.Picker]),
-		Attendees:    night.Attendees,
+		GroupID:             gid,
+		ScheduledFor:        night.ScheduledFor,
+		StartTime:           night.StartTime,
+		PickerID:            night.Picker,
+		IsCredited:          creditedForRole(roles[night.Picker]),
+		Attendees:           night.Attendees,
+		RepeatFreq:          freq,
+		RepeatIntervalWeeks: intervalWeeks,
+		RepeatWeekOfMonth:   weekOfMonth,
 	})
 }
 
@@ -63,9 +68,10 @@ func recordPick(ctx context.Context, q *db.Queries, gid, nightID, picker uuid.UU
 // edit says so changes its picker and records it as watched (ADR-0012). The
 // picker, new or kept, must be an attendee, and only a Night with a film can
 // be recorded. A Night being recorded, or already a Watched Night, must be
-// dated no later than recordableAsWatched allows at now (ADR-0013). A taken
-// date fails on the UpdateNight statement, after the attendee writes; the
-// rollback undoes them.
+// dated no later than recordableAsWatched allows at now (ADR-0013), and a
+// Watched Night can't repeat. Recording a repeating Night moves its series on
+// (ADR-0014). A taken date fails on the UpdateNight statement, after the
+// attendee writes; the rollback undoes them.
 func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit nightEdit, now time.Time) error {
 	locked, err := q.LockNight(ctx, db.LockNightParams{NightID: nightID, GroupID: gid})
 	if err != nil {
@@ -88,6 +94,9 @@ func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit 
 	if (edit.Watched || locked.IsWatched) && !recordableAsWatched(edit.ScheduledFor, now) {
 		return errWatchedDateAhead
 	}
+	if locked.IsWatched && edit.Repeat != nil {
+		return errWatchedRepeats
+	}
 	if err := q.RemoveAttendeesNotIn(ctx, db.RemoveAttendeesNotInParams{PickID: nightID, Keep: edit.Attendees}); err != nil {
 		return err
 	}
@@ -104,6 +113,7 @@ func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit 
 			return err
 		}
 	}
+	freq, intervalWeeks, weekOfMonth := repeatColumns(edit.Repeat)
 	if err := q.UpdateNight(ctx, db.UpdateNightParams{
 		NightID:              nightID,
 		GroupID:              gid,
@@ -113,13 +123,97 @@ func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit 
 		RemindMorningOf:      edit.Reminders.MorningOf,
 		RemindTwoHoursBefore: edit.Reminders.TwoHoursBefore,
 		RemindAudience:       edit.Reminders.Audience,
+		RepeatFreq:           freq,
+		RepeatIntervalWeeks:  intervalWeeks,
+		RepeatWeekOfMonth:    weekOfMonth,
 	}); err != nil {
 		return err
 	}
 	if !edit.Watched {
 		return nil
 	}
-	return q.RecordNightWatched(ctx, db.RecordNightWatchedParams{NightID: nightID, GroupID: gid})
+	if err := q.RecordNightWatched(ctx, db.RecordNightWatchedParams{NightID: nightID, GroupID: gid}); err != nil {
+		return err
+	}
+	if edit.Repeat == nil {
+		return nil
+	}
+	if err := moveSeriesOn(ctx, q, gid, nightID, picker, *edit.Repeat, edit.ScheduledFor.Time, false, now); err != nil {
+		return err
+	}
+	return q.ClearNightRepeat(ctx, db.ClearNightRepeatParams{NightID: nightID, GroupID: gid})
+}
+
+// cancelNight deletes a Night ("Cancel this night"). A repeating Night's
+// series moves on first, so cancelling skips one date rather than ending the
+// series (ADR-0014). A missing Night is not an error: deleting is idempotent.
+func cancelNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, now time.Time) error {
+	locked, err := q.LockNight(ctx, db.LockNightParams{NightID: nightID, GroupID: gid})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if rule := repeatFromColumns(locked.RepeatFreq, locked.RepeatIntervalWeeks, locked.RepeatWeekOfMonth); rule != nil {
+		if err := moveSeriesOn(ctx, q, gid, nightID, locked.PickerID, *rule, locked.ScheduledFor.Time, true, now); err != nil {
+			return err
+		}
+	}
+	return q.DeleteNight(ctx, db.DeleteNightParams{NightID: nightID, GroupID: gid})
+}
+
+// moveSeriesOn opens the next Night of the series on Night from (dated date,
+// picked by picker) on nextSeriesDate (ADR-0014). If a Night not yet watched
+// already holds that date, it joins the series instead (keeping its own
+// repeat, if it has one); a Watched Night there is passed over for the
+// following date. A new Night copies from's start time, reminders, repeat and
+// attendees, and its picker leads the turn ranking over those attendees, or
+// is picker again when none of them is in the rotation. When from is being
+// cancelled, its pick is left out of the ranking, so its picker keeps the
+// turn they didn't get.
+func moveSeriesOn(ctx context.Context, q *db.Queries, gid, from, picker uuid.UUID, rule repeatRule, date time.Time, cancelled bool, now time.Time) error {
+	next := nextSeriesDate(rule, date, now)
+	for {
+		taken, err := q.LockNightOnDate(ctx, db.LockNightOnDateParams{GroupID: gid, ScheduledFor: pgtype.Date{Time: next, Valid: true}})
+		if errors.Is(err, pgx.ErrNoRows) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if !taken.IsWatched {
+			return q.JoinSeries(ctx, db.JoinSeriesParams{NightID: taken.ID, GroupID: gid, FromNight: from})
+		}
+		next = nextOccurrence(rule, next)
+	}
+	attendees, err := q.ListNightAttendees(ctx, db.ListNightAttendeesParams{GroupID: gid, NightID: from})
+	if err != nil {
+		return err
+	}
+	var exclude pgtype.UUID
+	if cancelled {
+		exclude = pgtype.UUID{Bytes: from, Valid: true}
+	}
+	ranked, err := q.RankGroupTurn(ctx, db.RankGroupTurnParams{GroupID: gid, ExcludeNight: exclude, Present: presentIDs(attendees)})
+	if err != nil {
+		return err
+	}
+	if len(ranked) > 0 {
+		picker = ranked[0].ID
+	}
+	role, err := attendeeRole(attendees, picker)
+	if err != nil {
+		return err
+	}
+	_, err = q.CreateNextInSeries(ctx, db.CreateNextInSeriesParams{
+		GroupID:      gid,
+		FromNight:    from,
+		ScheduledFor: pgtype.Date{Time: next, Valid: true},
+		PickerID:     picker,
+		IsCredited:   creditedForRole(role),
+	})
+	return err
 }
 
 // memberRoles returns each attendee's role in the group, or errNotMember for
@@ -150,7 +244,8 @@ func writeNightError(w http.ResponseWriter, gid uuid.UUID, op string, err error)
 	case errors.Is(err, pgx.ErrNoRows):
 		writeJSONError(w, http.StatusNotFound, "night not found")
 	case errors.Is(err, errPickerNotAttendee), errors.Is(err, errNotMember),
-		errors.Is(err, errWatchedWithoutFilm), errors.Is(err, errWatchedDateAhead):
+		errors.Is(err, errWatchedWithoutFilm), errors.Is(err, errWatchedDateAhead),
+		errors.Is(err, errWatchedRepeats):
 		writeJSONError(w, http.StatusUnprocessableEntity, err.Error())
 	case isUniqueViolation(err):
 		writeJSONError(w, http.StatusConflict, errNightDateTaken)

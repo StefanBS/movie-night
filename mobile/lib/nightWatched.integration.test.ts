@@ -66,6 +66,7 @@ const PLANNED: Night = {
   ],
   reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
   watchedAt: null,
+  repeat: null,
 };
 
 type Patch = { scheduledFor: string; startTime: string | null; attendees: string[]; pickerId: string; watched: boolean };
@@ -97,6 +98,7 @@ function backend(over: Partial<Record<string, Handler>> = {}, patches: Patch[] =
         pickerId: patch.pickerId,
         attendees: patch.attendees.map((id) => ({ id, name: id, role: id === "frankie" ? "guest" : "core" })),
         watchedAt: "2026-06-19T22:00:00Z",
+        repeat: null,
       };
       return json(res, 200, night);
     }

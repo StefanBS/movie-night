@@ -27,6 +27,7 @@ const night = (...ids: string[]): Night => ({
   pickerId: ids[0],
   reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
   watchedAt: null,
+  repeat: null,
   movie: null,
   attendees: ids.map((id) => ({ id, name: id[0].toUpperCase() + id.slice(1), role: id === "frankie" ? "guest" : "core" })),
 });
@@ -62,6 +63,7 @@ test("isDirty is false until the draft differs from the stored Night", () => {
     startTime: stored.startTime,
     attendees: new Set(["ada", "blake"]),
     reminders: stored.reminders,
+    repeat: stored.repeat,
   };
   const cases: { name: string; draft: Partial<Draft>; want: boolean }[] = [
     { name: "unchanged", draft: {}, want: false },
@@ -69,6 +71,7 @@ test("isDirty is false until the draft differs from the stored Night", () => {
     { name: "an equal reminders copy", draft: { reminders: { ...stored.reminders } }, want: false },
     { name: "another date", draft: { date: "2026-06-27" }, want: true },
     { name: "another start time", draft: { startTime: "19:30" }, want: true },
+    { name: "set to repeat", draft: { repeat: { freq: "weekly", intervalWeeks: 1 } }, want: true },
     { name: "start time cleared", draft: { startTime: null }, want: true },
     { name: "someone added", draft: { attendees: new Set(["ada", "blake", "frankie"]) }, want: true },
     { name: "someone removed", draft: { attendees: new Set(["ada"]) }, want: true },

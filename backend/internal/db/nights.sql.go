@@ -29,26 +29,89 @@ func (q *Queries) AddAttendees(ctx context.Context, arg AddAttendeesParams) erro
 	return err
 }
 
-const createNight = `-- name: CreateNight :one
+const clearNightRepeat = `-- name: ClearNightRepeat :exec
+UPDATE picks
+SET repeat_freq = NULL, repeat_interval_weeks = NULL, repeat_week_of_month = NULL
+WHERE id = $1 AND group_id = $2
+`
 
+type ClearNightRepeatParams struct {
+	NightID uuid.UUID `json:"night_id"`
+	GroupID uuid.UUID `json:"group_id"`
+}
+
+func (q *Queries) ClearNightRepeat(ctx context.Context, arg ClearNightRepeatParams) error {
+	_, err := q.db.Exec(ctx, clearNightRepeat, arg.NightID, arg.GroupID)
+	return err
+}
+
+const createNextInSeries = `-- name: CreateNextInSeries :one
 WITH night AS (
-  INSERT INTO picks (group_id, scheduled_for, start_time, picker_id, is_credited)
-  VALUES ($1, $2, $3, $4, $5)
+  INSERT INTO picks (group_id, scheduled_for, start_time, picker_id, is_credited,
+                     remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience,
+                     repeat_freq, repeat_interval_weeks, repeat_week_of_month)
+  SELECT src.group_id, $1, src.start_time, $2, $3,
+         src.remind_night_before, src.remind_morning_of, src.remind_two_hours_before, src.remind_audience,
+         src.repeat_freq, src.repeat_interval_weeks, src.repeat_week_of_month
+  FROM picks AS src
+  WHERE src.id = $4 AND src.group_id = $5
   RETURNING id
 ), attended AS (
   INSERT INTO attendances (pick_id, user_id)
-  SELECT night.id, unnest($6::uuid[]) FROM night
+  SELECT night.id, a.user_id FROM night, attendances a WHERE a.pick_id = $4
+)
+SELECT id FROM night
+`
+
+type CreateNextInSeriesParams struct {
+	ScheduledFor pgtype.Date `json:"scheduled_for"`
+	PickerID     uuid.UUID   `json:"picker_id"`
+	IsCredited   bool        `json:"is_credited"`
+	FromNight    uuid.UUID   `json:"from_night"`
+	GroupID      uuid.UUID   `json:"group_id"`
+}
+
+// Opens the next Night of a series (ADR-0014) from the Night it moves on from:
+// its start time, reminders, repeat and attendees, on the new date with the
+// given picker and no film. Attendances are read as the transaction left them.
+func (q *Queries) CreateNextInSeries(ctx context.Context, arg CreateNextInSeriesParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createNextInSeries,
+		arg.ScheduledFor,
+		arg.PickerID,
+		arg.IsCredited,
+		arg.FromNight,
+		arg.GroupID,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const createNight = `-- name: CreateNight :one
+
+WITH night AS (
+  INSERT INTO picks (group_id, scheduled_for, start_time, picker_id, is_credited,
+                     repeat_freq, repeat_interval_weeks, repeat_week_of_month)
+  VALUES ($1, $2, $3, $4, $5,
+          $6, $7, $8)
+  RETURNING id
+), attended AS (
+  INSERT INTO attendances (pick_id, user_id)
+  SELECT night.id, unnest($9::uuid[]) FROM night
 )
 SELECT id FROM night
 `
 
 type CreateNightParams struct {
-	GroupID      uuid.UUID   `json:"group_id"`
-	ScheduledFor pgtype.Date `json:"scheduled_for"`
-	StartTime    pgtype.Time `json:"start_time"`
-	PickerID     uuid.UUID   `json:"picker_id"`
-	IsCredited   bool        `json:"is_credited"`
-	Attendees    []uuid.UUID `json:"attendees"`
+	GroupID             uuid.UUID      `json:"group_id"`
+	ScheduledFor        pgtype.Date    `json:"scheduled_for"`
+	StartTime           pgtype.Time    `json:"start_time"`
+	PickerID            uuid.UUID      `json:"picker_id"`
+	IsCredited          bool           `json:"is_credited"`
+	RepeatFreq          NullRepeatFreq `json:"repeat_freq"`
+	RepeatIntervalWeeks pgtype.Int2    `json:"repeat_interval_weeks"`
+	RepeatWeekOfMonth   pgtype.Int2    `json:"repeat_week_of_month"`
+	Attendees           []uuid.UUID    `json:"attendees"`
 }
 
 // Night writes change picks/attendances and return at most the Night's id; the
@@ -63,6 +126,9 @@ func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (uuid.
 		arg.StartTime,
 		arg.PickerID,
 		arg.IsCredited,
+		arg.RepeatFreq,
+		arg.RepeatIntervalWeeks,
+		arg.RepeatWeekOfMonth,
 		arg.Attendees,
 	)
 	var id uuid.UUID
@@ -86,7 +152,7 @@ func (q *Queries) DeleteNight(ctx context.Context, arg DeleteNightParams) error 
 }
 
 const getNight = `-- name: GetNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes, watched_at FROM nights
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes, watched_at, repeat_freq, repeat_interval_weeks, repeat_week_of_month FROM nights
 WHERE id = $1 AND group_id = $2
 `
 
@@ -117,8 +183,35 @@ func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (Night, erro
 		&i.MovieGenres,
 		&i.MovieRuntimeMinutes,
 		&i.WatchedAt,
+		&i.RepeatFreq,
+		&i.RepeatIntervalWeeks,
+		&i.RepeatWeekOfMonth,
 	)
 	return i, err
+}
+
+const joinSeries = `-- name: JoinSeries :exec
+UPDATE picks AS t
+SET repeat_freq           = s.repeat_freq,
+    repeat_interval_weeks = s.repeat_interval_weeks,
+    repeat_week_of_month  = s.repeat_week_of_month
+FROM picks AS s
+WHERE t.id = $1 AND t.group_id = $2
+  AND s.id = $3 AND s.group_id = $2
+  AND t.repeat_freq IS NULL
+`
+
+type JoinSeriesParams struct {
+	NightID   uuid.UUID `json:"night_id"`
+	GroupID   uuid.UUID `json:"group_id"`
+	FromNight uuid.UUID `json:"from_night"`
+}
+
+// Hands a series' repeat to a Night already on its next date, unless that
+// Night repeats on its own (ADR-0014).
+func (q *Queries) JoinSeries(ctx context.Context, arg JoinSeriesParams) error {
+	_, err := q.db.Exec(ctx, joinSeries, arg.NightID, arg.GroupID, arg.FromNight)
+	return err
 }
 
 const listNightAttendees = `-- name: ListNightAttendees :many
@@ -164,7 +257,7 @@ func (q *Queries) ListNightAttendees(ctx context.Context, arg ListNightAttendees
 }
 
 const listNights = `-- name: ListNights :many
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes, watched_at FROM nights
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes, watched_at, repeat_freq, repeat_interval_weeks, repeat_week_of_month FROM nights
 WHERE group_id = $1
 ORDER BY scheduled_for DESC
 `
@@ -197,6 +290,9 @@ func (q *Queries) ListNights(ctx context.Context, groupID uuid.UUID) ([]Night, e
 			&i.MovieGenres,
 			&i.MovieRuntimeMinutes,
 			&i.WatchedAt,
+			&i.RepeatFreq,
+			&i.RepeatIntervalWeeks,
+			&i.RepeatWeekOfMonth,
 		); err != nil {
 			return nil, err
 		}
@@ -259,7 +355,8 @@ func (q *Queries) ListNightsAttendees(ctx context.Context, arg ListNightsAttende
 const lockNight = `-- name: LockNight :one
 SELECT picker_id,
        (movie_id IS NOT NULL)::boolean AS has_movie,
-       (watched_at IS NOT NULL)::boolean AS is_watched
+       (watched_at IS NOT NULL)::boolean AS is_watched,
+       scheduled_for, repeat_freq, repeat_interval_weeks, repeat_week_of_month
 FROM picks
 WHERE id = $1 AND group_id = $2
 FOR UPDATE
@@ -271,18 +368,56 @@ type LockNightParams struct {
 }
 
 type LockNightRow struct {
-	PickerID  uuid.UUID `json:"picker_id"`
-	HasMovie  bool      `json:"has_movie"`
-	IsWatched bool      `json:"is_watched"`
+	PickerID            uuid.UUID      `json:"picker_id"`
+	HasMovie            bool           `json:"has_movie"`
+	IsWatched           bool           `json:"is_watched"`
+	ScheduledFor        pgtype.Date    `json:"scheduled_for"`
+	RepeatFreq          NullRepeatFreq `json:"repeat_freq"`
+	RepeatIntervalWeeks pgtype.Int2    `json:"repeat_interval_weeks"`
+	RepeatWeekOfMonth   pgtype.Int2    `json:"repeat_week_of_month"`
 }
 
 // Locks the night row for the rest of the write's transaction and returns its
-// picker, whether it has a film and whether it is recorded as watched, so no
-// other write can change them or the attendees until it commits.
+// picker, whether it has a film, whether it is recorded as watched, and its
+// date and repeat, so no other write can change them or the attendees until it
+// commits.
 func (q *Queries) LockNight(ctx context.Context, arg LockNightParams) (LockNightRow, error) {
 	row := q.db.QueryRow(ctx, lockNight, arg.NightID, arg.GroupID)
 	var i LockNightRow
-	err := row.Scan(&i.PickerID, &i.HasMovie, &i.IsWatched)
+	err := row.Scan(
+		&i.PickerID,
+		&i.HasMovie,
+		&i.IsWatched,
+		&i.ScheduledFor,
+		&i.RepeatFreq,
+		&i.RepeatIntervalWeeks,
+		&i.RepeatWeekOfMonth,
+	)
+	return i, err
+}
+
+const lockNightOnDate = `-- name: LockNightOnDate :one
+SELECT id, (watched_at IS NOT NULL)::boolean AS is_watched FROM picks
+WHERE group_id = $1 AND scheduled_for = $2
+FOR UPDATE
+`
+
+type LockNightOnDateParams struct {
+	GroupID      uuid.UUID   `json:"group_id"`
+	ScheduledFor pgtype.Date `json:"scheduled_for"`
+}
+
+type LockNightOnDateRow struct {
+	ID        uuid.UUID `json:"id"`
+	IsWatched bool      `json:"is_watched"`
+}
+
+// Locks the group's Night on a date, if there is one, for a series moving on
+// to that date (ADR-0014).
+func (q *Queries) LockNightOnDate(ctx context.Context, arg LockNightOnDateParams) (LockNightOnDateRow, error) {
+	row := q.db.QueryRow(ctx, lockNightOnDate, arg.GroupID, arg.ScheduledFor)
+	var i LockNightOnDateRow
+	err := row.Scan(&i.ID, &i.IsWatched)
 	return i, err
 }
 
@@ -349,8 +484,11 @@ SET scheduled_for           = $1,
     remind_night_before     = $3,
     remind_morning_of       = $4,
     remind_two_hours_before = $5,
-    remind_audience         = $6
-WHERE id = $7 AND group_id = $8
+    remind_audience         = $6,
+    repeat_freq             = $7,
+    repeat_interval_weeks   = $8,
+    repeat_week_of_month    = $9
+WHERE id = $10 AND group_id = $11
 `
 
 type UpdateNightParams struct {
@@ -360,11 +498,15 @@ type UpdateNightParams struct {
 	RemindMorningOf      bool             `json:"remind_morning_of"`
 	RemindTwoHoursBefore bool             `json:"remind_two_hours_before"`
 	RemindAudience       ReminderAudience `json:"remind_audience"`
+	RepeatFreq           NullRepeatFreq   `json:"repeat_freq"`
+	RepeatIntervalWeeks  pgtype.Int2      `json:"repeat_interval_weeks"`
+	RepeatWeekOfMonth    pgtype.Int2      `json:"repeat_week_of_month"`
 	NightID              uuid.UUID        `json:"night_id"`
 	GroupID              uuid.UUID        `json:"group_id"`
 }
 
-// Replaces every editable field at once. A NULL start_time clears it.
+// Replaces every editable field at once. A NULL start_time clears it, and
+// NULL repeat columns end the series.
 func (q *Queries) UpdateNight(ctx context.Context, arg UpdateNightParams) error {
 	_, err := q.db.Exec(ctx, updateNight,
 		arg.ScheduledFor,
@@ -373,6 +515,9 @@ func (q *Queries) UpdateNight(ctx context.Context, arg UpdateNightParams) error 
 		arg.RemindMorningOf,
 		arg.RemindTwoHoursBefore,
 		arg.RemindAudience,
+		arg.RepeatFreq,
+		arg.RepeatIntervalWeeks,
+		arg.RepeatWeekOfMonth,
 		arg.NightID,
 		arg.GroupID,
 	)
