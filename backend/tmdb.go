@@ -16,7 +16,7 @@ import (
 // given id (an upstream 404), so the attach handler can map it to a 404.
 var errMovieNotFound = errors.New("tmdb: movie not found")
 
-// movieResult is the trimmed TMDB movie shape this app cares about: title + year.
+// movieResult is the trimmed TMDB movie shape this app cares about.
 // TMDBID/ReleaseYear are int32 to match the movies table columns (Postgres
 // integer), so they cross the DB boundary without a narrowing conversion; an
 // out-of-range value from TMDB is rejected at decode/parse time instead.
@@ -27,6 +27,12 @@ type movieResult struct {
 	// PosterPath is the raw TMDB poster_path ("" = no poster); the full image
 	// URL is built via posterURL at DTO time, not here.
 	PosterPath string
+	// Genres are TMDB genre names in TMDB order: empty when TMDB has none, and
+	// always for search hits, which carry only genre ids. Parsing never yields
+	// nil; mappers still pass it through genresOrEmpty before JSON or the DB.
+	Genres []string
+	// RuntimeMinutes is nil when unknown (TMDB 0, null or missing, and search hits).
+	RuntimeMinutes *int32
 }
 
 // tmdbClient calls the TMDB REST API. baseURL is injectable so tests point it at
@@ -119,11 +125,31 @@ type tmdbMovieJSON struct {
 	Title       string `json:"title"`
 	ReleaseDate string `json:"release_date"`
 	PosterPath  string `json:"poster_path"`
+	Genres      []struct {
+		Name string `json:"name"`
+	} `json:"genres"`
+	Runtime int32 `json:"runtime"` // 0 when null or missing
 }
 
 // toResult maps the decoded TMDB JSON to the trimmed movieResult this app stores.
 func (m tmdbMovieJSON) toResult() movieResult {
-	return movieResult{TMDBID: m.ID, Title: m.Title, ReleaseYear: releaseYear(m.ReleaseDate), PosterPath: m.PosterPath}
+	genres := make([]string, 0, len(m.Genres))
+	for _, g := range m.Genres {
+		genres = append(genres, g.Name)
+	}
+	var runtime *int32
+	if m.Runtime > 0 {
+		r := m.Runtime
+		runtime = &r
+	}
+	return movieResult{
+		TMDBID:         m.ID,
+		Title:          m.Title,
+		ReleaseYear:    releaseYear(m.ReleaseDate),
+		PosterPath:     m.PosterPath,
+		Genres:         genres,
+		RuntimeMinutes: runtime,
+	}
 }
 
 // parseTMDBSearch decodes a /search/movie body into movieResults. Pure.

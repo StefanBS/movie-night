@@ -1,9 +1,11 @@
 -- name: UpsertMovie :one
-INSERT INTO movies (tmdb_id, title, release_year, poster_path)
-VALUES (sqlc.arg(tmdb_id), sqlc.arg(title), sqlc.arg(release_year), sqlc.arg(poster_path))
+INSERT INTO movies (tmdb_id, title, release_year, poster_path, genres, runtime_minutes)
+VALUES (sqlc.arg(tmdb_id), sqlc.arg(title), sqlc.arg(release_year), sqlc.arg(poster_path),
+        sqlc.arg(genres), sqlc.arg(runtime_minutes))
 ON CONFLICT (tmdb_id) DO UPDATE
     SET title = excluded.title, release_year = excluded.release_year,
-        poster_path = excluded.poster_path, cached_at = now()
+        poster_path = excluded.poster_path, genres = excluded.genres,
+        runtime_minutes = excluded.runtime_minutes, cached_at = now()
 RETURNING id;
 
 -- name: SetNightMovie :exec

@@ -42,7 +42,7 @@ function json(res: http.ServerResponse, status: number, payload: unknown) {
 
 const GROUP = "g1";
 const NIGHT = "n1";
-const DUNE: Movie = { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: null };
+const DUNE: Movie = { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: null, genres: [], runtimeMinutes: null };
 const MEMBERS: Member[] = [
   { id: "ada", name: "Ada", role: "core", status: "active", joinedOn: "2026-01-01" },
   { id: "blake", name: "Blake", role: "core", status: "active", joinedOn: "2026-01-01" },

@@ -84,9 +84,23 @@ test("parseNight rejects a missing or null pickerId (every Night has a picker)",
 test("parseNight reads an attached movie", () => {
   const n = parseNight({
     ...valid,
-    movie: { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg" },
+    movie: {
+      tmdbId: 438631,
+      title: "Dune",
+      releaseYear: 2021,
+      posterUrl: "https://img/x.jpg",
+      genres: ["Drama"],
+      runtimeMinutes: 98,
+    },
   });
-  assert.deepEqual(n.movie, { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg" });
+  assert.deepEqual(n.movie, {
+    tmdbId: 438631,
+    title: "Dune",
+    releaseYear: 2021,
+    posterUrl: "https://img/x.jpg",
+    genres: ["Drama"],
+    runtimeMinutes: 98,
+  });
 });
 
 test("parseNight accepts a null or absent movie", () => {

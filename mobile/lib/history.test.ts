@@ -14,7 +14,7 @@ function night(id: string, scheduledFor: string, tmdbId: number | null): Night {
     movie:
       tmdbId === null
         ? null
-        : { tmdbId, title: `Film ${tmdbId}`, releaseYear: null, posterUrl: null },
+        : { tmdbId, title: `Film ${tmdbId}`, releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null },
     attendees: [],
   };
 }

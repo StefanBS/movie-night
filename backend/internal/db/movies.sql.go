@@ -50,19 +50,23 @@ func (q *Queries) SetNightMovie(ctx context.Context, arg SetNightMovieParams) er
 }
 
 const upsertMovie = `-- name: UpsertMovie :one
-INSERT INTO movies (tmdb_id, title, release_year, poster_path)
-VALUES ($1, $2, $3, $4)
+INSERT INTO movies (tmdb_id, title, release_year, poster_path, genres, runtime_minutes)
+VALUES ($1, $2, $3, $4,
+        $5, $6)
 ON CONFLICT (tmdb_id) DO UPDATE
     SET title = excluded.title, release_year = excluded.release_year,
-        poster_path = excluded.poster_path, cached_at = now()
+        poster_path = excluded.poster_path, genres = excluded.genres,
+        runtime_minutes = excluded.runtime_minutes, cached_at = now()
 RETURNING id
 `
 
 type UpsertMovieParams struct {
-	TmdbID      int32       `json:"tmdb_id"`
-	Title       string      `json:"title"`
-	ReleaseYear pgtype.Int4 `json:"release_year"`
-	PosterPath  pgtype.Text `json:"poster_path"`
+	TmdbID         int32       `json:"tmdb_id"`
+	Title          string      `json:"title"`
+	ReleaseYear    pgtype.Int4 `json:"release_year"`
+	PosterPath     pgtype.Text `json:"poster_path"`
+	Genres         []string    `json:"genres"`
+	RuntimeMinutes pgtype.Int4 `json:"runtime_minutes"`
 }
 
 func (q *Queries) UpsertMovie(ctx context.Context, arg UpsertMovieParams) (uuid.UUID, error) {
@@ -71,6 +75,8 @@ func (q *Queries) UpsertMovie(ctx context.Context, arg UpsertMovieParams) (uuid.
 		arg.Title,
 		arg.ReleaseYear,
 		arg.PosterPath,
+		arg.Genres,
+		arg.RuntimeMinutes,
 	)
 	var id uuid.UUID
 	err := row.Scan(&id)

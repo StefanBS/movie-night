@@ -211,16 +211,18 @@ func toNightResponse(night nightRow, rows []db.ListNightAttendeesRow) nightRespo
 
 // movieDTOFromCols builds the movie DTO from a night row's nullable LEFT JOIN
 // columns; nil when the night has no movie attached. It is the only movie-row
-// mapper, so a new movie field is added here and to the night select lists.
+// mapper, so a new movie field is added here and to the nights view.
 func movieDTOFromCols(row nightRow) *movieDTO {
 	if !row.MovieTmdbID.Valid {
 		return nil
 	}
 	return &movieDTO{
-		TMDBID:      row.MovieTmdbID.Int32,
-		Title:       row.MovieTitle.String,
-		ReleaseYear: releaseYearPtr(row.MovieReleaseYear),
-		PosterURL:   posterURLPtr(row.MoviePosterPath),
+		TMDBID:         row.MovieTmdbID.Int32,
+		Title:          row.MovieTitle.String,
+		ReleaseYear:    nullableInt32(row.MovieReleaseYear),
+		PosterURL:      posterURLPtr(row.MoviePosterPath),
+		Genres:         genresOrEmpty(row.MovieGenres),
+		RuntimeMinutes: nullableInt32(row.MovieRuntimeMinutes),
 	}
 }
 

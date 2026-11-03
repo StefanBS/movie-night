@@ -21,15 +21,28 @@ import (
 // movieDTO is the JSON shape for an attached movie (and a search result).
 // ReleaseYear is null when TMDB has no release date. int32 matches the movies
 // table and TMDB's domain (ids/years fit in 32 bits); JSON renders it as a number.
+// Genres is always an array (never null); RuntimeMinutes is null when unknown.
+// Search results carry neither, so they return [] and null.
 type movieDTO struct {
-	TMDBID      int32   `json:"tmdbId"`
-	Title       string  `json:"title"`
-	ReleaseYear *int32  `json:"releaseYear"`
-	PosterURL   *string `json:"posterUrl"`
+	TMDBID         int32    `json:"tmdbId"`
+	Title          string   `json:"title"`
+	ReleaseYear    *int32   `json:"releaseYear"`
+	PosterURL      *string  `json:"posterUrl"`
+	Genres         []string `json:"genres"`
+	RuntimeMinutes *int32   `json:"runtimeMinutes"`
 }
 
-// releaseYearPtr renders a nullable release year as *int32 (nil → JSON null).
-func releaseYearPtr(v pgtype.Int4) *int32 {
+// genresOrEmpty renders genres as a JSON array, never null.
+func genresOrEmpty(g []string) []string {
+	if g == nil {
+		return []string{}
+	}
+	return g
+}
+
+// nullableInt32 renders a nullable integer column (release year, runtime) as
+// *int32 (nil → JSON null).
+func nullableInt32(v pgtype.Int4) *int32 {
 	if !v.Valid {
 		return nil
 	}
@@ -59,7 +72,7 @@ func validateMovieRequest(req movieRequest) error {
 	return nil
 }
 
-// int4Ptr maps an optional release year to pgtype.Int4 for UpsertMovie.
+// int4Ptr maps an optional int32 (release year, runtime) to pgtype.Int4 for UpsertMovie.
 func int4Ptr(v *int32) pgtype.Int4 {
 	if v == nil {
 		return pgtype.Int4{}
@@ -79,7 +92,14 @@ func pgText(s string) pgtype.Text {
 func toMovieResults(results []movieResult) []movieDTO {
 	out := make([]movieDTO, 0, len(results))
 	for _, m := range results {
-		out = append(out, movieDTO{TMDBID: m.TMDBID, Title: m.Title, ReleaseYear: m.ReleaseYear, PosterURL: posterURL(m.PosterPath)})
+		out = append(out, movieDTO{
+			TMDBID:         m.TMDBID,
+			Title:          m.Title,
+			ReleaseYear:    m.ReleaseYear,
+			PosterURL:      posterURL(m.PosterPath),
+			Genres:         genresOrEmpty(m.Genres),
+			RuntimeMinutes: m.RuntimeMinutes,
+		})
 	}
 	return out
 }
@@ -152,6 +172,9 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			Title:       movie.Title,
 			ReleaseYear: int4Ptr(movie.ReleaseYear),
 			PosterPath:  pgText(movie.PosterPath),
+			// Never nil, so the NOT NULL text[] column never gets a NULL.
+			Genres:         genresOrEmpty(movie.Genres),
+			RuntimeMinutes: int4Ptr(movie.RuntimeMinutes),
 		})
 		if err != nil {
 			internalError(w, gid, "upsert movie", err)
