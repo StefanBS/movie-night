@@ -75,3 +75,32 @@ export function searchMovies(
     { signal },
   );
 }
+
+// formatRuntime renders a running time in minutes as "1h 38m", "45m" or "2h".
+export function formatRuntime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+export type MovieDetail = { kind: "year" | "genres" | "runtime"; text: string };
+
+// movieDetails returns the detail lines shown under a film's title, in order:
+// year, comma-separated genres, runtime. A line we don't have is left out
+// (never a placeholder); TMDB's 0 runtime means unknown. `kind` lets the
+// screen set figures tabular on the numeric lines only.
+export function movieDetails(movie: Movie): MovieDetail[] {
+  const lines: MovieDetail[] = [];
+  if (movie.releaseYear !== null) {
+    lines.push({ kind: "year", text: String(movie.releaseYear) });
+  }
+  const genres = movie.genres.filter((g) => g !== "").join(", ");
+  if (genres !== "") {
+    lines.push({ kind: "genres", text: genres });
+  }
+  if (movie.runtimeMinutes !== null && movie.runtimeMinutes > 0) {
+    lines.push({ kind: "runtime", text: formatRuntime(movie.runtimeMinutes) });
+  }
+  return lines;
+}

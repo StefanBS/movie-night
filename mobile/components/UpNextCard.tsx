@@ -2,21 +2,28 @@ import { Text, View } from "react-native";
 
 import { AppButton } from "./AppButton";
 import { Avatar } from "./Avatar";
+import { Poster } from "./Poster";
 import { firstName } from "../lib/avatar";
 import { formatStartTime, formatWeekdayDate } from "../lib/date";
+import { movieDetails } from "../lib/movies";
 import { nightWording } from "../lib/nightLifecycle";
 import type { Night } from "../lib/nights";
 import { capitalize } from "../lib/text";
-import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, radius, space, tabular, textPresets } from "../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, radius, space, tabular, textPresets, trackPx } from "../theme";
 
 const MAX_AVATARS = 4; // overlapping "coming" faces
+const POSTER_W = 88;
+const POSTER_H = 132;
 
 // UpNextCard is the home's scheduled-night card: when a night is on the
-// calendar, the home leads with it instead of the whose-turn hero. The film is
-// the headline (textPresets.filmTitle at text-3xl), with the picker credited
-// on one body-size line beneath it ("Picked by Tomas"). Before the film is
-// chosen the headline reads "Not picked yet." in tertiary text and the credit
-// reads "Tomas is picking". The accent is only the date-line dot and "Start
+// calendar, the home leads with it instead of the whose-turn hero. The film
+// leads: its 88×132 poster (or the hue tile) beside the title in
+// textPresets.filmTitle at text-2xl, never truncated, then year, genres and
+// length on a line each (any we don't have are left out). The text block sits
+// on the poster's bottom edge. The picker is credited on one body-size line
+// beneath ("Picked by Tomas"). Before the film is chosen an empty outlined
+// slot sits beside "Not picked yet." in tertiary text and the credit reads
+// "Tomas is picking". The accent is only the date-line dot and "Start
 // the night"; nothing glows. Edit routes to /night/edit/[id].
 export function UpNextCard({
   night,
@@ -30,6 +37,8 @@ export function UpNextCard({
   onEdit: () => void;
 }) {
   const styles = useStyles();
+  const movie = night.movie;
+  const details = movie !== null ? movieDetails(movie) : [];
   const picker = night.attendees.find((a) => a.id === night.pickerId) ?? null;
   const wording = nightWording(night.scheduledFor, today);
   const when = [
@@ -48,12 +57,39 @@ export function UpNextCard({
         </Text>
       </View>
 
-      <Text
-        style={[styles.title, night.movie === null && styles.titlePending]}
-        numberOfLines={3}
-      >
-        {night.movie !== null ? night.movie.title : "Not picked yet."}
-      </Text>
+      <View style={styles.filmRow}>
+        {movie !== null ? (
+          <View style={styles.posterShadow}>
+            <Poster
+              uri={movie.posterUrl}
+              title={movie.title}
+              year={movie.releaseYear ?? undefined}
+              w={POSTER_W}
+              h={POSTER_H}
+            />
+          </View>
+        ) : (
+          <View style={styles.emptyPoster} />
+        )}
+        <View style={styles.filmText}>
+          <Text style={[styles.title, movie === null && styles.titlePending]}>
+            {movie !== null ? movie.title : "Not picked yet."}
+          </Text>
+          {details.length > 0 ? (
+            <View style={styles.details}>
+              {details.map((d) => (
+                <Text
+                  key={d.kind}
+                  style={[styles.detail, d.kind !== "genres" && styles.detailNumeric]}
+                  numberOfLines={1}
+                >
+                  {d.text}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      </View>
 
       {picker !== null ? (
         <View style={styles.creditRow}>
@@ -97,7 +133,7 @@ export function UpNextCard({
   );
 }
 
-const useStyles = createThemedStyles((colors) => ({
+const useStyles = createThemedStyles((colors, shadow) => ({
   card: {
     borderRadius: radius.xl,
     paddingTop: space[6],
@@ -115,16 +151,35 @@ const useStyles = createThemedStyles((colors) => ({
     color: colors.text.secondary,
     flexShrink: 1,
   },
-  // The film leads. Sized up from the filmTitle preset so the face (and its
-  // Phase 2 change to upright Newsreader 500) comes from one place.
+  filmRow: { flexDirection: "row", alignItems: "flex-end", gap: space[4], marginTop: space[4] },
+  // shadow.sm sits on a wrapper: Poster clips its own corners.
+  posterShadow: { borderRadius: radius.sm, ...shadow.sm },
+  emptyPoster: {
+    width: POSTER_W,
+    height: POSTER_H,
+    borderRadius: radius.sm,
+    boxShadow: `inset 0 0 0 ${borderWidth.regular}px ${colors.border.strong}`,
+  },
+  filmText: { flex: 1, minWidth: 0, paddingBottom: 2 },
+  // The film leads. Sized from the filmTitle preset so the face comes from
+  // one place. No numberOfLines: the title always shows in full.
   title: {
     ...textPresets.filmTitle,
-    fontSize: fontSize["3xl"],
-    lineHeight: lh(fontSize["3xl"], "snug"),
+    fontSize: fontSize["2xl"],
+    lineHeight: Math.round(fontSize["2xl"] * 1.08),
+    letterSpacing: trackPx(fontSize["2xl"], "film"),
     color: colors.text.primary,
-    marginTop: space[4],
   },
   titlePending: { color: colors.text.tertiary },
+  details: { marginTop: space[2] },
+  detail: {
+    ...textPresets.meta,
+    lineHeight: Math.round(fontSize.sm * 1.4),
+    color: colors.text.tertiary,
+  },
+  // Year and length only: genres are prose, and Schibsted's tabular comma
+  // would open a gap after each one.
+  detailNumeric: tabular,
   creditRow: { flexDirection: "row", alignItems: "center", gap: space[2], marginTop: space[4] },
   // The picker's name stays at body size here; it's a credit, not a headline.
   credit: { ...textPresets.body, color: colors.text.secondary, flexShrink: 1 },

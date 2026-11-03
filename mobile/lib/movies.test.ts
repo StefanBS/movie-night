@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 
-import { parseMovie, searchMovies } from "./movies";
+import { formatRuntime, movieDetails, parseMovie, searchMovies, type Movie } from "./movies";
 
 type Handler = (req: http.IncomingMessage, res: http.ServerResponse) => void;
 
@@ -112,5 +112,51 @@ test("searchMovies throws on a non-2xx response", async () => {
     await assert.rejects(searchMovies(server.url, "dune"), /request failed: 503/);
   } finally {
     await server.close();
+  }
+});
+
+test("formatRuntime", () => {
+  const cases: { minutes: number; want: string }[] = [
+    { minutes: 98, want: "1h 38m" },
+    { minutes: 45, want: "45m" },
+    { minutes: 120, want: "2h" },
+    { minutes: 60, want: "1h" },
+    { minutes: 61, want: "1h 1m" },
+    { minutes: 1, want: "1m" },
+  ];
+  for (const { minutes, want } of cases) {
+    assert.equal(formatRuntime(minutes), want, `${minutes} minutes`);
+  }
+});
+
+test("movieDetails tags each line with its kind", () => {
+  const movie: Movie = { tmdbId: 1, title: "In the Mood for Love", releaseYear: 2000, posterUrl: null, genres: ["Drama"], runtimeMinutes: 98 };
+  assert.deepEqual(
+    movieDetails(movie).map((d) => d.kind),
+    ["year", "genres", "runtime"],
+  );
+});
+
+test("movieDetails", () => {
+  const base: Movie = { tmdbId: 1, title: "In the Mood for Love", releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null };
+  const cases: { name: string; movie: Partial<Movie>; want: string[] }[] = [
+    {
+      name: "all three",
+      movie: { releaseYear: 2000, genres: ["Drama", "Romance"], runtimeMinutes: 98 },
+      want: ["2000", "Drama, Romance", "1h 38m"],
+    },
+    { name: "no genres", movie: { releaseYear: 2000, runtimeMinutes: 98 }, want: ["2000", "1h 38m"] },
+    { name: "no runtime", movie: { releaseYear: 2000, genres: ["Drama"] }, want: ["2000", "Drama"] },
+    { name: "no year", movie: { genres: ["Drama"], runtimeMinutes: 45 }, want: ["Drama", "45m"] },
+    { name: "none", movie: {}, want: [] },
+    { name: "zero runtime is unknown", movie: { releaseYear: 2000, runtimeMinutes: 0 }, want: ["2000"] },
+    { name: "blank genre names dropped", movie: { genres: ["", "Drama"] }, want: ["Drama"] },
+  ];
+  for (const { name, movie, want } of cases) {
+    assert.deepEqual(
+      movieDetails({ ...base, ...movie }).map((d) => d.text),
+      want,
+      name,
+    );
   }
 });

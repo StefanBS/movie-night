@@ -52,6 +52,7 @@ export const leading = {
 export const tracking = {
   display: -0.045, // 44px+
   title: -0.025, // 22–30px
+  film: -0.015, // film titles (tokens.json film-title)
   caption: 0.01,
   normal: 0,
 } as const;
