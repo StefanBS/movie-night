@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { alsoPlanned, watchedNights, isDue, nightDates, nightMeta, nightTiming, nightWording, plannedNights, upNext, type NightTiming } from "./nightLifecycle";
+import { alsoPlanned, watchedNights, isDue, nightDates, nightMeta, nightTiming, nightWording, plannedNights, upNext, upNextAction, type NightTiming, type UpNextAction } from "./nightLifecycle";
 import type { Night } from "./nights";
 
 const TODAY = "2026-06-22";
@@ -52,6 +52,23 @@ const dueCases: [string, Night, boolean][] = [
 for (const [name, n, want] of dueCases) {
   test(`isDue: ${name} → ${want}`, () => {
     assert.equal(isDue(n, TODAY), want);
+  });
+}
+
+// upNextAction: the UpNextCard's primary button, the next thing to do.
+
+const actionCases: [string, Night, UpNextAction][] = [
+  ["no film, tomorrow", night("u", "2026-06-23"), "chooseFilm"],
+  ["no film, today", night("t", TODAY), "chooseFilm"],
+  ["no film, yesterday", night("p", "2026-06-21"), "chooseFilm"],
+  ["film, tomorrow", night("u", "2026-06-23", { movie: aMovie }), null],
+  ["film, today", night("t", TODAY, { movie: aMovie }), "watched"],
+  ["film, yesterday, not recorded", night("p", "2026-06-21", { movie: aMovie }), "watched"],
+  ["film, yesterday, already recorded", night("p", "2026-06-21", { movie: aMovie, ...WATCHED }), null],
+];
+for (const [name, n, want] of actionCases) {
+  test(`upNextAction: ${name} → ${want}`, () => {
+    assert.equal(upNextAction(n, TODAY), want);
   });
 }
 

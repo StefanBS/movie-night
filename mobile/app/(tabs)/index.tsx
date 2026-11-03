@@ -185,17 +185,16 @@ export default function TonightScreen() {
   const openNight = (night: Night) => {
     router.navigate({ pathname: "/night/[id]", params: { id: night.id, from: "Tonight" } });
   };
-  const openScheduled = () => {
-    if (scheduled === null) {
-      return;
-    }
-    router.navigate({ pathname: "/night/[id]", params: { id: scheduled.id, from: "Tonight" } });
+  // The UpNextCard's actions, for the scheduled Night. "Choose the film" opens
+  // the Night on its Pick step, whose back link returns to the Night view.
+  const openPick = (night: Night) => {
+    router.navigate({ pathname: "/night/[id]", params: { id: night.id, from: "Tonight", step: "pick" } });
   };
-  const openEdit = () => {
-    if (scheduled === null) {
-      return;
-    }
-    router.navigate({ pathname: "/night/edit/[id]", params: { id: scheduled.id, from: "Tonight" } });
+  const openWatched = (night: Night) => {
+    router.navigate({ pathname: "/night/watched/[id]", params: { id: night.id, from: "Tonight" } });
+  };
+  const openEdit = (night: Night) => {
+    router.navigate({ pathname: "/night/edit/[id]", params: { id: night.id, from: "Tonight" } });
   };
 
   return (
@@ -222,8 +221,10 @@ export default function TonightScreen() {
               <UpNextCard
                 night={scheduled}
                 today={today}
-                onStart={openScheduled}
-                onEdit={openEdit}
+                onChooseFilm={() => openPick(scheduled)}
+                onWatched={() => openWatched(scheduled)}
+                onOpen={() => openNight(scheduled)}
+                onEdit={() => openEdit(scheduled)}
               />
               <AlsoPlanned nights={later} onOpen={openNight} />
               {onDeck.length > 0 ? <OnDeck label="Then" members={onDeck} /> : null}
