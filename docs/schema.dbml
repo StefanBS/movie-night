@@ -126,6 +126,7 @@ Table picks {
   remind_morning_of   boolean           [not null, default: true, note: 'Reminder at 9 AM on the day (ADR-0010)']
   remind_two_hours_before boolean       [not null, default: true, note: 'Reminder two hours before start_time; only fires when there is one (ADR-0011)']
   remind_audience     reminder_audience [not null, default: 'everyone', note: 'Who the reminders go to; the picker\'s nudge goes out regardless']
+  watched_at          timestamptz       [null, note: 'When the group recorded the night as watched; NULL = still planned. Needs a film; set once (ADR-0012)']
 
   Indexes {
     (group_id, scheduled_for) [unique, name: 'uq_night_per_group_date', note: 'At most one night per group per date']

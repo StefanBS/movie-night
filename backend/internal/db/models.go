@@ -244,6 +244,7 @@ type Night struct {
 	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
 	MovieGenres          []string           `json:"movie_genres"`
 	MovieRuntimeMinutes  pgtype.Int4        `json:"movie_runtime_minutes"`
+	WatchedAt            pgtype.Timestamptz `json:"watched_at"`
 }
 
 type Pick struct {
@@ -259,6 +260,7 @@ type Pick struct {
 	RemindAudience       ReminderAudience   `json:"remind_audience"`
 	StartTime            pgtype.Time        `json:"start_time"`
 	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
+	WatchedAt            pgtype.Timestamptz `json:"watched_at"`
 }
 
 type RemindersSent struct {

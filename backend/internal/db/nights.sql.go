@@ -86,7 +86,7 @@ func (q *Queries) DeleteNight(ctx context.Context, arg DeleteNightParams) error 
 }
 
 const getNight = `-- name: GetNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes FROM nights
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes, watched_at FROM nights
 WHERE id = $1 AND group_id = $2
 `
 
@@ -116,6 +116,7 @@ func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (Night, erro
 		&i.MoviePosterPath,
 		&i.MovieGenres,
 		&i.MovieRuntimeMinutes,
+		&i.WatchedAt,
 	)
 	return i, err
 }
@@ -163,7 +164,7 @@ func (q *Queries) ListNightAttendees(ctx context.Context, arg ListNightAttendees
 }
 
 const listNights = `-- name: ListNights :many
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes FROM nights
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes, watched_at FROM nights
 WHERE group_id = $1
 ORDER BY scheduled_for DESC
 `
@@ -195,6 +196,7 @@ func (q *Queries) ListNights(ctx context.Context, groupID uuid.UUID) ([]Night, e
 			&i.MoviePosterPath,
 			&i.MovieGenres,
 			&i.MovieRuntimeMinutes,
+			&i.WatchedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -255,7 +257,7 @@ func (q *Queries) ListNightsAttendees(ctx context.Context, arg ListNightsAttende
 }
 
 const lockNight = `-- name: LockNight :one
-SELECT picker_id FROM picks
+SELECT picker_id, (movie_id IS NOT NULL)::boolean AS has_movie FROM picks
 WHERE id = $1 AND group_id = $2
 FOR UPDATE
 `
@@ -265,13 +267,37 @@ type LockNightParams struct {
 	GroupID uuid.UUID `json:"group_id"`
 }
 
+type LockNightRow struct {
+	PickerID uuid.UUID `json:"picker_id"`
+	HasMovie bool      `json:"has_movie"`
+}
+
 // Locks the night row for the rest of the write's transaction and returns its
-// picker, so no other write can change the picker or attendees until it commits.
-func (q *Queries) LockNight(ctx context.Context, arg LockNightParams) (uuid.UUID, error) {
+// picker and whether it has a film, so no other write can change them or the
+// attendees until it commits.
+func (q *Queries) LockNight(ctx context.Context, arg LockNightParams) (LockNightRow, error) {
 	row := q.db.QueryRow(ctx, lockNight, arg.NightID, arg.GroupID)
-	var picker_id uuid.UUID
-	err := row.Scan(&picker_id)
-	return picker_id, err
+	var i LockNightRow
+	err := row.Scan(&i.PickerID, &i.HasMovie)
+	return i, err
+}
+
+const recordNightWatched = `-- name: RecordNightWatched :exec
+UPDATE picks
+SET watched_at = COALESCE(watched_at, now())
+WHERE id = $1 AND group_id = $2
+`
+
+type RecordNightWatchedParams struct {
+	NightID uuid.UUID `json:"night_id"`
+	GroupID uuid.UUID `json:"group_id"`
+}
+
+// Records the night as watched (ADR-0012). Recording again keeps the first
+// watched_at.
+func (q *Queries) RecordNightWatched(ctx context.Context, arg RecordNightWatchedParams) error {
+	_, err := q.db.Exec(ctx, recordNightWatched, arg.NightID, arg.GroupID)
+	return err
 }
 
 const removeAttendeesNotIn = `-- name: RemoveAttendeesNotIn :exec

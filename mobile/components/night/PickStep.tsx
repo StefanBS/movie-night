@@ -63,7 +63,7 @@ export function PickStep({
     return () => clearTimeout(timer);
   }, [movieQuery, onSearch]);
 
-  const watched = useMemo(() => watchedOn(groupNights, night.id, today), [groupNights, night.id, today]);
+  const watched = useMemo(() => watchedOn(groupNights, night.id), [groupNights, night.id]);
   const choosePicker = async (memberId: string) => {
     if ((await onChangePicker(memberId)) !== null) {
       setChangingPicker(false);

@@ -1,8 +1,8 @@
 import { firstName } from "./avatar";
-import { formatMonthYear, todayLocalISO } from "./date";
+import { formatMonthYear } from "./date";
 import { capitalize } from "./text";
 import type { Member } from "./members";
-import { historyNights } from "./nightLifecycle";
+import { watchedNights } from "./nightLifecycle";
 import type { Night } from "./nights";
 import type { TurnMember } from "./turn";
 
@@ -80,14 +80,10 @@ export function memberSince(member: Member): string {
   return `${member.name} · ${since}`;
 }
 
-// memberPicks is a member's picks list: the Nights they picked that have
-// happened (today or earlier, as in Watched), newest first.
-export function memberPicks(
-  nights: Night[],
-  memberId: string,
-  today: string = todayLocalISO(),
-): Night[] {
-  return historyNights(nights, today)
+// memberPicks is a member's picks list: the Nights they picked that the group
+// has recorded as watched (as in Watched), newest first.
+export function memberPicks(nights: Night[], memberId: string): Night[] {
+  return watchedNights(nights)
     .filter((n) => n.pickerId === memberId)
     .sort((a, b) => b.scheduledFor.localeCompare(a.scheduledFor));
 }

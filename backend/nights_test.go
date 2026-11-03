@@ -150,6 +150,54 @@ func TestUpdateNightRequestValidation(t *testing.T) {
 	}
 }
 
+// PATCH's optional pickerId changes the picker in the same edit, and
+// watched: true records the Night. Omitted, both leave the stored Night as is.
+func TestUpdateNightRequestPickerAndWatched(t *testing.T) {
+	const a = "a0000000-0000-0000-0000-000000000001"
+	everyone := remindersDTO{Audience: "everyone"}
+	tests := []struct {
+		name        string
+		pickerID    *string
+		watched     bool
+		wantErr     bool
+		wantPicker  string // "" = picker unchanged
+		wantWatched bool
+	}{
+		{name: "neither: picker kept, not recorded"},
+		{name: "a new picker", pickerID: str(a), wantPicker: a},
+		{name: "recorded", watched: true, wantWatched: true},
+		{name: "recorded with a picker", pickerID: str(a), watched: true, wantPicker: a, wantWatched: true},
+		{name: "bad picker uuid", pickerID: str("nope"), wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := validateUpdateNightRequest(updateNightRequest{
+				ScheduledFor: "2026-07-04", Attendees: []string{a}, Reminders: everyone,
+				PickerID: tt.pickerID, Watched: tt.watched,
+			})
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got %+v", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			picker := ""
+			if got.Picker.Valid {
+				picker = uuid.UUID(got.Picker.Bytes).String()
+			}
+			if picker != tt.wantPicker {
+				t.Errorf("picker = %q, want %q", picker, tt.wantPicker)
+			}
+			if got.Watched != tt.wantWatched {
+				t.Errorf("watched = %v, want %v", got.Watched, tt.wantWatched)
+			}
+		})
+	}
+}
+
 func TestParseReminders(t *testing.T) {
 	tests := []struct {
 		name    string

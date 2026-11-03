@@ -20,7 +20,7 @@ import { formatShortDate } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { fetchGroup } from "../../lib/group";
 import { buildHistoryMonths, watchedSub } from "../../lib/history";
-import { historyNights } from "../../lib/nightLifecycle";
+import { watchedNights } from "../../lib/nightLifecycle";
 import { listNights, type Night } from "../../lib/nights";
 import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, space, tabular, textPresets, useColors } from "../../theme";
 
@@ -48,7 +48,7 @@ export default function WatchedScreen() {
       );
       (async () => {
         try {
-          setNights(historyNights(await listNights(API_URL, GROUP_ID, controller.signal)));
+          setNights(watchedNights(await listNights(API_URL, GROUP_ID, controller.signal)));
           setError(null);
         } catch (e) {
           if (!controller.signal.aborted) {

@@ -53,6 +53,13 @@ UPDATE picks SET movie_id = (SELECT id FROM movies WHERE tmdb_id = 872585) WHERE
 UPDATE picks SET movie_id = (SELECT id FROM movies WHERE tmdb_id = 666277) WHERE id = 'c0000000-0000-0000-0000-000000000003';
 UPDATE picks SET movie_id = (SELECT id FROM movies WHERE tmdb_id = 933260) WHERE id = 'c0000000-0000-0000-0000-000000000004';
 
+-- The seeded nights have been watched (ADR-0012), so they show on Watched
+-- rather than waiting on "We watched it". An UPDATE for the same re-seed
+-- reason as the films above; a first recording is kept.
+UPDATE picks SET watched_at = COALESCE(watched_at, scheduled_for + time '23:00')
+WHERE id IN ('c0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002',
+             'c0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000004');
+
 -- Attendees for the seeded nights. The picker must be an attendee so the History
 -- list can resolve the picker's name (it looks the picker up among attendees);
 -- a few others (incl. guest Frankie) make the rows realistic. Idempotent.

@@ -37,6 +37,10 @@ type parsedCreateNight struct {
 // Night's picker is always one of its attendees.
 var errPickerNotAttendee = errors.New("picker is not an attendee of this night")
 
+// errWatchedWithoutFilm is the 422 for recording a Night that has no film yet:
+// there is nothing to have watched (ADR-0012).
+var errWatchedWithoutFilm = errors.New("night has no film to record as watched")
+
 // errNotMember is the 422 for an attendee who has no membership in the group;
 // attendeeRoles wraps it with the offending id.
 var errNotMember = errors.New("attendee is not a member of this group")
@@ -154,7 +158,8 @@ type remindersDTO struct {
 }
 
 // nightResponse is the JSON shape for a night and its current attendees. Every
-// night has a picker (ADR-0008); Movie is null until a film is attached.
+// night has a picker (ADR-0008); Movie is null until a film is attached, and
+// WatchedAt (RFC 3339) until the night is recorded as watched (ADR-0012).
 type nightResponse struct {
 	ID           string       `json:"id"`
 	ScheduledFor string       `json:"scheduledFor"`
@@ -163,6 +168,7 @@ type nightResponse struct {
 	Movie        *movieDTO    `json:"movie"`
 	Attendees    []attendee   `json:"attendees"`
 	Reminders    remindersDTO `json:"reminders"`
+	WatchedAt    *string      `json:"watchedAt"`
 }
 
 // toAttendee builds the attendee DTO. The single-night query and the grouped
@@ -193,7 +199,18 @@ func newNightResponse(night nightRow, atts []attendee) nightResponse {
 			TwoHoursBefore: night.RemindTwoHoursBefore,
 			Audience:       string(night.RemindAudience),
 		},
+		WatchedAt: formatTimestampWire(night.WatchedAt),
 	}
+}
+
+// formatTimestampWire is a nullable timestamp as the wire carries it: RFC 3339
+// in UTC, or nil when unset. Pure.
+func formatTimestampWire(t pgtype.Timestamptz) *string {
+	if !t.Valid {
+		return nil
+	}
+	s := t.Time.UTC().Format(time.RFC3339)
+	return &s
 }
 
 // nightRow is a full Night: a row of the nights view, which every Night read
@@ -314,12 +331,17 @@ type recordPickRequest struct {
 
 // updateNightRequest is the JSON body of PATCH .../nights/{nightId}: the whole
 // editable Night, which replaces the stored one. A null (or omitted) startTime
-// clears it; attendees replace the whole set.
+// clears it; attendees replace the whole set. Two fields are optional: a
+// pickerId changes the picker in the same edit, and watched: true records the
+// Night (ADR-0012). Omitted, they leave the picker and the record as they are;
+// there is no un-recording.
 type updateNightRequest struct {
 	ScheduledFor string       `json:"scheduledFor"`
 	StartTime    *string      `json:"startTime"`
 	Attendees    []string     `json:"attendees"`
 	Reminders    remindersDTO `json:"reminders"`
+	PickerID     *string      `json:"pickerId"`
+	Watched      bool         `json:"watched"`
 }
 
 // nightReminders is a validated remindersDTO.
@@ -331,12 +353,15 @@ type nightReminders struct {
 }
 
 // nightEdit is a validated updateNightRequest. Attendees is deduped; StartTime
-// is not Valid when the Night has none.
+// is not Valid when the Night has none, and Picker not Valid when the edit
+// keeps the stored picker.
 type nightEdit struct {
 	ScheduledFor pgtype.Date
 	StartTime    pgtype.Time
 	Attendees    []uuid.UUID
 	Reminders    nightReminders
+	Picker       pgtype.UUID
+	Watched      bool
 }
 
 // parseReminders requires a known audience. Pure.
@@ -372,11 +397,21 @@ func validateUpdateNightRequest(req updateNightRequest) (nightEdit, error) {
 	if err != nil {
 		return nightEdit{}, err
 	}
+	var picker pgtype.UUID
+	if req.PickerID != nil {
+		id, err := uuid.Parse(*req.PickerID)
+		if err != nil {
+			return nightEdit{}, fmt.Errorf("invalid picker id")
+		}
+		picker = pgtype.UUID{Bytes: id, Valid: true}
+	}
 	return nightEdit{
 		ScheduledFor: scheduledFor,
 		StartTime:    startTime,
 		Attendees:    attendees,
 		Reminders:    reminders,
+		Picker:       picker,
+		Watched:      req.Watched,
 	}, nil
 }
 

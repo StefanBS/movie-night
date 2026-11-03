@@ -85,6 +85,7 @@ test("attachMovie posts the tmdbId and returns the night with its movie", async 
     startTime: null,
     pickerId: "u1",
     reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
+    watchedAt: null,
     movie: {
       tmdbId: 438631,
       title: "Dune",

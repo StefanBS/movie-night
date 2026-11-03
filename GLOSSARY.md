@@ -43,7 +43,7 @@ The attendee who chooses the film for a Night.
 _Avoid_: chooser, host
 
 **Film**:
-The movie watched at a Night. Optional; adding it later does not change the Night's state.
+The movie watched at a Night. Optional while the Night is planned; adding it later does not change the Night's state. A Night needs its film before it can be recorded as watched.
 _Avoid_: pick (for the movie)
 
 **Upcoming Night**:
@@ -54,8 +54,15 @@ _Avoid_: scheduled night (as a state), future night
 A Night dated today.
 
 **Past Night**:
-A Night dated before today. A past Night with no film still counts.
-_Avoid_: recorded night, done night
+A Night dated before today. Being past is only its date: a past Night stays planned until it is recorded as watched.
+
+**Watched Night**:
+A Night the group has recorded as watched ("We watched it"), which saves it to Watched. Only Watched Nights are history; the date alone never makes a Night watched. Recording happens once and is not undone.
+_Avoid_: recorded night, done night, confirmed night
+
+**Due Night**:
+A Night dated today or earlier that isn't watched yet. It stays up next on Tonight until it is recorded.
+_Avoid_: overdue night, pending night
 
 **Calendar entry**:
 A one-off copy of a Night placed in a person's own device calendar. It does not follow later changes to the Night.

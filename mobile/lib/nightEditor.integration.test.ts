@@ -53,6 +53,7 @@ const SAVED: Night = {
   startTime: null,
   pickerId: "ada",
   reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
+  watchedAt: null,
   movie: null,
   attendees: [
     { id: "ada", name: "Ada", role: "core" },

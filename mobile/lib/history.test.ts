@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { buildHistoryMonths, watchedOn, watchedSub } from "./history";
 import type { Night } from "./nights";
 
-function night(id: string, scheduledFor: string, tmdbId: number | null): Night {
+// night is a Night recorded as watched unless `watched` is false.
+function night(id: string, scheduledFor: string, tmdbId: number | null, watched = true): Night {
   return {
     id,
     scheduledFor,
@@ -16,6 +17,7 @@ function night(id: string, scheduledFor: string, tmdbId: number | null): Night {
         ? null
         : { tmdbId, title: `Film ${tmdbId}`, releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null },
     attendees: [],
+    watchedAt: watched ? `${scheduledFor}T22:00:00Z` : null,
   };
 }
 
@@ -35,13 +37,10 @@ test("buildHistoryMonths on an empty list is empty", () => {
   assert.deepEqual(buildHistoryMonths([]), []);
 });
 
-const TODAY = "2026-06-22";
-
 const watchedCases: [string, Night[], [number, string][]][] = [
   ["no nights", [], []],
-  ["a past night's film, with its date", [night("a", "2026-05-02", 10)], [[10, "2026-05-02"]]],
-  ["tonight's film counts as watched", [night("a", TODAY, 10)], [[10, TODAY]]],
-  ["an upcoming night's film doesn't", [night("a", "2026-06-26", 10)], []],
+  ["a watched night's film, with its date", [night("a", "2026-05-02", 10)], [[10, "2026-05-02"]]],
+  ["a night not yet recorded doesn't count, whatever its date", [night("a", "2026-05-02", 10, false)], []],
   ["a night without a film adds nothing", [night("a", "2026-05-02", null)], []],
   ["the night being edited is left out", [night("self", "2026-05-02", 10)], []],
   [
@@ -52,7 +51,7 @@ const watchedCases: [string, Night[], [number, string][]][] = [
 ];
 for (const [name, nights, want] of watchedCases) {
   test(`watchedOn: ${name}`, () => {
-    assert.deepEqual([...watchedOn(nights, "self", TODAY)], want);
+    assert.deepEqual([...watchedOn(nights, "self")], want);
   });
 }
 

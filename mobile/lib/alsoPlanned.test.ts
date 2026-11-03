@@ -16,6 +16,7 @@ function night(opts: Partial<Night> = {}): Night {
       { id: "p", name: "Priya Raman", role: "core" },
     ],
     reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
+    watchedAt: null,
     ...opts,
   };
 }

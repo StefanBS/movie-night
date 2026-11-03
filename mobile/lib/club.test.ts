@@ -83,7 +83,8 @@ for (const [name, member, want] of sinceCases) {
 }
 
 const TODAY = "2026-06-22";
-function night(id: string, scheduledFor: string, pickerId: string): Night {
+// night is a Night recorded as watched unless `watched` is false.
+function night(id: string, scheduledFor: string, pickerId: string, watched = true): Night {
   return {
     id,
     scheduledFor,
@@ -92,6 +93,7 @@ function night(id: string, scheduledFor: string, pickerId: string): Night {
     movie: null,
     attendees: [],
     reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
+    watchedAt: watched ? `${scheduledFor}T22:00:00Z` : null,
   };
 }
 const nights: Night[] = [
@@ -99,17 +101,18 @@ const nights: Night[] = [
   night("bo", "2026-06-01", "b"),
   night("recent", "2026-06-15", "a"),
   night("tonight", TODAY, "a"),
-  night("ahead", "2026-06-30", "a"),
+  night("due", "2026-06-20", "a", false),
+  night("ahead", "2026-06-30", "a", false),
 ];
 
 const picksCases: [string, string, string[]][] = [
-  ["their past nights and tonight, newest first", "a", ["tonight", "recent", "old"]],
+  ["their watched nights, newest first; a due one isn't yet", "a", ["tonight", "recent", "old"]],
   ["only their own", "b", ["bo"]],
   ["nobody's picks", "g", []],
 ];
 for (const [name, id, want] of picksCases) {
   test(`memberPicks: ${name}`, () => {
-    assert.deepEqual(memberPicks(nights, id, TODAY).map((n) => n.id), want);
+    assert.deepEqual(memberPicks(nights, id).map((n) => n.id), want);
   });
 }
 
