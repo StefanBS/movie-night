@@ -1,8 +1,10 @@
-import { formatMonthYear, formatShortDateYear } from "./date";
+import { formatShortDateYear, todayLocalISO } from "./date";
 import { watchedNights } from "./nightLifecycle";
 import type { Night } from "./nights";
 
-export type HistoryMonth = { label: string; nights: Night[] };
+// A HistorySection is a run of Watched rows under one year label, or under
+// none (label null) for the current year.
+export type HistorySection = { label: string | null; nights: Night[] };
 
 // watchedSub is the Watched tab bar's sub: how many nights the group has
 // recorded and since when ("11 nights since Sep 12 2025."). `since` is the
@@ -12,26 +14,32 @@ export function watchedSub(count: number, since: string): string {
   return `${count} ${nights} since ${formatShortDateYear(since)}.`;
 }
 
-// buildHistoryMonths groups nights into month buckets for the History list,
-// newest month first and newest night first within each bucket. The label is the
-// month of scheduledFor ("Jun 2026"). Sorting compares the YYYY-MM-DD strings
-// directly — fixed-width ISO sorts chronologically as plain text, so there is no
-// Date parsing and the result stays timezone-independent (like date.ts).
-export function buildHistoryMonths(nights: Night[]): HistoryMonth[] {
+// buildHistory lays out the Watched list: one continuous run of nights, newest
+// first. Rows carry their own date, so months get no headers; only a year
+// earlier than `today`'s gets a section label ("2025"), and the current year's
+// section has label null. Sorting compares the YYYY-MM-DD strings directly:
+// fixed-width ISO sorts chronologically as plain text, so there is no Date
+// parsing and the result stays timezone-independent (like date.ts).
+export function buildHistory(
+  nights: Night[],
+  today: string = todayLocalISO(),
+): HistorySection[] {
+  const thisYear = today.slice(0, 4);
   const sorted = [...nights].sort((a, b) =>
     b.scheduledFor.localeCompare(a.scheduledFor),
   );
-  const months: HistoryMonth[] = [];
+  const sections: HistorySection[] = [];
   for (const n of sorted) {
-    const label = formatMonthYear(n.scheduledFor);
-    const last = months[months.length - 1];
+    const year = n.scheduledFor.slice(0, 4);
+    const label = year < thisYear ? year : null;
+    const last = sections[sections.length - 1];
     if (last !== undefined && last.label === label) {
       last.nights.push(n);
     } else {
-      months.push({ label, nights: [n] });
+      sections.push({ label, nights: [n] });
     }
   }
-  return months;
+  return sections;
 }
 
 // watchedOn maps each film the group has already watched (by tmdbId) to the

@@ -1,6 +1,6 @@
 # Movie Night design system: changes since the last bundle
 
-Everything in the previous bundle is already in the app (`StefanBS/movie-night`, `mobile/`). This file lists only what changed since then, as six changes. The rest of `project/` is the full, current design system for reference.
+Everything in the previous bundle is already in the app (`StefanBS/movie-night`, `mobile/`). This file lists only what changed since then, as seven changes. The rest of `project/` is the full, current design system for reference.
 
 **Where to look**
 - Components: `project/components/<Name>/README.md` (guidelines), `<Name>.d.ts` (props) and `project/components/src/**` (web reference source; the app mirrors these in React Native).
@@ -81,6 +81,15 @@ File: `app-screens/screens-shelf.jsx`. Boards 18, 19.
 Remove the "Tonight / Fri 19 / Sat 20" chips above the calendar. The calendar opens on the current month with today ringed, so tonight is still one tap away. Start time and the footer summary are unchanged.
 
 File: `app-screens/screens-night.jsx` (`NightDateScreen`). Board 04.
+
+## 7. Watched: one continuous list, no month headers
+
+With one night a month, a month header and a big gap sat above every row. Each row already shows its date ("May 30"), so:
+
+- Drop the month section headers. The list is one continuous run of rows, newest first, 12px under the title block, with hairlines between rows.
+- Only a year *earlier than the current one* gets a section label ("2025"), 24px above its first row.
+
+File: `app-screens/screens-shelf.jsx` (`groupByYear`, `HistoryScreen`). Board 18.
 
 ---
 

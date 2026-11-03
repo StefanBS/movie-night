@@ -19,7 +19,7 @@ import { GROUP_ID } from "../../lib/api";
 import { formatShortDate } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
 import { fetchGroup } from "../../lib/group";
-import { buildHistoryMonths, watchedSub } from "../../lib/history";
+import { buildHistory, watchedSub } from "../../lib/history";
 import { watchedNights } from "../../lib/nightLifecycle";
 import { listNights, nightPicker, type Night } from "../../lib/nights";
 import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, space, tabular, textPresets, useColors } from "../../theme";
@@ -100,7 +100,7 @@ export default function WatchedScreen() {
   }
 
   const sub = since !== null ? watchedSub(nights.length, since) : undefined;
-  const months = buildHistoryMonths(nights);
+  const sections = buildHistory(nights);
   const open = (id: string) =>
     router.push({ pathname: "/night/[id]", params: { id, from: "Watched" } });
 
@@ -108,12 +108,12 @@ export default function WatchedScreen() {
     <View style={styles.screen}>
       <TopBar kind="tab" title="Watched" sub={sub} subTabular />
       <TabScrollView contentContainerStyle={styles.content}>
-        {months.map((month, mi) => (
-          <View key={month.label}>
-            <SectionLabel marginTop={mi === 0 ? FIRST_SECTION_GAP : LATER_SECTION_GAP}>
-              {month.label}
-            </SectionLabel>
-            {month.nights.map((n, i) => {
+        {sections.map((section) => (
+          <View key={section.label ?? "this-year"}>
+            {section.label !== null && (
+              <SectionLabel>{section.label}</SectionLabel>
+            )}
+            {section.nights.map((n, i) => {
               const picker = nightPicker(n);
               return (
                 <Pressable
@@ -121,7 +121,7 @@ export default function WatchedScreen() {
                   onPress={() => open(n.id)}
                   style={({ pressed }) => [
                     styles.row,
-                    i < month.nights.length - 1 && styles.divider,
+                    i < section.nights.length - 1 && styles.divider,
                     pressed && styles.rowPressed,
                   ]}
                 >
@@ -150,17 +150,15 @@ export default function WatchedScreen() {
   );
 }
 
-// The first month sits 20 below the top bar, later months 28 (24 + 4).
-const FIRST_SECTION_GAP = space[5];
-const LATER_SECTION_GAP = space[6] + space[1];
-
 const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
   empty: { ...textPresets.body, color: colors.text.secondary },
   center: { marginTop: space[8], alignSelf: "center" },
   errorText: { ...textPresets.body, color: colors.text.danger },
-  content: { paddingHorizontal: space[5] },
+  // One continuous list, 12 under the title block; an earlier year's label
+  // sits 24 above its first row.
+  content: { paddingHorizontal: space[5], paddingTop: space[3] },
   row: {
     flexDirection: "row",
     alignItems: "center",
