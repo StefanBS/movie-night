@@ -123,7 +123,7 @@ export default function TonightScreen() {
     if (scheduled === null) {
       return;
     }
-    router.navigate({ pathname: "/night/[id]", params: { id: scheduled.id } });
+    router.navigate({ pathname: "/night/[id]", params: { id: scheduled.id, from: "Tonight" } });
   };
   const openEdit = () => {
     if (scheduled === null) {

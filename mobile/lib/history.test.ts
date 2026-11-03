@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildHistoryMonths, historyStats } from "./history";
+import { buildHistoryMonths, historyStats, watchedOn } from "./history";
 import type { Night } from "./nights";
 
 function night(id: string, scheduledFor: string, tmdbId: number | null): Night {
@@ -52,3 +52,24 @@ test("buildHistoryMonths groups by month, newest first within and across", () =>
 test("buildHistoryMonths on an empty list is empty", () => {
   assert.deepEqual(buildHistoryMonths([]), []);
 });
+
+const TODAY = "2026-06-22";
+
+const watchedCases: [string, Night[], [number, string][]][] = [
+  ["no nights", [], []],
+  ["a past night's film, with its date", [night("a", "2026-05-02", 10)], [[10, "2026-05-02"]]],
+  ["tonight's film counts as watched", [night("a", TODAY, 10)], [[10, TODAY]]],
+  ["an upcoming night's film doesn't", [night("a", "2026-06-26", 10)], []],
+  ["a night without a film adds nothing", [night("a", "2026-05-02", null)], []],
+  ["the night being edited is left out", [night("self", "2026-05-02", 10)], []],
+  [
+    "a film watched twice keeps the later date, in any order",
+    [night("a", "2026-03-06", 10), night("b", "2026-05-02", 10), night("c", "2026-04-10", 10)],
+    [[10, "2026-05-02"]],
+  ],
+];
+for (const [name, nights, want] of watchedCases) {
+  test(`watchedOn: ${name}`, () => {
+    assert.deepEqual([...watchedOn(nights, "self", TODAY)], want);
+  });
+}

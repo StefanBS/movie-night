@@ -16,14 +16,15 @@ import { createNightLoad, nightLoadView } from "../../lib/nightLoad";
 import { createThemedStyles, space, textPresets, useColors } from "../../theme";
 
 export default function NightDetailRoute() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  return <NightDetailLoader key={id} id={id} />;
+  // `from` names the screen that opened the night, for the back link.
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
+  return <NightDetailLoader key={id} id={id} from={from ?? "Tonight"} />;
 }
 
 // NightDetailLoader loads the Night on every focus (lib/nightLoad). Only the
 // first load shows the spinner, so returning from the Edit screen refreshes the
 // Night under a still-mounted editor instead of resetting its step and search.
-function NightDetailLoader({ id }: { id: string }) {
+function NightDetailLoader({ id, from }: { id: string; from: string }) {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -46,7 +47,7 @@ function NightDetailLoader({ id }: { id: string }) {
         <TopBar
           kind="title"
           title="Night"
-          back={{ label: "Back", onPress: () => router.back() }}
+          back={{ label: from, onPress: () => router.back() }}
         />
         <ActivityIndicator
           style={styles.center}
@@ -63,7 +64,7 @@ function NightDetailLoader({ id }: { id: string }) {
         <TopBar
           kind="title"
           title="Night"
-          back={{ label: "Back", onPress: () => router.back() }}
+          back={{ label: from, onPress: () => router.back() }}
         />
         <Text style={[styles.center, styles.error]}>
           {`Couldn't load night: ${error}`}
@@ -78,7 +79,7 @@ function NightDetailLoader({ id }: { id: string }) {
         <TopBar
           kind="title"
           title="Night"
-          back={{ label: "Back", onPress: () => router.back() }}
+          back={{ label: from, onPress: () => router.back() }}
         />
         <View style={styles.body}>
           <Text style={styles.muted}>{"Couldn't find that night."}</Text>
@@ -94,13 +95,10 @@ function NightDetailLoader({ id }: { id: string }) {
       members={members}
       loadStartedAt={loadStartedAt}
       today={today}
-      onDone={() => router.back()}
-      onCancel={() => router.back()}
+      back={{ label: from, onPress: () => router.back() }}
       onEdit={() =>
         router.push({ pathname: "/night/edit/[id]", params: { id: night.id } })
       }
-      cancelLabel="Back"
-      showBackOnNight
     />
   );
 }

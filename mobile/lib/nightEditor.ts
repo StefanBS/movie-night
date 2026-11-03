@@ -1,7 +1,7 @@
 import { errorMessage } from "./errors";
 import type { Member } from "./members";
 import { searchMovies, type Movie } from "./movies";
-import { attachMovie, detachMovie, recordNightPick, type Night } from "./nights";
+import { attachMovie, detachMovie, listNights, recordNightPick, type Night } from "./nights";
 import { createSessionCore, type Session } from "./session";
 
 // The editor module for a saved Night: choosing or clearing its film and
@@ -19,13 +19,22 @@ export type NightEditorState = {
   busy: string | null;
   actionError: string | null;
   results: Movie[];
+  // resultsFor is the trimmed query the results answer ("" before any search),
+  // so the screen can tell "no films match" from "still typing".
+  resultsFor: string;
   searching: boolean;
   searchError: string | null;
+  // groupNights is every Night of the group, loaded once the Pick step opens,
+  // for the "watched May 2" hints (lib/history watchedOn). It's a hint: a
+  // failed load leaves it empty.
+  groupNights: Night[];
 };
 
 export type NightEditor = Session<NightEditorState> & {
   pickFilm(): void;
   toNight(): void;
+  // search runs as the user types: a newer query cancels an older one, and a
+  // blank query clears the results without a request.
   search(query: string): Promise<void>;
   // attach sets the film and returns to the Night view.
   attach(tmdbId: number): Promise<Night | null>;
@@ -58,11 +67,33 @@ export function createNightEditor({
     busy: null,
     actionError: null,
     results: [],
+    resultsFor: "",
     searching: false,
     searchError: null,
+    groupNights: [],
   });
 
   let lastWriteAt = -Infinity;
+  let searchController: AbortController | null = null;
+  let groupNightsRequested = false;
+
+  // loadGroupNights fetches the group's Nights the first time the Pick step
+  // opens. It never sets an error: the hints just don't show.
+  const loadGroupNights = async () => {
+    if (groupNightsRequested) {
+      return;
+    }
+    groupNightsRequested = true;
+    try {
+      const groupNights = await core.track((signal) => listNights(baseUrl, groupId, signal));
+      core.set({ groupNights });
+    } catch {
+      groupNightsRequested = false;
+    }
+  };
+  if (initialStep === "pick") {
+    void loadGroupNights();
+  }
 
   // write runs one Night write under the busy guard, keeping the returned
   // Night; on failure the Night is unchanged and the error is shown.
@@ -97,6 +128,7 @@ export function createNightEditor({
 
     pickFilm() {
       core.set({ step: "pick" });
+      void loadGroupNights();
     },
 
     toNight() {
@@ -105,15 +137,29 @@ export function createNightEditor({
 
     async search(query) {
       const q = query.trim();
-      if (q === "" || core.state.searching) {
+      searchController?.abort();
+      searchController = null;
+      if (q === "") {
+        core.set({ results: [], resultsFor: "", searching: false, searchError: null });
         return;
       }
+      const controller = new AbortController();
+      searchController = controller;
       core.set({ searching: true, searchError: null });
       try {
-        const results = await core.track((signal) => searchMovies(baseUrl, q, signal));
-        core.set({ results, searching: false });
+        const results = await core.track((signal) => searchMovies(baseUrl, q, signal), controller);
+        if (searchController === controller) {
+          core.set({ results, resultsFor: q, searching: false });
+        }
       } catch (e) {
-        core.set({ searching: false, searchError: errorMessage(e, "search failed") });
+        // An aborted search was replaced by a newer one, or the screen closed.
+        if (!controller.signal.aborted) {
+          core.set({ searching: false, searchError: errorMessage(e, "search failed") });
+        }
+      } finally {
+        if (searchController === controller) {
+          searchController = null;
+        }
       }
     },
 
@@ -124,7 +170,7 @@ export function createNightEditor({
         "failed to attach movie",
       );
       if (updated !== null) {
-        core.set({ results: [], searchError: null, step: "night" });
+        core.set({ results: [], resultsFor: "", searchError: null, step: "night" });
       }
       return updated;
     },
