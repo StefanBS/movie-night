@@ -103,7 +103,7 @@ export function MemberRow(props: MemberRowProps): JSX.Element;
 // ---- Poster
 /**
  * Film poster. Real TMDB image via `uri`; otherwise (and on error) a tile
- * tinted by `hue`, titled in Newsreader Italic when tall enough (h ≥ 104).
+ * tinted by `hue`, titled in Newsreader (upright) when tall enough (h ≥ 104).
  */
 export interface PosterProps {
   uri?: string | null;
@@ -190,11 +190,11 @@ export interface BannerProps {
 export function Banner(props: BannerProps): JSX.Element;
 
 // ---- Stepper
-/** Wizard progress — segmented bar with labels (When · Here · Pick · Done). */
+/** Wizard progress — segmented bar with labels (Date · People · Movie · Done). */
 export interface StepperProps {
   /** Zero-based current step. @default 0 */
   current?: number;
-  /** @default ["When","Here","Pick","Done"] */
+  /** @default ["Date","People","Movie","Done"] */
   steps?: string[];
   style?: React.CSSProperties;
 }
@@ -213,7 +213,7 @@ export function Toast(props: ToastProps): JSX.Element;
 
 // ---- Calendar
 /**
- * Month date picker for the "When" step. Selected day = ember disc, today =
+ * Month date picker for the "Date" step. Selected day = ember disc, today =
  * ring, days that already have a night = dot. Presentational only.
  */
 export interface CalendarProps {
@@ -267,13 +267,13 @@ export function Toggle(props: ToggleProps): JSX.Element;
 // ---- TopBar
 /**
  * App top bar. `home` (logomark + wordmark + group), `tab` (big left title +
- * italic sub), `title` (centered title + back link, for pushed screens).
+ * serif sub), `title` (centered title + back link, for pushed screens).
  */
 export interface TopBarProps {
   /** @default "tab" */
   kind?: "home" | "tab" | "title";
   title?: string;
-  /** tab: italic line under the title. */
+  /** tab: serif line under the title. */
   sub?: string;
   /** home: the group name. */
   group?: string;
@@ -285,11 +285,37 @@ export interface TopBarProps {
 
 export function TopBar(props: TopBarProps): JSX.Element;
 
+// ---- TabBar
+/**
+ * Bottom navigation: Tonight · Upcoming · Watched · Club. 24px Lucide icon over
+ * a 12px label; active = text-primary + semibold, inactive = text-secondary.
+ * Never ember. Settings lives behind the top-bar gear, not here.
+ */
+export interface TabBarTab {
+  id: string;
+  label: string;
+  /** A built-in icon name ("clapperboard" | "calendar-days" | "library" | "users-round") or your own 24px node. */
+  icon: string | React.ReactNode;
+}
+
+export interface TabBarProps {
+  /** Id of the current tab. @default "tonight" */
+  active?: "tonight" | "upcoming" | "watched" | "club" | string;
+  /** Called with the tapped tab's id. */
+  onChange?: (id: string) => void;
+  /** @default Tonight · Upcoming · Watched · Club */
+  tabs?: TabBarTab[];
+  style?: React.CSSProperties;
+}
+
+export function TabBar(props: TabBarProps): JSX.Element;
+
 // ---- UpNextCard
 /**
- * Home card for a scheduled night: countdown line, the picker's first name
- * as the headline, "picks the film." (or the chosen film) in italic serif,
- * who's coming, and Start / Edit.
+ * Home card for a scheduled night: countdown line, the film title as the
+ * headline in upright serif ("Not picked yet." until chosen), a small
+ * "Picked by Tomas" credit with the picker's avatar, who's coming, and
+ * Start / Edit.
  */
 export interface UpNextCardProps {
   /** e.g. "Fri 19 Jun". */
@@ -300,7 +326,7 @@ export interface UpNextCardProps {
   time?: string;
   /** Picker's full name. */
   picker: string;
-  /** Film title once chosen. */
+  /** Film title once chosen: the card's headline. */
   film?: string;
   /** Names of attendees. */
   coming?: string[];

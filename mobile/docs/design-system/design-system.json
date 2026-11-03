@@ -1,0 +1,50 @@
+{
+  "v": 3,
+  "assetGroups": {
+    "Other": {
+      "files": {},
+      "name": "Other",
+      "order": []
+    },
+    "notes": {
+      "files": {},
+      "name": "notes",
+      "order": []
+    }
+  },
+  "blobs": {},
+  "createdOnFiles": {
+    "at": "2026-11-02T11:50:55.642Z",
+    "v": 1
+  },
+  "docs": {
+    "readme": "project/README.md",
+    "sections": [
+      "project/github.md"
+    ]
+  },
+  "groups": [
+    "Other",
+    "notes"
+  ],
+  "lastChange": {
+    "by": "Stefan",
+    "via": "Claude",
+    "at": "2026-11-03T11:00:00Z",
+    "note": "Removed the original Spotlight (indigo) theme: legacy kits, old handoff, explorations, old screenshots, the old bundle and the deprecated token aliases."
+  },
+  "layout": "files",
+  "libraries": [
+    {
+      "name": "react",
+      "version": "18"
+    },
+    {
+      "name": "react-dom",
+      "version": "18"
+    }
+  ],
+  "namespace": "MovieNightDesignSystem_b54ad3",
+  "sections": {},
+  "title": "Movie Night Design System"
+}

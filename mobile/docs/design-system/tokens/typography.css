@@ -1,16 +1,15 @@
 /* ============================================================
-   Movie Night — Typography tokens · "Spotlight" (refined)
+   Movie Night — Typography tokens · "Spotlight, refined"
    One grotesk does almost everything: Schibsted Grotesk, set big
    and tight for names and titles, plain for UI. Film titles are
-   the one exception: Newsreader Italic. No uppercase, no mono.
+   the one exception: Newsreader, upright. No italics, no uppercase, no mono.
    ============================================================ */
 
 :root {
   /* Families */
   --font-display: "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-sans:    "Schibsted Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-serif:   "Newsreader", Georgia, "Times New Roman", serif; /* film titles, italic only */
-  --font-mono:    var(--font-sans); /* deprecated — use --font-sans + tabular-nums */
+  --font-serif:   "Newsreader", Georgia, "Times New Roman", serif; /* film titles, upright, weight 500 */
 
   /* Weights */
   --weight-regular:  400;
@@ -27,7 +26,7 @@
   --text-xl:      22px; /* section headings, film title in rows */
   --text-2xl:     30px; /* bar titles */
   --text-3xl:     44px; /* tab titles */
-  --text-4xl:     64px; /* card hero name */
+  --text-4xl:     64px; /* large name headlines */
   --text-display: 96px; /* the picker's name on Tonight */
 
   /* Line heights */

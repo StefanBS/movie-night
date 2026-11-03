@@ -1,5 +1,5 @@
 /* ============================================================
-   Movie Night — Spacing, radius, border, motion · "Spotlight" (refined)
+   Movie Night — Spacing, radius, border, motion · "Spotlight, refined"
    4px grid. Buttons are pills; cards are soft. Elevation is quiet
    and lives in colors.css because it differs per theme. Nothing
    glows: emphasis comes from type size and the ember accent.
@@ -28,11 +28,9 @@
   /* Borders */
   --border-width-hairline: 1px;
   --border-width-regular:  1.5px;
-  --border-width-ring:     2px; /* the picker's avatar ring */
+  --border-width-ring:     2px; /* today ring on the calendar; focus outlines */
 
   --shadow-none: none;
-  /* Deprecated: the glow is retired. Kept so old screens don't break. */
-  --glow-spotlight: 0 0 0 0 transparent; /* @kind shadow */
 
   /* Motion */
   --ease-standard: cubic-bezier(0.2, 0, 0, 1); /* @kind other */

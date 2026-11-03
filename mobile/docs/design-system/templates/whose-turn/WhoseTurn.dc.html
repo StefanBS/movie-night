@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Whose turn? screen" description="The app's signature rotation screen in Spotlight, refined: logomark header, the picker's name set big, the ranked rotation, and one terracotta primary action." -->
+<helmet>
+<script src="./ds-base.js"></script>
+<style>html,body{margin:0}body{background:#0A0908;font-family:"Schibsted Grotesk",system-ui,sans-serif}</style>
+</helmet>
+<div style="min-height:100vh;box-sizing:border-box;display:grid;place-items:center;padding:32px;background:#0A0908;">
+<div data-theme="{{ theme }}" style="width:390px;max-width:100%;background:var(--surface-page);color:var(--text-primary);border-radius:32px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.4);">
+<div style="display:flex;align-items:center;gap:10px;padding:22px 22px 6px;">
+<x-import component-from-global-scope="MovieNightDesignSystem_b54ad3.Logomark" size="{{ 24 }}" hint-size="24px,24px"></x-import>
+<div style="min-width:0;">
+<div style="font-weight:800;font-size:17px;letter-spacing:-0.02em;line-height:1.1;">Movie Night</div>
+<div style="font-size:13px;color:var(--text-secondary);">Friday Film Club</div>
+</div>
+</div>
+<div style="padding:34px 22px 0;">
+<div style="font-size:14px;font-weight:500;color:var(--text-secondary);">Whose turn? · Fri 19 Jun, 8 pm</div>
+<div style="font-weight:800;font-size:84px;line-height:0.9;letter-spacing:-0.05em;margin-top:12px;">Tomas</div>
+<div style="font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:36px;line-height:1.1;margin-top:6px;">picks the film.</div>
+<div style="width:44px;height:4px;background:var(--accent);margin-top:18px;"></div>
+<div style="font-size:15px;line-height:1.5;color:var(--text-secondary);margin-top:16px;max-width:290px;">His first turn. Whatever he chooses, we watch. No voting, no vetoes.</div>
+</div>
+<div style="padding:26px 22px 0;display:flex;align-items:center;gap:8px;">
+<x-import component-from-global-scope="MovieNightDesignSystem_b54ad3.Button" hint-size="150px,44px">Start the night</x-import>
+<x-import component-from-global-scope="MovieNightDesignSystem_b54ad3.Button" variant="ghost" hint-size="110px,44px">Skip turn</x-import>
+</div>
+<div style="padding:30px 22px 26px;">
+<div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">After Tomas</div>
+<div style="display:flex;flex-direction:column;min-height:180px;">{{ roster }}</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:454,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;\&quot;dark\&quot; | \&quot;light\&quot;&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() {
+    if (!window.MovieNightDesignSystem_b54ad3) {
+      this._poll = setInterval(() => {
+        if (window.MovieNightDesignSystem_b54ad3) { clearInterval(this._poll); this.forceUpdate(); }
+      }, 60);
+    }
+  }
+  componentWillUnmount() { if (this._poll) clearInterval(this._poll); }
+  renderVals() {
+    const theme = this.props.theme ?? "dark";
+    const DS = window.MovieNightDesignSystem_b54ad3 || {};
+    const { MemberRow } = DS;
+    if (!MemberRow) return { theme, roster: null };
+    // `name` is reserved on import elements, so rows are built here. Order = fewest picks first.
+    const members = [
+      { name: "Priya Nair", meta: "2 picks · last May 22" },
+      { name: "Jonah Okafor", meta: "2 picks · last May 29" },
+      { name: "Sam Reyes", meta: "3 picks · last Jun 5" },
+      { name: "Mira Brandt", meta: "3 picks · last Jun 12" },
+    ];
+    const roster = members.map((m, i) => React.createElement(MemberRow, { key: i, name: m.name, compact: true, trailing: m.meta, divider: i < members.length - 1 }));
+    return { theme, roster };
+  }
+}
+</script>
+</body>
+</html>

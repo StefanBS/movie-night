@@ -28,22 +28,27 @@ function Group({ children }) {
 }
 const Chev = () => <i data-lucide="chevron-right" style={{ width: 18, height: 18, color: "var(--text-tertiary)" }}></i>;
 
-// ── Settings (tab) ─────────────────────────────────────────────
+// ── Settings (pushed from the gear on Tonight; not a tab) ─────────────────────────────────────────────
 function SettingsScreen() {
   return (
     <window.Phone>
-      <window.TopBar kind="tab" title="Settings" />
-      <window.Screen>
+      <window.TopBar title="Settings" back="Tonight" />
+      <window.Screen tabbar={false}>
         <div style={{ marginTop: 22, paddingBottom: 22, borderBottom: "1px solid var(--border-hairline)" }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)" }}>The house rule</div>
           <div style={{ fontWeight: 800, fontSize: 28, lineHeight: 1.05, letterSpacing: "-0.035em", marginTop: 8 }}>One pick a night.</div>
-          <div style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: 24, marginTop: 2 }}>No voting, no vetoing.</div>
+          <div style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 24, marginTop: 2 }}>No voting, no vetoing.</div>
           <div style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 10, lineHeight: 1.45 }}>The app tracks who's picked and proposes whose turn is next, so it's always fair.</div>
         </div>
         <window.SectionLabel>Group</window.SectionLabel>
         <Group>
           <Row icon="users-round" label="Group name" value={_XD.group.name} trailing={<Chev />} />
           <Row icon="calendar" label="Movie nights since" value={_XD.fmtDate(_XD.group.since, true)} last />
+        </Group>
+        <window.SectionLabel>You</window.SectionLabel>
+        <Group>
+          <Row icon="smartphone" label={_XD.byId("m-priya").name} sub="This phone belongs to you" trailing={<_set_DS.Avatar name={_XD.byId("m-priya").name} size={28} />} />
+          <Row icon="repeat" label="Not you? Switch" trailing={<Chev />} last />
         </Group>
         <window.SectionLabel>Rotation</window.SectionLabel>
         <Group>
@@ -61,7 +66,6 @@ function SettingsScreen() {
           <Row icon="log-out" label="Leave group" danger last />
         </Group>
       </window.Screen>
-      <window.TabBar active="settings" />
     </window.Phone>
   );
 }
@@ -74,7 +78,7 @@ function WelcomeScreen() {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" }}>
           <_set_DS.Logomark size={56} />
           <div style={{ fontWeight: 800, fontSize: 60, lineHeight: 0.92, letterSpacing: "-0.05em", marginTop: 26 }}>Movie<br />Night</div>
-          <div style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: 24, lineHeight: 1.2, marginTop: 14 }}>Everyone gets their turn.</div>
+          <div style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 24, lineHeight: 1.2, marginTop: 14 }}>Everyone gets their turn.</div>
           <div style={{ marginTop: 34 }}>
             {["Each night, one member's pick is law.", "The app remembers what you watched.", "It proposes whose turn is next, fairly."].map((t, i) => (
               <div key={i} style={{ display: "flex", gap: 14, alignItems: "baseline", padding: "12px 0", borderTop: "1px solid var(--border-hairline)" }}>

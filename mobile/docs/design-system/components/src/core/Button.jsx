@@ -6,6 +6,8 @@ import React from "react";
  * secondary = hairline outline, primary-text label
  * ghost = no chrome, secondary-text label (e.g. "Skip turn")
  * danger = no chrome, red label
+ * disabled = primary and secondary turn neutral (subtle fill, tertiary label);
+ *   never a faded ember, which reads as muddy brown. Ghost and danger dim.
  */
 export function Button({ children, variant = "primary", size = "md", disabled = false, fullWidth = false, type = "button", onClick, style, ...rest }) {
   const pad = size === "sm" ? "8px 16px" : size === "lg" ? "17px 28px" : "13px 22px";
@@ -17,6 +19,7 @@ export function Button({ children, variant = "primary", size = "md", disabled = 
     danger: { background: "transparent", color: "var(--text-danger)", border: "1px solid transparent" },
   };
   const ghostLike = variant === "ghost" || variant === "danger";
+  const off = disabled ? (ghostLike ? { opacity: 0.45 } : { background: "var(--surface-subtle)", color: "var(--text-tertiary)", border: "1px solid transparent" }) : null;
   return (
     <button
       type={type}
@@ -26,9 +29,9 @@ export function Button({ children, variant = "primary", size = "md", disabled = 
         display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "var(--space-2)",
         width: fullWidth ? "100%" : "auto", padding: ghostLike ? (size === "sm" ? "8px 4px" : "13px 6px") : pad,
         fontFamily: "var(--font-sans)", fontSize, fontWeight: "var(--weight-bold)", lineHeight: 1, whiteSpace: "nowrap", flex: "none",
-        borderRadius: "var(--radius-full)", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.4 : 1,
+        borderRadius: "var(--radius-full)", cursor: disabled ? "not-allowed" : "pointer", opacity: 1,
         transition: "opacity var(--duration-fast) var(--ease-standard), background var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard)",
-        WebkitTapHighlightColor: "transparent", ...variants[variant], ...style,
+        WebkitTapHighlightColor: "transparent", ...variants[variant], ...off, ...style,
       }}
       onMouseDown={(e) => { if (!disabled) e.currentTarget.style.opacity = "var(--pressed-opacity)"; }}
       onMouseUp={(e) => { if (!disabled) e.currentTarget.style.opacity = "1"; }}

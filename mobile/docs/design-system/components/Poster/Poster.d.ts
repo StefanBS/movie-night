@@ -2,7 +2,7 @@ import * as React from "react";
 
 /**
  * Film poster. Real TMDB image via `uri`; otherwise (and on error) a tile
- * tinted by `hue`, titled in Newsreader Italic when tall enough (h ≥ 104).
+ * tinted by `hue`, titled in Newsreader (upright) when tall enough (h ≥ 104).
  */
 export interface PosterProps {
   uri?: string | null;

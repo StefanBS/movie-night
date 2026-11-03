@@ -1,0 +1,21 @@
+<!-- @dsCard group="Actions" height=150 subtitle="pill actions · sizes · disabled" -->
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>body{margin:0;background:var(--surface-page);color:var(--text-primary);font-family:var(--font-sans)}#root{padding:20px 24px;display:flex;flex-direction:column;gap:16px}.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}</style>
+</head><body><div id="root"></div>
+<script>
+(function () {
+  function run() {
+    var h = React.createElement, F = React.Fragment, NS = window.MovieNightDesignSystem_b54ad3;
+    var Gear = function () { return h("svg", { width: 19, height: 19, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" }, h("circle", { cx: 12, cy: 12, r: 3 }), h("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09c-.66 0-1.25.4-1.51 1z" })); };
+    var Chev = function () { return h("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round" }, h("path", { d: "m9 18 6-6-6-6" })); };
+    var row = function () { return h.apply(null, ["div", { className: "row" }].concat([].slice.call(arguments))); };
+    var B = NS.Button;
+    function Demo() { return h(F, null,
+      row(h(B, null, "Start the night"), h(B, { variant: "secondary" }, "Edit"), h(B, { variant: "ghost" }, "Skip turn")),
+      row(h(B, { size: "sm" }, "Add"), h(B, { size: "sm", variant: "secondary" }, "Change date"), h(B, { size: "sm", variant: "danger" }, "Cancel night"), h(B, { size: "sm", disabled: true }, "Disabled"))); }
+    ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
+  }
+  run();
+})();
+</script></body></html>

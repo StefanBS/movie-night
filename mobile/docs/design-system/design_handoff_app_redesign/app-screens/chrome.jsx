@@ -32,7 +32,7 @@ function Phone({ children }) {
 }
 
 // ── Top bar ────────────────────────────────────────────────────
-// home → mark + wordmark + group ; tab → big title + italic sub ; title → back + centered title
+// home → mark + wordmark + group ; tab → big title + serif sub ; title → back + centered title
 function TopBar({ kind = "title", title, group, back = "Tonight", right }) {
   if (kind === "home") {
     return (
@@ -53,7 +53,7 @@ function TopBar({ kind = "title", title, group, back = "Tonight", right }) {
       <div style={{ padding: "60px 20px 4px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", position: "relative", zIndex: 20 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 800, fontSize: 40, lineHeight: 1, letterSpacing: "-0.045em" }}>{title}</div>
-          {group && <div style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: 18, color: "var(--text-secondary)", marginTop: 6 }}>{group}</div>}
+          {group && <div style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: 18, color: "var(--text-secondary)", marginTop: 6 }}>{group}</div>}
         </div>
         {right}
       </div>
@@ -72,27 +72,10 @@ function TopBar({ kind = "title", title, group, back = "Tonight", right }) {
   );
 }
 
-// ── Tab bar ────────────────────────────────────────────────────
-const TABS = [
-  { id: "tonight", label: "Tonight", icon: "clapperboard" },
-  { id: "history", label: "History", icon: "history" },
-  { id: "club", label: "The Club", icon: "users-round" },
-  { id: "settings", label: "Settings", icon: "settings" },
-];
+// ── Tab bar (the design system's TabBar, pinned to the bottom of the phone) ──
+// Tonight · Upcoming · Watched · Club. Settings is behind the gear on Tonight.
 function TabBar({ active }) {
-  return (
-    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 25, padding: "9px 0 28px", display: "flex", justifyContent: "space-around", background: "var(--surface-tab-bar)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", borderTop: "1px solid var(--border-hairline)" }}>
-      {TABS.map((t) => {
-        const on = t.id === active;
-        return (
-          <div key={t.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 70, color: on ? "var(--text-primary)" : "var(--text-tertiary)" }}>
-            <i data-lucide={t.icon} style={{ width: 22, height: 22 }}></i>
-            <span style={{ fontSize: 11, fontWeight: on ? 700 : 500 }}>{t.label}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
+  return <DS.TabBar active={active} style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 25, paddingBottom: 28 }} />;
 }
 
 // ── Scroll body ────────────────────────────────────────────────
@@ -105,9 +88,11 @@ function Screen({ children, pad = true, tabbar = true, style }) {
 }
 
 // ── Sticky footer for flow screens ─────────────────────────────
+// Solid page fill with a hairline on top, so scrolled content never shows
+// through the summary line or the buttons.
 function Footer({ children }) {
   return (
-    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 25, padding: "18px 20px 32px", background: "linear-gradient(transparent, var(--surface-page) 24%)", display: "flex", flexDirection: "column", gap: 6 }}>{children}</div>
+    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 25, padding: "14px 20px 32px", background: "var(--surface-page)", borderTop: "1px solid var(--border-hairline)", display: "flex", flexDirection: "column", gap: 6 }}>{children}</div>
   );
 }
 
@@ -115,7 +100,7 @@ function SectionLabel({ children, style }) {
   return <DS.SectionLabel style={style}>{children}</DS.SectionLabel>;
 }
 
-// ── Poster (offline tile; title in Newsreader Italic when tall) ─
+// ── Poster (offline tile; title in Newsreader when tall) ─
 function Poster({ id, w = 56, h = 84, radius = "var(--radius-sm)", showTitle = "auto", style }) {
   const m = (id && D.movies[id]) || { title: "—", year: "", hue: 30 };
   const withTitle = showTitle === true || (showTitle === "auto" && h >= 104);
@@ -149,21 +134,21 @@ function DateChip({ children, accent = false }) {
   );
 }
 
-// Big picker name + italic line — the system's one hero pattern
+// Big picker name + serif line — the system's one hero pattern
 function PickerHero({ name, line = "picks the film.", meta, size = 84, align = "left" }) {
   const first = name.split(" ")[0];
   return (
     <div style={{ textAlign: align }}>
       {meta && <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-secondary)" }}>{meta}</div>}
       <div style={{ fontWeight: 800, fontSize: size, lineHeight: 0.9, letterSpacing: "-0.05em", marginTop: meta ? 12 : 0 }}>{first}</div>
-      <div style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: Math.round(size * 0.42), lineHeight: 1.1, marginTop: 6 }}>{line}</div>
+      <div style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: Math.round(size * 0.42), lineHeight: 1.1, marginTop: 6 }}>{line}</div>
       <div style={{ width: 44, height: 4, background: "var(--accent)", marginTop: 18, marginLeft: align === "center" ? "auto" : 0, marginRight: align === "center" ? "auto" : 0 }} />
     </div>
   );
 }
 
 function Film({ children, size = 20, style }) {
-  return <span style={{ fontFamily: "var(--font-serif)", fontStyle: "italic", fontSize: size, lineHeight: 1.12, color: "var(--text-primary)", ...style }}>{children}</span>;
+  return <span style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: size, lineHeight: 1.12, color: "var(--text-primary)", ...style }}>{children}</span>;
 }
 
 function Stack({ ids, size = 30, bg = "var(--surface-page)" }) {
@@ -174,4 +159,50 @@ function Stack({ ids, size = 30, bg = "var(--surface-page)" }) {
   );
 }
 
-Object.assign(window, { Phone, TopBar, TabBar, Screen, Footer, SectionLabel, Poster, Stat, Calendar, DateChip, PickerHero, Film, Stack, PHONE_W, PHONE_H, REACTIONS });
+// ── Credit line: the picker, set small under a film ─────────────
+// "Picked by Priya · May 2" (past) or "Tomas is picking" (no film yet).
+function Credit({ name, pending = false, note, action, style }) {
+  const first = name.split(" ")[0];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15, color: "var(--text-secondary)", ...style }}>
+      <DS.Avatar name={name} size={28} />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        {pending ? <><b style={{ color: "var(--text-primary)", fontWeight: 600 }}>{first}</b> is picking</> : <>Picked by <b style={{ color: "var(--text-primary)", fontWeight: 600 }}>{first}</b></>}
+        {note && <span style={{ color: "var(--text-tertiary)" }}> · {note}</span>}
+      </span>
+      {action}
+    </div>
+  );
+}
+
+// ── "More" button and action sheet ─────────────────────────────
+// Secondary actions on a screen (Change film, Edit night, Clear film) live
+// here, so the screen itself keeps one clear action, or none.
+function MoreBtn() {
+  return <DS.IconButton label="More" filled><i data-lucide="ellipsis" style={{ width: 20, height: 20 }}></i></DS.IconButton>;
+}
+function Sheet({ title, children }) {
+  return (
+    <>
+      <div style={{ position: "absolute", inset: 0, zIndex: 26, background: "rgba(10,9,8,0.55)" }} />
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 27, background: "var(--surface-raised)", borderTopLeftRadius: "var(--radius-xl)", borderTopRightRadius: "var(--radius-xl)", boxShadow: "var(--shadow-lg)", padding: "12px 20px 40px" }}>
+        <div style={{ width: 38, height: 5, borderRadius: 999, background: "var(--border-strong)", margin: "0 auto 14px" }} />
+        {title && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6 }}>{title}</div>}
+        {children}
+      </div>
+    </>
+  );
+}
+function SheetRow({ icon, label, sub, danger, last }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 0", borderBottom: last ? "none" : "1px solid var(--border-hairline)", cursor: "pointer" }}>
+      <i data-lucide={icon} style={{ width: 20, height: 20, flex: "none", color: danger ? "var(--text-danger)" : "var(--text-secondary)" }}></i>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 16, fontWeight: 500, color: danger ? "var(--text-danger)" : "var(--text-primary)" }}>{label}</div>
+        {sub && <div style={{ fontSize: 13, color: "var(--text-tertiary)", marginTop: 2 }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+Object.assign(window, { Phone, TopBar, TabBar, Screen, Footer, SectionLabel, Poster, Stat, Calendar, DateChip, PickerHero, Film, Stack, Credit, MoreBtn, Sheet, SheetRow, PHONE_W, PHONE_H, REACTIONS });

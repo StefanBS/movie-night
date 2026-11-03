@@ -5,4 +5,4 @@ Film poster. Mirrors the app's `Poster`. Posters are the main source of colour i
 <Poster title="Heat" hue={210} />
 ```
 
-Pair with the film title in `--font-serif` italic.
+Pair with the film title in `--font-serif`, upright, weight 500.

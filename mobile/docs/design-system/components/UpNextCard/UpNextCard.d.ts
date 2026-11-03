@@ -1,9 +1,10 @@
 import * as React from "react";
 
 /**
- * Home card for a scheduled night: countdown line, the picker's first name
- * as the headline, "picks the film." (or the chosen film) in italic serif,
- * who's coming, and Start / Edit.
+ * Home card for a scheduled night: countdown line, the film title as the
+ * headline in upright serif ("Not picked yet." until chosen), a small
+ * "Picked by Tomas" credit with the picker's avatar, who's coming, and
+ * Start / Edit.
  */
 export interface UpNextCardProps {
   /** e.g. "Fri 19 Jun". */
@@ -14,7 +15,7 @@ export interface UpNextCardProps {
   time?: string;
   /** Picker's full name. */
   picker: string;
-  /** Film title once chosen. */
+  /** Film title once chosen: the card's headline. */
   film?: string;
   /** Names of attendees. */
   coming?: string[];

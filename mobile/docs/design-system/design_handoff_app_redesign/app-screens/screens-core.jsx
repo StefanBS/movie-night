@@ -56,7 +56,6 @@ function PlannedHomeScreen() {
       <window.Screen>
         <CUpNext style={{ marginTop: 18 }} countdown={_D.countdownLabel(s.date)} date={_D.fmtWeekdayDate(s.date)} time={s.repeat.label} picker={picker.name} coming={s.presentIds.map((id) => _D.byId(id).name)} />
         <OnDeck order={order} label="Then" />
-        <div style={{ marginTop: 8 }}><CButton variant="ghost" size="sm" style={{ color: "var(--text-primary)" }}>Plan another night →</CButton></div>
       </window.Screen>
       <window.TabBar active="tonight" />
     </window.Phone>
