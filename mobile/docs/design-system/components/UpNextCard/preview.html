@@ -1,4 +1,4 @@
-<!-- @dsCard group="Night" height=260 subtitle="before and after the film is chosen" -->
+<!-- @dsCard group="Night" height=430 subtitle="at phone width (350, scroll sideways) · no film yet · on the night · film chosen, night ahead" -->
 <!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>body{margin:0;background:var(--surface-page);color:var(--text-primary);font-family:var(--font-sans)}#root{padding:20px 24px;display:flex;flex-direction:column;gap:16px}.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}</style>
@@ -11,10 +11,13 @@
     var Chev = function () { return h("svg", { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round" }, h("path", { d: "m9 18 6-6-6-6" })); };
     var row = function () { return h.apply(null, ["div", { className: "row" }].concat([].slice.call(arguments))); };
     var U = NS.UpNextCard;
+    // Cards at real phone width: a 390pt screen minus its 20pt side margins.
+    var W = { width: 350, flex: "none" };
     var coming = ["Tomas Vlk", "Priya Nair", "Jonah Reyes", "Sam Lindqvist", "Mira Okafor"];
-    function Demo() { return h("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 } },
-      h(U, { countdown: "In 3 days", date: "Fri 19 Jun", time: "8 pm", picker: "Tomas Vlk", coming: coming }),
-      h(U, { countdown: "Tonight", time: "8 pm", picker: "Priya Nair", film: "In the Mood for Love", coming: coming })); }
+    function Demo() { return h("div", { style: { display: "flex", alignItems: "flex-start", gap: 16, overflowX: "auto", paddingBottom: 4 } },
+      h(U, { countdown: "In 3 days", date: "Fri 19 Jun", time: "8 pm", picker: "Tomas Vlk", coming: coming, style: W }),
+      h(U, { due: true, countdown: "Tonight", time: "8 pm", picker: "Priya Nair", film: "In the Mood for Love", hue: 8, year: 2000, genre: ["Drama", "Romance"], runtime: "1h 38m", coming: coming, style: W }),
+      h(U, { countdown: "In 3 days", date: "Fri 19 Jun", time: "8 pm", picker: "Tomas Vlk", film: "Past Lives", hue: 18, year: 2023, genre: "Drama", runtime: "1h 46m", coming: coming, style: W })); }
     ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
   }
   run();

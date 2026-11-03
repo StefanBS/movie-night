@@ -73,7 +73,7 @@ function TopBar({ kind = "title", title, group, back = "Tonight", right }) {
 }
 
 // ── Tab bar (the design system's TabBar, pinned to the bottom of the phone) ──
-// Tonight · Upcoming · Watched · Club. Settings is behind the gear on Tonight.
+// Tonight · Watched · Club. Settings is behind the gear on Tonight.
 function TabBar({ active }) {
   return <DS.TabBar active={active} style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 25, paddingBottom: 28 }} />;
 }
@@ -135,14 +135,14 @@ function DateChip({ children, accent = false }) {
 }
 
 // Big picker name + serif line — the system's one hero pattern
-function PickerHero({ name, line = "picks the film.", meta, size = 84, align = "left" }) {
+function PickerHero({ name, line = "picks the film.", meta, size = 52, align = "left" }) {
   const first = name.split(" ")[0];
   return (
     <div style={{ textAlign: align }}>
       {meta && <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text-secondary)" }}>{meta}</div>}
-      <div style={{ fontWeight: 800, fontSize: size, lineHeight: 0.9, letterSpacing: "-0.05em", marginTop: meta ? 12 : 0 }}>{first}</div>
-      <div style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: Math.round(size * 0.42), lineHeight: 1.1, marginTop: 6 }}>{line}</div>
-      <div style={{ width: 44, height: 4, background: "var(--accent)", marginTop: 18, marginLeft: align === "center" ? "auto" : 0, marginRight: align === "center" ? "auto" : 0 }} />
+      <div style={{ fontWeight: 800, fontSize: size, lineHeight: 0.95, letterSpacing: "-0.045em", marginTop: meta ? 10 : 0 }}>{first}</div>
+      <div style={{ fontFamily: "var(--font-serif)", fontWeight: 500, fontSize: Math.round(size * 0.46), lineHeight: 1.15, marginTop: 4 }}>{line}</div>
+      <div style={{ width: 36, height: 3, background: "var(--accent)", marginTop: 14, marginLeft: align === "center" ? "auto" : 0, marginRight: align === "center" ? "auto" : 0 }} />
     </div>
   );
 }

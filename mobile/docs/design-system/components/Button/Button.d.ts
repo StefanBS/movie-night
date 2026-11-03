@@ -2,7 +2,7 @@ import * as React from "react";
 
 /**
  * Pill-shaped action control. `primary` is the ember fill — one per screen,
- * reserved for the main action ("Start the night"). `secondary` is a hairline
+ * reserved for the main action ("Choose the film"). `secondary` is a hairline
  * outline, `ghost` is a quiet text action ("Skip turn"), `danger` is red text.
  */
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {

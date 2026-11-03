@@ -16,7 +16,7 @@ const Both = ({ children }) => <>{["dark", "light"].map(t => <div key={t} classN
 const { Button, IconButton } = NS;
 function Demo(){return <Both>{t => <>
 <div className="cap">{t === "dark" ? "Dark" : "Light"}</div>
-<div className="row"><Button>Start the night</Button><Button variant="secondary">Edit</Button><Button variant="ghost">Skip turn</Button></div>
+<div className="row"><Button>Choose the film</Button><Button variant="secondary">Edit</Button><Button variant="ghost">Skip turn</Button></div>
 <div className="row"><Button size="sm">Add</Button><Button size="sm" variant="secondary">Change date</Button><Button variant="danger" size="sm">Cancel night</Button><Button size="sm" disabled>Disabled</Button></div>
 <div className="row"><IconButton label="Settings" filled><Gear /></IconButton><IconButton label="Settings"><Gear /></IconButton><IconButton label="Next" size="sm"><Chev /></IconButton></div>
 </>}</Both>}

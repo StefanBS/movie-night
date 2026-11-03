@@ -24,7 +24,7 @@
   --text-2xl:     30px; /* bar titles */
   --text-3xl:     44px; /* tab titles */
   --text-4xl:     64px; /* large name headlines */
-  --text-display: 96px; /* the picker's name on Tonight */
+  --text-display: 52px; /* the picker's name on Tonight */
 
   /* Line heights */
   --leading-tight:  0.9;  /* display names */

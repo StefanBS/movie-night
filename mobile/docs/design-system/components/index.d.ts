@@ -3,7 +3,7 @@ import * as React from "react";
 // ---- Button
 /**
  * Pill-shaped action control. `primary` is the ember fill — one per screen,
- * reserved for the main action ("Start the night"). `secondary` is a hairline
+ * reserved for the main action ("Choose the film"). `secondary` is a hairline
  * outline, `ghost` is a quiet text action ("Skip turn"), `danger` is red text.
  */
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -287,7 +287,7 @@ export function TopBar(props: TopBarProps): JSX.Element;
 
 // ---- TabBar
 /**
- * Bottom navigation: Tonight · Upcoming · Watched · Club. 24px Lucide icon over
+ * Bottom navigation: Tonight · Watched · Club. 24px Lucide icon over
  * a 12px label; active = text-primary + semibold, inactive = text-secondary.
  * Never ember. Settings lives behind the top-bar gear, not here.
  */
@@ -300,10 +300,10 @@ export interface TabBarTab {
 
 export interface TabBarProps {
   /** Id of the current tab. @default "tonight" */
-  active?: "tonight" | "upcoming" | "watched" | "club" | string;
+  active?: "tonight" | "watched" | "club" | string;
   /** Called with the tapped tab's id. */
   onChange?: (id: string) => void;
-  /** @default Tonight · Upcoming · Watched · Club */
+  /** @default Tonight · Watched · Club */
   tabs?: TabBarTab[];
   style?: React.CSSProperties;
 }
@@ -312,10 +312,11 @@ export function TabBar(props: TabBarProps): JSX.Element;
 
 // ---- UpNextCard
 /**
- * Home card for a scheduled night: countdown line, the film title as the
- * headline in upright serif ("Not picked yet." until chosen), a small
- * "Picked by Tomas" credit with the picker's avatar, who's coming, and
- * Start / Edit.
+ * Home card for a scheduled night: countdown line, the film (poster beside
+ * the title in upright serif (never cut), then year, genres and length on a line each; an empty poster
+ * slot and "Not picked yet." until chosen), a small "Picked by Tomas" credit
+ * with the picker's avatar, who's coming, then one main button that follows
+ * the night ("Choose the film" → "We watched it" → none while it's ahead) and "Edit".
  */
 export interface UpNextCardProps {
   /** e.g. "Fri 19 Jun". */
@@ -328,9 +329,27 @@ export interface UpNextCardProps {
   picker: string;
   /** Film title once chosen: the card's headline. */
   film?: string;
+  /** TMDB poster URL. Without it (or on error) the Poster falls back to a hue tile. */
+  posterUri?: string | null;
+  /** 0–360 hue for the fallback tile, stable per title. @default 30 */
+  hue?: number;
+  /** Release year, e.g. 2000. */
+  year?: string | number;
+  /** Genre or genres, e.g. "Drama" or ["Drama", "Romance"]. Shown as one line under the year; cut with "…" if it runs long. */
+  genre?: string | string[];
+  /** Running time, e.g. "1h 38m". */
+  runtime?: string;
   /** Names of attendees. */
   coming?: string[];
-  onStart?: () => void;
+  /** True when the night is today, or has passed without being saved. With a film chosen, the main button becomes "We watched it". @default false */
+  due?: boolean;
+  /** "Choose the film": the main button while no film is chosen. Opens the picker's film search. */
+  onChooseFilm?: () => void;
+  /** "We watched it": the main button once a film is chosen and the night is due. Confirms who came, saves the night to Watched and moves the rotation on. */
+  onWatched?: () => void;
+  /** Tapping the card (outside the buttons) opens the night. */
+  onOpen?: () => void;
+  /** "Edit": always shown, as the secondary button. */
   onEdit?: () => void;
   style?: React.CSSProperties;
 }
