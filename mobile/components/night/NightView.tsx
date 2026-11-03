@@ -1,29 +1,33 @@
+import { type ComponentProps } from "react";
 import { Platform, ScrollView, Text, View } from "react-native";
-import { Clock } from "lucide-react-native";
+import { CalendarPlus, Clapperboard, Film, Pencil, X } from "lucide-react-native";
 
-import { AppButton, Avatar, Badge, Poster, SectionLabel, useToast } from "../";
+import { AppButton, Avatar, Poster, SectionLabel, Sheet, SheetRow, useToast } from "../";
+import { Credit } from "./Credit";
 import { WizardFooter } from "./WizardFooter";
 import { addToCalendar } from "../../calendarExport";
-import { formatShortDate, formatStartTime, weekday } from "../../lib/date";
+import { firstName } from "../../lib/avatar";
+import { formatShortDate, formatWeekdayDate } from "../../lib/date";
 import type { Member } from "../../lib/members";
-import { nightTiming, nightWording } from "../../lib/nightLifecycle";
-import { capitalize } from "../../lib/text";
+import { nightMeta, nightWording } from "../../lib/nightLifecycle";
 import type { Night } from "../../lib/nights";
-import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, radius, space, tabular, textPresets, trackPx, useColors } from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, radius, space, tabular, textPresets, useColors } from "../../theme";
 
-// NightView is the unified night terminal — one editable view for a night
-// whatever its date or completeness. A night with a film leads with the film
-// poster, one without with a date hero; the wording for its timing (badge,
-// countdown, section labels) comes from nightWording. The film shows when set, with
-// a "Change film" action; when unset, "Choose the film now". The picker and
-// attendees render; editing the film re-enters PickStep, and "Edit night" (when
-// onEdit is given) is the explicit way to change the date or who's coming.
-// `today` is passed in (mirrors lib/date.ts) for deterministic date framing.
+type SheetAction = Omit<ComponentProps<typeof SheetRow>, "last">;
+
+// NightView is the one screen for every saved night, past, tonight or ahead.
+// The film leads, beside its poster (or an empty slot), and the picker is a
+// credit line under it. A night without a film has one primary action, "Choose
+// the film"; a night with one has none. The secondary actions (Change film,
+// Edit night, Add to calendar, Clear film) sit in the sheet behind the ⋯
+// button, which the editor's top bar opens through moreOpen. `today` is passed
+// in (mirrors lib/date.ts) for deterministic date framing.
 export function NightView({
   night,
   members,
   today,
-  onDone,
+  moreOpen,
+  onCloseMore,
   onPickFilm,
   onClearFilm,
   onEdit,
@@ -31,7 +35,8 @@ export function NightView({
   night: Night;
   members: Member[];
   today: string;
-  onDone: () => void;
+  moreOpen: boolean;
+  onCloseMore: () => void;
   onPickFilm: () => void;
   onClearFilm?: () => void;
   onEdit?: () => void;
@@ -40,180 +45,141 @@ export function NightView({
   const styles = useStyles();
   const toast = useToast();
   const wording = nightWording(night.scheduledFor, today);
-  // The OS calendar form has no web version.
-  const canExport = wording.canAddToCalendar && Platform.OS !== "web";
   const movie = night.movie;
-  // The picker of a night still ahead is the one "Next up"; a past night has no turn to mark.
-  const ahead = nightTiming(night.scheduledFor, today) !== "past";
-  // countdown is lowercase for use mid-sentence; the chip starts with it.
-  const chipLabel = [wording.countdown, night.startTime !== null ? formatStartTime(night.startTime) : null]
-    .filter((part) => part !== null)
-    .join(" · ");
-  const pickerName = members.find((m) => m.id === night.pickerId)?.name ?? "";
+  const pickerName =
+    night.attendees.find((a) => a.id === night.pickerId)?.name ??
+    members.find((m) => m.id === night.pickerId)?.name ??
+    "";
+  const first = firstName(pickerName);
   const onAddToCalendar = async () => {
     if ((await addToCalendar(night)) === "saved") {
       toast({ title: "Added to your calendar", body: "It won't follow later changes to the night." });
     }
   };
+
+  // Each action closes the sheet before it runs.
+  const act = (run: () => void) => () => {
+    onCloseMore();
+    run();
+  };
+  const actions: SheetAction[] = [];
+  if (movie !== null) {
+    actions.push({ icon: Film, label: "Change film", sub: `Keeps the night and ${first}'s pick`, onPress: act(onPickFilm) });
+  }
+  if (onEdit !== undefined) {
+    actions.push({ icon: Pencil, label: "Edit night", sub: wording.editSub, onPress: act(onEdit) });
+  }
+  // The OS calendar form has no web version.
+  if (wording.canAddToCalendar && Platform.OS !== "web") {
+    actions.push({
+      icon: CalendarPlus,
+      label: "Add to calendar",
+      sub: "A one-off event on this phone",
+      onPress: act(() => void onAddToCalendar()),
+    });
+  }
+  if (movie !== null && onClearFilm !== undefined) {
+    actions.push({
+      icon: X,
+      label: "Clear film",
+      sub: "The night stays; the film is removed",
+      danger: true,
+      onPress: act(onClearFilm),
+    });
+  }
+
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content}>
-        {movie !== null ? (
-          <View style={styles.filmHero}>
-            <Poster uri={movie.posterUrl} title={movie.title} w={150} h={222} />
-            <View style={styles.badgeWrap}>
-              <Badge label={wording.badge} />
+        <View style={styles.head}>
+          {movie !== null ? (
+            <Poster uri={movie.posterUrl} title={movie.title} w={120} h={180} />
+          ) : (
+            <View style={styles.emptyPoster}>
+              <Clapperboard size={28} color={colors.text.tertiary} />
             </View>
-            <Text style={styles.filmTitle} numberOfLines={3}>
-              {movie.title}
-            </Text>
-            {movie.releaseYear !== null ? (
-              <Text style={styles.filmYear}>{movie.releaseYear}</Text>
+          )}
+          <View style={styles.headText}>
+            <Text style={styles.meta}>{nightMeta(night.scheduledFor, night.startTime, today)}</Text>
+            {movie !== null ? (
+              <Text style={styles.filmTitle} numberOfLines={4}>
+                {movie.title}
+              </Text>
+            ) : (
+              <Text style={[styles.filmTitle, styles.notPicked]}>Not picked yet.</Text>
+            )}
+            {movie !== null && movie.releaseYear !== null ? (
+              <Text style={styles.year}>{movie.releaseYear}</Text>
             ) : null}
           </View>
-        ) : (
-          <View style={styles.dateHero}>
-            <Badge label={wording.badge} />
-            <Text style={styles.heroWeekday} allowFontScaling={false}>
-              {weekday(night.scheduledFor, true)}
-            </Text>
-            <Text style={styles.heroDate} allowFontScaling={false}>
-              {formatShortDate(night.scheduledFor)}
-            </Text>
-          </View>
-        )}
+        </View>
 
-        {wording.countdown !== null || night.startTime !== null ? (
-          <View style={styles.countdownChip}>
-            <Clock size={14} color={colors.text.secondary} />
-            <Text style={styles.countdown} allowFontScaling={false}>
-              {capitalize(chipLabel)}
-            </Text>
-          </View>
+        <View style={styles.credit}>
+          <Credit name={pickerName} pending={movie === null} />
+        </View>
+        {movie === null && wording.pickerNote !== null ? (
+          <Text style={styles.note}>{wording.pickerNote(first)}</Text>
         ) : null}
 
-        <SectionLabel>{wording.pickSection}</SectionLabel>
-        <View style={styles.pickerRow}>
-          <Avatar name={pickerName} size={40} />
-          <View style={styles.pickerText}>
-            <Text style={styles.pickerName} numberOfLines={1}>
-              {wording.pickerTitle(pickerName)}
-            </Text>
-            <Text style={styles.pickerSub}>
-              {wording.pickerSub}
-            </Text>
-          </View>
-          {ahead ? <Badge label="Next up" tone="solid" /> : null}
-        </View>
-
         <SectionLabel>{wording.attendeesSection(night.attendees.length)}</SectionLabel>
-        <View style={styles.cluster}>
-          {night.attendees.map((a, i) => (
-            <View key={a.id} style={[styles.clusterAvatar, i > 0 && styles.clusterOverlap]}>
-              <Avatar name={a.name} size={40} />
-            </View>
-          ))}
-        </View>
+        {night.attendees.map((a, i) => (
+          <View key={a.id} style={[styles.person, i < night.attendees.length - 1 && styles.divider]}>
+            <Avatar name={a.name} size={32} />
+            <Text style={styles.personName} numberOfLines={1}>
+              {a.name}
+            </Text>
+            {a.id === night.pickerId ? <Text style={styles.tag}>Picker</Text> : null}
+          </View>
+        ))}
       </ScrollView>
-      <WizardFooter>
-        <AppButton title="Done" fullWidth onPress={onDone} />
-        <View style={styles.filmActionRow}>
-          <AppButton
-            title={movie !== null ? "Change film" : "Choose the film now →"}
-            variant="ghost"
-            size="sm"
-            onPress={onPickFilm}
-          />
-          {movie !== null && onClearFilm !== undefined ? (
-            <AppButton title="Clear film" variant="danger" size="sm" onPress={onClearFilm} />
-          ) : null}
-          {onEdit !== undefined ? (
-            <AppButton title="Edit night" variant="ghost" size="sm" onPress={onEdit} />
-          ) : null}
-          {canExport ? (
-            <AppButton title="Add to calendar" variant="ghost" size="sm" onPress={() => void onAddToCalendar()} />
-          ) : null}
-        </View>
-      </WizardFooter>
+
+      {movie === null ? (
+        <WizardFooter>
+          <AppButton title="Choose the film" fullWidth onPress={onPickFilm} />
+        </WizardFooter>
+      ) : null}
+
+      <Sheet
+        visible={moreOpen}
+        title={movie !== null ? `${movie.title} · ${formatShortDate(night.scheduledFor)}` : formatWeekdayDate(night.scheduledFor)}
+        onClose={onCloseMore}
+      >
+        {actions.map((a, i) => (
+          <SheetRow key={a.label} {...a} last={i === actions.length - 1} />
+        ))}
+      </Sheet>
     </View>
   );
 }
 
 const useStyles = createThemedStyles((colors) => ({
   flex: { flex: 1 },
-  content: { paddingHorizontal: space[5], paddingTop: space[3], paddingBottom: space[6] },
-  filmHero: { alignItems: "center", paddingTop: space[2] },
-  badgeWrap: { marginTop: space[5] },
-  // Stretch to the full width (textAlign centres the lines) instead of letting
-  // filmHero's alignItems shrink-wrap the box to the measured text. On Android,
-  // after the search keyboard opens, the title can draw wider than its
-  // measurement, and a shrink-wrapped box clips the wrapped last word (#156).
-  filmTitle: {
-    alignSelf: "stretch",
-    ...textPresets.filmTitle,
-    fontSize: 40,
-    lineHeight: 44,
-    color: colors.text.primary,
-    marginTop: space[3],
-    textAlign: "center",
-  },
-  filmYear: {
-    fontFamily: fontFamily.sans,
-    ...tabular,
-    fontSize: fontSize.sm,
-    color: colors.text.tertiary,
-    marginTop: space[2],
-  },
-  // A night without a film leads with its date, flush on the page: the
-  // weekday set large and heavy, the date in the serif under it.
-  dateHero: { marginTop: space[6], alignItems: "flex-start" },
-  heroWeekday: {
-    fontFamily: fontFamily.display,
-    fontSize: fontSize["4xl"],
-    lineHeight: lh(fontSize["4xl"], "tight"),
-    letterSpacing: trackPx(fontSize["4xl"], "display"),
-    color: colors.text.primary,
-    marginTop: space[4],
-  },
-  heroDate: {
-    ...textPresets.filmTitle,
-    fontSize: fontSize["2xl"],
-    lineHeight: lh(fontSize["2xl"], "snug"),
-    color: colors.text.primary,
-    marginTop: space[1],
-  },
-  countdownChip: {
-    flexDirection: "row",
+  content: { paddingHorizontal: space[5], paddingTop: space[2], paddingBottom: space[6] },
+  head: { flexDirection: "row", alignItems: "flex-end", gap: 18, marginTop: 10 },
+  // The slot a poster will fill: a poster-shaped outline around a clapperboard.
+  emptyPoster: {
+    width: 120,
+    height: 180,
+    borderRadius: radius.sm,
+    borderWidth: borderWidth.regular,
+    borderColor: colors.border.strong,
     alignItems: "center",
-    alignSelf: "flex-start",
-    gap: 6,
-    marginTop: space[4],
-    paddingVertical: 6,
-    paddingHorizontal: space[3],
-    borderRadius: radius.full,
-    backgroundColor: colors.surface.subtle,
+    justifyContent: "center",
   },
-  countdown: { ...textPresets.meta, ...tabular, fontFamily: fontFamily.sansSemibold, fontSize: 13, color: colors.text.secondary },
-  // The picker sits flush like any row, set heavier; the solid Next up badge is its mark.
-  pickerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space[3],
-    paddingVertical: space[3],
-    borderBottomWidth: borderWidth.hairline,
-    borderBottomColor: colors.border.hairline,
+  headText: { flex: 1, minWidth: 0, paddingBottom: space[1] },
+  meta: { fontFamily: fontFamily.sansSemibold, fontSize: 13, lineHeight: lh(13), color: colors.text.secondary },
+  filmTitle: { ...textPresets.filmTitle, fontSize: 32, lineHeight: 36, color: colors.text.primary, marginTop: space[2] },
+  notPicked: { color: colors.text.tertiary },
+  year: { ...textPresets.meta, ...tabular, color: colors.text.tertiary, marginTop: space[2] },
+  credit: {
+    marginTop: 22,
+    paddingTop: space[4],
+    borderTopWidth: borderWidth.hairline,
+    borderTopColor: colors.border.hairline,
   },
-  pickerText: { flex: 1 },
-  pickerName: {
-    fontFamily: fontFamily.display,
-    fontSize: fontSize.lg,
-    lineHeight: lh(fontSize.lg, "snug"),
-    letterSpacing: trackPx(fontSize.lg, "title"),
-    color: colors.text.primary,
-  },
-  pickerSub: { ...textPresets.meta, fontSize: 13, color: colors.text.secondary, marginTop: 2 },
-  cluster: { flexDirection: "row", paddingTop: space[2] },
-  clusterAvatar: { borderRadius: radius.full, borderWidth: borderWidth.regular, borderColor: colors.surface.page },
-  clusterOverlap: { marginLeft: -space[2] },
-  filmActionRow: { alignItems: "center" },
+  note: { ...textPresets.meta, lineHeight: lh(fontSize.sm, "normal"), color: colors.text.secondary, marginTop: 14 },
+  person: { flexDirection: "row", alignItems: "center", gap: space[3], paddingVertical: 10 },
+  divider: { borderBottomWidth: borderWidth.hairline, borderBottomColor: colors.border.hairline },
+  personName: { flex: 1, fontFamily: fontFamily.sansMedium, fontSize: fontSize.base, lineHeight: lh(fontSize.base), color: colors.text.primary },
+  tag: { ...textPresets.meta, fontSize: 13, color: colors.text.tertiary },
 }));

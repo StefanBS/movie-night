@@ -17,3 +17,4 @@ export { PickerHero } from "./PickerHero";
 export { UpNextCard } from "./UpNextCard";
 export { Toggle } from "./Toggle";
 export { ToastProvider, useToast, type ToastMessage } from "./Toast";
+export { Sheet, SheetRow } from "./Sheet";

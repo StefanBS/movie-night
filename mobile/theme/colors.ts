@@ -77,6 +77,7 @@ const dark = {
     spotlight: "rgba(200, 105, 63, 0.14)", // selected tint only, never a glow
     dark: ink[1000] as string,
     tabBar: "rgba(17, 16, 14, 0.88)",
+    scrim: "rgba(10, 9, 8, 0.55)", // behind a sheet, both themes (app-screens chrome)
     danger: "rgba(240, 112, 95, 0.12)",
     success: "rgba(123, 199, 154, 0.12)",
   },
@@ -139,6 +140,7 @@ const light: Colors = {
     spotlight: "rgba(169, 85, 47, 0.10)",
     dark: ink[950],
     tabBar: "rgba(244, 241, 236, 0.90)",
+    scrim: "rgba(10, 9, 8, 0.55)",
     danger: "rgba(194, 58, 43, 0.08)",
     success: "rgba(47, 138, 85, 0.08)",
   },

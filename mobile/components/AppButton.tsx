@@ -13,6 +13,8 @@ type Variant = "primary" | "secondary" | "ghost" | "danger";
 //   danger    = no chrome, red label
 // size "sm" is the compact button for inline links and secondary action rows.
 // `strong` gives a ghost the primary-text label (e.g. "See full rotation →").
+// Disabled, primary and secondary turn neutral (surface.subtle fill,
+// text.tertiary label), never a faded accent; ghost and danger just dim.
 export function AppButton({
   title,
   onPress,
@@ -45,7 +47,7 @@ export function AppButton({
         ghostLike ? (sm ? styles.ghostPaddingSm : styles.ghostPadding) : sm ? styles.paddingSm : styles.padding,
         fullWidth && styles.fullWidth,
         styles[variant],
-        disabled && styles.disabled,
+        disabled && (ghostLike ? styles.dimmed : styles.neutral),
         pressed && !disabled && styles.pressed,
       ]}
     >
@@ -55,6 +57,7 @@ export function AppButton({
           sm && styles.labelSm,
           labelStyles[variant],
           strong && variant === "ghost" && labelStyles.strong,
+          disabled && !ghostLike && labelStyles.neutral,
         ]}
         numberOfLines={1}
       >
@@ -86,7 +89,8 @@ const useStyles = createThemedStyles((colors) => ({
   secondary: { borderColor: colors.border.strong },
   ghost: {},
   danger: {},
-  disabled: { opacity: 0.4 },
+  neutral: { backgroundColor: colors.surface.subtle, borderColor: "transparent" },
+  dimmed: { opacity: 0.45 },
   pressed: { opacity: pressedOpacity },
   label: { fontFamily: fontFamily.sansBold, fontSize: fontSize.base, lineHeight: fontSize.base + 2 },
   labelSm: { fontSize: fontSize.sm, lineHeight: fontSize.sm + 2 },
@@ -98,4 +102,5 @@ const useLabelStyles = createThemedStyles((colors) => ({
   ghost: { color: colors.text.secondary },
   danger: { color: colors.text.danger },
   strong: { color: colors.text.primary },
+  neutral: { color: colors.text.tertiary },
 }));

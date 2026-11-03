@@ -1,29 +1,39 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 
-import { AppButton, Avatar, Badge, Input, PickerHero, Poster, SectionLabel } from "../";
+import { AppButton, Avatar, Badge, Input, Poster } from "../";
+import { Credit } from "./Credit";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
 import { firstName } from "../../lib/avatar";
+import { formatShortDate } from "../../lib/date";
+import { watchedOn } from "../../lib/history";
 import type { Member } from "../../lib/members";
 import type { Movie } from "../../lib/movies";
 import { nightWording } from "../../lib/nightLifecycle";
 import type { Night } from "../../lib/nights";
-import { borderWidth, createThemedStyles, fontFamily, pressedOpacity, space, tabular, textPresets, useColors } from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, lh, pressedOpacity, space, tabular, textPresets, useColors } from "../../theme";
 
-// PickStep — the picker spotlight (with a correction reveal over present
-// attendees), then film search. Selecting a result attaches the movie and
-// advances; selection is the action, so this step has no footer CTA. The search
-// text and the reveal are view-only state, so they live here; everything that
-// touches the server comes from the editor (lib/nightEditor).
+// How long typing has to pause before the search runs.
+const SEARCH_DEBOUNCE_MS = 300;
+
+// PickStep opens on "What are we watching?" with the picker as a credit line
+// (its "Change" reveals the night's attendees to hand the pick to), then the
+// film search, which runs as you type. Films the group has already watched say
+// when. Selecting a result attaches it and returns to the Night, so the step
+// has no main action, only "Skip for now". The search text and the reveal are
+// view-only state, so they live here; everything that touches the server comes
+// from the editor (lib/nightEditor).
 export function PickStep({
   night,
   members,
   today,
   busy,
   results,
+  resultsFor,
   searching,
   searchError,
+  groupNights,
   onSearch,
   onAttach,
   onChangePicker,
@@ -34,8 +44,10 @@ export function PickStep({
   today: string;
   busy: string | null;
   results: Movie[];
+  resultsFor: string;
   searching: boolean;
   searchError: string | null;
+  groupNights: Night[];
   onSearch: (query: string) => void;
   onAttach: (tmdbId: number) => void;
   onChangePicker: (memberId: string) => Promise<Night | null>;
@@ -45,33 +57,47 @@ export function PickStep({
   const styles = useStyles();
   const [movieQuery, setMovieQuery] = useState("");
   const [changingPicker, setChangingPicker] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => onSearch(movieQuery), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [movieQuery, onSearch]);
+
+  const watched = useMemo(() => watchedOn(groupNights, night.id, today), [groupNights, night.id, today]);
   const choosePicker = async (memberId: string) => {
     if ((await onChangePicker(memberId)) !== null) {
       setChangingPicker(false);
     }
   };
-  const search = () => onSearch(movieQuery);
-  const pickerName = members.find((m) => m.id === night.pickerId)?.name ?? "";
+  const pickerName =
+    night.attendees.find((a) => a.id === night.pickerId)?.name ??
+    members.find((m) => m.id === night.pickerId)?.name ??
+    "";
+  const first = firstName(pickerName);
   const wording = nightWording(night.scheduledFor, today);
+  const query = movieQuery.trim();
+  const answered = query !== "" && resultsFor === query && !searching;
+
   return (
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Stepper current={2} />
+        <Text style={styles.heading}>What are we watching?</Text>
 
-        <View style={styles.hero}>
-          <PickerHero name={pickerName} meta={wording.pickingTag} line="it's your call." size={60} />
-        </View>
-
-        <View style={styles.changeRow}>
-          <AppButton
-            title={
-              changingPicker
-                ? "Keep this picker"
-                : `Not ${firstName(pickerName)}? Choose who picks`
+        <View style={styles.credit}>
+          <Credit
+            name={pickerName}
+            pending
+            action={
+              <AppButton
+                title={changingPicker ? "Cancel" : "Change"}
+                variant="ghost"
+                size="sm"
+                strong
+                onPress={() => setChangingPicker(!changingPicker)}
+                disabled={busy !== null}
+              />
             }
-            variant="ghost"
-            onPress={() => setChangingPicker(!changingPicker)}
-            disabled={busy !== null}
           />
         </View>
         {changingPicker
@@ -80,7 +106,7 @@ export function PickStep({
                 key={a.id}
                 onPress={() => void choosePicker(a.id)}
                 disabled={busy !== null}
-                style={({ pressed }) => [styles.chooseRow, pressed && styles.rowPressed]}
+                style={({ pressed }) => [styles.row, styles.chooseRow, pressed && styles.rowPressed]}
               >
                 <Avatar name={a.name} size={32} />
                 <Text style={[styles.name, styles.rowText]} numberOfLines={1}>
@@ -95,50 +121,56 @@ export function PickStep({
             ))
           : null}
 
-        <SectionLabel>{"Find a film"}</SectionLabel>
-        <Input
-          value={movieQuery}
-          onChangeText={setMovieQuery}
-          placeholder="Search a film title…"
-          onSubmitEditing={search}
-          addonLabel="Search"
-          onAddonPress={search}
-        />
-        {searchError !== null ? (
-          <Text style={[styles.hint, styles.error]}>{searchError}</Text>
-        ) : null}
-        {searching ? (
+        <View style={styles.search}>
+          <Input
+            value={movieQuery}
+            onChangeText={setMovieQuery}
+            placeholder="Search a film title…"
+            onSubmitEditing={() => onSearch(movieQuery)}
+          />
+        </View>
+        {searchError !== null ? <Text style={[styles.hint, styles.error]}>{searchError}</Text> : null}
+        {searching && results.length === 0 ? (
           <ActivityIndicator style={styles.searchSpinner} color={colors.text.secondary} />
         ) : null}
+        {answered && results.length === 0 && searchError === null ? (
+          <Text style={styles.hint}>No films match that title.</Text>
+        ) : null}
+        {query !== "" && results.length > 0 ? (
+          <Text style={[styles.hint, styles.count]}>
+            {`${results.length} ${results.length === 1 ? "film" : "films"} · tap one to make it ${first}'s pick`}
+          </Text>
+        ) : null}
 
-        {results.map((mv) => (
-          <Pressable
-            key={mv.tmdbId}
-            onPress={() => onAttach(mv.tmdbId)}
-            disabled={busy !== null}
-            style={({ pressed }) => [styles.resultRow, pressed && styles.rowPressed]}
-          >
-            <Poster uri={mv.posterUrl} title={mv.title} w={42} h={63} />
-            <View style={styles.rowText}>
-              <Text style={styles.resultTitle} numberOfLines={2}>
-                {mv.title}
-              </Text>
-              {mv.releaseYear !== null ? (
-                <Text style={styles.resultYear}>{mv.releaseYear}</Text>
-              ) : null}
-            </View>
-            {busy === String(mv.tmdbId) ? <Text style={styles.tag}>…</Text> : null}
-          </Pressable>
-        ))}
+        {query !== ""
+          ? results.map((mv, i) => {
+              const seen = watched.get(mv.tmdbId);
+              const meta = [mv.releaseYear, seen !== undefined ? `watched ${formatShortDate(seen)}` : null]
+                .filter((part) => part !== null)
+                .join(" · ");
+              return (
+                <Pressable
+                  key={mv.tmdbId}
+                  onPress={() => onAttach(mv.tmdbId)}
+                  disabled={busy !== null}
+                  style={({ pressed }) => [styles.row, i < results.length - 1 && styles.divider, pressed && styles.rowPressed]}
+                >
+                  <Poster uri={mv.posterUrl} title={mv.title} w={44} h={66} />
+                  <View style={styles.rowText}>
+                    <Text style={styles.resultTitle} numberOfLines={2}>
+                      {mv.title}
+                    </Text>
+                    {meta !== "" ? <Text style={styles.resultMeta}>{meta}</Text> : null}
+                  </View>
+                  {busy === String(mv.tmdbId) ? <Text style={styles.tag}>…</Text> : null}
+                </Pressable>
+              );
+            })
+          : null}
       </ScrollView>
       {onSkip ? (
         <WizardFooter>
-          <AppButton
-            title={wording.skipLabel}
-            variant="ghost"
-            onPress={onSkip}
-            disabled={busy !== null}
-          />
+          <AppButton title={wording.skipLabel(first)} variant="ghost" onPress={onSkip} disabled={busy !== null} />
         </WizardFooter>
       ) : null}
     </View>
@@ -152,43 +184,37 @@ const useStyles = createThemedStyles((colors) => ({
     paddingTop: space[3],
     paddingBottom: space[6],
   },
-  hint: { ...textPresets.meta, color: colors.text.secondary },
+  heading: { ...textPresets.screenTitle, color: colors.text.primary, marginTop: space[6] },
+  credit: { marginTop: 14 },
+  search: { marginTop: space[5] },
+  hint: { ...textPresets.meta, color: colors.text.secondary, marginTop: space[3] },
+  count: { fontSize: 13, lineHeight: lh(13), color: colors.text.tertiary, ...tabular },
   error: { ...textPresets.body, color: colors.text.danger },
-  rowText: { flex: 1 },
+  rowText: { flex: 1, minWidth: 0 },
   name: { ...textPresets.rowName, color: colors.text.primary },
   tag: { ...textPresets.tag, color: colors.text.secondary },
   rowPressed: { opacity: pressedOpacity },
-  hero: { marginTop: space[6], marginBottom: space[2] },
-  changeRow: { marginTop: space[2], alignItems: "flex-start" },
+  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 10 },
+  divider: { borderBottomWidth: borderWidth.hairline, borderBottomColor: colors.border.hairline },
   chooseRow: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: space[3],
-    paddingVertical: space[2],
     paddingHorizontal: space[2],
     borderBottomWidth: borderWidth.hairline,
     borderBottomColor: colors.border.hairline,
   },
   searchSpinner: { marginTop: space[3] },
-  resultRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space[3],
-    paddingVertical: space[2],
-    borderBottomWidth: borderWidth.hairline,
-    borderBottomColor: colors.border.hairline,
-  },
   resultTitle: {
     fontFamily: fontFamily.serifMedium,
     fontSize: 19,
     lineHeight: 21,
     color: colors.text.primary,
   },
-  resultYear: {
+  resultMeta: {
     fontFamily: fontFamily.sans,
     ...tabular,
     fontSize: 13,
+    lineHeight: lh(13),
     color: colors.text.tertiary,
-    marginTop: 2,
+    marginTop: 3,
   },
 }));

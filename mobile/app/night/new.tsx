@@ -4,7 +4,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { TopBar } from "../../components";
 import { WhenStep, WhoStep, ExistingNightEditor } from "../../components/night";
@@ -24,6 +24,9 @@ export default function NightScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
+  // `from` names the screen that opened the flow; the saved Night's back link
+  // returns there.
+  const { from = "Tonight" } = useLocalSearchParams<{ from?: string }>();
   const [today] = useState(todayLocalISO);
   const [plan, state] = useSession(() =>
     createNightPlan({ baseUrl: API_URL, groupId: GROUP_ID, today }),
@@ -64,8 +67,7 @@ export default function NightScreen() {
         members={state.members}
         today={today}
         initialStep="pick"
-        onDone={() => router.back()}
-        onCancel={() => router.back()}
+        back={{ label: from, onPress: () => router.back() }}
         onEdit={() =>
           router.push({ pathname: "/night/edit/[id]", params: { id: created.id } })
         }

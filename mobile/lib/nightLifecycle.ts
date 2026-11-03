@@ -1,4 +1,12 @@
-import { countdownLabel, daysUntil, formatShortDate, todayLocalISO } from "./date";
+import {
+  countdownLabel,
+  daysUntil,
+  formatShortDate,
+  formatStartTime,
+  formatWeekdayDate,
+  relativeLabel,
+  todayLocalISO,
+} from "./date";
 import type { Night } from "./nights";
 
 // The Night lifecycle: the one owner of a Night's date-relative state and the
@@ -51,18 +59,19 @@ export function nightDates(nights: Night[]): Set<string> {
 // screen reduces the timing to its own yes/no. Tonight's Night reads forward
 // (the film hasn't been watched yet); a past Night reads as a record.
 export type NightWording = {
-  badge: string;
   // countdown is null once the Night has passed.
   countdown: string | null;
-  pickSection: string;
   pickerTitle: (name: string) => string;
-  pickerSub: string;
   attendeesSection: (count: number) => string;
   whoSection: string;
   whoHint: string;
   planTag: string;
-  pickingTag: string;
-  skipLabel: string;
+  // pickerNote is the line under a Night still waiting on its film, or null
+  // for a past Night, which has nothing left to wait for.
+  pickerNote: ((first: string) => string) | null;
+  // editSub says what "Edit night" changes.
+  editSub: string;
+  skipLabel: (first: string) => string;
   // A Calendar entry is for a Night still ahead.
   canAddToCalendar: boolean;
 };
@@ -73,48 +82,62 @@ export function nightWording(scheduledFor: string, today: string = todayLocalISO
   switch (timing) {
     case "upcoming":
       return {
-        badge: "Scheduled ✓",
         countdown: countdownLabel(scheduledFor, today),
-        pickSection: "On the night",
         pickerTitle: (name) => `${name} picks`,
-        pickerSub: "Chooses the film that night",
         attendeesSection: (count) => `Coming · ${count}`,
         whoSection: "Who's coming?",
         whoHint: "Who's planning to come? The next-up member who's in gets the pick.",
         planTag: "Planning",
-        pickingTag: "Picking ahead",
-        skipLabel: "Decide on the night →",
+        pickerNote: (first) => `${first} can choose now or on the night. Whatever it is, you watch it.`,
+        editSub: "Date, time and who's coming",
+        skipLabel: (first) => `Skip for now · ${first} can pick later`,
         canAddToCalendar: true,
       };
     case "tonight":
       return {
-        badge: "Tonight ✓",
         countdown: countdownLabel(scheduledFor, today),
-        pickSection: "Tonight's pick",
         pickerTitle: (name) => `${name} picks`,
-        pickerSub: "Chooses the film tonight",
         attendeesSection: (count) => `Coming · ${count}`,
         whoSection: "Who's here?",
         whoHint: "Tap who made it. Tonight's pick goes to whoever's next up and here.",
         planTag: "Tonight",
-        pickingTag: "Picking tonight",
-        skipLabel: "Skip for now →",
+        pickerNote: (first) => `${first} can choose now or later tonight. Whatever it is, you watch it.`,
+        editSub: "Date, time and who's coming",
+        skipLabel: (first) => `Skip for now · ${first} can pick later`,
         canAddToCalendar: true,
       };
     case "past":
       return {
-        badge: "Recorded ✓",
         countdown: null,
-        pickSection: "The pick",
         pickerTitle: (name) => name,
-        pickerSub: `Picked · ${formatShortDate(scheduledFor)}`,
-        attendeesSection: () => "Who watched",
+        attendeesSection: (count) => `Who watched · ${count}`,
         whoSection: "Who was there?",
         whoHint: "Tap who made it. The pick goes to whoever was next up and there.",
         planTag: "Recording",
-        pickingTag: "Recording the pick",
-        skipLabel: "Skip for now →",
+        pickerNote: null,
+        editSub: "Date, time and who watched",
+        skipLabel: () => "Skip for now",
         canAddToCalendar: false,
       };
   }
+}
+
+// nightMeta is the line above the film on the Night screen: the full date for
+// a past Night ("Saturday, Jun 20"), and for one still ahead how far off it is,
+// the date and the start time when set ("Tonight · Jun 23 · 8:00 PM").
+// `locale` reaches formatStartTime, for deterministic tests.
+export function nightMeta(
+  scheduledFor: string,
+  startTime: string | null,
+  today: string = todayLocalISO(),
+  locale?: string,
+): string {
+  if (nightTiming(scheduledFor, today) === "past") {
+    return formatWeekdayDate(scheduledFor);
+  }
+  const parts = [relativeLabel(scheduledFor, today), formatShortDate(scheduledFor)];
+  if (startTime !== null) {
+    parts.push(formatStartTime(startTime, locale));
+  }
+  return parts.join(" · ");
 }

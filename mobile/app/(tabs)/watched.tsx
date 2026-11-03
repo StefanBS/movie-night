@@ -93,7 +93,7 @@ export default function WatchedScreen() {
   const stats = historyStats(nights);
   const months = buildHistoryMonths(nights);
   const open = (id: string) =>
-    router.push({ pathname: "/night/[id]", params: { id } });
+    router.push({ pathname: "/night/[id]", params: { id, from: "Watched" } });
 
   return (
     <View style={styles.screen}>
