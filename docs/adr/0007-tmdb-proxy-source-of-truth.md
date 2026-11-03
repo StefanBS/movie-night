@@ -13,10 +13,11 @@ place that holds the token and one trusted shape for stored movie metadata.
   ships to the client, and attribution lives in one place. The phone never calls
   TMDB directly.
 - On attach (`POST /groups/{gid}/nights/{nightId}/movie`), the client sends only a
-  `tmdbId`. The backend **re-fetches canonical title/year from TMDB** `/movie/{id}`
+  `tmdbId`. The backend **re-fetches canonical metadata (title, year,
+  poster, genres, runtime) from TMDB** `/movie/{id}`
   and is the source of truth; client-supplied metadata is never trusted for the
   stored record.
-- `movies` is a **cache keyed by `tmdb_id`** (upsert refreshes title/year). A
+- `movies` is a **cache keyed by `tmdb_id`** (upsert refreshes that metadata). A
   night references a cached movie via the nullable `picks.movie_id` (planned
   first, attached later).
 - TMDB is **optional config**: with no token, search and attach return `503` and

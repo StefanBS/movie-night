@@ -24,7 +24,7 @@ function night(opts: Partial<Night> = {}): Night {
   };
 }
 
-const movie = (releaseYear: number | null): Movie => ({ tmdbId: 949, title: "Heat", releaseYear, posterUrl: null });
+const movie = (releaseYear: number | null): Movie => ({ tmdbId: 949, title: "Heat", releaseYear, posterUrl: null, genres: [], runtimeMinutes: null });
 
 test("calendarEntry titles the entry after the picker's first name", () => {
   const cases: { name: string; night: Night; want: string }[] = [

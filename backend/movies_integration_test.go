@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
@@ -25,16 +26,17 @@ func fakeTMDB(t *testing.T) *httptest.Server {
 	})
 	mux.HandleFunc("/movie/438631", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":438631,"title":"Dune","release_date":"2021-10-22","poster_path":"/dune.jpg"}`))
+		_, _ = w.Write([]byte(`{"id":438631,"title":"Dune","release_date":"2021-10-22","poster_path":"/dune.jpg",
+			"genres":[{"id":878,"name":"Science Fiction"},{"id":12,"name":"Adventure"}],"runtime":155}`))
 	})
 	mux.HandleFunc("/movie/841", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":841,"title":"Dune","release_date":"1984-12-14","poster_path":"/dune84.jpg"}`))
 	})
-	// A movie TMDB knows but with no poster (poster_path null).
+	// A movie TMDB knows but with no poster, genres or runtime.
 	mux.HandleFunc("/movie/555", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":555,"title":"No Poster","release_date":"2000-01-01","poster_path":null}`))
+		_, _ = w.Write([]byte(`{"id":555,"title":"No Poster","release_date":"2000-01-01","poster_path":null,"genres":[],"runtime":0}`))
 	})
 	// Any other /movie/{id} → 404 (unknown movie).
 	mux.HandleFunc("/movie/", func(w http.ResponseWriter, _ *http.Request) {
@@ -88,6 +90,93 @@ func TestMovieAttachIntegration(t *testing.T) {
 		}
 		if got[0].PosterURL == nil || *got[0].PosterURL != "https://image.tmdb.org/t/p/w342/dune.jpg" {
 			t.Fatalf("search poster = %v, want built w342 url", got[0].PosterURL)
+		}
+		if got[0].Genres == nil || len(got[0].Genres) != 0 || got[0].RuntimeMinutes != nil {
+			t.Fatalf("search genres/runtime = %#v/%v, want []/nil", got[0].Genres, got[0].RuntimeMinutes)
+		}
+	})
+
+	// movieDetails reads a cached movie's stored genres and runtime.
+	movieDetails := func(t *testing.T, tmdbID int) ([]string, *int32) {
+		t.Helper()
+		var genres []string
+		var runtime *int32
+		if err := pool.QueryRow(context.Background(),
+			"SELECT genres, runtime_minutes FROM movies WHERE tmdb_id=$1", tmdbID).Scan(&genres, &runtime); err != nil {
+			t.Fatalf("read movie details: %v", err)
+		}
+		return genres, runtime
+	}
+
+	t.Run("attach stores and returns genres and runtime", func(t *testing.T) {
+		night := mkNight(t, seededGroup)
+		code, n := attach(t, seededGroup, night, `{"tmdbId":438631}`)
+		if code != http.StatusOK {
+			t.Fatalf("attach status = %d, want 200", code)
+		}
+		want := []string{"Science Fiction", "Adventure"}
+		if n.Movie == nil || !slices.Equal(n.Movie.Genres, want) ||
+			n.Movie.RuntimeMinutes == nil || *n.Movie.RuntimeMinutes != 155 {
+			t.Fatalf("night movie = %+v, want genres %v and runtime 155", n.Movie, want)
+		}
+		genres, runtime := movieDetails(t, 438631)
+		if !slices.Equal(genres, want) || runtime == nil || *runtime != 155 {
+			t.Fatalf("stored genres/runtime = %v/%v", genres, runtime)
+		}
+		// The detail read goes through the nights view too.
+		code, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+night, "")
+		if code != http.StatusOK || got.Movie == nil || !slices.Equal(got.Movie.Genres, want) ||
+			got.Movie.RuntimeMinutes == nil || *got.Movie.RuntimeMinutes != 155 {
+			t.Fatalf("detail status %d movie = %+v", code, got.Movie)
+		}
+	})
+
+	t.Run("no genres and runtime 0 store {} and return [] and null", func(t *testing.T) {
+		night := mkNight(t, seededGroup)
+		_, n := attach(t, seededGroup, night, `{"tmdbId":555}`)
+		if n.Movie == nil || n.Movie.Genres == nil || len(n.Movie.Genres) != 0 || n.Movie.RuntimeMinutes != nil {
+			t.Fatalf("night movie = %+v, want genres [] and runtime nil", n.Movie)
+		}
+		genres, runtime := movieDetails(t, 555)
+		if genres == nil || len(genres) != 0 || runtime != nil {
+			t.Fatalf("stored genres/runtime = %#v/%v, want {}/NULL", genres, runtime)
+		}
+	})
+
+	t.Run("re-attach refreshes stale genres and runtime", func(t *testing.T) {
+		night := mkNight(t, seededGroup)
+		attach(t, seededGroup, night, `{"tmdbId":438631}`)
+		if _, err := pool.Exec(context.Background(),
+			"UPDATE movies SET genres='{Stale}', runtime_minutes=1 WHERE tmdb_id=438631"); err != nil {
+			t.Fatalf("stale movie: %v", err)
+		}
+		_, n := attach(t, seededGroup, night, `{"tmdbId":438631}`)
+		if n.Movie == nil || !slices.Equal(n.Movie.Genres, []string{"Science Fiction", "Adventure"}) ||
+			n.Movie.RuntimeMinutes == nil || *n.Movie.RuntimeMinutes != 155 {
+			t.Fatalf("night movie after re-attach = %+v", n.Movie)
+		}
+	})
+
+	t.Run("a movie cached before genres/runtime returns [] and null", func(t *testing.T) {
+		night := mkNight(t, seededGroup)
+		// Inserted without the new columns, as a row from before migration 0014.
+		if _, err := pool.Exec(context.Background(), `
+			WITH m AS (INSERT INTO movies (tmdb_id, title) VALUES (777, 'Old Cache') RETURNING id)
+			UPDATE picks SET movie_id = (SELECT id FROM m) WHERE id = $1`, night); err != nil {
+			t.Fatalf("seed cached movie: %v", err)
+		}
+		code, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+night, "")
+		if code != http.StatusOK || got.Movie == nil || got.Movie.Title != "Old Cache" ||
+			got.Movie.Genres == nil || len(got.Movie.Genres) != 0 || got.Movie.RuntimeMinutes != nil {
+			t.Fatalf("detail status %d movie = %+v, want genres [] and runtime nil", code, got.Movie)
+		}
+	})
+
+	t.Run("a night with no film returns movie null", func(t *testing.T) {
+		night := mkNight(t, seededGroup)
+		code, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+night, "")
+		if code != http.StatusOK || got.Movie != nil {
+			t.Fatalf("detail status %d movie = %+v, want nil", code, got.Movie)
 		}
 	})
 

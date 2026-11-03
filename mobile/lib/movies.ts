@@ -5,7 +5,16 @@ export type Movie = {
   title: string;
   releaseYear: number | null;
   posterUrl: string | null;
+  // TMDB genre names in TMDB order; [] when unknown (search results, movies
+  // cached before the backend stored them, or an older backend).
+  genres: string[];
+  // Running time in minutes; null when unknown. Formatting is the client's.
+  runtimeMinutes: number | null;
 };
+
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every((g) => typeof g === "string");
+}
 
 // parseMovie validates an untrusted movie object (a search result or a night's
 // attached movie) and returns a typed Movie, throwing on a bad shape.
@@ -13,7 +22,10 @@ export function parseMovie(raw: unknown): Movie {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("expected a movie object");
   }
-  const { tmdbId, title, releaseYear, posterUrl } = raw as Record<string, unknown>;
+  const { tmdbId, title, releaseYear, posterUrl, genres, runtimeMinutes } = raw as Record<
+    string,
+    unknown
+  >;
   if (typeof tmdbId !== "number") {
     throw new Error("movie: tmdbId must be a number");
   }
@@ -26,11 +38,19 @@ export function parseMovie(raw: unknown): Movie {
   if (posterUrl !== undefined && posterUrl !== null && typeof posterUrl !== "string") {
     throw new Error("movie: posterUrl must be a string or null");
   }
+  if (genres !== undefined && genres !== null && !isStringArray(genres)) {
+    throw new Error("movie: genres must be an array of strings");
+  }
+  if (runtimeMinutes !== undefined && runtimeMinutes !== null && typeof runtimeMinutes !== "number") {
+    throw new Error("movie: runtimeMinutes must be a number or null");
+  }
   return {
     tmdbId,
     title,
     releaseYear: releaseYear ?? null,
     posterUrl: posterUrl ?? null,
+    genres: genres ?? [],
+    runtimeMinutes: runtimeMinutes ?? null,
   };
 }
 

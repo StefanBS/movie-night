@@ -106,6 +106,8 @@ Table movies {
   title        varchar      [not null]
   release_year integer      [null]
   poster_path  varchar      [null, note: 'Raw TMDB poster path; full image URL built at render time']
+  genres       "text[]"     [not null, default: `'{}'`, note: 'TMDB genre names in TMDB order; {} when none or cached before 0014']
+  runtime_minutes integer   [null, note: 'Running time in minutes; NULL when unknown (TMDB 0 or missing)']
   cached_at    timestamptz  [not null, default: `now()`, note: 'Metadata cached from TMDB; refresh as needed']
 
   Note: 'Movie metadata cached from TMDB.'

@@ -21,8 +21,47 @@ async function startServer(handler: Handler): Promise<{ url: string; close: () =
 }
 
 test("parseMovie accepts a valid movie", () => {
-  const m = parseMovie({ tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg" });
-  assert.deepEqual(m, { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg" });
+  const m = parseMovie({
+    tmdbId: 438631,
+    title: "Dune",
+    releaseYear: 2021,
+    posterUrl: "https://img/x.jpg",
+    genres: ["Science Fiction", "Adventure"],
+    runtimeMinutes: 155,
+  });
+  assert.deepEqual(m, {
+    tmdbId: 438631,
+    title: "Dune",
+    releaseYear: 2021,
+    posterUrl: "https://img/x.jpg",
+    genres: ["Science Fiction", "Adventure"],
+    runtimeMinutes: 155,
+  });
+});
+
+test("parseMovie defaults absent or null genres and runtimeMinutes", () => {
+  const cases: [string, Record<string, unknown>, string[], number | null][] = [
+    ["absent (older backend)", {}, [], null],
+    ["search result shape", { genres: [], runtimeMinutes: null }, [], null],
+    ["null genres", { genres: null }, [], null],
+    ["present", { genres: ["Drama"], runtimeMinutes: 98 }, ["Drama"], 98],
+  ];
+  for (const [name, extra, genres, runtimeMinutes] of cases) {
+    const m = parseMovie({ tmdbId: 1, title: "X", ...extra });
+    assert.deepEqual(m.genres, genres, name);
+    assert.equal(m.runtimeMinutes, runtimeMinutes, name);
+  }
+});
+
+test("parseMovie rejects wrong-typed genres and runtimeMinutes", () => {
+  const cases: [string, Record<string, unknown>, RegExp][] = [
+    ["genres not an array", { genres: "Drama" }, /genres/],
+    ["a genre not a string", { genres: ["Drama", 18] }, /genres/],
+    ["runtimeMinutes a string", { runtimeMinutes: "98" }, /runtimeMinutes/],
+  ];
+  for (const [name, extra, err] of cases) {
+    assert.throws(() => parseMovie({ tmdbId: 1, title: "X", ...extra }), err, name);
+  }
 });
 
 test("parseMovie treats null and missing releaseYear as null", () => {

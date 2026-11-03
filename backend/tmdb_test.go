@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func intp(n int32) *int32 { return &n }
 
@@ -109,4 +112,74 @@ func TestParseTMDBMovie(t *testing.T) {
 			t.Error("parseTMDBMovie(malformed): expected non-nil error, got nil")
 		}
 	})
+}
+
+func TestParseTMDBMovieDetails(t *testing.T) {
+	tests := []struct {
+		name        string
+		body        string
+		wantGenres  []string
+		wantRuntime *int32
+	}{
+		{
+			name:        "genres in TMDB order and runtime in minutes",
+			body:        `{"id":843,"title":"In the Mood for Love","genres":[{"id":18,"name":"Drama"},{"id":10749,"name":"Romance"}],"runtime":98}`,
+			wantGenres:  []string{"Drama", "Romance"},
+			wantRuntime: intp(98),
+		},
+		{
+			name:        "runtime 0 is unknown",
+			body:        `{"id":1,"title":"A","genres":[],"runtime":0}`,
+			wantGenres:  []string{},
+			wantRuntime: nil,
+		},
+		{
+			name:        "null runtime is unknown",
+			body:        `{"id":1,"title":"A","genres":null,"runtime":null}`,
+			wantGenres:  []string{},
+			wantRuntime: nil,
+		},
+		{
+			name:        "missing genres and runtime",
+			body:        `{"id":1,"title":"A"}`,
+			wantGenres:  []string{},
+			wantRuntime: nil,
+		},
+		{
+			name:        "negative runtime is unknown",
+			body:        `{"id":1,"title":"A","runtime":-5}`,
+			wantGenres:  []string{},
+			wantRuntime: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseTMDBMovie([]byte(tt.body))
+			if err != nil {
+				t.Fatalf("parseTMDBMovie: %v", err)
+			}
+			if got.Genres == nil {
+				t.Fatalf("genres = nil, want non-nil %v", tt.wantGenres)
+			}
+			if !slices.Equal(got.Genres, tt.wantGenres) {
+				t.Errorf("genres = %v, want %v", got.Genres, tt.wantGenres)
+			}
+			if (got.RuntimeMinutes == nil) != (tt.wantRuntime == nil) ||
+				(got.RuntimeMinutes != nil && *got.RuntimeMinutes != *tt.wantRuntime) {
+				t.Errorf("runtime = %v, want %v", got.RuntimeMinutes, tt.wantRuntime)
+			}
+		})
+	}
+}
+
+func TestToMovieResultsDetails(t *testing.T) {
+	// Search hits carry only genre ids and no runtime, so the DTO always has
+	// genres [] (never null) and runtimeMinutes null.
+	got := toMovieResults([]movieResult{{TMDBID: 1, Title: "A"}})
+	if got[0].Genres == nil || len(got[0].Genres) != 0 {
+		t.Errorf("genres = %#v, want []", got[0].Genres)
+	}
+	if got[0].RuntimeMinutes != nil {
+		t.Errorf("runtime = %v, want nil", got[0].RuntimeMinutes)
+	}
 }

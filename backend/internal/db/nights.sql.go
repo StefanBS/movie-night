@@ -86,7 +86,7 @@ func (q *Queries) DeleteNight(ctx context.Context, arg DeleteNightParams) error 
 }
 
 const getNight = `-- name: GetNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path FROM nights
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes FROM nights
 WHERE id = $1 AND group_id = $2
 `
 
@@ -114,6 +114,8 @@ func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (Night, erro
 		&i.MovieTitle,
 		&i.MovieReleaseYear,
 		&i.MoviePosterPath,
+		&i.MovieGenres,
+		&i.MovieRuntimeMinutes,
 	)
 	return i, err
 }
@@ -161,7 +163,7 @@ func (q *Queries) ListNightAttendees(ctx context.Context, arg ListNightAttendees
 }
 
 const listNights = `-- name: ListNights :many
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path FROM nights
+SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes FROM nights
 WHERE group_id = $1
 ORDER BY scheduled_for DESC
 `
@@ -191,6 +193,8 @@ func (q *Queries) ListNights(ctx context.Context, groupID uuid.UUID) ([]Night, e
 			&i.MovieTitle,
 			&i.MovieReleaseYear,
 			&i.MoviePosterPath,
+			&i.MovieGenres,
+			&i.MovieRuntimeMinutes,
 		); err != nil {
 			return nil, err
 		}

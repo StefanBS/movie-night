@@ -216,12 +216,14 @@ type Membership struct {
 }
 
 type Movie struct {
-	ID          uuid.UUID          `json:"id"`
-	TmdbID      int32              `json:"tmdb_id"`
-	Title       string             `json:"title"`
-	ReleaseYear pgtype.Int4        `json:"release_year"`
-	CachedAt    pgtype.Timestamptz `json:"cached_at"`
-	PosterPath  pgtype.Text        `json:"poster_path"`
+	ID             uuid.UUID          `json:"id"`
+	TmdbID         int32              `json:"tmdb_id"`
+	Title          string             `json:"title"`
+	ReleaseYear    pgtype.Int4        `json:"release_year"`
+	CachedAt       pgtype.Timestamptz `json:"cached_at"`
+	PosterPath     pgtype.Text        `json:"poster_path"`
+	Genres         []string           `json:"genres"`
+	RuntimeMinutes pgtype.Int4        `json:"runtime_minutes"`
 }
 
 type Night struct {
@@ -240,6 +242,8 @@ type Night struct {
 	MovieTitle           pgtype.Text        `json:"movie_title"`
 	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
 	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
+	MovieGenres          []string           `json:"movie_genres"`
+	MovieRuntimeMinutes  pgtype.Int4        `json:"movie_runtime_minutes"`
 }
 
 type Pick struct {

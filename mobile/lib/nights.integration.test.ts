@@ -170,7 +170,14 @@ test("recordNightPick posts the pickerId and parses the night", async () => {
 test("attachMovie posts the tmdbId and parses the night with its movie", async () => {
   const withMovie: Night = {
     ...night,
-    movie: { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg" },
+    movie: {
+      tmdbId: 438631,
+      title: "Dune",
+      releaseYear: 2021,
+      posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg",
+      genres: ["Science Fiction", "Adventure"],
+      runtimeMinutes: 155,
+    },
   };
   let path = "";
   let method = "";
@@ -188,7 +195,14 @@ test("attachMovie posts the tmdbId and parses the night with its movie", async (
     assert.equal(method, "POST");
     assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/movie`);
     assert.deepEqual(JSON.parse(body), { tmdbId: 438631 });
-    assert.deepEqual(got.movie, { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg" });
+    assert.deepEqual(got.movie, {
+      tmdbId: 438631,
+      title: "Dune",
+      releaseYear: 2021,
+      posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg",
+      genres: ["Science Fiction", "Adventure"],
+      runtimeMinutes: 155,
+    });
   } finally {
     await server.close();
   }
