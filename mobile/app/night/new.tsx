@@ -81,7 +81,7 @@ export default function NightScreen() {
   if (state.step === "who") {
     return (
       <View style={styles.screen}>
-        <TopBar kind="title" title="New night" back={{ label: "When", onPress: plan.back }} />
+        <TopBar kind="title" title="New night" back={{ label: "Date", onPress: plan.back }} />
         {banner}
         <WhoStep
           scheduledFor={state.date}

@@ -187,7 +187,7 @@ const useStyles = createThemedStyles((colors) => ({
   rowPressed: { opacity: pressedOpacity },
   rowText: { flex: 1 },
   rowTitle: {
-    fontFamily: fontFamily.serifItalic,
+    fontFamily: fontFamily.serifMedium,
     fontSize: 20,
     lineHeight: 22,
     color: colors.text.primary,

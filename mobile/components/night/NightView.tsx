@@ -165,7 +165,7 @@ const useStyles = createThemedStyles((colors) => ({
     marginTop: space[2],
   },
   // A night without a film leads with its date, flush on the page: the
-  // weekday set large and heavy, the date in italic serif under it.
+  // weekday set large and heavy, the date in the serif under it.
   dateHero: { marginTop: space[6], alignItems: "flex-start" },
   heroWeekday: {
     fontFamily: fontFamily.display,

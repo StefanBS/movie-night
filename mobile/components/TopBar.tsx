@@ -8,7 +8,7 @@ import { createThemedStyles, fontFamily, lh, pressedOpacity, space, textPresets,
 
 // The app's shared top-bar chrome, in the three kinds the redesign uses:
 //   home  — logomark + "Movie Night" wordmark + group name + right slot (Tonight)
-//   tab   — large left-aligned title + optional italic-serif sub + right slot
+//   tab   — large left-aligned title + optional serif sub + right slot
 //   title — centered title + back link (primary text) + right slot (pushed screens)
 // `back` couples its label and handler so a title bar can't render a dead button.
 type TopBarProps =
@@ -111,7 +111,7 @@ const useStyles = createThemedStyles((colors) => ({
   group: { ...textPresets.barMeta, color: colors.text.secondary },
   tabTitle: { ...textPresets.tabTitle, color: colors.text.primary },
   sub: {
-    fontFamily: fontFamily.serifItalic,
+    fontFamily: fontFamily.serifMedium,
     fontSize: 19,
     lineHeight: lh(19, "snug"),
     color: colors.text.secondary,

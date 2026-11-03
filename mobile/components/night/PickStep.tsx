@@ -179,7 +179,7 @@ const useStyles = createThemedStyles((colors) => ({
     borderBottomColor: colors.border.hairline,
   },
   resultTitle: {
-    fontFamily: fontFamily.serifItalic,
+    fontFamily: fontFamily.serifMedium,
     fontSize: 19,
     lineHeight: 21,
     color: colors.text.primary,

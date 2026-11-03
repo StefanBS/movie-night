@@ -7,7 +7,7 @@ import { createThemedStyles, fontFamily, radius, space, tabular } from "../theme
 // Poster shows a real TMDB image when given a `uri`, untreated at 2:3, and
 // otherwise (or on error) the hue-per-title gradient tile. The tile is always
 // dark, whatever the theme; from 104px tall it carries the title in Newsreader
-// Italic. `hue` is a stable 0–360 derived from the title by the caller.
+// Medium. `hue` is a stable 0–360 derived from the title by the caller.
 export function Poster({
   uri,
   title = "—",
@@ -70,7 +70,7 @@ const useStyles = createThemedStyles((colors) => ({
   },
   caption: { position: "absolute", left: 10, right: 10, bottom: 10 },
   title: {
-    fontFamily: fontFamily.serifItalic,
+    fontFamily: fontFamily.serifMedium,
     fontSize: 16,
     lineHeight: Math.round(16 * 1.1),
     color: colors.text.onDark,
