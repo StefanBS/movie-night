@@ -1,4 +1,5 @@
 import { errorMessage } from "./errors";
+import { fetchGroupName } from "./group";
 import { fetchMembers, type Member } from "./members";
 import { draftPicker } from "./nightDraft";
 import { nightDates } from "./nightLifecycle";
@@ -18,6 +19,8 @@ export type NightPlanState = {
   error: string | null;
   members: Member[];
   nightDates: Set<string>;
+  // groupName titles the saved Night's calendar entry; null if it failed.
+  groupName: string | null;
   step: PlanStep;
   date: string;
   startTime: string | null;
@@ -29,7 +32,8 @@ export type NightPlanState = {
 };
 
 export type NightPlan = Session<NightPlanState> & {
-  // load fetches the roster and the dates that already hold a Night.
+  // load fetches the roster, the club's name and the dates that already hold
+  // a Night.
   load(): Promise<void>;
   // chooseDate sets the date and HH:MM start time (or none) and moves on to Who.
   chooseDate(iso: string, startTime: string | null): void;
@@ -58,6 +62,7 @@ export function createNightPlan({
     error: null,
     members: [],
     nightDates: new Set(),
+    groupName: null,
     step: "when",
     date: today,
     startTime: null,
@@ -90,14 +95,15 @@ export function createNightPlan({
     async load() {
       core.set({ loading: true, error: null });
       try {
-        const [members, nights] = await core.track((signal) =>
+        const [members, groupName, nights] = await core.track((signal) =>
           Promise.all([
             fetchMembers(baseUrl, groupId, signal),
+            fetchGroupName(baseUrl, groupId, signal),
             // The dots are a hint; a failure here must not block planning.
             listNights(baseUrl, groupId, signal).catch(() => [] as Night[]),
           ]),
         );
-        core.set({ members, nightDates: nightDates(nights), loading: false });
+        core.set({ members, groupName, nightDates: nightDates(nights), loading: false });
       } catch (e) {
         core.set({ error: errorMessage(e, "failed to load the club"), loading: false });
       }

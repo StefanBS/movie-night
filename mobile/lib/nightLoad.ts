@@ -1,12 +1,14 @@
 import { errorMessage } from "./errors";
+import { fetchGroupName } from "./group";
 import { fetchMembers, type Member } from "./members";
 import { nightDates } from "./nightLifecycle";
 import { getNightOrNull, listNights, type Night } from "./nights";
 import { createSessionCore, type Session } from "./session";
 
 // The loading module behind the routes for a saved Night (the Night view and
-// the Edit screen): the Night, the roster, and — for Edit's calendar — the
-// dates that already hold a Night. The route calls load() on every focus. Only
+// the Edit screen): the Night, the roster, the club's name (for Add to
+// calendar), and — for Edit's calendar — the dates that already hold a Night.
+// The route calls load() on every focus. Only
 // the first load shows a spinner; a refresh keeps the last good data on screen,
 // so the editor below it stays mounted with its step, results and errors, and a
 // failed refresh leaves that data in place.
@@ -18,6 +20,9 @@ export type NightLoadState = {
   night: Night | null;
   members: Member[];
   nightDates: Set<string>;
+  // groupName titles calendar entries; null until a load fetches it. A
+  // failed fetch keeps the last name, or null.
+  groupName: string | null;
   error: string | null;
   // loadStartedAt is when the load behind this data began (performance.now()),
   // so the editor can tell a refresh from a read older than its last write.
@@ -55,6 +60,7 @@ export function createNightLoad({
     night: null,
     members: [],
     nightDates: new Set(),
+    groupName: null,
     error: null,
     loadStartedAt: 0,
   });
@@ -73,11 +79,12 @@ export function createNightLoad({
       current = controller;
       const loadStartedAt = performance.now();
       try {
-        const [night, members, planned] = await core.track(
+        const [night, members, groupName, planned] = await core.track(
           (signal) =>
             Promise.all([
               getNightOrNull(baseUrl, groupId, nightId, signal),
               fetchMembers(baseUrl, groupId, signal),
+              fetchGroupName(baseUrl, groupId, signal),
               // The dots are a hint (see listNights): a failure never fails the screen.
               withNightDates ? listNights(baseUrl, groupId, signal).catch(() => [] as Night[]) : null,
             ]),
@@ -90,6 +97,7 @@ export function createNightLoad({
           loaded: true,
           night,
           members,
+          groupName: groupName ?? core.state.groupName,
           ...(planned !== null && { nightDates: nightDates(planned) }),
           error: null,
           loadStartedAt,

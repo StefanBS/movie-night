@@ -33,6 +33,16 @@ export function fetchGroup(
   return requestJson(`${baseUrl}/groups/${groupId}`, parseGroup, { signal });
 }
 
+// fetchGroupName loads just the group's name, for screens where it's a nicety
+// (a calendar entry's title): any failure resolves null instead of failing the
+// screen's load.
+export function fetchGroupName(baseUrl: string, groupId: string, signal?: AbortSignal): Promise<string | null> {
+  return fetchGroup(baseUrl, groupId, signal).then(
+    (g) => g.name,
+    () => null,
+  );
+}
+
 // renameGroup PATCHes a new group name and returns the updated group.
 export function renameGroup(
   baseUrl: string,

@@ -1,4 +1,4 @@
-import { type ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { Platform, ScrollView, Text, View } from "react-native";
 import { CalendarPlus, Clapperboard, Film, Pencil, Repeat, X } from "lucide-react-native";
 
@@ -7,6 +7,7 @@ import { Credit } from "./Credit";
 import { WizardFooter } from "./WizardFooter";
 import { addToCalendar } from "../../calendarExport";
 import { firstName } from "../../lib/avatar";
+import { calendarRecurrence, seriesNote, type CalendarRecurrence } from "../../lib/calendarEntry";
 import { formatShortDate, formatWeekdayDate } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import { nightMeta, nightWording } from "../../lib/nightLifecycle";
@@ -21,11 +22,14 @@ type SheetAction = Omit<ComponentProps<typeof SheetRow>, "last">;
 // credit line under it. A night without a film has one primary action, "Choose
 // the film"; a night with one has none. The secondary actions (Change film,
 // Edit night, Add to calendar, Clear film) sit in the sheet behind the ⋯
-// button, which the editor's top bar opens through moreOpen. `today` is passed
-// in (mirrors lib/date.ts) for deterministic date framing.
+// button, which the editor's top bar opens through moreOpen. On a weekly
+// night, Add to calendar first asks: the whole series, or just this night;
+// `groupName` titles the entry. `today` is passed in (mirrors lib/date.ts)
+// for deterministic date framing.
 export function NightView({
   night,
   members,
+  groupName,
   today,
   moreOpen,
   onCloseMore,
@@ -35,6 +39,7 @@ export function NightView({
 }: {
   night: Night;
   members: Member[];
+  groupName: string | null;
   today: string;
   moreOpen: boolean;
   onCloseMore: () => void;
@@ -49,9 +54,13 @@ export function NightView({
   const movie = night.movie;
   const pickerName = nightPickerName(night, members);
   const first = firstName(pickerName);
-  const onAddToCalendar = async () => {
-    if ((await addToCalendar(night)) === "saved") {
-      toast({ title: "Added to your calendar", body: "It won't follow later changes to the night." });
+  const recurrence = calendarRecurrence(night.repeat);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const onAddToCalendar = async (rule: CalendarRecurrence | null) => {
+    setCalendarOpen(false);
+    if ((await addToCalendar(night, groupName, rule)) === "saved") {
+      const recurring = rule !== null && night.repeat !== null ? `Recurring ${seriesNote(night.repeat, night.scheduledFor)}. ` : "";
+      toast({ title: "Added to your calendar", body: `${recurring}It won't follow later changes to the night.` });
     }
   };
 
@@ -72,8 +81,8 @@ export function NightView({
     actions.push({
       icon: CalendarPlus,
       label: "Add to calendar",
-      sub: "A one-off event on this phone",
-      onPress: act(() => void onAddToCalendar()),
+      sub: recurrence !== null ? "The whole series, or just this night" : "A one-off event on this phone",
+      onPress: act(() => (recurrence !== null ? setCalendarOpen(true) : void onAddToCalendar(null))),
     });
   }
   if (movie !== null && onClearFilm !== undefined) {
@@ -154,6 +163,18 @@ export function NightView({
           <SheetRow key={a.label} {...a} last={i === actions.length - 1} />
         ))}
       </Sheet>
+
+      {recurrence !== null && night.repeat !== null ? (
+        <Sheet visible={calendarOpen} title="Add to calendar" onClose={() => setCalendarOpen(false)}>
+          <SheetRow
+            icon={Repeat}
+            label="Add the whole series"
+            sub={`${formatRepeatLabel(night.repeat, night.scheduledFor)}, recurring`}
+            onPress={() => void onAddToCalendar(recurrence)}
+          />
+          <SheetRow icon={CalendarPlus} label="Just this night" sub="A one-off event" last onPress={() => void onAddToCalendar(null)} />
+        </Sheet>
+      ) : null}
     </View>
   );
 }
