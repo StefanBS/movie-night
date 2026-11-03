@@ -36,13 +36,13 @@ export const fontSize = {
   "2xl": 30, // bar titles
   "3xl": 44, // tab titles
   "4xl": 64, // card hero name
-  display: 96, // the picker's name on Tonight
+  display: 52, // the picker's name on Tonight
 } as const;
 
 // Line-height multipliers (CSS leading). RN lineHeight is absolute px,
 // so compute: lineHeight = Math.round(fontSize * leading).
 export const leading = {
-  tight: 0.9, // display names
+  display: 0.95, // the display style (tokens.json), the picker's name
   none: 1, // tab titles (text-3xl)
   snug: 1.15,
   normal: 1.45,
@@ -56,7 +56,7 @@ export const tracking = {
   normal: 0,
 } as const;
 
-/** lh(16) -> 23 ; lh(96,'tight') -> 86 */
+/** lh(16) -> 23 ; lh(52,'display') -> 49 */
 export const lh = (size: number, l: keyof typeof leading = "normal") =>
   Math.round(size * leading[l]);
 
