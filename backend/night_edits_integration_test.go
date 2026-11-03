@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -404,6 +405,79 @@ func TestNightEditsIntegration(t *testing.T) {
 		// An edit without watched leaves the record alone; there is no un-recording.
 		if _, edited := doJSON[nightResponse](t, mux, http.MethodPatch, path, editBody(t, second, func(*updateNightRequest) {})); !equalPtr(edited.WatchedAt, deref(before.WatchedAt)) {
 			t.Fatalf("watchedAt after a plain edit = %v, want %v kept", edited.WatchedAt, before.WatchedAt)
+		}
+	})
+
+	// A Night can be recorded up to the day after the server's UTC date
+	// (ADR-0013): the latest date that is "today" in some zone (UTC+14).
+	utcDay := func(days int) string { return time.Now().UTC().AddDate(0, 0, days).Format(dateLayout) }
+	mkFilmNightOn := func(t *testing.T, date string) nightResponse {
+		t.Helper()
+		clearAllPicks(t, pool, seededGroup)
+		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody(date, ada))
+		if code != http.StatusCreated {
+			t.Fatalf("create night on %s = %d", date, code)
+		}
+		if code, _ := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":438631}`); code != http.StatusOK {
+			t.Fatalf("attach status = %d, want 200", code)
+		}
+		_, n = doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, "")
+		return n
+	}
+
+	t.Run("PATCH watched on a night dated today in UTC+14 records it", func(t *testing.T) {
+		n := mkFilmNightOn(t, utcDay(1))
+		code, got := doJSON[nightResponse](t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			editBody(t, n, func(r *updateNightRequest) { r.Watched = true }))
+		if code != http.StatusOK || got.WatchedAt == nil {
+			t.Fatalf("patch = %d, watchedAt %v; want 200 and recorded", code, got.WatchedAt)
+		}
+	})
+
+	t.Run("PATCH watched on a night that hasn't happened yields 422 and changes nothing", func(t *testing.T) {
+		n := mkFilmNightOn(t, utcDay(2))
+		code, body := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			editBody(t, n, func(r *updateNightRequest) {
+				r.Attendees, r.PickerID, r.Watched = []string{ada, blake}, str(blake), true
+			}))
+		if code != http.StatusUnprocessableEntity {
+			t.Fatalf("patch status = %d, want 422 (body %s)", code, body)
+		}
+		unchanged(t, n)
+	})
+
+	t.Run("PATCH watched moving a night past the bound yields 422 and changes nothing", func(t *testing.T) {
+		n := mkFilmNightOn(t, utcDay(0))
+		code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			editBody(t, n, func(r *updateNightRequest) { r.ScheduledFor, r.Watched = utcDay(7), true }))
+		if code != http.StatusUnprocessableEntity {
+			t.Fatalf("patch status = %d, want 422", code)
+		}
+		unchanged(t, n)
+	})
+
+	t.Run("a watched night can't be moved past the bound", func(t *testing.T) {
+		n := mkFilmNightOn(t, utcDay(-3))
+		path := "/groups/" + seededGroup + "/nights/" + n.ID
+		code, recorded := doJSON[nightResponse](t, mux, http.MethodPatch, path, editBody(t, n, func(r *updateNightRequest) { r.Watched = true }))
+		if code != http.StatusOK {
+			t.Fatalf("record status = %d, want 200", code)
+		}
+		if code, _ := do(t, http.MethodPatch, path, editBody(t, recorded, func(r *updateNightRequest) { r.ScheduledFor = utcDay(2) })); code != http.StatusUnprocessableEntity {
+			t.Fatalf("move watched night ahead = %d, want 422", code)
+		}
+		unchanged(t, recorded)
+		code, moved := doJSON[nightResponse](t, mux, http.MethodPatch, path, editBody(t, recorded, func(r *updateNightRequest) { r.ScheduledFor = utcDay(1) }))
+		if code != http.StatusOK || moved.ScheduledFor != utcDay(1) || !equalPtr(moved.WatchedAt, deref(recorded.WatchedAt)) {
+			t.Fatalf("move watched night within the bound = %d %+v, want 200, moved and still recorded", code, moved)
+		}
+	})
+
+	t.Run("a night not yet watched can still be planned any distance ahead", func(t *testing.T) {
+		n := mkFilmNightOn(t, utcDay(0))
+		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			editBody(t, n, func(r *updateNightRequest) { r.ScheduledFor = utcDay(30) })); code != http.StatusOK {
+			t.Fatalf("patch status = %d, want 200", code)
 		}
 	})
 

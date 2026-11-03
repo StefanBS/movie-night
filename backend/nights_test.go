@@ -575,3 +575,42 @@ func deref(s *string) string {
 	}
 	return *s
 }
+
+// A Night can be recorded as watched up to one day after the server's UTC date
+// (ADR-0013): every zone's today is at most a day ahead of UTC (UTC+14), so a
+// Night dated today anywhere is accepted.
+func TestRecordableAsWatched(t *testing.T) {
+	// 10:30 UTC on 3 Nov is already 00:30 on 4 Nov in UTC+14, and still
+	// 22:30 on 2 Nov in UTC-12.
+	now := time.Date(2026, 11, 3, 10, 30, 0, 0, time.UTC)
+	tests := []struct {
+		name         string
+		scheduledFor string
+		now          time.Time
+		want         bool
+	}{
+		{name: "a past night", scheduledFor: "2026-10-01", now: now, want: true},
+		{name: "dated today in UTC-12", scheduledFor: "2026-11-02", now: now, want: true},
+		{name: "dated the UTC date", scheduledFor: "2026-11-03", now: now, want: true},
+		{name: "dated today in UTC+14", scheduledFor: "2026-11-04", now: now, want: true},
+		{name: "two days after the UTC date", scheduledFor: "2026-11-05", now: now, want: false},
+		{name: "next week", scheduledFor: "2026-11-10", now: now, want: false},
+		{name: "a non-UTC clock is read as UTC", scheduledFor: "2026-11-05",
+			now: time.Date(2026, 11, 4, 1, 0, 0, 0, time.FixedZone("UTC+14", 14*3600)), want: false},
+		{name: "end of the UTC day", scheduledFor: "2026-11-04",
+			now: time.Date(2026, 11, 3, 23, 59, 59, 0, time.UTC), want: true},
+		{name: "across a month end", scheduledFor: "2026-12-01",
+			now: time.Date(2026, 11, 30, 0, 0, 0, 0, time.UTC), want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d, err := parseDate(tt.scheduledFor)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := recordableAsWatched(d, tt.now); got != tt.want {
+				t.Errorf("recordableAsWatched(%s, %v) = %v, want %v", tt.scheduledFor, tt.now, got, tt.want)
+			}
+		})
+	}
+}

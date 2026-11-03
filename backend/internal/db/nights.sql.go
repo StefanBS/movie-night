@@ -257,7 +257,10 @@ func (q *Queries) ListNightsAttendees(ctx context.Context, arg ListNightsAttende
 }
 
 const lockNight = `-- name: LockNight :one
-SELECT picker_id, (movie_id IS NOT NULL)::boolean AS has_movie FROM picks
+SELECT picker_id,
+       (movie_id IS NOT NULL)::boolean AS has_movie,
+       (watched_at IS NOT NULL)::boolean AS is_watched
+FROM picks
 WHERE id = $1 AND group_id = $2
 FOR UPDATE
 `
@@ -268,17 +271,18 @@ type LockNightParams struct {
 }
 
 type LockNightRow struct {
-	PickerID uuid.UUID `json:"picker_id"`
-	HasMovie bool      `json:"has_movie"`
+	PickerID  uuid.UUID `json:"picker_id"`
+	HasMovie  bool      `json:"has_movie"`
+	IsWatched bool      `json:"is_watched"`
 }
 
 // Locks the night row for the rest of the write's transaction and returns its
-// picker and whether it has a film, so no other write can change them or the
-// attendees until it commits.
+// picker, whether it has a film and whether it is recorded as watched, so no
+// other write can change them or the attendees until it commits.
 func (q *Queries) LockNight(ctx context.Context, arg LockNightParams) (LockNightRow, error) {
 	row := q.db.QueryRow(ctx, lockNight, arg.NightID, arg.GroupID)
 	var i LockNightRow
-	err := row.Scan(&i.PickerID, &i.HasMovie)
+	err := row.Scan(&i.PickerID, &i.HasMovie, &i.IsWatched)
 	return i, err
 }
 

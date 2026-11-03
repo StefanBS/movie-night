@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -61,9 +62,11 @@ func recordPick(ctx context.Context, q *db.Queries, gid, nightID, picker uuid.UU
 // editNight replaces a Night's editable fields and attendee set, and when the
 // edit says so changes its picker and records it as watched (ADR-0012). The
 // picker, new or kept, must be an attendee, and only a Night with a film can
-// be recorded. A taken date fails on the UpdateNight statement, after the
-// attendee writes; the rollback undoes them.
-func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit nightEdit) error {
+// be recorded. A Night being recorded, or already a Watched Night, must be
+// dated no later than recordableAsWatched allows at now (ADR-0013). A taken
+// date fails on the UpdateNight statement, after the attendee writes; the
+// rollback undoes them.
+func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit nightEdit, now time.Time) error {
 	locked, err := q.LockNight(ctx, db.LockNightParams{NightID: nightID, GroupID: gid})
 	if err != nil {
 		return err
@@ -81,6 +84,9 @@ func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit 
 	}
 	if edit.Watched && !locked.HasMovie {
 		return errWatchedWithoutFilm
+	}
+	if (edit.Watched || locked.IsWatched) && !recordableAsWatched(edit.ScheduledFor, now) {
+		return errWatchedDateAhead
 	}
 	if err := q.RemoveAttendeesNotIn(ctx, db.RemoveAttendeesNotInParams{PickID: nightID, Keep: edit.Attendees}); err != nil {
 		return err
@@ -137,13 +143,14 @@ func attendeeRole(attendees []db.ListNightAttendeesRow, picker uuid.UUID) (db.Me
 }
 
 // writeNightError maps a failed Night write to its response: a missing Night is
-// a 404, a broken ADR-0008 rule or recording a Night with no film a 422, a date
-// another Night holds a 409, and anything else a 500.
+// a 404; a broken ADR-0008 rule, or recording a Night with no film or before
+// its date, a 422; a date another Night holds a 409; and anything else a 500.
 func writeNightError(w http.ResponseWriter, gid uuid.UUID, op string, err error) {
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		writeJSONError(w, http.StatusNotFound, "night not found")
-	case errors.Is(err, errPickerNotAttendee), errors.Is(err, errNotMember), errors.Is(err, errWatchedWithoutFilm):
+	case errors.Is(err, errPickerNotAttendee), errors.Is(err, errNotMember),
+		errors.Is(err, errWatchedWithoutFilm), errors.Is(err, errWatchedDateAhead):
 		writeJSONError(w, http.StatusUnprocessableEntity, err.Error())
 	case isUniqueViolation(err):
 		writeJSONError(w, http.StatusConflict, errNightDateTaken)

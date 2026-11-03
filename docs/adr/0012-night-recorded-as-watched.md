@@ -1,6 +1,6 @@
 # ADR-0012 — A Night is history only once the group records it as watched
 
-**Status:** Accepted (2026-11-03)
+**Status:** Accepted (2026-11-03). The server-side date check is superseded by [ADR-0013](0013-watched-night-date-bound.md).
 
 ## Context
 A Night's state has been a function of its date alone: every Night dated today

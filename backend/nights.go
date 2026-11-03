@@ -41,6 +41,22 @@ var errPickerNotAttendee = errors.New("picker is not an attendee of this night")
 // there is nothing to have watched (ADR-0012).
 var errWatchedWithoutFilm = errors.New("night has no film to record as watched")
 
+// errWatchedDateAhead is the 422 for recording a Night that hasn't happened,
+// or moving a Watched Night to a date that hasn't (ADR-0013).
+var errWatchedDateAhead = errors.New("night is dated too far ahead to be recorded as watched")
+
+// recordableAsWatched reports whether a Night on scheduledFor can be (or stay)
+// recorded as watched at now: it is dated no later than the day after now's
+// UTC date. There is no group timezone, and every zone's today is at most one
+// day ahead of the UTC date (UTC+14), so a Night dated today anywhere passes,
+// at the cost of letting a Night be recorded up to a day early (ADR-0013).
+// Pure.
+func recordableAsWatched(scheduledFor pgtype.Date, now time.Time) bool {
+	y, m, d := now.UTC().Date()
+	latest := time.Date(y, m, d+1, 0, 0, 0, 0, time.UTC)
+	return !scheduledFor.Time.After(latest)
+}
+
 // errNotMember is the 422 for an attendee who has no membership in the group;
 // attendeeRoles wraps it with the offending id.
 var errNotMember = errors.New("attendee is not a member of this group")
@@ -605,9 +621,12 @@ func recordNightPickHandler(pool *pgxpool.Pool) http.HandlerFunc {
 // updateNightHandler serves PATCH /groups/{groupId}/nights/{nightId}. The body
 // {"scheduledFor", "startTime", "attendees", "reminders"} is the whole editable
 // Night and replaces it in one transaction, so a rejected edit changes nothing.
-// The picker must stay an attendee (422), every attendee must be a member
-// (422), and a date another night already holds is a 409. The picker itself is
-// changed only by record-pick.
+// The optional pickerId and watched: true change the picker and record the
+// Night in the same edit (ADR-0012). The picker must stay an attendee (422),
+// every attendee must be a member (422), a Night can only be recorded once it
+// has a film (422), a Watched Night (or one being recorded) can't be dated
+// past recordableAsWatched's bound (422, ADR-0013), and a date another night
+// already holds is a 409.
 func updateNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
@@ -624,7 +643,7 @@ func updateNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		err = withTx(r.Context(), pool, func(q *db.Queries) error {
-			return editNight(r.Context(), q, gid, nightID, edit)
+			return editNight(r.Context(), q, gid, nightID, edit, time.Now())
 		})
 		if err != nil {
 			writeNightError(w, gid, "update night", err)
