@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 
-import { formatRuntime, movieDetails, parseMovie, searchMovies, type Movie } from "./movies";
+import { formatRuntime, formatYearRuntime, movieDetails, parseMovie, searchMovies, type Movie } from "./movies";
 
 type Handler = (req: http.IncomingMessage, res: http.ServerResponse) => void;
 
@@ -158,5 +158,19 @@ test("movieDetails", () => {
       want,
       name,
     );
+  }
+});
+
+test("formatYearRuntime", () => {
+  const base: Movie = { tmdbId: 1, title: "Past Lives", releaseYear: null, posterUrl: null, genres: ["Drama"], runtimeMinutes: null };
+  const cases: { name: string; movie: Partial<Movie>; want: string }[] = [
+    { name: "both", movie: { releaseYear: 2023, runtimeMinutes: 106 }, want: "2023 · 1h 46m" },
+    { name: "year only", movie: { releaseYear: 2023 }, want: "2023" },
+    { name: "runtime only", movie: { runtimeMinutes: 106 }, want: "1h 46m" },
+    { name: "zero runtime is unknown", movie: { releaseYear: 2023, runtimeMinutes: 0 }, want: "2023" },
+    { name: "neither", movie: {}, want: "" },
+  ];
+  for (const c of cases) {
+    assert.equal(formatYearRuntime({ ...base, ...c.movie }), c.want, c.name);
   }
 });

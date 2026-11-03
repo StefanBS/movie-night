@@ -154,14 +154,24 @@ export function listNights(
 }
 
 // getNightTurn loads the core pick order over a night's attendees, ignoring the
-// night's own pick — the order its picker is chosen from.
-export function getNightTurn(
+// night's own pick — the order its picker is chosen from. `present` ranks a
+// draft of who came instead of the stored attendees; an empty draft is []
+// without a request (a blank `present` would mean the stored ones).
+export async function getNightTurn(
   baseUrl: string,
   groupId: string,
   nightId: string,
   signal?: AbortSignal,
+  present?: string[],
 ): Promise<TurnMember[]> {
-  return requestJson(`${baseUrl}/groups/${groupId}/nights/${nightId}/turn`, parseTurn, { signal });
+  let url = `${baseUrl}/groups/${groupId}/nights/${nightId}/turn`;
+  if (present !== undefined) {
+    if (present.length === 0) {
+      return [];
+    }
+    url += `?present=${encodeURIComponent(present.join(","))}`;
+  }
+  return requestJson(url, parseTurn, { signal });
 }
 
 // recordNightPick changes the night's picker (who must be attending). The backend derives
@@ -246,6 +256,39 @@ export function deleteNight(
 ): Promise<void> {
   return requestNoContent(`${baseUrl}/groups/${groupId}/nights/${nightId}`, {
     method: "DELETE",
+    signal,
+  });
+}
+
+// Attendance is who came to a Night and who picked, as the "We watched it"
+// flow confirms them. The picker must be one of the attendees.
+export type Attendance = {
+  attendees: string[];
+  pickerId: string;
+};
+
+// recordWatched records a Night as watched (ADR-0012) with the attendees and
+// picker the group confirmed, in the one PATCH that either fully applies or
+// changes nothing. Its date, start time and reminders are sent as they are.
+// The backend rejects a Night with no film (422); recording again keeps the
+// first watchedAt.
+export function recordWatched(
+  baseUrl: string,
+  groupId: string,
+  night: Night,
+  { attendees, pickerId }: Attendance,
+  signal?: AbortSignal,
+): Promise<Night> {
+  const changes: NightChanges = {
+    scheduledFor: night.scheduledFor,
+    startTime: night.startTime,
+    attendees,
+    reminders: night.reminders,
+  };
+  return fetchNight(`${baseUrl}/groups/${groupId}/nights/${night.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...changes, pickerId, watched: true }),
     signal,
   });
 }

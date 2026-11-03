@@ -17,14 +17,15 @@ import { createThemedStyles, space, textPresets, useColors } from "../../theme";
 
 export default function NightDetailRoute() {
   // `from` names the screen that opened the night, for the back link.
-  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
-  return <NightDetailLoader key={id} id={id} from={from ?? "Tonight"} />;
+  // `step=pick` opens it on the film search (the Done screen's Change film).
+  const { id, from, step } = useLocalSearchParams<{ id: string; from?: string; step?: string }>();
+  return <NightDetailLoader key={id} id={id} from={from ?? "Tonight"} pick={step === "pick"} />;
 }
 
 // NightDetailLoader loads the Night on every focus (lib/nightLoad). Only the
 // first load shows the spinner, so returning from the Edit screen refreshes the
 // Night under a still-mounted editor instead of resetting its step and search.
-function NightDetailLoader({ id, from }: { id: string; from: string }) {
+function NightDetailLoader({ id, from, pick }: { id: string; from: string; pick: boolean }) {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -95,6 +96,7 @@ function NightDetailLoader({ id, from }: { id: string; from: string }) {
       members={members}
       loadStartedAt={loadStartedAt}
       today={today}
+      initialStep={pick ? "pick" : undefined}
       back={{ label: from, onPress: () => router.back() }}
       onEdit={() =>
         router.push({ pathname: "/night/edit/[id]", params: { id: night.id, from: "Night" } })

@@ -118,7 +118,7 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `GET` | `/groups/{groupId}/nights/{nightId}` | A night and its attendees. |
 | `PATCH` | `/groups/{groupId}/nights/{nightId}` | Replace the whole editable Night (date, start time, attendee set, reminder settings) in one transaction — a rejected edit changes nothing. Body `{"scheduledFor","startTime","attendees","reminders"}` (`startTime` `null` for none), plus optional `"pickerId"` (change the picker in the same edit) and `"watched": true` (record the Night as watched; the first `watchedAt` is kept, ADR-0012); `422` if the attendees leave out the picker or include a non-member, or `watched` is sent for a Night with no film, `409` if the date is taken. |
 | `DELETE` | `/groups/{groupId}/nights/{nightId}` | Cancel/delete the night; `204`. Idempotent. |
-| `GET` | `/groups/{groupId}/nights/{nightId}/turn` | Least-served ranking over the night's attendees, ignoring the night's own pick. |
+| `GET` | `/groups/{groupId}/nights/{nightId}/turn` | Least-served ranking over the night's attendees, ignoring the night's own pick. Optional `present=<uuid>,…` ranks that set instead (a draft of who came). |
 | `POST` | `/groups/{groupId}/nights/{nightId}/pick` | Change the picker (must be an attendee; guest picks don't move standings). Body `{"pickerId"}`. |
 
 **Movies** ([ADR-0007](../docs/adr/0007-tmdb-proxy-source-of-truth.md)) — `503` when `TMDB_READ_TOKEN` is unset.

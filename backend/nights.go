@@ -533,26 +533,36 @@ func nightDetailHandler(store nightStore) http.HandlerFunc {
 // pick order over the night's attendees. Reuses RankGroupTurn with the attendee
 // IDs as a non-nil present set (empty present = rank nobody), excluding this
 // night's own pick so recording (or re-recording) its picker never reshuffles
-// the order the picker was chosen from.
+// the order the picker was chosen from. An optional `present=<uuid>,…` ranks
+// that draft attendee set instead of the stored one (the "We watched it" flow
+// confirms who came before saving); blank means the stored attendees.
 func nightTurnHandler(store nightStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
+		present, err := parsePresent(r.URL.Query().Get("present"))
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "invalid present id")
+			return
+		}
 		ctx := r.Context()
 		if _, ok := loadNight(w, r, store, gid, nightID); !ok {
 			return
 		}
-		rows, err := store.ListNightAttendees(ctx, db.ListNightAttendeesParams{GroupID: gid, NightID: nightID})
-		if err != nil {
-			internalError(w, gid, "list night attendees", err)
-			return
+		if present == nil {
+			rows, err := store.ListNightAttendees(ctx, db.ListNightAttendeesParams{GroupID: gid, NightID: nightID})
+			if err != nil {
+				internalError(w, gid, "list night attendees", err)
+				return
+			}
+			present = presentIDs(rows)
 		}
 		ranked, err := store.RankGroupTurn(ctx, db.RankGroupTurnParams{
 			GroupID:      gid,
 			ExcludeNight: pgtype.UUID{Bytes: nightID, Valid: true},
-			Present:      presentIDs(rows),
+			Present:      present,
 		})
 		if err != nil {
 			internalError(w, gid, "rank group turn", err)

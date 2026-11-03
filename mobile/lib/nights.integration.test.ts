@@ -7,6 +7,7 @@ import {
   getNightTurn,
   listNights,
   recordNightPick,
+  recordWatched,
   attachMovie,
   type Night,
 } from "./nights";
@@ -222,6 +223,59 @@ test("listNights GETs the group's nights and parses the array", async () => {
     assert.equal(got.length, 2);
     assert.equal(got[0].id, "n1");
     assert.equal(got[1].id, "n2");
+  } finally {
+    await server.close();
+  }
+});
+
+test("getNightTurn with a present set ranks that draft, and an empty one is [] without a request", async () => {
+  let path = "";
+  let requests = 0;
+  const server = await startServer((req, res) => {
+    requests++;
+    path = req.url ?? "";
+    res.statusCode = 200;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify([{ id: ADA, name: "Ada", role: "core", servedCount: 0, lastPickedOn: null }]));
+  });
+  try {
+    await getNightTurn(server.url, GROUP, NIGHT, undefined, [ADA, "b"]);
+    assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/turn?present=${encodeURIComponent(`${ADA},b`)}`);
+    assert.deepEqual(await getNightTurn(server.url, GROUP, NIGHT, undefined, []), []);
+    assert.equal(requests, 1);
+  } finally {
+    await server.close();
+  }
+});
+
+test("recordWatched PATCHes the night as it is, with the confirmed attendees, picker and watched", async () => {
+  let path = "";
+  let method = "";
+  let body = "";
+  const BLAKE = "a0000000-0000-0000-0000-000000000002";
+  const planned: Night = { ...night, startTime: "20:00", attendees: [...night.attendees, { id: BLAKE, name: "Blake", role: "core" }] };
+  const recorded: Night = { ...planned, pickerId: BLAKE, watchedAt: "2026-06-12T22:00:00Z" };
+  const server = await startServer(async (req, res) => {
+    path = req.url ?? "";
+    method = req.method ?? "";
+    body = await collect(req);
+    res.statusCode = 200;
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify(recorded));
+  });
+  try {
+    const got = await recordWatched(server.url, GROUP, planned, { attendees: [BLAKE], pickerId: BLAKE });
+    assert.equal(method, "PATCH");
+    assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}`);
+    assert.deepEqual(JSON.parse(body), {
+      scheduledFor: "2026-06-12",
+      startTime: "20:00",
+      attendees: [BLAKE],
+      reminders: planned.reminders,
+      pickerId: BLAKE,
+      watched: true,
+    });
+    assert.deepEqual(got, recorded);
   } finally {
     await server.close();
   }

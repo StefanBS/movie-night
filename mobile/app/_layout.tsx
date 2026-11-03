@@ -47,6 +47,7 @@ export default function RootLayout() {
             <Stack.Screen name="night/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="night/edit/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="night/new" options={{ headerShown: false }} />
+            <Stack.Screen name="night/watched/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="welcome" options={{ headerShown: false }} />
             <Stack.Screen name="rotation" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
