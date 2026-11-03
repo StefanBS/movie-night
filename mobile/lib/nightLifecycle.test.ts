@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { historyNights, nightDates, nightMeta, nightTiming, nightWording, upNext, type NightTiming } from "./nightLifecycle";
+import { historyNights, nightDates, nightMeta, nightTiming, nightWording, upcomingNights, upNext, type NightTiming } from "./nightLifecycle";
 import type { Night } from "./nights";
 
 const TODAY = "2026-06-22";
@@ -193,5 +193,22 @@ const metaCases: [string, string, string | null, string][] = [
 for (const [name, date, startTime, want] of metaCases) {
   test(`nightMeta: ${name}`, () => {
     assert.equal(nightMeta(date, startTime, TODAY, "en-US"), want);
+  });
+}
+
+// upcomingNights
+
+const upcomingCases: [string, Night[], string[]][] = [
+  ["no nights", [], []],
+  ["only past nights", [night("p", "2026-06-20")], []],
+  [
+    "tonight and later, soonest first",
+    [night("far", "2026-07-10"), night("p", "2026-06-01"), night("t", TODAY), night("soon", "2026-06-26")],
+    ["t", "soon", "far"],
+  ],
+];
+for (const [name, nights, want] of upcomingCases) {
+  test(`upcomingNights: ${name}`, () => {
+    assert.deepEqual(ids(upcomingNights(nights, TODAY)), want);
   });
 }
