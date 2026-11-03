@@ -22,7 +22,6 @@ window.sigDot = sigDot;
 function NightRow({ n, last }) {
   const mv = _SD.movies[n.movie];
   const picker = _SD.byId(n.pickerId);
-  const r = window.REACTIONS[n.reaction];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "11px 0", borderBottom: last ? "none" : "1px solid var(--border-hairline)", cursor: "pointer" }}>
       <window.Poster id={n.movie} w={46} h={69} showTitle={false} />
@@ -30,7 +29,6 @@ function NightRow({ n, last }) {
         <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}><window.Film size={20}>{mv.title}</window.Film></div>
         <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 5, fontSize: 13, color: "var(--text-secondary)" }}>
           {sigDot(picker.name)}<span>{picker.name.split(" ")[0]}'s pick</span>
-          {n.reaction === "loved" && <span style={{ color: "var(--text-tertiary)" }}>· {r.glyph}</span>}
         </div>
       </div>
       <span style={{ fontSize: 13, color: "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>{_SD.fmtDate(n.date)}</span>
@@ -40,20 +38,15 @@ function NightRow({ n, last }) {
 
 // ── Watched (tab) ──────────────────────────────────────────────
 function HistoryScreen() {
+  // No counters: the list itself is the record. (Reactions aren't planned yet.)
   const groups = groupByMonth(_SD.nights);
-  const films = new Set(_SD.nights.map((n) => n.movie)).size;
   return (
     <window.Phone>
       <window.TopBar kind="tab" title="Watched" group={`${_SD.nights.length} nights since ${_SD.fmtDate(_SD.group.since, true).replace(/,.*/, "")} 2025.`} />
       <window.Screen>
-        <div style={{ display: "flex", gap: 30, marginTop: 20 }}>
-          <window.Stat value={_SD.nights.length} label="Nights" />
-          <window.Stat value={films} label="Films" />
-          <window.Stat value={_SD.nights.filter((n) => n.reaction === "loved").length} label="Loved" />
-        </div>
-        {groups.map((g) => (
+        {groups.map((g, gi) => (
           <div key={g.label}>
-            <window.SectionLabel style={{ marginTop: 28 }}>{g.label}</window.SectionLabel>
+            <window.SectionLabel style={{ marginTop: gi ? 28 : 20 }}>{g.label}</window.SectionLabel>
             {g.items.map((n, i) => <NightRow key={n.id} n={n} last={i === g.items.length - 1} />)}
           </div>
         ))}
@@ -106,13 +99,11 @@ function PeopleList({ label, ids, pickerId }) {
 function NightDetailScreen({ sheet = false }) {
   const n = _SD.nights.find((x) => x.id === "n-02");
   const picker = _SD.byId(n.pickerId);
-  const r = window.REACTIONS[n.reaction];
   return (
     <window.Phone>
       <window.TopBar title="" back="Watched" right={<window.MoreBtn />} />
       <window.Screen tabbar={false}>
         <NightHead movie={n.movie} meta={_SD.fmtWeekdayDate(n.date)} pickerName={picker.name} />
-        <div style={{ marginTop: 14 }}><SBadge tone="neutral">{r.glyph} {r.label}</SBadge></div>
         <PeopleList label="Who watched" ids={n.presentIds} pickerId={n.pickerId} />
       </window.Screen>
       {sheet && (
@@ -127,7 +118,7 @@ function NightDetailScreen({ sheet = false }) {
 }
 function NightMoreScreen() { return <NightDetailScreen sheet />; }
 
-// A night that hasn't happened yet (from Tonight, Upcoming or a reminder).
+// A night that hasn't happened yet (from Tonight or a reminder).
 // One action: choose the film. Edit night and Add to calendar sit behind More.
 function NightUpcomingScreen() {
   const s = _SD.scheduledNight;

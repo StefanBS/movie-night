@@ -18,7 +18,7 @@ References: Letterboxd, A24, VHS era.
 
 ## Sources
 
-- **GitHub — `StefanBS/movie-night` @ `main`**, `mobile/` subtree (see `github.md`). The app already implements the four-tab redesign. Its tokens live in `mobile/theme/{colors,typography,spacing}.ts` and its components in `mobile/components/`. Every component here mirrors one there by name and props.
+- **GitHub — `StefanBS/movie-night` @ `main`**, `mobile/` subtree (see `github.md`). The app currently has four tabs (Tonight, Upcoming, Watched, Club); the design now drops Upcoming. Its tokens live in `mobile/theme/{colors,typography,spacing}.ts` and its components in `mobile/components/`. Every component here mirrors one there by name and props.
 
 ---
 
@@ -26,7 +26,7 @@ References: Letterboxd, A24, VHS era.
 
 One person picks; the app says so plainly. The picker's **name**, set huge, is the spotlight. A single **terracotta** mark backs it up. Everything else steps back: warm neutrals, hairlines, and the posters, which carry the colour.
 
-- **The name is the emphasis — until there's a film.** With no night planned, Tonight sets the picker's first name at 64–96px, heavy and tight, followed by "picks the film." in the serif. Once a night is scheduled, the up-next card leads with the film title and credits the picker beneath it ("Picked by Tomas"). No glows, washes, or stacked badges.
+- **The name is the emphasis — until there's a film.** With no night planned, Tonight sets the picker's first name at 52px (`display`), heavy and tight, followed by "picks the film." in the serif at 24px. It leads the screen without shouting. Once a night is scheduled, the up-next card leads with the film title and credits the picker beneath it ("Picked by Tomas"). No glows, washes, or stacked badges.
 - **The accent is rationed.** Terracotta, toned to sit with the member colours. It appears on the picker (a small bar or dot, the `Next up` badge — never on the avatar) and on the one primary action per screen. Nowhere else.
 - **Each member has a colour.** Seven signature colours (`--sig-1…7`), hashed from the name, so a person is recognisable across avatars, lists and history.
 - **Two themes, one scale.** Warm true-black (dark, default) and warm off-white (light) both come from the `--ink` scale.
@@ -48,7 +48,7 @@ One person picks; the app says so plainly. The picker's **name**, set huge, is t
 
 - **Colour.** Dark: page `--ink-950 #11100E`, cards `--ink-900 #1A1816`, text `--ink-100 #EDE8E0` / `--ink-400` / `--ink-450`. Light (`data-theme="light"`): page `--ink-50 #F4F1EC`, cards white, text `--ink-950` / `--ink-600` / `--ink-500`. Accent is **terracotta** (tokens keep the `--ember-*` name): `#C8693F` (dark) / `#A9552F` (light), hover and accent text on light `--ember-600 #934826`. Labels on the accent use `--text-on-accent`: ink in dark, white in light. Red is destructive-only; green is rare.
 - **Signature colours.** "Film stock": dusty, desaturated mid-tones. `--sig-1…7` = gold, teal, lilac, sage, rose, sky, sand (‑300 on dark, slightly deeper ‑600 on light), white initials (`--text-on-sig`) on both themes. Avatars carry no ring or accent. Hash = sum of char codes mod 7 (same as `lib/avatar.ts`).
-- **Type.** **Schibsted Grotesk** for everything: 800 with −0.045em tracking for names and titles (44–96px), 600–700 for UI, 400 for body; tabular figures for counts and dates. **Newsreader**, upright at 500, for film titles and the one serif line under a title. No italics anywhere. Scale: 12 · 14 · 16 · 18 · 22 · 30 · 44 · 64 · 96.
+- **Type.** **Schibsted Grotesk** for everything: 800 with −0.045em tracking for names and titles (44–64px), 600–700 for UI, 400 for body; tabular figures for counts and dates. **Newsreader**, upright at 500, for film titles and the one serif line under a title. No italics anywhere. Scale: 12 · 14 · 16 · 18 · 22 · 30 · 44 · 52 · 64.
 - **Spacing.** 4px grid. Screen gutters 20–24px.
 - **Shape.** Buttons and badges are pills. Cards 18px, hero cards 28px, inputs 12px, posters 4px.
 - **Surfaces.** Lists sit flush on the page with hairlines — no card around a list. Cards only for discrete objects (the up-next night, settings groups, toasts).
@@ -98,11 +98,11 @@ Each component's guidelines, types and live preview are in `components/<Name>/`.
 
 Not mirrored: `TabScrollView`, `ToastProvider` (behaviour only).
 
-**Navigation.** Four tabs: Tonight, Upcoming, Watched and Club (see `components/TabBar/`). Settings opens from the gear in the Tonight top bar and is not a tab.
+**Navigation.** Three tabs: Tonight, Watched and Club (see `components/TabBar/`). Planned nights live on Tonight: the next as the up-next card, any others under "Also planned". A repeating schedule is set in Edit night › Repeat, which previews the next dates. Settings opens from the gear in the Tonight top bar and is not a tab.
 
 ## Mobile App
 
-- `design_handoff_app_redesign/app-screens/` — all 26 screens in Spotlight, refined, with a dark/light switch (the Mobile App card). Tabs: Tonight, Upcoming, Watched, Club.
+- `design_handoff_app_redesign/app-screens/` — all 25 screens in Spotlight, refined, with a dark/light switch. Tabs: Tonight, Watched, Club. On this page they show under **Components › Screens**, one card per section (`ScreensTonight`, `ScreensWatched`, …), so each can take comments.
 - **Screen patterns.** The film leads and the picker is a credit line under it ("Picked by Priya", "Tomas is picking"). A screen has at most one primary action; a recorded night has none. Secondary actions (Change film, Edit night, Clear film) live behind a ⋯ button in a sheet. Flow footers are solid with a hairline on top and carry one summary line ("Friday, Jun 19 · 8:00 pm · in 4 days"). Back links name the screen you came from.
 - `templates/whose-turn/` — the rotation screen as a starting template (dark/light tweak).
 

@@ -14,13 +14,13 @@ export const TAB_ICONS = {
 
 export const DEFAULT_TABS = [
   { id: "tonight", label: "Tonight", icon: "clapperboard" },
-  { id: "upcoming", label: "Upcoming", icon: "calendar-days" },
   { id: "watched", label: "Watched", icon: "library" },
   { id: "club", label: "Club", icon: "users-round" },
 ];
 
 /**
- * TabBar — the app's bottom navigation: Tonight · Upcoming · Watched · Club.
+ * TabBar — the app's bottom navigation: Tonight · Watched · Club. Planned
+ * nights live on Tonight; there is no separate calendar tab.
  * Translucent bar with a top hairline; 24px Lucide icon over a 12px label.
  * Active = text-primary + semibold label; inactive = text-secondary.
  * Never ember: the accent stays with the picker and the primary action.

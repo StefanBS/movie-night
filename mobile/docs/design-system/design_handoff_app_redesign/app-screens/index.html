@@ -1,4 +1,4 @@
-<!-- @dsCard group="Mobile App" viewport="1340x980" name="Proposed app screens" subtitle="All 26 screens in Spotlight, refined · dark and light" -->
+<!-- @dsCard group="Mobile App" viewport="1340x980" name="Proposed app screens" subtitle="All 25 screens in Spotlight, refined · dark and light" -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -36,7 +36,6 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
 <script type="text/babel" src="./screens-group.jsx"></script>
 <script type="text/babel" src="./screens-setup.jsx"></script>
 <script type="text/babel" src="./screens-scheduling.jsx"></script>
-<script type="text/babel" src="./screens-upcoming.jsx"></script>
 
 <script type="text/babel">
   const paint = () => window.lucide && window.lucide.createIcons();
@@ -52,7 +51,7 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
     {
       eyebrow: "Tab 1",
       title: "Tonight — the home",
-      desc: "Answers the only question that matters at a glance: whose turn is it? The next picker's name is the headline; one tap starts the night.",
+      desc: "Answers the only question that matters at a glance: whose turn is it? The next picker's name is the headline; one tap plans the night.",
       screens: [
         { comp: "HomeScreen", name: "Tonight", role: "Home tab. The picker's name, set big, says who's up; the next three follow, with the primary “Plan a night”." },
         { comp: "RotationScreen", name: "The order", role: "The full fairness-ranked rotation, with the why (fewest picks first) and a skip control." },
@@ -76,8 +75,9 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
       desc: "A night doesn't have to be tonight. Schedule one for any date: the picker is locked from the rotation now, the film is chosen on the night, and the home turns into a countdown so nobody forgets.",
       flow: true,
       screens: [
-        { comp: "PlannedHomeScreen", name: "Tonight · planned", role: "Home once a night is on the calendar — an “Up next” card with the date, countdown, the picker, and who's coming." },
-        { comp: "NightUpcomingScreen", name: "Night · upcoming", role: "New. A night that hasn't happened yet, from Tonight, Upcoming or a reminder. Film slot first, “Tomas is picking” under it, one action: Choose the film. Edit night and Add to calendar sit behind ⋯." },
+        { comp: "PlannedHomeScreen", name: "Tonight · planned", role: "Home once a night is on the calendar: an “Up next” card with the date, countdown, the picker and who's coming. No film yet, so the main button is “Choose the film”. Any other planned nights sit under “Also planned”; there is no calendar tab." },
+        { comp: "TonightFilmScreen", name: "Tonight · on the night", role: "The night is today and the film is chosen, so the main button is “We watched it”: confirm who came (the People step, pre-filled), then Done saves it to Watched and moves the rotation on. While a night with a film is still days away, the card has no main button, only “Edit”." },
+        { comp: "NightUpcomingScreen", name: "Night · upcoming", role: "New. A night that hasn't happened yet, from Tonight or a reminder. Film slot first, “Tomas is picking” under it, one action: Choose the film. Edit night and Add to calendar sit behind ⋯." },
         { comp: "NightScheduledScreen", name: "Scheduled", role: "The future-night confirmation — the date, a countdown, the locked picker, and a nudge to remind the group." },
       ],
     },
@@ -97,15 +97,6 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
     },
     {
       eyebrow: "Tab 2",
-      title: "Upcoming — the calendar",
-      desc: "Every night ahead, next first. The scheduled night shows its picker; later dates in a repeating series show whose turn it will be if the order holds. The one action is “Plan a night”.",
-      screens: [
-        { comp: "UpcomingScreen", name: "Upcoming", role: "Upcoming tab. The next night with its picker and who's coming, then the rest of the series in quieter type." },
-        { comp: "UpcomingEmptyScreen", name: "Upcoming · empty", role: "Nothing planned: one honest line, who would pick, and Plan a night." },
-      ],
-    },
-    {
-      eyebrow: "Tab 3",
       title: "Watched — the shelf",
       desc: "The product's promise made visible — “remembers what you watched and who picked.” The biggest gap in the original three screens.",
       screens: [
@@ -115,7 +106,7 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
       ],
     },
     {
-      eyebrow: "Tab 4",
+      eyebrow: "Tab 3",
       title: "Club — the group",
       desc: "Members reframed around the rotation: who's in line, their pick counts, and a real profile per person. Folds in the old “Manage members”.",
       screens: [
@@ -161,11 +152,10 @@ html,body{margin:0}body{font-family:var(--font-sans);-webkit-font-smoothing:anti
           <div className="eyebrow">Movie Night · Spotlight, refined</div>
           <h1 style={{ fontSize: 60, lineHeight: 0.95, letterSpacing: "-0.05em", margin: "14px 0 0", fontWeight: 800 }}>The screens the app should have</h1>
           <p style={{ fontSize: 17, lineHeight: 1.6, color: "var(--text-secondary)", marginTop: 18 }}>
-            The current three screens each map to a feature, but never formed an app — and they skip the product's own promise to <em>remember what you watched</em>. This is a coherent architecture built on the ritual itself: <b style={{ color: "var(--text-primary)" }}>see whose turn → run the night → it's remembered → the rotation advances</b>. Four tabs hold it together: Tonight, Upcoming, Watched and Club. Settings sits behind the gear.
+            The current three screens each map to a feature, but never formed an app — and they skip the product's own promise to <em>remember what you watched</em>. This is a coherent architecture built on the ritual itself: <b style={{ color: "var(--text-primary)" }}>see whose turn → run the night → it's remembered → the rotation advances</b>. Three tabs hold it together: Tonight, Watched and Club. Settings sits behind the gear.
           </p>
           <div className="map">
-            <span className="map-pill"><i data-lucide="clapperboard"></i><b>Tonight</b> · whose turn + start</span>
-            <span className="map-pill"><i data-lucide="calendar-days"></i><b>Upcoming</b> · planned and repeating nights</span>
+            <span className="map-pill"><i data-lucide="clapperboard"></i><b>Tonight</b> · whose turn + every planned night</span>
             <span className="map-pill"><i data-lucide="library"></i><b>Watched</b> · the shelf</span>
             <span className="map-pill"><i data-lucide="users-round"></i><b>Club</b> · members</span>
           </div>

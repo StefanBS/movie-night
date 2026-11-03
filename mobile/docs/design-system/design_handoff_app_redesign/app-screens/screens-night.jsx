@@ -15,7 +15,6 @@ function NightDateScreen() {
   const [sel, setSel] = React.useState("2026-06-19");
   const [month, setMonth] = React.useState(new Date(2026, 5, 1));
   const moveMonth = (dir) => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + dir, 1));
-  const chips = [{ label: "Tonight", date: _ND.today }, { label: "Fri 19", date: "2026-06-19" }, { label: "Sat 20", date: "2026-06-20" }];
   const future = _ND.daysUntil(sel) > 0;
   return (
     <window.Phone>
@@ -24,15 +23,8 @@ function NightDateScreen() {
         <Stepper step={1} />
         <H1>When's the night?</H1>
         <Lede>Tonight, or any date to plan ahead. We'll remind everyone.</Lede>
-        <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
-          {chips.map((c) => {
-            const on = c.date === sel;
-            return (
-              <div key={c.label} onClick={() => { setSel(c.date); setMonth(new Date(2026, 5, 1)); }} style={{ padding: "9px 16px", borderRadius: "var(--radius-full)", cursor: "pointer", fontSize: 14, fontWeight: 600, background: on ? "var(--text-primary)" : "var(--surface-subtle)", color: on ? "var(--surface-page)" : "var(--text-primary)" }}>{c.label}</div>
-            );
-          })}
-        </div>
-        <div style={{ marginTop: 18, padding: "18px 16px 10px", background: "var(--surface-card)", borderRadius: "var(--radius-lg)" }}>
+        {/* No quick-date chips: the calendar opens on this month with today marked, which covers tonight and any other day. */}
+        <div style={{ marginTop: 20, padding: "18px 16px 10px", background: "var(--surface-card)", borderRadius: "var(--radius-lg)" }}>
           <window.Calendar value={sel} month={month} onPick={setSel} onMonth={moveMonth} />
         </div>
         <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 13, padding: "14px 16px", background: "var(--surface-card)", borderRadius: "var(--radius-lg)", cursor: "pointer" }}>

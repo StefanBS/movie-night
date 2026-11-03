@@ -1,0 +1,161 @@
+<!-- @dsCard group="Screens" width=1340 height=1260 subtitle="Watched: the shelf · 3 screens, numbered as in the full set · dark and light" -->
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+body{margin:0;font-family:var(--font-sans);-webkit-font-smoothing:antialiased}
+body{font-family:var(--font-sans);-webkit-font-smoothing:antialiased}button{-webkit-tap-highlight-color:transparent}a{color:var(--text-primary)}a:hover{color:var(--accent-strong)}
+.page{min-height:100vh;background:var(--surface-subtle);color:var(--text-primary)}
+.wrap{max-width:1300px;margin:0 auto;padding:64px 40px 120px}.lede{max-width:740px}
+.eyebrow{font-size:13px;font-weight:600;color:var(--text-secondary)}
+.map{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}.map-pill{display:inline-flex;align-items:center;gap:8px;padding:8px 14px 8px 11px;border-radius:999px;background:var(--surface-card);font-size:14px;color:var(--text-secondary);white-space:nowrap}.map-pill b{color:var(--text-primary);font-weight:700}.map-pill i{width:16px;height:16px;color:var(--text-primary)}
+.sec{margin-top:80px}.sec-head{border-top:1px solid var(--border-strong);padding-top:22px;margin-bottom:34px;max-width:760px}
+.row{display:flex;flex-wrap:wrap;gap:56px 48px}.board{display:flex;flex-direction:column;gap:18px}.cap{max-width:384px;padding-left:4px}
+.cap-n{font-size:13px;font-weight:700;color:var(--text-tertiary);font-variant-numeric:tabular-nums}.cap-t{font-size:22px;font-weight:800;letter-spacing:-.025em;margin-top:2px}.cap-d{font-size:14px;line-height:1.5;color:var(--text-secondary);margin-top:6px;text-wrap:pretty}
+.flow-tag{display:inline-block;margin-left:10px;font-size:12px;font-weight:700;color:var(--text-secondary);background:var(--surface-card);border-radius:999px;padding:4px 10px;vertical-align:middle;letter-spacing:0}
+.theme{position:fixed;top:16px;right:16px;z-index:100;display:flex;gap:2px;padding:3px;border-radius:999px;background:var(--surface-card);box-shadow:var(--shadow-md)}.theme button{border:none;border-radius:999px;padding:8px 14px;font:600 13px var(--font-sans);cursor:pointer;background:transparent;color:var(--text-secondary)}.theme button[aria-pressed="true"]{background:var(--text-primary);color:var(--surface-page)}
+.wrap{padding:40px 40px 60px}
+</style>
+</head><body><div id="root"></div>
+<script type="text/plain" id="page-src">
+  const SECTIONS = [
+    {
+      eyebrow: "Entry",
+      title: "Getting started",
+      desc: "The first thing a new group sees — the product's one rule, stated up front, before any setup.",
+      screens: [
+        { comp: "WelcomeScreen", name: "Welcome", role: "First run. States the house rule, then “Start a group” or join with a code." },
+      ],
+    },
+    {
+      eyebrow: "Tab 1",
+      title: "Tonight — the home",
+      desc: "Answers the only question that matters at a glance: whose turn is it? The next picker's name is the headline; one tap plans the night.",
+      screens: [
+        { comp: "HomeScreen", name: "Tonight", role: "Home tab. The picker's name, set big, says who's up; the next three follow, with the primary “Plan a night”." },
+        { comp: "RotationScreen", name: "The order", role: "The full fairness-ranked rotation, with the why (fewest picks first) and a skip control." },
+      ],
+    },
+    {
+      eyebrow: "Flow",
+      title: "Running the night",
+      desc: "A focused flow launched from Tonight — when, who's here, what we're watching, locked in. It now opens with a date, so a night can be tonight or planned ahead. Replaces the old overloaded “Tonight” screen.",
+      flow: true,
+      screens: [
+        { comp: "NightDateScreen", name: "Date", role: "Step 1. Pick a date and a start time. The footer sums up what you chose in one line: “Friday, Jun 19 · 8:00 pm · in 4 days”." },
+        { comp: "NightAttendanceScreen", name: "People", role: "Step 2. Mark who's in; the next-up member attending gets the pick. Copy adapts for a future date (“Who's coming?”)." },
+        { comp: "NightChooseScreen", name: "Movie", role: "Step 3, redesigned. Search first: results appear as you type, no Search button. The picker is a credit line with “Change”; films you’ve already watched say when." },
+        { comp: "NightRecordedScreen", name: "Done", role: "Step 4. Tonight's night is saved to history — movie, picker, and who watched." },
+      ],
+    },
+    {
+      eyebrow: "New",
+      title: "Planning ahead",
+      desc: "A night doesn't have to be tonight. Schedule one for any date: the picker is locked from the rotation now, the film is chosen on the night, and the home turns into a countdown so nobody forgets.",
+      flow: true,
+      screens: [
+        { comp: "PlannedHomeScreen", name: "Tonight · planned", role: "Home once a night is on the calendar: an “Up next” card with the date, countdown, the picker and who's coming. No film yet, so the main button is “Choose the film”. Any other planned nights sit under “Also planned”; there is no calendar tab." },
+        { comp: "TonightFilmScreen", name: "Tonight · on the night", role: "The night is today and the film is chosen, so the main button is “We watched it”: confirm who came (the People step, pre-filled), then Done saves it to Watched and moves the rotation on. While a night with a film is still days away, the card has no main button, only “Edit”." },
+        { comp: "NightUpcomingScreen", name: "Night · upcoming", role: "New. A night that hasn't happened yet, from Tonight or a reminder. Film slot first, “Tomas is picking” under it, one action: Choose the film. Edit night and Add to calendar sit behind ⋯." },
+        { comp: "NightScheduledScreen", name: "Scheduled", role: "The future-night confirmation — the date, a countdown, the locked picker, and a nudge to remind the group." },
+      ],
+    },
+    {
+      eyebrow: "New",
+      title: "Scheduling follow-ons",
+      desc: "Once a night is on the calendar you can change it, put it on a cadence, and decide how the group gets nudged — plus what that nudge actually looks like.",
+      flow: true,
+      screens: [
+        { comp: "EditNightScreen", name: "Edit night", role: "From Tonight's “Edit”. Back names where you came from. Date, start time, repeat and reminders; who's coming, with the picker marked. Save stays disabled (neutral grey) until something changes." },
+        { comp: "RepeatScreen", name: "Repeat", role: "Put movie night on a cadence (every week / 2 weeks / month), with a live preview of the next dates." },
+        { comp: "RemindersScreen", name: "Reminders", role: "When to nudge (night before / morning of / 2h before) and who — the picker always gets a personal one." },
+        { comp: "NotificationsScreen", name: "The nudge", role: "How a reminder lands — the picker's “it's your turn” push and the group heads-up on the lock screen." },
+        { comp: "CalendarExportScreen", name: "Add to calendar", role: "A sheet over the Scheduled screen — pick which calendar, and (if it recurs) add the whole series or just this night." },
+        { comp: "CalendarAddedScreen", name: "On the calendar", role: "Confirmation — added to the chosen calendar as a recurring event, with the next few dates and a jump to the OS calendar." },
+      ],
+    },
+    {
+      eyebrow: "Tab 2",
+      title: "Watched — the shelf",
+      desc: "The product's promise made visible — “remembers what you watched and who picked.” The biggest gap in the original three screens.",
+      screens: [
+        { comp: "HistoryScreen", name: "Watched", role: "Watched tab. Every night, newest first, grouped by month with posters and who picked." },
+        { comp: "NightDetailScreen", name: "Night · past", role: "Redesigned. The film leads, the picker is a credit line, then who watched. A recorded night has no main button; its actions are behind ⋯." },
+        { comp: "NightMoreScreen", name: "Night · ⋯", role: "The ⋯ sheet: Change film, Edit night, and Clear film (in red, with what it does)." },
+      ],
+    },
+    {
+      eyebrow: "Tab 3",
+      title: "Club — the group",
+      desc: "Members reframed around the rotation: who's in line, their pick counts, and a real profile per person. Folds in the old “Manage members”.",
+      screens: [
+        { comp: "MembersScreen", name: "Club", role: "Club tab. In-rotation order, guests, and inactive — each with pick stats." },
+        { comp: "MemberProfileScreen", name: "Member", role: "Redesigned. Left-aligned like every other screen: stats on a hairline, place in line in plain text, their picks as the content. Deactivate is a quiet red action at the end." },
+        { comp: "MemberNewScreen", name: "Member · no picks", role: "The empty state says something true: “No picks yet. Tomas is next up, so the first one is coming.”" },
+        { comp: "AddMemberScreen", name: "Add member", role: "Add someone as core (enters rotation) or guest (watches only)." },
+      ],
+    },
+    {
+      eyebrow: "From the gear",
+      title: "Settings & rules",
+      desc: "The group's controls and the house rule restated — skipping, who can pick, reminders.",
+      screens: [
+        { comp: "SettingsScreen", name: "Settings", role: "Opened from the gear on Tonight. Group, rotation behavior, notifications, and the danger zone." },
+      ],
+    },
+  ];
+
+  function Board({ s, index }) {
+    const Comp = window[s.comp];
+    return (
+      <div className="board">
+        <Comp />
+        <div className="cap">
+          <div className="cap-n">{String(index).padStart(2, "0")}</div>
+          <div className="cap-t">{s.name}</div>
+          <div className="cap-d">{s.role}</div>
+        </div>
+      </div>
+    );
+  }
+
+  const ONLY = "Watched \u2014 the shelf";
+  const START = 17;
+  const paint = () => window.lucide && window.lucide.createIcons();
+  function Page() {
+    const [theme, setTheme] = React.useState(() => { try { return localStorage.getItem("mn-proto-theme") || "dark"; } catch (e) { return "dark"; } });
+    React.useEffect(() => { try { localStorage.setItem("mn-proto-theme", theme); } catch (e) {} setTimeout(paint, 0); }, [theme]);
+    const s = SECTIONS.find((x) => x.title === ONLY);
+    return (
+      <div className="page" data-theme={theme}>
+        <div className="theme" role="group" aria-label="Theme">{["dark", "light"].map((t) => <button key={t} aria-pressed={theme === t} onClick={() => setTheme(t)}>{t === "dark" ? "Dark" : "Light"}</button>)}</div>
+        <div className="wrap">
+          <div className="sec-head">
+            <div className="eyebrow">{s.eyebrow}</div>
+            <h2 style={{ fontSize: 36, letterSpacing: "-0.04em", lineHeight: 1, margin: "8px 0 0", fontWeight: 800 }}>{s.title}{s.flow && <span className="flow-tag">Flow</span>}</h2>
+            <p style={{ fontSize: 15, lineHeight: 1.55, color: "var(--text-secondary)", margin: "10px 0 0", maxWidth: 620 }}>{s.desc}</p>
+          </div>
+          <div className="row">{s.screens.map((sc, i) => <Board key={sc.comp} s={sc} index={START + i + 1} />)}</div>
+        </div>
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById("root")).render(<Page />);
+  setTimeout(paint, 60); setTimeout(paint, 400);
+  document.addEventListener("click", () => setTimeout(paint, 0));
+</script>
+<script>
+// The proposed app screens are kept in design_handoff_app_redesign/app-screens as JSX.
+// This card loads Babel, compiles them in order and renders one section.
+(function () {
+  var base = "../../design_handoff_app_redesign/app-screens/";
+  var files = ["chrome.jsx", "screens-core.jsx", "screens-night.jsx", "screens-shelf.jsx", "screens-group.jsx", "screens-setup.jsx", "screens-scheduling.jsx"];
+  function load(src) { return new Promise(function (res, rej) { var s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); }); }
+  function run(code) { var s = document.createElement("script"); s.textContent = Babel.transform(code, { presets: [["env", { modules: false }], "react"] }).code; document.body.appendChild(s); }
+  load("https://unpkg.com/@babel/standalone@7.29.0/babel.min.js")
+    .then(function () { return load("https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"); })
+    .then(function () { return load(base + "data.js"); })
+    .then(function () { return Promise.all(files.map(function (f) { return fetch(base + f).then(function (r) { return r.text(); }); })); })
+    .then(function (srcs) { srcs.forEach(run); run(document.getElementById("page-src").textContent); })
+    .catch(function (e) { document.getElementById("root").textContent = "Couldn't load the screens: " + e; });
+})();
+</script></body></html>

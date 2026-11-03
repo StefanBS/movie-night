@@ -1,4 +1,4 @@
-<!-- @dsCard group="Components" viewport="900x440" name="Up next card" subtitle="scheduled night on Tonight · before and after the film is chosen" -->
+<!-- @dsCard group="Components" viewport="900x900" name="Up next card" subtitle="scheduled night on Tonight · the main button follows the night" -->
 <!DOCTYPE html>
 <html><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
 <style>body{margin:0;font-family:var(--font-sans);background:#0A0908}#root{display:grid;grid-template-columns:1fr 1fr;min-height:100vh}.pane{padding:24px;background:var(--surface-page);color:var(--text-primary);display:flex;flex-direction:column;gap:18px}.cap{font-size:12px;font-weight:600;color:var(--text-tertiary)}.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}</style></head>
@@ -16,7 +16,7 @@ const Both = ({ children }) => <>{["dark", "light"].map(t => <div key={t} classN
 const { UpNextCard } = NS;
 const coming = ["Tomas Vlk","Priya Nair","Jonah Reyes","Sam Lindqvist","Mira Okafor"];
 function Demo(){return <Both>{t => t === "dark"
-? <UpNextCard countdown="In 3 days" date="Fri 19 Jun" time="8 pm" picker="Tomas Vlk" coming={coming} />
-: <UpNextCard countdown="Tonight" time="8 pm" picker="Priya Nair" film="In the Mood for Love" coming={coming} />}</Both>}
+? <><div className="cap">No film yet</div><UpNextCard countdown="In 3 days" date="Fri 19 Jun" time="8 pm" picker="Tomas Vlk" coming={coming} /><div className="cap">Film chosen, night still ahead: no main button</div><UpNextCard countdown="In 3 days" date="Fri 19 Jun" time="8 pm" picker="Tomas Vlk" film="Past Lives" hue={18} year={2023} genre="Drama" runtime="1h 46m" coming={coming} /></>
+: <><div className="cap">On the night, film chosen</div><UpNextCard due countdown="Tonight" time="8 pm" picker="Priya Nair" film="In the Mood for Love" hue={8} year={2000} genre={["Drama","Romance"]} runtime="1h 38m" coming={coming} /></>}</Both>}
 ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
 </script></body></html>

@@ -12,7 +12,7 @@
     var row = function () { return h.apply(null, ["div", { className: "row" }].concat([].slice.call(arguments))); };
     var B = NS.Button;
     function Demo() { return h(F, null,
-      row(h(B, null, "Start the night"), h(B, { variant: "secondary" }, "Edit"), h(B, { variant: "ghost" }, "Skip turn")),
+      row(h(B, null, "Choose the film"), h(B, { variant: "secondary" }, "Edit"), h(B, { variant: "ghost" }, "Skip turn")),
       row(h(B, { size: "sm" }, "Add"), h(B, { size: "sm", variant: "secondary" }, "Change date"), h(B, { size: "sm", variant: "danger" }, "Cancel night"), h(B, { size: "sm", disabled: true }, "Disabled"))); }
     ReactDOM.createRoot(document.getElementById("root")).render(h(Demo));
   }
