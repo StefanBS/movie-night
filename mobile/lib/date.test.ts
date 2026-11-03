@@ -5,6 +5,7 @@ import {
   countdownLabel,
   daysUntil,
   formatMonthYear,
+  formatShortDateYear,
   formatShortDate,
   formatStartTime,
   formatWeekdayDate,
@@ -41,6 +42,11 @@ test("does not zero-pad the day", () => {
 
 test("formats December correctly (last month index)", () => {
   assert.equal(formatShortDate("2025-12-31"), "Dec 31");
+});
+
+test("formatShortDateYear renders a day-month-year label without a comma", () => {
+  assert.equal(formatShortDateYear("2025-09-12"), "Sep 12 2025");
+  assert.equal(formatShortDateYear("2026-01-03"), "Jan 3 2026");
 });
 
 test("formatMonthYear renders a month-and-year label", () => {

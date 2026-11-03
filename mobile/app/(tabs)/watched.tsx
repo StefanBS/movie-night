@@ -10,7 +10,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import {
   Poster,
   SectionLabel,
-  Stat,
   TabScrollView,
   TopBar,
 } from "../../components";
@@ -19,16 +18,18 @@ import { firstName } from "../../lib/avatar";
 import { GROUP_ID } from "../../lib/api";
 import { formatShortDate } from "../../lib/date";
 import { errorMessage } from "../../lib/errors";
-import { buildHistoryMonths, historyStats } from "../../lib/history";
+import { fetchGroup } from "../../lib/group";
+import { buildHistoryMonths, watchedSub } from "../../lib/history";
 import { historyNights } from "../../lib/nightLifecycle";
 import { listNights, type Night } from "../../lib/nights";
-import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, radius, space, tabular, textPresets, useColors } from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, space, tabular, textPresets, useColors } from "../../theme";
 
 export default function WatchedScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
   const [nights, setNights] = useState<Night[]>([]);
+  const [since, setSince] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,6 +38,14 @@ export default function WatchedScreen() {
   useFocusEffect(
     useCallback(() => {
       const controller = new AbortController();
+      // The group only feeds the "N nights since …" sub, so a failed fetch
+      // drops that line and leaves the list alone.
+      fetchGroup(API_URL, GROUP_ID, controller.signal).then(
+        (g) => setSince(g.createdOn),
+        () => {
+          if (!controller.signal.aborted) setSince(null);
+        },
+      );
       (async () => {
         try {
           setNights(historyNights(await listNights(API_URL, GROUP_ID, controller.signal)));
@@ -90,28 +99,20 @@ export default function WatchedScreen() {
     );
   }
 
-  const stats = historyStats(nights);
+  const sub = since !== null ? watchedSub(nights.length, since) : undefined;
   const months = buildHistoryMonths(nights);
   const open = (id: string) =>
     router.push({ pathname: "/night/[id]", params: { id, from: "Watched" } });
 
   return (
     <View style={styles.screen}>
-      <TopBar kind="tab" title="Watched" />
+      <TopBar kind="tab" title="Watched" sub={sub} subTabular />
       <TabScrollView contentContainerStyle={styles.content}>
-        <View style={styles.stats}>
-          <View style={styles.statCell}>
-            <Stat value={stats.nights} label="Nights" />
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statCell}>
-            <Stat value={stats.films} label="Films" />
-          </View>
-        </View>
-
-        {months.map((month) => (
+        {months.map((month, mi) => (
           <View key={month.label}>
-            <SectionLabel>{month.label}</SectionLabel>
+            <SectionLabel marginTop={mi === 0 ? FIRST_SECTION_GAP : LATER_SECTION_GAP}>
+              {month.label}
+            </SectionLabel>
             {month.nights.map((n, i) => {
               const picker =
                 n.attendees.find((a) => a.id === n.pickerId) ?? null;
@@ -150,6 +151,10 @@ export default function WatchedScreen() {
   );
 }
 
+// The first month sits 20 below the top bar, later months 28 (24 + 4).
+const FIRST_SECTION_GAP = space[5];
+const LATER_SECTION_GAP = space[6] + space[1];
+
 const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
   body: { paddingHorizontal: space[5], paddingTop: space[6] },
@@ -157,23 +162,6 @@ const useStyles = createThemedStyles((colors) => ({
   center: { marginTop: space[8], alignSelf: "center" },
   errorText: { ...textPresets.body, color: colors.text.danger },
   content: { paddingHorizontal: space[5] },
-  stats: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surface.card,
-    borderWidth: borderWidth.hairline,
-    borderColor: colors.border.hairline,
-    borderRadius: radius.lg,
-    paddingVertical: space[4],
-    paddingHorizontal: space[4],
-    marginTop: space[5],
-  },
-  statCell: { flex: 1, alignItems: "center" },
-  statDivider: {
-    width: borderWidth.hairline,
-    alignSelf: "stretch",
-    backgroundColor: colors.border.hairline,
-  },
   row: {
     flexDirection: "row",
     alignItems: "center",

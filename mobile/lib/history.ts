@@ -1,24 +1,15 @@
-import { formatMonthYear, todayLocalISO } from "./date";
+import { formatMonthYear, formatShortDateYear, todayLocalISO } from "./date";
 import { historyNights } from "./nightLifecycle";
 import type { Night } from "./nights";
 
-export type HistoryStats = { nights: number; films: number };
 export type HistoryMonth = { label: string; nights: Night[] };
 
-// historyStats summarizes recorded nights for the History stat strip. `films`
-// counts distinct movies (by tmdbId), so a film watched twice counts once and a
-// movie-less night counts toward `nights` only.
-export function historyStats(nights: Night[]): HistoryStats {
-  const tmdbIds = new Set<number>();
-  for (const n of nights) {
-    if (n.movie !== null) {
-      tmdbIds.add(n.movie.tmdbId);
-    }
-  }
-  return {
-    nights: nights.length,
-    films: tmdbIds.size,
-  };
+// watchedSub is the Watched tab bar's sub: how many nights the group has
+// recorded and since when ("11 nights since Sep 12 2025."). `since` is the
+// group's creation date (YYYY-MM-DD).
+export function watchedSub(count: number, since: string): string {
+  const nights = count === 1 ? "night" : "nights";
+  return `${count} ${nights} since ${formatShortDateYear(since)}.`;
 }
 
 // buildHistoryMonths groups nights into month buckets for the History list,
