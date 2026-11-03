@@ -171,15 +171,14 @@ for (const [date, want] of nightScreenCases) {
   });
 }
 
-const planCases: [string, { planTag: string; canAddToCalendar: boolean }][] = [
-  [UPCOMING, { planTag: "Planning", canAddToCalendar: true }],
-  [TODAY, { planTag: "Tonight", canAddToCalendar: true }],
-  [PAST, { planTag: "Recording", canAddToCalendar: false }],
+const calendarCases: [string, boolean][] = [
+  [UPCOMING, true],
+  [TODAY, true],
+  [PAST, false],
 ];
-for (const [date, want] of planCases) {
-  test(`nightWording: wizard tag and calendar for ${date}`, () => {
-    const { planTag, canAddToCalendar } = nightWording(date, TODAY);
-    assert.deepEqual({ planTag, canAddToCalendar }, want);
+for (const [date, want] of calendarCases) {
+  test(`nightWording: calendar entry for ${date}`, () => {
+    assert.equal(nightWording(date, TODAY).canAddToCalendar, want);
   });
 }
 

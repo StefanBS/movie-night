@@ -4,12 +4,13 @@ import { Pressable, Text, View } from "react-native";
 import { createThemedStyles, fontFamily, pressedOpacity, space, textPresets } from "../theme";
 
 // SettingsRow is the Settings screen's grouped-row primitive: a sentence-case
-// label with an optional `value` and an optional `right` node (Toggle /
+// label (with an optional quieter `sub` line under it) and an optional `value` and an optional `right` node (Toggle /
 // chevron); a row with both shows the value before the node. `disabled` dims rows whose backend isn't wired yet;
 // `danger` is the red Danger-zone ink. Grouping (card + dividers) is the
 // caller's job, so the same row works in every group.
 export function SettingsRow({
   label,
+  sub,
   value,
   right,
   onPress,
@@ -17,6 +18,7 @@ export function SettingsRow({
   danger = false,
 }: {
   label: string;
+  sub?: string;
   value?: string;
   right?: ReactNode;
   onPress?: () => void;
@@ -26,12 +28,15 @@ export function SettingsRow({
   const styles = useStyles();
   const content = (
     <>
-      <Text
-        style={[styles.label, danger && styles.dangerLabel]}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
+      <View style={styles.text}>
+        <Text
+          style={[styles.label, danger && styles.dangerLabel]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+        {sub ? <Text style={styles.sub}>{sub}</Text> : null}
+      </View>
       {value ? (
         <Text style={styles.value} numberOfLines={1}>
           {value}
@@ -71,13 +76,13 @@ const useStyles = createThemedStyles((colors) => ({
     minHeight: 52,
     paddingHorizontal: space[4],
   },
+  text: { flex: 1, minWidth: 0, paddingVertical: space[3] },
   label: {
     ...textPresets.body,
     fontFamily: fontFamily.sansMedium,
     color: colors.text.primary,
-    flex: 1,
-    minWidth: 0,
   },
+  sub: { ...textPresets.meta, color: colors.text.tertiary, marginTop: 2 },
   dangerLabel: { color: colors.text.danger },
   // No tabular figures: values can be prose ("Night before, morning of").
   value: { ...textPresets.meta, color: colors.text.secondary },

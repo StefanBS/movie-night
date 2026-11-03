@@ -66,7 +66,6 @@ export type NightWording = {
   attendeesSection: (count: number) => string;
   whoSection: string;
   whoHint: string;
-  planTag: string;
   // pickerNote is the line under a Night still waiting on its film, or null
   // for a past Night, which has nothing left to wait for.
   pickerNote: ((first: string) => string) | null;
@@ -88,7 +87,6 @@ export function nightWording(scheduledFor: string, today: string = todayLocalISO
         attendeesSection: (count) => `Coming · ${count}`,
         whoSection: "Who's coming?",
         whoHint: "Who's planning to come? The next-up member who's in gets the pick.",
-        planTag: "Planning",
         pickerNote: (first) => `${first} can choose now or on the night. Whatever it is, you watch it.`,
         editSub: "Date, time and who's coming",
         skipLabel: (first) => `Skip for now · ${first} can pick later`,
@@ -101,7 +99,6 @@ export function nightWording(scheduledFor: string, today: string = todayLocalISO
         attendeesSection: (count) => `Coming · ${count}`,
         whoSection: "Who's here?",
         whoHint: "Tap who made it. Tonight's pick goes to whoever's next up and here.",
-        planTag: "Tonight",
         pickerNote: (first) => `${first} can choose now or later tonight. Whatever it is, you watch it.`,
         editSub: "Date, time and who's coming",
         skipLabel: (first) => `Skip for now · ${first} can pick later`,
@@ -114,7 +111,6 @@ export function nightWording(scheduledFor: string, today: string = todayLocalISO
         attendeesSection: (count) => `Who watched · ${count}`,
         whoSection: "Who was there?",
         whoHint: "Tap who made it. The pick goes to whoever was next up and there.",
-        planTag: "Recording",
         pickerNote: null,
         editSub: "Date, time and who watched",
         skipLabel: () => "Skip for now",

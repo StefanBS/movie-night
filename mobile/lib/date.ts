@@ -66,6 +66,27 @@ export function formatWeekdayDate(iso: string): string {
   return `${weekday(iso, true)}, ${formatShortDate(iso)}`;
 }
 
+// nightSummary is the new-night Date step's footer line, as parts to join
+// with " · ": the full weekday date, then the start time when set, then a
+// countdown for a future date ("in 4 days"). Tonight and past dates get no
+// countdown, so the line never repeats the date in other words. `locale` is
+// for the start time (default: the device's).
+export function nightSummary(
+  iso: string,
+  startTime: string | null,
+  today: string = todayLocalISO(),
+  locale?: string,
+): string[] {
+  const parts = [formatWeekdayDate(iso)];
+  if (startTime !== null) {
+    parts.push(formatStartTime(startTime, locale));
+  }
+  if (daysUntil(iso, today) > 0) {
+    parts.push(countdownLabel(iso, today));
+  }
+  return parts;
+}
+
 // relativeLabel describes a date relative to today in movie-night terms:
 // "Tonight" / "Tomorrow" / "This Friday" (2-6 days out) / "Next Friday"
 // (7-13 days out) / the full weekday date for anything further out or in the

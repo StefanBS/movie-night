@@ -97,7 +97,7 @@ function NightDetailLoader({ id, from }: { id: string; from: string }) {
       today={today}
       back={{ label: from, onPress: () => router.back() }}
       onEdit={() =>
-        router.push({ pathname: "/night/edit/[id]", params: { id: night.id } })
+        router.push({ pathname: "/night/edit/[id]", params: { id: night.id, from: "Night" } })
       }
     />
   );

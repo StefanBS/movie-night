@@ -8,6 +8,7 @@ import {
   formatShortDate,
   formatStartTime,
   formatWeekdayDate,
+  nightSummary,
   relativeLabel,
   startTimeDate,
   startTimeMinus,
@@ -160,4 +161,26 @@ test("startTimeMinus counts back across midnight", () => {
   assert.equal(startTimeMinus("19:30", 120), "17:30");
   assert.equal(startTimeMinus("01:00", 120), "23:00");
   assert.equal(startTimeMinus("02:00", 120), "00:00");
+});
+
+test("nightSummary is the weekday date, the start time when set, and a countdown only ahead", () => {
+  const today = "2026-06-15";
+  const cases: { name: string; iso: string; startTime: string | null; want: string }[] = [
+    { name: "ahead with a time", iso: "2026-06-19", startTime: "20:00", want: "Friday, Jun 19 · 8:00 PM · in 4 days" },
+    { name: "ahead without a time", iso: "2026-06-19", startTime: null, want: "Friday, Jun 19 · in 4 days" },
+    { name: "tomorrow", iso: "2026-06-16", startTime: "19:30", want: "Tuesday, Jun 16 · 7:30 PM · tomorrow" },
+    { name: "tonight has no countdown", iso: "2026-06-15", startTime: "20:00", want: "Monday, Jun 15 · 8:00 PM" },
+    { name: "tonight without a time", iso: "2026-06-15", startTime: null, want: "Monday, Jun 15" },
+    { name: "a past night has no countdown", iso: "2026-06-12", startTime: null, want: "Friday, Jun 12" },
+  ];
+  for (const c of cases) {
+    assert.equal(nightSummary(c.iso, c.startTime, today, "en-US").join(" · "), c.want, c.name);
+  }
+});
+
+test("nightSummary uses the locale's clock for the start time", () => {
+  assert.equal(
+    nightSummary("2026-06-19", "20:00", "2026-06-15", "en-GB").join(" · "),
+    "Friday, Jun 19 · 20:00 · in 4 days",
+  );
 });
