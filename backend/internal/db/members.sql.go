@@ -132,15 +132,8 @@ func (q *Queries) LockGroupMember(ctx context.Context, arg LockGroupMemberParams
 
 const rotationSeedInputs = `-- name: RotationSeedInputs :one
 SELECT
-  (SELECT COALESCE(AVG(m.baseline_picks + COALESCE(p.cnt, 0)), 0)
-     FROM memberships m
-     LEFT JOIN (
-       SELECT picker_id, COUNT(*) FILTER (WHERE is_credited) AS cnt
-       FROM nights pk
-       WHERE pk.group_id = $1
-       GROUP BY picker_id
-     ) p ON p.picker_id = m.user_id
-    WHERE m.group_id = $1 AND m.status = 'active' AND m.role = 'core')::float8 AS avg_served,
+  (SELECT COALESCE(AVG(s.served_count), 0)
+     FROM served_counts($1, NULL) AS s(user_id, served_count, last_picked_on))::float8 AS avg_served,
   (SELECT COUNT(*) FILTER (WHERE c.is_credited)
      FROM nights c
     WHERE c.group_id = $1 AND c.picker_id = $2)::int AS credited_count,
