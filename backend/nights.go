@@ -346,7 +346,7 @@ func presentIDs(rows []db.ListNightAttendeesRow) []uuid.UUID {
 
 // nightStore is the subset of *db.Queries the night read handlers need; the
 // real *db.Queries satisfies it, so no mock is ever written (same pattern as
-// turnStore/pickStore/memberStore). Night writes take the pool instead and run
+// turnStore/groupStore). Night writes take the pool instead and run
 // in night_writes.go.
 type nightStore interface {
 	GetNight(ctx context.Context, arg db.GetNightParams) (db.FullNight, error)

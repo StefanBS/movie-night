@@ -29,12 +29,12 @@ func TestSeedBaseline(t *testing.T) {
 }
 
 func TestValidateJoin(t *testing.T) {
-	t.Run("trims name and defaults role to core", func(t *testing.T) {
-		name, role, err := validateJoin(joinRequest{Name: "  Ada  "})
+	t.Run("trims name and keeps a core role", func(t *testing.T) {
+		name, role, err := validateJoin(joinRequest{Name: "  Ada  ", Role: "core"})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if name != "Ada" || role != "core" {
+		if name != "Ada" || role != db.MembershipRoleCore {
 			t.Errorf("got (%q, %q), want (\"Ada\", \"core\")", name, role)
 		}
 	})
@@ -43,7 +43,7 @@ func TestValidateJoin(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if role != "guest" {
+		if role != db.MembershipRoleGuest {
 			t.Errorf("role = %q, want \"guest\"", role)
 		}
 	})
@@ -51,7 +51,8 @@ func TestValidateJoin(t *testing.T) {
 		name string
 		req  joinRequest
 	}{
-		{name: "whitespace name", req: joinRequest{Name: "   "}},
+		{name: "whitespace name", req: joinRequest{Name: "   ", Role: "core"}},
+		{name: "missing role", req: joinRequest{Name: "Ada"}},
 		{name: "unknown role", req: joinRequest{Name: "Ada", Role: "admin"}},
 	} {
 		t.Run("rejects "+tc.name, func(t *testing.T) {
