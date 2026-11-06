@@ -70,14 +70,14 @@ func TestToTurnResponses(t *testing.T) {
 
 	t.Run("maps fields, preserves order, handles null date", func(t *testing.T) {
 		rows := []db.RankGroupTurnRow{
-			{ID: id1, Name: "Ada", Role: db.MembershipRoleCore, ServedCount: 0, LastPickedOn: pgtype.Date{}},
-			{ID: id2, Name: "Blake", Role: db.MembershipRoleCore, ServedCount: 1, LastPickedOn: apr10},
+			{ID: id1, Name: "Ada", ServedCount: 0, LastPickedOn: pgtype.Date{}},
+			{ID: id2, Name: "Blake", ServedCount: 1, LastPickedOn: apr10},
 		}
 		got := toTurnResponses(rows)
 		if len(got) != 2 {
 			t.Fatalf("len = %d, want 2", len(got))
 		}
-		if got[0].ID != id1.String() || got[0].Name != "Ada" || got[0].Role != "core" || got[0].ServedCount != 0 {
+		if got[0].ID != id1.String() || got[0].Name != "Ada" || got[0].ServedCount != 0 {
 			t.Errorf("[0] = %+v", got[0])
 		}
 		if got[0].LastPickedOn != nil {

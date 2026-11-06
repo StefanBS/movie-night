@@ -34,7 +34,6 @@ test("requests the turn path and returns parsed members", async () => {
   const member: TurnMember = {
     id: "a",
     name: "Ada",
-    role: "core",
     servedCount: 0,
     lastPickedOn: null,
   };
@@ -67,7 +66,7 @@ test("throws on a non-2xx response", async () => {
 test("throws when the payload fails validation", async () => {
   const server = await startServer((_req, res) => {
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify([{ id: "a", name: "Ada", role: "core", servedCount: "x", lastPickedOn: null }]));
+    res.end(JSON.stringify([{ id: "a", name: "Ada", servedCount: "x", lastPickedOn: null }]));
   });
   try {
     await assert.rejects(fetchTurn(server.url, GROUP), /servedCount/);

@@ -13,7 +13,7 @@ import (
 )
 
 const rankGroupTurn = `-- name: RankGroupTurn :many
-SELECT u.id, u.name, m.role, s.served_count::int AS served_count, s.last_picked_on::date AS last_picked_on
+SELECT u.id, u.name, s.served_count::int AS served_count, s.last_picked_on::date AS last_picked_on
 FROM served_counts($1, $2::uuid) AS s(user_id, served_count, last_picked_on)
 JOIN memberships m ON m.group_id = $1 AND m.user_id = s.user_id
 JOIN users u ON u.id = s.user_id
@@ -28,11 +28,10 @@ type RankGroupTurnParams struct {
 }
 
 type RankGroupTurnRow struct {
-	ID           uuid.UUID      `json:"id"`
-	Name         string         `json:"name"`
-	Role         MembershipRole `json:"role"`
-	ServedCount  int32          `json:"served_count"`
-	LastPickedOn pgtype.Date    `json:"last_picked_on"`
+	ID           uuid.UUID   `json:"id"`
+	Name         string      `json:"name"`
+	ServedCount  int32       `json:"served_count"`
+	LastPickedOn pgtype.Date `json:"last_picked_on"`
 }
 
 // exclude_night (nullable) drops that night's own pick from the counts, so
@@ -51,7 +50,6 @@ func (q *Queries) RankGroupTurn(ctx context.Context, arg RankGroupTurnParams) ([
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
-			&i.Role,
 			&i.ServedCount,
 			&i.LastPickedOn,
 		); err != nil {

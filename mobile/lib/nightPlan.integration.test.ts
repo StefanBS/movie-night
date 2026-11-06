@@ -50,7 +50,7 @@ const member = (id: string, role: "core" | "guest" = "core"): Member => ({
   status: "active",
   joinedOn: "2026-01-01",
 });
-const ranked = (id: string): TurnMember => ({ id, name: id, role: "core", servedCount: 0, lastPickedOn: null });
+const ranked = (id: string): TurnMember => ({ id, name: id, servedCount: 0, lastPickedOn: null });
 
 const ROSTER = [member("ada"), member("blake"), member("frankie", "guest")];
 const EXISTING: Night = {

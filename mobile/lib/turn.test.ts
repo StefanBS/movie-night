@@ -8,12 +8,12 @@ import { parseTurn, picksLabel, pickerMeta, pickerSummary, type TurnMember } fro
 
 test("parses a valid ranked array", () => {
   const raw = [
-    { id: "a", name: "Ada", role: "core", servedCount: 0, lastPickedOn: null },
-    { id: "b", name: "Bo", role: "core", servedCount: 1, lastPickedOn: "2026-04-10" },
+    { id: "a", name: "Ada", servedCount: 0, lastPickedOn: null },
+    { id: "b", name: "Bo", servedCount: 1, lastPickedOn: "2026-04-10" },
   ];
   const want: TurnMember[] = [
-    { id: "a", name: "Ada", role: "core", servedCount: 0, lastPickedOn: null },
-    { id: "b", name: "Bo", role: "core", servedCount: 1, lastPickedOn: "2026-04-10" },
+    { id: "a", name: "Ada", servedCount: 0, lastPickedOn: null },
+    { id: "b", name: "Bo", servedCount: 1, lastPickedOn: "2026-04-10" },
   ];
   assert.deepEqual(parseTurn(raw), want);
 });
@@ -21,11 +21,10 @@ test("parses a valid ranked array", () => {
 const invalid: { name: string; raw: unknown; wantError: RegExp }[] = [
   { name: "rejects a non-array payload", raw: { id: "a" }, wantError: /array/ },
   { name: "rejects a non-object element", raw: ["nope"], wantError: /member 0.*object/ },
-  { name: "rejects a missing id", raw: [{ name: "Ada", role: "core", servedCount: 0, lastPickedOn: null }], wantError: /member 0.*id/ },
-  { name: "rejects a non-string name", raw: [{ id: "a", name: 42, role: "core", servedCount: 0, lastPickedOn: null }], wantError: /member 0.*name/ },
-  { name: "rejects an unknown role", raw: [{ id: "a", name: "Ada", role: "admin", servedCount: 0, lastPickedOn: null }], wantError: /member 0.*role/ },
-  { name: "rejects a non-number servedCount", raw: [{ id: "a", name: "Ada", role: "core", servedCount: "x", lastPickedOn: null }], wantError: /member 0.*servedCount/ },
-  { name: "rejects a non-string non-null lastPickedOn", raw: [{ id: "a", name: "Ada", role: "core", servedCount: 0, lastPickedOn: 5 }], wantError: /member 0.*lastPickedOn/ },
+  { name: "rejects a missing id", raw: [{ name: "Ada", servedCount: 0, lastPickedOn: null }], wantError: /member 0.*id/ },
+  { name: "rejects a non-string name", raw: [{ id: "a", name: 42, servedCount: 0, lastPickedOn: null }], wantError: /member 0.*name/ },
+  { name: "rejects a non-number servedCount", raw: [{ id: "a", name: "Ada", servedCount: "x", lastPickedOn: null }], wantError: /member 0.*servedCount/ },
+  { name: "rejects a non-string non-null lastPickedOn", raw: [{ id: "a", name: "Ada", servedCount: 0, lastPickedOn: 5 }], wantError: /member 0.*lastPickedOn/ },
 ];
 
 for (const c of invalid) {
@@ -49,21 +48,21 @@ for (const c of picksCases) {
 
 test("pickerMeta shows the first-turn copy when never picked", () => {
   const m: TurnMember = {
-    id: "a", name: "Ada", role: "core", servedCount: 0, lastPickedOn: null,
+    id: "a", name: "Ada", servedCount: 0, lastPickedOn: null,
   };
   assert.equal(pickerMeta(m), "First turn · hasn't picked yet");
 });
 
 test("pickerMeta shows picks count and last date once picked", () => {
   const m: TurnMember = {
-    id: "b", name: "Bo", role: "core", servedCount: 2, lastPickedOn: "2026-05-30",
+    id: "b", name: "Bo", servedCount: 2, lastPickedOn: "2026-05-30",
   };
   assert.equal(pickerMeta(m), "2 picks · last May 30");
 });
 
 test("pickerMeta falls back to first-turn copy if servedCount>0 but date missing", () => {
   const m: TurnMember = {
-    id: "c", name: "Cy", role: "core", servedCount: 1, lastPickedOn: null,
+    id: "c", name: "Cy", servedCount: 1, lastPickedOn: null,
   };
   assert.equal(pickerMeta(m), "First turn · hasn't picked yet");
 });
@@ -75,7 +74,7 @@ const summaryCases: { name: string; servedCount: number; lastPickedOn: string | 
 ];
 for (const c of summaryCases) {
   test(`pickerSummary: ${c.name}`, () => {
-    const m: TurnMember = { id: "x", name: "Ada", role: "core", servedCount: c.servedCount, lastPickedOn: c.lastPickedOn };
+    const m: TurnMember = { id: "x", name: "Ada", servedCount: c.servedCount, lastPickedOn: c.lastPickedOn };
     assert.equal(pickerSummary(m), c.want);
   });
 }
