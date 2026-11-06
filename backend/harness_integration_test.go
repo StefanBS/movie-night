@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -175,22 +176,19 @@ func seedFixtures(t *testing.T, pool *pgxpool.Pool) {
 		},
 		{
 			sql: `INSERT INTO users (id, name) VALUES
-				('a0000000-0000-0000-0000-000000000001', 'Ada'),
-				('a0000000-0000-0000-0000-000000000002', 'Blake'),
-				('a0000000-0000-0000-0000-000000000003', 'Cleo'),
-				('a0000000-0000-0000-0000-000000000006', 'Frankie'),
-				('a0000000-0000-0000-0000-000000000009', 'Zed')`,
+				($1, 'Ada'), ($2, 'Blake'), ($3, 'Cleo'), ($4, 'Frankie'), ($5, 'Zed')`,
+			args: []any{ada, blake, cleo, frankie, zed},
 		},
 		{
 			// rotation_position deliberately out of insert order to prove ORDER BY.
 			// Zed is inactive; Frankie is an active guest (not in the rotation).
 			sql: `INSERT INTO memberships (group_id, user_id, role, status, rotation_position) VALUES
-				($1, 'a0000000-0000-0000-0000-000000000002', 'core', 'active', 2),
-				($1, 'a0000000-0000-0000-0000-000000000001', 'core', 'active', 1),
-				($1, 'a0000000-0000-0000-0000-000000000003', 'core', 'active', 3),
-				($1, 'a0000000-0000-0000-0000-000000000009', 'core', 'inactive', 4),
-				($1, 'a0000000-0000-0000-0000-000000000006', 'guest', 'active', 5)`,
-			args: []any{seededGroup},
+				($1, $3, 'core', 'active', 2),
+				($1, $2, 'core', 'active', 1),
+				($1, $4, 'core', 'active', 3),
+				($1, $6, 'core', 'inactive', 4),
+				($1, $5, 'guest', 'active', 5)`,
+			args: []any{seededGroup, ada, blake, cleo, frankie, zed},
 		},
 	})
 }
@@ -236,7 +234,13 @@ func doReqAuth(t *testing.T, mux http.Handler, method, path, body, authorization
 // the caller to assert on the status code.
 func doJSON[T any](t *testing.T, mux http.Handler, method, path, body string) (int, T) {
 	t.Helper()
-	code, b := doReq(t, mux, method, path, body)
+	return doJSONAuth[T](t, mux, method, path, body, "")
+}
+
+// doJSONAuth is doJSON with an Authorization header, sent when non-empty.
+func doJSONAuth[T any](t *testing.T, mux http.Handler, method, path, body, authorization string) (int, T) {
+	t.Helper()
+	code, b := doReqAuth(t, mux, method, path, body, authorization)
 	var v T
 	if code >= 200 && code < 300 {
 		if err := json.Unmarshal(b, &v); err != nil {
@@ -244,6 +248,44 @@ func doJSON[T any](t *testing.T, mux http.Handler, method, path, body string) (i
 		}
 	}
 	return code, v
+}
+
+// nightBody builds a create-night body: the picker plus the other attendees.
+func nightBody(date, picker string, others ...string) string {
+	ids := append([]string{picker}, others...)
+	return `{"scheduledFor":"` + date + `","pickerId":"` + picker + `","attendees":["` + strings.Join(ids, `","`) + `"]}`
+}
+
+// mustCreateNight creates a Night in group from body, failing the test unless
+// the API answers 201, and returns the created Night.
+func mustCreateNight(t *testing.T, mux http.Handler, group, body string) nightResponse {
+	t.Helper()
+	path := "/groups/" + group + "/nights"
+	code, b := doReq(t, mux, http.MethodPost, path, body)
+	if code != http.StatusCreated {
+		t.Fatalf("create night: status = %d, want 201 (body %s)", code, b)
+	}
+	var n nightResponse
+	if err := json.Unmarshal(b, &n); err != nil {
+		t.Fatalf("decode POST %s: %v (body %s)", path, err, b)
+	}
+	return n
+}
+
+// attachMovie attaches (or changes) the film on a Night.
+func attachMovie(t *testing.T, mux http.Handler, group, nightID, body string) (int, nightResponse) {
+	t.Helper()
+	return doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+group+"/nights/"+nightID+"/movie", body)
+}
+
+// attendeeIDs lists a night's attendee ids in the response's order (core
+// first, then by name).
+func attendeeIDs(n nightResponse) []string {
+	ids := make([]string, 0, len(n.Attendees))
+	for _, a := range n.Attendees {
+		ids = append(ids, a.ID)
+	}
+	return ids
 }
 
 // editBody is a PATCH body for Night n: the whole editable Night as it stands,

@@ -77,12 +77,7 @@ func TestRemindersIntegration(t *testing.T) {
 			t.Fatalf("unmute: %v", err)
 		}
 		// Ada picks; Blake, Frankie (guest) and Zed (inactive) are coming.
-		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights",
-			nightBody("2026-06-19", ada, blake, frankie, zed))
-		if code != http.StatusCreated {
-			t.Fatalf("create night = %d", code)
-		}
-		return n
+		return mustCreateNight(t, mux, seededGroup, nightBody("2026-06-19", ada, blake, frankie, zed))
 	}
 	byToken := func(msgs []pushMessage) map[string]pushMessage {
 		out := make(map[string]pushMessage, len(msgs))

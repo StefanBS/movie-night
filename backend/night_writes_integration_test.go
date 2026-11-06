@@ -26,10 +26,7 @@ func TestNightWritesWaitForEachOther(t *testing.T) {
 	mkNight := func(t *testing.T) (nightResponse, string) {
 		t.Helper()
 		clearAllPicks(t, pool, seededGroup)
-		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-06-12", ada, blake))
-		if code != http.StatusCreated {
-			t.Fatalf("create night = %d", code)
-		}
+		n := mustCreateNight(t, mux, seededGroup, nightBody("2026-06-12", ada, blake))
 		return n, "/groups/" + seededGroup + "/nights/" + n.ID
 	}
 

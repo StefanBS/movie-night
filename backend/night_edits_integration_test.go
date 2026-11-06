@@ -20,19 +20,10 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	mux := newRoutes(pool, client)
 
-	do := func(t *testing.T, method, path, body string) (int, []byte) {
-		t.Helper()
-		return doReq(t, mux, method, path, body)
-	}
-
 	mkNight := func(t *testing.T) nightResponse {
 		t.Helper()
 		clearAllPicks(t, pool, seededGroup)
-		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-06-12", ada))
-		if code != http.StatusCreated {
-			t.Fatalf("create night = %d", code)
-		}
-		return n
+		return mustCreateNight(t, mux, seededGroup, nightBody("2026-06-12", ada))
 	}
 
 	t.Run("PATCH changes scheduledFor", func(t *testing.T) {
@@ -49,24 +40,22 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("PATCH onto another night's date yields 409", func(t *testing.T) {
 		n := mkNight(t)
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-07-04", blake)); code != http.StatusCreated {
-			t.Fatalf("create second night = %d, want 201", code)
-		}
-		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.ScheduledFor = "2026-07-04" })); code != http.StatusConflict {
+		mustCreateNight(t, mux, seededGroup, nightBody("2026-07-04", blake))
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.ScheduledFor = "2026-07-04" })); code != http.StatusConflict {
 			t.Fatalf("patch status = %d, want 409", code)
 		}
 	})
 
 	t.Run("PATCH bad date yields 400", func(t *testing.T) {
 		n := mkNight(t)
-		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.ScheduledFor = "nope" })); code != http.StatusBadRequest {
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.ScheduledFor = "nope" })); code != http.StatusBadRequest {
 			t.Fatalf("bad date status = %d, want 400", code)
 		}
 	})
 
 	t.Run("PATCH attendees replaces the set", func(t *testing.T) {
 		n := mkNight(t) // Ada picks, alone
-		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.Attendees = []string{ada, frankie} })); code != http.StatusOK {
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.Attendees = []string{ada, frankie} })); code != http.StatusOK {
 			t.Fatalf("add guest status = %d, want 200", code)
 		}
 		code, got := doJSON[nightResponse](t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
@@ -127,10 +116,10 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("a night created with a start time keeps it", func(t *testing.T) {
 		clearAllPicks(t, pool, seededGroup)
-		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights",
+		n := mustCreateNight(t, mux, seededGroup,
 			`{"scheduledFor":"2026-06-12","startTime":"19:30","pickerId":"`+ada+`","attendees":["`+ada+`"]}`)
-		if code != http.StatusCreated || !equalPtr(n.StartTime, "19:30") {
-			t.Fatalf("create = %d, startTime %v; want 201, 19:30", code, n.StartTime)
+		if !equalPtr(n.StartTime, "19:30") {
+			t.Fatalf("created startTime = %v, want 19:30", n.StartTime)
 		}
 		if _, read := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, ""); !equalPtr(read.StartTime, "19:30") {
 			t.Fatalf("stored startTime = %v, want 19:30", read.StartTime)
@@ -139,7 +128,7 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("a bad start time on create yields 400", func(t *testing.T) {
 		clearAllPicks(t, pool, seededGroup)
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights",
+		if code, _ := doReq(t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights",
 			`{"scheduledFor":"2026-06-12","startTime":"7pm","pickerId":"`+ada+`","attendees":["`+ada+`"]}`); code != http.StatusBadRequest {
 			t.Fatalf("create status = %d, want 400", code)
 		}
@@ -165,10 +154,8 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("PATCH onto a taken date with a new start time changes nothing", func(t *testing.T) {
 		n := mkNight(t)
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-07-04", blake)); code != http.StatusCreated {
-			t.Fatalf("create second night = %d, want 201", code)
-		}
-		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) {
+		mustCreateNight(t, mux, seededGroup, nightBody("2026-07-04", blake))
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) {
 			r.ScheduledFor, r.StartTime = "2026-07-04", str("21:00")
 		})); code != http.StatusConflict {
 			t.Fatalf("patch status = %d, want 409", code)
@@ -178,17 +165,15 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("PATCH without reminders yields 400 (the body is the whole Night)", func(t *testing.T) {
 		n := mkNight(t)
-		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`); code != http.StatusBadRequest {
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{"scheduledFor":"2026-06-12","attendees":["`+ada+`"]}`); code != http.StatusBadRequest {
 			t.Fatalf("patch status = %d, want 400", code)
 		}
 	})
 
 	t.Run("PATCH onto a taken date with new reminders changes nothing", func(t *testing.T) {
 		n := mkNight(t)
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-07-04", blake)); code != http.StatusCreated {
-			t.Fatalf("create second night = %d, want 201", code)
-		}
-		code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		mustCreateNight(t, mux, seededGroup, nightBody("2026-07-04", blake))
+		code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			editBody(t, n, func(r *updateNightRequest) {
 				r.ScheduledFor, r.Reminders = "2026-07-04", remindersDTO{Audience: "picker"}
 			}))
@@ -200,11 +185,9 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("PATCH onto a taken date with new attendees changes nothing", func(t *testing.T) {
 		n := mkNight(t)
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-07-04", blake)); code != http.StatusCreated {
-			t.Fatalf("create second night = %d, want 201", code)
-		}
+		mustCreateNight(t, mux, seededGroup, nightBody("2026-07-04", blake))
 		// The attendee change is valid on its own; only the date fails, last.
-		code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			editBody(t, n, func(r *updateNightRequest) { r.ScheduledFor, r.Attendees = "2026-07-04", []string{ada, cleo} }))
 		if code != http.StatusConflict {
 			t.Fatalf("patch status = %d, want 409", code)
@@ -214,7 +197,7 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("PATCH with a non-member attendee yields 422 and changes nothing", func(t *testing.T) {
 		n := mkNight(t)
-		code, body := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		code, body := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			editBody(t, n, func(r *updateNightRequest) { r.ScheduledFor, r.Attendees = "2026-07-04", []string{ada, unknownUser} }))
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("patch status = %d, want 422", code)
@@ -227,8 +210,8 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("PATCH dropping the picker yields 422 and changes nothing", func(t *testing.T) {
 		clearAllPicks(t, pool, seededGroup)
-		_, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-06-12", ada, blake))
-		code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		n := mustCreateNight(t, mux, seededGroup, nightBody("2026-06-12", ada, blake))
+		code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			editBody(t, n, func(r *updateNightRequest) { r.ScheduledFor, r.Attendees = "2026-07-04", []string{blake} }))
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("patch status = %d, want 422", code)
@@ -238,7 +221,7 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("PATCH with no attendees yields 422 (the picker is always one)", func(t *testing.T) {
 		n := mkNight(t)
-		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.Attendees = []string{} })); code != http.StatusUnprocessableEntity {
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.Attendees = []string{} })); code != http.StatusUnprocessableEntity {
 			t.Fatalf("patch status = %d, want 422", code)
 		}
 		unchanged(t, n)
@@ -247,14 +230,14 @@ func TestNightEditsIntegration(t *testing.T) {
 	t.Run("PATCH an unknown night yields 404", func(t *testing.T) {
 		n := mkNight(t)
 		body := editBody(t, n, func(r *updateNightRequest) { r.Attendees = []string{unknownUser} })
-		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+unknownNight, body); code != http.StatusNotFound {
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+unknownNight, body); code != http.StatusNotFound {
 			t.Fatalf("patch status = %d, want 404 (before the 422)", code)
 		}
 	})
 
 	t.Run("PATCH with an empty body yields 400", func(t *testing.T) {
 		n := mkNight(t)
-		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{}`); code != http.StatusBadRequest {
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, `{}`); code != http.StatusBadRequest {
 			t.Fatalf("patch status = %d, want 400", code)
 		}
 	})
@@ -329,7 +312,7 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("PATCH watched without a film yields 422 and changes nothing", func(t *testing.T) {
 		n := mkNight(t)
-		code, body := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		code, body := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			editBody(t, n, func(r *updateNightRequest) {
 				r.Attendees, r.PickerID, r.Watched = []string{blake, cleo}, str(blake), true
 			}))
@@ -341,7 +324,7 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("PATCH with a picker who isn't attending yields 422 and changes nothing", func(t *testing.T) {
 		n := mkNight(t)
-		code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			editBody(t, n, func(r *updateNightRequest) { r.Attendees, r.PickerID = []string{ada, cleo}, str(blake) }))
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("patch status = %d, want 422", code)
@@ -354,10 +337,8 @@ func TestNightEditsIntegration(t *testing.T) {
 		if code, _ := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":438631}`); code != http.StatusOK {
 			t.Fatalf("attach status = %d, want 200", code)
 		}
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-07-04", blake)); code != http.StatusCreated {
-			t.Fatalf("create second night = %d, want 201", code)
-		}
-		code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		mustCreateNight(t, mux, seededGroup, nightBody("2026-07-04", blake))
+		code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			editBody(t, n, func(r *updateNightRequest) {
 				r.ScheduledFor, r.Attendees, r.PickerID, r.Watched = "2026-07-04", []string{ada, cleo}, str(cleo), true
 			}))
@@ -403,10 +384,7 @@ func TestNightEditsIntegration(t *testing.T) {
 	mkFilmNightOn := func(t *testing.T, date string) nightResponse {
 		t.Helper()
 		clearAllPicks(t, pool, seededGroup)
-		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody(date, ada))
-		if code != http.StatusCreated {
-			t.Fatalf("create night on %s = %d", date, code)
-		}
+		n := mustCreateNight(t, mux, seededGroup, nightBody(date, ada))
 		if code, _ := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":438631}`); code != http.StatusOK {
 			t.Fatalf("attach status = %d, want 200", code)
 		}
@@ -425,7 +403,7 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("PATCH watched on a night that hasn't happened yields 422 and changes nothing", func(t *testing.T) {
 		n := mkFilmNightOn(t, utcDay(2))
-		code, body := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		code, body := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			editBody(t, n, func(r *updateNightRequest) {
 				r.Attendees, r.PickerID, r.Watched = []string{ada, blake}, str(blake), true
 			}))
@@ -437,7 +415,7 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("PATCH watched moving a night past the bound yields 422 and changes nothing", func(t *testing.T) {
 		n := mkFilmNightOn(t, utcDay(0))
-		code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			editBody(t, n, func(r *updateNightRequest) { r.ScheduledFor, r.Watched = utcDay(7), true }))
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("patch status = %d, want 422", code)
@@ -452,7 +430,7 @@ func TestNightEditsIntegration(t *testing.T) {
 		if code != http.StatusOK {
 			t.Fatalf("record status = %d, want 200", code)
 		}
-		if code, _ := do(t, http.MethodPatch, path, editBody(t, recorded, func(r *updateNightRequest) { r.ScheduledFor = utcDay(2) })); code != http.StatusUnprocessableEntity {
+		if code, _ := doReq(t, mux, http.MethodPatch, path, editBody(t, recorded, func(r *updateNightRequest) { r.ScheduledFor = utcDay(2) })); code != http.StatusUnprocessableEntity {
 			t.Fatalf("move watched night ahead = %d, want 422", code)
 		}
 		unchanged(t, recorded)
@@ -464,7 +442,7 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("a night not yet watched can still be planned any distance ahead", func(t *testing.T) {
 		n := mkFilmNightOn(t, utcDay(0))
-		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			editBody(t, n, func(r *updateNightRequest) { r.ScheduledFor = utcDay(30) })); code != http.StatusOK {
 			t.Fatalf("patch status = %d, want 200", code)
 		}
@@ -472,12 +450,12 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("recording a night leaves the turn order and served counts as they were", func(t *testing.T) {
 		clearAllPicks(t, pool, seededGroup)
-		_, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody("2026-06-12", ada, blake, cleo))
+		n := mustCreateNight(t, mux, seededGroup, nightBody("2026-06-12", ada, blake, cleo))
 		if code, _ := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":438631}`); code != http.StatusOK {
 			t.Fatalf("attach status = %d, want 200", code)
 		}
 		_, before := doJSON[[]turnResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/turn", "")
-		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			editBody(t, n, func(r *updateNightRequest) { r.PickerID, r.Watched = str(ada), true })); code != http.StatusOK {
 			t.Fatalf("record status = %d, want 200", code)
 		}
@@ -490,7 +468,7 @@ func TestNightEditsIntegration(t *testing.T) {
 	})
 
 	t.Run("DELETE movie on an unknown night yields 404", func(t *testing.T) {
-		if code, _ := do(t, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+unknownNight+"/movie", ""); code != http.StatusNotFound {
+		if code, _ := doReq(t, mux, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+unknownNight+"/movie", ""); code != http.StatusNotFound {
 			t.Fatalf("clear status = %d, want 404", code)
 		}
 	})
@@ -528,7 +506,7 @@ func TestNightEditsIntegration(t *testing.T) {
 		if code, _ := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":438631}`); code != http.StatusOK {
 			t.Fatalf("attach status = %d, want 200", code)
 		}
-		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
 			editBody(t, n, func(r *updateNightRequest) { r.Watched = true })); code != http.StatusOK {
 			t.Fatalf("record status = %d, want 200", code)
 		}
@@ -537,7 +515,7 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("DELETE movie on a Watched Night yields 422 and keeps the film", func(t *testing.T) {
 		n := mkWatched(t)
-		if code, _ := do(t, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID+"/movie", ""); code != http.StatusUnprocessableEntity {
+		if code, _ := doReq(t, mux, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID+"/movie", ""); code != http.StatusUnprocessableEntity {
 			t.Fatalf("clear status = %d, want 422", code)
 		}
 		_, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, "")
@@ -559,36 +537,21 @@ func TestNightEditsIntegration(t *testing.T) {
 
 	t.Run("DELETE night removes it", func(t *testing.T) {
 		n := mkNight(t)
-		if code, _ := do(t, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID, ""); code != http.StatusNoContent {
+		if code, _ := doReq(t, mux, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID, ""); code != http.StatusNoContent {
 			t.Fatalf("delete status = %d, want 204", code)
 		}
-		if code, _ := do(t, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, ""); code != http.StatusNotFound {
+		if code, _ := doReq(t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, ""); code != http.StatusNotFound {
 			t.Fatalf("get after delete = %d, want 404", code)
 		}
 	})
 
 	t.Run("DELETE night is idempotent", func(t *testing.T) {
 		n := mkNight(t)
-		if code, _ := do(t, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID, ""); code != http.StatusNoContent {
+		if code, _ := doReq(t, mux, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID, ""); code != http.StatusNoContent {
 			t.Fatalf("first delete = %d, want 204", code)
 		}
-		if code, _ := do(t, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID, ""); code != http.StatusNoContent {
+		if code, _ := doReq(t, mux, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID, ""); code != http.StatusNoContent {
 			t.Fatalf("second delete = %d, want 204", code)
 		}
 	})
-}
-
-func attachMovie(t *testing.T, mux http.Handler, group, nightID, body string) (int, nightResponse) {
-	t.Helper()
-	return doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+group+"/nights/"+nightID+"/movie", body)
-}
-
-// attendeeIDs lists a night's attendee ids in the response's order (core
-// first, then by name).
-func attendeeIDs(n nightResponse) []string {
-	ids := make([]string, 0, len(n.Attendees))
-	for _, a := range n.Attendees {
-		ids = append(ids, a.ID)
-	}
-	return ids
 }

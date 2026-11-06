@@ -3,7 +3,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -28,14 +27,7 @@ func TestIdentityIntegration(t *testing.T) {
 	}
 	whoAmI := func(t *testing.T, token string) (int, identityResponse) {
 		t.Helper()
-		code, b := doReqAuth(t, mux, http.MethodGet, "/identity", "", "Bearer "+token)
-		var id identityResponse
-		if code == http.StatusOK {
-			if err := json.Unmarshal(b, &id); err != nil {
-				t.Fatalf("decode identity: %v (body %s)", err, b)
-			}
-		}
-		return code, id
+		return doJSONAuth[identityResponse](t, mux, http.MethodGet, "/identity", "", "Bearer "+token)
 	}
 
 	t.Run("claim returns a token that resolves to the person", func(t *testing.T) {
@@ -112,14 +104,7 @@ func TestIdentityIntegration(t *testing.T) {
 	}
 	mute := func(t *testing.T, token string, muted bool) (int, identityResponse) {
 		t.Helper()
-		code, b := doReqAuth(t, mux, http.MethodPut, "/identity/preferences", fmt.Sprintf(`{"remindersMuted":%t}`, muted), "Bearer "+token)
-		var id identityResponse
-		if code == http.StatusOK {
-			if err := json.Unmarshal(b, &id); err != nil {
-				t.Fatalf("decode identity: %v (body %s)", err, b)
-			}
-		}
-		return code, id
+		return doJSONAuth[identityResponse](t, mux, http.MethodPut, "/identity/preferences", fmt.Sprintf(`{"remindersMuted":%t}`, muted), "Bearer "+token)
 	}
 
 	t.Run("registering push stores the token and time zone", func(t *testing.T) {
