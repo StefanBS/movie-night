@@ -8,26 +8,36 @@ import { Avatar } from "./Avatar";
 // hairlines (`divider`, usually on all but the last) — no card around a list.
 // `highlighted` marks the picker with a heavier, larger name: no ring, fill or
 // glow. `rank` is the turn position (terracotta on the picker), `muted` dims
-// an inactive member. A string `right` is trailing text ("2 picks"); any
-// other node (a badge, a chevron) renders as is.
+// an inactive member. `dimmed` marks someone who's out on an attendance row:
+// the avatar and name fade but `right` (the AttendCheck) stays full strength.
+// `metaTone="accent"` is for the picker's "Gets the pick". A string `right` is
+// trailing text ("2 picks"); any other node (a badge, a chevron) renders as is.
 export function MemberRow({
   name,
   meta,
   rank,
   highlighted = false,
   muted = false,
+  dimmed = false,
+  metaTone = "secondary",
   divider = false,
   right,
   onPress,
+  disabled = false,
+  accessibilityHint,
 }: {
   name: string;
   meta?: string;
   rank?: number;
   highlighted?: boolean;
   muted?: boolean;
+  dimmed?: boolean;
+  metaTone?: "secondary" | "accent";
   divider?: boolean;
   right?: ReactNode;
   onPress?: () => void;
+  disabled?: boolean;
+  accessibilityHint?: string;
 }) {
   const styles = useStyles();
   const content = (
@@ -35,13 +45,15 @@ export function MemberRow({
       {rank != null ? (
         <Text style={[styles.rank, highlighted && styles.rankHighlighted]}>{rank}</Text>
       ) : null}
-      <Avatar name={name} />
-      <View style={styles.text}>
+      <View style={dimmed && styles.avatarDimmed}>
+        <Avatar name={name} />
+      </View>
+      <View style={[styles.text, dimmed && styles.textDimmed]}>
         <Text style={[styles.name, highlighted && styles.nameHighlighted]} numberOfLines={1}>
           {name}
         </Text>
         {meta ? (
-          <Text style={styles.meta} numberOfLines={1}>
+          <Text style={[styles.meta, metaTone === "accent" && styles.metaAccent]} numberOfLines={1}>
             {meta}
           </Text>
         ) : null}
@@ -63,6 +75,8 @@ export function MemberRow({
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
+      accessibilityHint={accessibilityHint}
       style={({ pressed }) => [...rowStyle, pressed && styles.pressed]}
     >
       {content}
@@ -83,6 +97,8 @@ const useStyles = createThemedStyles((colors) => ({
   },
   divider: { borderBottomColor: colors.border.hairline },
   muted: { opacity: 0.55 },
+  avatarDimmed: { opacity: 0.4 },
+  textDimmed: { opacity: 0.5 },
   pressed: { opacity: pressedOpacity },
   rank: {
     fontFamily: fontFamily.sansBold,
@@ -105,5 +121,6 @@ const useStyles = createThemedStyles((colors) => ({
     letterSpacing: trackPx(NAME_HIGHLIGHTED, "title"),
   },
   meta: { ...textPresets.meta, ...tabular, color: colors.text.secondary },
+  metaAccent: { fontFamily: fontFamily.sansSemibold, color: colors.accent.strong },
   trailing: { ...textPresets.meta, ...tabular, color: colors.text.secondary },
 }));
