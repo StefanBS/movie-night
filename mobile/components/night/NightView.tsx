@@ -3,6 +3,7 @@ import { Platform, ScrollView, Text, View } from "react-native";
 import { CalendarPlus, Clapperboard, Film, Pencil, Repeat, X } from "lucide-react-native";
 
 import { AppButton, Avatar, Poster, SectionLabel, Sheet, SheetRow, useToast } from "../";
+import { useGroup } from "../GroupProvider";
 import { Credit } from "./Credit";
 import { WizardFooter } from "./WizardFooter";
 import { addToCalendar } from "../../calendarExport";
@@ -24,11 +25,10 @@ type SheetAction = Omit<ComponentProps<typeof SheetRow>, "last">;
 // button, which the editor's top bar opens through moreOpen; a Watched Night
 // keeps its film, so it can change film but not clear it. On a weekly
 // night, Add to calendar first asks: the whole series, or just this night;
-// `groupName` titles the entry. `today` is passed in (mirrors lib/date.ts)
+// the club's name (GroupProvider) titles the entry. `today` is passed in (mirrors lib/date.ts)
 // for deterministic date framing.
 export function NightView({
   night,
-  groupName,
   today,
   moreOpen,
   onCloseMore,
@@ -37,7 +37,6 @@ export function NightView({
   onEdit,
 }: {
   night: Night;
-  groupName: string | null;
   today: string;
   moreOpen: boolean;
   onCloseMore: () => void;
@@ -48,6 +47,7 @@ export function NightView({
   const colors = useColors();
   const styles = useStyles();
   const toast = useToast();
+  const groupName = useGroup().group?.name ?? null;
   const wording = nightWording(night.scheduledFor, today);
   const movie = night.movie;
   const pickerName = nightPicker(night).name;

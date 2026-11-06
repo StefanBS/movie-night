@@ -4,6 +4,7 @@ import { useFonts } from "expo-font";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 
+import { GroupProvider } from "../components/GroupProvider";
 import { IdentityProvider } from "../components/IdentityProvider";
 import { ReminderTaps } from "../components/ReminderTaps";
 import { ToastProvider } from "../components/Toast";
@@ -34,28 +35,30 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <StatusBar style="auto" />
       <ToastProvider>
-        <IdentityProvider>
-          <Stack
-            screenOptions={{
-              headerStyle: { backgroundColor: colors.surface.page },
-              headerTintColor: colors.text.primary,
-              contentStyle: { backgroundColor: colors.surface.page },
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            {/* These render their own TopBar (kind="title"); hide the Stack header. */}
-            <Stack.Screen name="night/[id]" options={{ headerShown: false }} />
-            <Stack.Screen name="night/edit/[id]" options={{ headerShown: false }} />
-            <Stack.Screen name="night/new" options={{ headerShown: false }} />
-            <Stack.Screen name="night/watched/[id]" options={{ headerShown: false }} />
-            <Stack.Screen name="welcome" options={{ headerShown: false }} />
-            <Stack.Screen name="rotation" options={{ headerShown: false }} />
-            <Stack.Screen name="settings" options={{ headerShown: false }} />
-            <Stack.Screen name="member/[id]" options={{ headerShown: false }} />
-            <Stack.Screen name="member/new" options={{ headerShown: false }} />
-          </Stack>
-          {Platform.OS !== "web" ? <ReminderTaps /> : null}
-        </IdentityProvider>
+        <GroupProvider>
+          <IdentityProvider>
+            <Stack
+              screenOptions={{
+                headerStyle: { backgroundColor: colors.surface.page },
+                headerTintColor: colors.text.primary,
+                contentStyle: { backgroundColor: colors.surface.page },
+              }}
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              {/* These render their own TopBar (kind="title"); hide the Stack header. */}
+              <Stack.Screen name="night/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="night/edit/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="night/new" options={{ headerShown: false }} />
+              <Stack.Screen name="night/watched/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="welcome" options={{ headerShown: false }} />
+              <Stack.Screen name="rotation" options={{ headerShown: false }} />
+              <Stack.Screen name="settings" options={{ headerShown: false }} />
+              <Stack.Screen name="member/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="member/new" options={{ headerShown: false }} />
+            </Stack>
+            {Platform.OS !== "web" ? <ReminderTaps /> : null}
+          </IdentityProvider>
+        </GroupProvider>
       </ToastProvider>
     </SafeAreaProvider>
   );

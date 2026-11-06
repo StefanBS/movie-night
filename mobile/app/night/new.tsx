@@ -68,7 +68,6 @@ export default function NightScreen() {
       <ExistingNightEditor
         key={created.id}
         night={created}
-        groupName={state.groupName}
         today={today}
         initialStep="pick"
         back={{ label: from, onPress: () => router.back() }}

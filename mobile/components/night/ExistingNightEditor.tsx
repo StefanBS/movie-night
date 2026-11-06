@@ -18,11 +18,9 @@ import { createThemedStyles, space, textPresets, useColors } from "../../theme";
 // key={night.id} when the loaded night changes. A route that refreshes the
 // Night passes loadStartedAt with it, and the editor takes the refreshed copy
 // without remounting, so its step survives. `back` names the screen the
-// Night view returns to ("Tonight", "Watched", …). `groupName` titles the
-// Night's calendar entry (null: "Movie night").
+// Night view returns to ("Tonight", "Watched", …).
 export function ExistingNightEditor({
   night,
-  groupName,
   loadStartedAt,
   today,
   initialStep,
@@ -30,7 +28,6 @@ export function ExistingNightEditor({
   onEdit,
 }: {
   night: Night;
-  groupName: string | null;
   loadStartedAt?: number;
   today: string;
   initialStep?: EditorStep;
@@ -94,7 +91,6 @@ export function ExistingNightEditor({
       ) : (
         <NightView
           night={current}
-          groupName={groupName}
           today={today}
           moreOpen={moreOpen}
           onCloseMore={() => setMoreOpen(false)}

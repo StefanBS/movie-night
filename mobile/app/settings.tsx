@@ -12,13 +12,13 @@ import {
   Toggle,
   TopBar,
 } from "../components";
+import { useGroup } from "../components/GroupProvider";
 import { useIdentity } from "../components/IdentityProvider";
-import { useLoad } from "../components/useLoad";
 import { API_URL } from "../apiUrl";
 import { GROUP_ID } from "../lib/api";
 import { formatMonthYear } from "../lib/date";
 import { errorMessage } from "../lib/errors";
-import { fetchGroup, renameGroup, type Group } from "../lib/group";
+import { renameGroup } from "../lib/group";
 import { borderWidth, createThemedStyles, fontFamily, radius, space, textPresets, useColors } from "../theme";
 
 export default function SettingsScreen() {
@@ -28,19 +28,11 @@ export default function SettingsScreen() {
   const me = identity.state.identity;
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  // The group name only changes here (via rename, which updates it directly),
-  // so loading once on mount is enough.
-  const {
-    data: group,
-    setData: setGroup,
-    loading,
-    error,
-  } = useLoad(
-    (signal): Promise<Group | null> => fetchGroup(API_URL, GROUP_ID, signal),
-    null,
-    "failed to load settings",
-    { refetchOnFocus: false },
-  );
+  // The group only changes here: a rename hands its reply to GroupProvider,
+  // so every screen shows the new name without refetching it. Until it loads,
+  // the row shows a spinner, or the launch load's error (opening Settings
+  // retries it).
+  const { group, setGroup, error } = useGroup();
 
   // Inline rename of the group name. `draft` holds the in-progress edit; saving
   // PATCHes and folds the row back to its display state on success.
@@ -105,19 +97,19 @@ export default function SettingsScreen() {
         </View>
 
         <SectionLabel>Group</SectionLabel>
-        {loading ? (
+        {group === null ? (
           <View style={styles.card}>
-            <View style={styles.loadingRow}>
-              <ActivityIndicator color={colors.text.secondary} />
-            </View>
+            {error !== null ? (
+              <View style={styles.messageRow}>
+                <Text style={styles.errorText}>{`Couldn't load: ${error}`}</Text>
+              </View>
+            ) : (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator color={colors.text.secondary} />
+              </View>
+            )}
           </View>
-        ) : error !== null ? (
-          <View style={styles.card}>
-            <View style={styles.messageRow}>
-              <Text style={styles.errorText}>{`Couldn't load: ${error}`}</Text>
-            </View>
-          </View>
-        ) : group !== null && editing ? (
+        ) : editing ? (
           <View style={styles.editGroup}>
             <Input
               value={draft}
@@ -132,7 +124,7 @@ export default function SettingsScreen() {
               <Text style={styles.errorText}>{saveError}</Text>
             ) : null}
           </View>
-        ) : group !== null ? (
+        ) : (
           <View style={styles.card}>
             <SettingsRow
               label={group.name}
@@ -140,7 +132,7 @@ export default function SettingsScreen() {
               onPress={startEdit}
             />
           </View>
-        ) : null}
+        )}
 
         <SectionLabel>You</SectionLabel>
         <View style={styles.card}>

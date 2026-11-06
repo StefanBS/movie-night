@@ -1,4 +1,6 @@
+import { errorMessage } from "./errors";
 import { requestJson } from "./http";
+import { createSessionCore, type Session } from "./session";
 
 export type Group = {
   name: string;
@@ -33,16 +35,6 @@ export function fetchGroup(
   return requestJson(`${baseUrl}/groups/${groupId}`, parseGroup, { signal });
 }
 
-// fetchGroupName loads just the group's name, for screens where it's a nicety
-// (a calendar entry's title): any failure resolves null instead of failing the
-// screen's load.
-export function fetchGroupName(baseUrl: string, groupId: string, signal?: AbortSignal): Promise<string | null> {
-  return fetchGroup(baseUrl, groupId, signal).then(
-    (g) => g.name,
-    () => null,
-  );
-}
-
 // renameGroup PATCHes a new group name and returns the updated group.
 export function renameGroup(
   baseUrl: string,
@@ -56,4 +48,57 @@ export function renameGroup(
     body: JSON.stringify({ name }),
     signal,
   });
+}
+
+export type GroupSessionState = {
+  // group is null until a load succeeds.
+  group: Group | null;
+  // error is the last load's failure, cleared by the next success.
+  error: string | null;
+};
+
+export type GroupSession = Session<GroupSessionState> & {
+  // load fetches the group unless it's already loaded or loading, so every
+  // screen can call it on focus: the first call loads it, and after a failure
+  // the next one retries.
+  load(): Promise<void>;
+  // set takes the group from a write's reply (a rename in Settings).
+  set(group: Group): void;
+};
+
+// createGroupSession holds the app's one copy of the group (name + since
+// date). The group only changes through a rename on this phone, so it is
+// fetched once, not on every screen.
+export function createGroupSession({ baseUrl, groupId }: { baseUrl: string; groupId: string }): GroupSession {
+  const core = createSessionCore<GroupSessionState>({ group: null, error: null });
+  let loading: Promise<void> | null = null;
+
+  return {
+    get state() {
+      return core.state;
+    },
+    subscribe: core.subscribe,
+    dispose: core.dispose,
+
+    load() {
+      if (core.state.group !== null) {
+        return Promise.resolve();
+      }
+      loading ??= (async () => {
+        try {
+          const group = await core.track((signal) => fetchGroup(baseUrl, groupId, signal));
+          core.set({ group: core.state.group ?? group, error: null });
+        } catch (e) {
+          core.set({ error: errorMessage(e, "failed to load the group") });
+        } finally {
+          loading = null;
+        }
+      })();
+      return loading;
+    },
+
+    set(group) {
+      core.set({ group, error: null });
+    },
+  };
 }

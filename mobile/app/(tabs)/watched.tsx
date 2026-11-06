@@ -12,12 +12,12 @@ import {
   TabScrollView,
   TopBar,
 } from "../../components";
+import { useGroup } from "../../components/GroupProvider";
 import { useLoad } from "../../components/useLoad";
 import { API_URL } from "../../apiUrl";
 import { firstName } from "../../lib/avatar";
 import { GROUP_ID } from "../../lib/api";
 import { formatShortDate } from "../../lib/date";
-import { fetchGroup } from "../../lib/group";
 import { buildHistory, watchedSub } from "../../lib/history";
 import { watchedNights } from "../../lib/nightLifecycle";
 import { listNights, nightPicker, type Night } from "../../lib/nights";
@@ -27,26 +27,18 @@ export default function WatchedScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
+  const { group } = useGroup();
   // Refetch on focus (useLoad's default): a night recorded on another tab must
   // show up when the user returns here, and the tab screen stays mounted. The
-  // group only feeds the "N nights since …" sub, so a failed group fetch drops
-  // that line and leaves the list alone.
+  // group (GroupProvider) only feeds the "N nights since …" sub; until it
+  // loads, that line is left off.
   const {
-    data: { nights, since },
+    data: nights,
     loading,
     error,
   } = useLoad(
-    async (signal) => {
-      const [all, since] = await Promise.all([
-        listNights(API_URL, GROUP_ID, signal),
-        fetchGroup(API_URL, GROUP_ID, signal).then(
-          (g): string | null => g.createdOn,
-          () => null,
-        ),
-      ]);
-      return { nights: watchedNights(all), since };
-    },
-    { nights: [] as Night[], since: null as string | null },
+    async (signal) => watchedNights(await listNights(API_URL, GROUP_ID, signal)),
+    [] as Night[],
     "failed to load history",
   );
 
@@ -85,7 +77,7 @@ export default function WatchedScreen() {
     );
   }
 
-  const sub = since !== null ? watchedSub(nights.length, since) : undefined;
+  const sub = group !== null ? watchedSub(nights.length, group.createdOn) : undefined;
   const sections = buildHistory(nights);
   const open = (id: string) =>
     router.push({ pathname: "/night/[id]", params: { id, from: "Watched" } });
