@@ -57,6 +57,25 @@ export function upNextAction(night: Night, today: string = todayLocalISO()): UpN
   return null;
 }
 
+// NightAction is a secondary action in the Night's ⋯ sheet.
+export type NightAction = "changeFilm" | "edit" | "addToCalendar" | "clearFilm";
+
+// nightActions picks the ⋯ sheet's actions, in display order. Edit is always
+// there. Change film needs a film; Clear film also needs the Night unwatched,
+// since a Watched Night keeps its film. Add to calendar is for a Night still
+// ahead (nightWording's canAddToCalendar), and never on web, where there is no
+// OS calendar form. Whether it then asks "whole series or just this night" is
+// calendarRecurrence's call (lib/calendarEntry.ts).
+export function nightActions(night: Night, today: string, { web }: { web: boolean }): NightAction[] {
+  const hasFilm = night.movie !== null;
+  const actions: NightAction[] = [];
+  if (hasFilm) actions.push("changeFilm");
+  actions.push("edit");
+  if (nightWording(night.scheduledFor, today).canAddToCalendar && !web) actions.push("addToCalendar");
+  if (hasFilm && !isWatched(night)) actions.push("clearFilm");
+  return actions;
+}
+
 // plannedNights is every Night not yet recorded as watched, soonest first. A
 // due Night from an earlier day comes first, so it stays on Tonight until it is
 // recorded. Tonight's lineup (lib/tonight.ts) puts its head up next and lists

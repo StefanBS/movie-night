@@ -10,7 +10,7 @@ import { addToCalendar } from "../../calendarExport";
 import { firstName } from "../../lib/avatar";
 import { calendarRecurrence, seriesNote, type CalendarRecurrence } from "../../lib/calendarEntry";
 import { formatShortDate, formatWeekdayDate } from "../../lib/date";
-import { isWatched, nightLine, nightWording } from "../../lib/nightLifecycle";
+import { nightActions, nightLine, nightWording, type NightAction } from "../../lib/nightLifecycle";
 import { nightPicker, type Night } from "../../lib/nights";
 import { formatRepeatLabel } from "../../lib/repeat";
 import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, radius, space, tabular, textPresets, useColors } from "../../theme";
@@ -22,8 +22,8 @@ type SheetAction = Omit<ComponentProps<typeof SheetRow>, "last">;
 // credit line under it. A night without a film has one primary action, "Choose
 // the film"; a night with one has none. The secondary actions (Change film,
 // Edit night, Add to calendar, Clear film) sit in the sheet behind the ⋯
-// button, which the editor's top bar opens through moreOpen; a Watched Night
-// keeps its film, so it can change film but not clear it. On a weekly
+// button, which the editor's top bar opens through moreOpen; which of them
+// show is nightActions' call (lib/nightLifecycle.ts). On a weekly
 // night, Add to calendar first asks: the whole series, or just this night;
 // the club's name (GroupProvider) titles the entry. `today` is passed in (mirrors lib/date.ts)
 // for deterministic date framing.
@@ -67,29 +67,24 @@ export function NightView({
     onCloseMore();
     run();
   };
-  const actions: SheetAction[] = [];
-  if (movie !== null) {
-    actions.push({ icon: Film, label: "Change film", sub: `Keeps the night and ${first}'s pick`, onPress: act(onPickFilm) });
-  }
-  actions.push({ icon: Pencil, label: "Edit night", sub: wording.editSub, onPress: act(onEdit) });
-  // The OS calendar form has no web version.
-  if (wording.canAddToCalendar && Platform.OS !== "web") {
-    actions.push({
+  const sheetAction: Record<NightAction, () => SheetAction> = {
+    changeFilm: () => ({ icon: Film, label: "Change film", sub: `Keeps the night and ${first}'s pick`, onPress: act(onPickFilm) }),
+    edit: () => ({ icon: Pencil, label: "Edit night", sub: wording.editSub, onPress: act(onEdit) }),
+    addToCalendar: () => ({
       icon: CalendarPlus,
       label: "Add to calendar",
       sub: recurrence !== null ? "The whole series, or just this night" : "A one-off event on this phone",
       onPress: act(() => (recurrence !== null ? setCalendarOpen(true) : void onAddToCalendar(null))),
-    });
-  }
-  if (movie !== null && !isWatched(night)) {
-    actions.push({
+    }),
+    clearFilm: () => ({
       icon: X,
       label: "Clear film",
       sub: "The night stays; the film is removed",
       danger: true,
       onPress: act(onClearFilm),
-    });
-  }
+    }),
+  };
+  const actions = nightActions(night, today, { web: Platform.OS === "web" }).map((kind) => sheetAction[kind]());
 
   return (
     <View style={styles.flex}>

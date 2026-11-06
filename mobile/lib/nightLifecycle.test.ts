@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { watchedNights, isDue, nightDates, nightLine, nightLineParts, nightTiming, nightWording, plannedNights, upNextAction, type NightLineParts, type NightTiming, type NightWhen, type UpNextAction } from "./nightLifecycle";
+import { watchedNights, isDue, nightDates, nightLine, nightActions, nightLineParts, nightTiming, nightWording, plannedNights, upNextAction, type NightAction, type NightLineParts, type NightTiming, type NightWhen, type UpNextAction } from "./nightLifecycle";
 import type { Night } from "./nights";
 
 const TODAY = "2026-06-22";
@@ -64,6 +64,30 @@ const actionCases: [string, Night, UpNextAction][] = [
 for (const [name, n, want] of actionCases) {
   test(`upNextAction: ${name} → ${want}`, () => {
     assert.equal(upNextAction(n, TODAY), want);
+  });
+}
+
+// nightActions: the ⋯ sheet's actions, in display order.
+
+const TOMORROW = "2026-06-23";
+const YESTERDAY = "2026-06-21";
+const FILM = { movie: aMovie };
+
+const sheetCases: [string, Night, boolean, NightAction[]][] = [
+  ["no film, ahead", night("u", TOMORROW), false, ["edit", "addToCalendar"]],
+  ["no film, today", night("t", TODAY), false, ["edit", "addToCalendar"]],
+  ["no film, past", night("p", YESTERDAY), false, ["edit"]],
+  ["film, ahead", night("u", TOMORROW, FILM), false, ["changeFilm", "edit", "addToCalendar", "clearFilm"]],
+  ["film, today", night("t", TODAY, FILM), false, ["changeFilm", "edit", "addToCalendar", "clearFilm"]],
+  ["film, past", night("p", YESTERDAY, FILM), false, ["changeFilm", "edit", "clearFilm"]],
+  ["film, today, watched", night("t", TODAY, { ...FILM, ...WATCHED }), false, ["changeFilm", "edit", "addToCalendar"]],
+  ["film, past, watched", night("p", YESTERDAY, { ...FILM, ...WATCHED }), false, ["changeFilm", "edit"]],
+  ["no film, ahead, web", night("u", TOMORROW), true, ["edit"]],
+  ["film, ahead, web", night("u", TOMORROW, FILM), true, ["changeFilm", "edit", "clearFilm"]],
+];
+for (const [name, n, web, want] of sheetCases) {
+  test(`nightActions: ${name} → ${want.join(", ")}`, () => {
+    assert.deepEqual(nightActions(n, TODAY, { web }), want);
   });
 }
 
