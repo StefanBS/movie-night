@@ -27,8 +27,8 @@ func TestNightEditsIntegration(t *testing.T) {
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(pool))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(pool))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, client))
-	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/movie", clearNightMovieHandler(q))
+	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(pool, client))
+	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/movie", clearNightMovieHandler(pool))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
 
 	do := func(t *testing.T, method, path, body string) (int, []byte) {
@@ -528,6 +528,43 @@ func TestNightEditsIntegration(t *testing.T) {
 		}
 		if got.Movie != nil {
 			t.Fatalf("movie = %+v, want null", got.Movie)
+		}
+	})
+
+	// A Watched Night needs its film (the glossary's Film), so clearing it is
+	// refused; correcting it to another film still works.
+	mkWatched := func(t *testing.T) nightResponse {
+		t.Helper()
+		n := mkNight(t)
+		if code, _ := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":438631}`); code != http.StatusOK {
+			t.Fatalf("attach status = %d, want 200", code)
+		}
+		if code, _ := do(t, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			editBody(t, n, func(r *updateNightRequest) { r.Watched = true })); code != http.StatusOK {
+			t.Fatalf("record status = %d, want 200", code)
+		}
+		return n
+	}
+
+	t.Run("DELETE movie on a Watched Night yields 422 and keeps the film", func(t *testing.T) {
+		n := mkWatched(t)
+		if code, _ := do(t, http.MethodDelete, "/groups/"+seededGroup+"/nights/"+n.ID+"/movie", ""); code != http.StatusUnprocessableEntity {
+			t.Fatalf("clear status = %d, want 422", code)
+		}
+		_, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID, "")
+		if got.Movie == nil || got.Movie.TMDBID != 438631 {
+			t.Fatalf("movie = %+v, want Dune kept", got.Movie)
+		}
+	})
+
+	t.Run("POST movie on a Watched Night changes its film", func(t *testing.T) {
+		n := mkWatched(t)
+		code, got := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":841}`)
+		if code != http.StatusOK {
+			t.Fatalf("attach status = %d, want 200", code)
+		}
+		if got.Movie == nil || got.Movie.TMDBID != 841 || got.WatchedAt == nil {
+			t.Fatalf("night = movie %+v watchedAt %v, want 841 and still watched", got.Movie, got.WatchedAt)
 		}
 	})
 

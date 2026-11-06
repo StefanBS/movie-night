@@ -43,6 +43,10 @@ var errPickerNotAttendee = errors.New("picker is not an attendee of this night")
 // there is nothing to have watched (ADR-0012).
 var errWatchedWithoutFilm = errors.New("night has no film to record as watched")
 
+// errWatchedFilmCleared is the 422 for clearing a Watched Night's film: a
+// Night needs its film to be recorded, and recording is not undone.
+var errWatchedFilmCleared = errors.New("a watched night keeps its film")
+
 // errWatchedDateAhead is the 422 for recording a Night that hasn't happened,
 // or moving a Watched Night to a date that hasn't (ADR-0013).
 var errWatchedDateAhead = errors.New("night is dated too far ahead to be recorded as watched")
@@ -340,17 +344,14 @@ func presentIDs(rows []db.ListNightAttendeesRow) []uuid.UUID {
 	return ids
 }
 
-// nightStore is the subset of *db.Queries the night read handlers (and the
-// movie attach) need; the real *db.Queries satisfies it, so no mock is ever
-// written (same pattern as turnStore/pickStore/memberStore). The picker and
-// attendee writes take the pool instead and run in night_writes.go.
+// nightStore is the subset of *db.Queries the night read handlers need; the
+// real *db.Queries satisfies it, so no mock is ever written (same pattern as
+// turnStore/pickStore/memberStore). Night writes take the pool instead and run
+// in night_writes.go.
 type nightStore interface {
 	GetNight(ctx context.Context, arg db.GetNightParams) (db.FullNight, error)
 	ListNightAttendees(ctx context.Context, arg db.ListNightAttendeesParams) ([]db.ListNightAttendeesRow, error)
 	RankGroupTurn(ctx context.Context, arg db.RankGroupTurnParams) ([]db.RankGroupTurnRow, error)
-	UpsertMovie(ctx context.Context, arg db.UpsertMovieParams) (uuid.UUID, error)
-	SetNightMovie(ctx context.Context, arg db.SetNightMovieParams) error
-	ClearNightMovie(ctx context.Context, arg db.ClearNightMovieParams) (uuid.UUID, error)
 	ListNights(ctx context.Context, groupID uuid.UUID) ([]db.FullNight, error)
 	ListNightsAttendees(ctx context.Context, arg db.ListNightsAttendeesParams) ([]db.ListNightsAttendeesRow, error)
 }

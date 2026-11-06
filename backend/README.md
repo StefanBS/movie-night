@@ -126,8 +126,8 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/movies/search?q=…` | TMDB search proxy; `400` empty query, `502` upstream failure. |
-| `POST` | `/groups/{groupId}/nights/{nightId}/movie` | Attach a movie by `{"tmdbId"}`; re-fetches canonical title/year from TMDB and returns the night. Repeatable. |
-| `DELETE` | `/groups/{groupId}/nights/{nightId}/movie` | Detach the film; returns the night with `movie` null. Idempotent. |
+| `POST` | `/groups/{groupId}/nights/{nightId}/movie` | Attach a movie by `{"tmdbId"}`; re-fetches canonical title/year from TMDB and returns the night. Repeatable, including on a Watched Night (changes its film). |
+| `DELETE` | `/groups/{groupId}/nights/{nightId}/movie` | Detach the film; returns the night with `movie` null. Idempotent. `422` on a Watched Night, which keeps its film. |
 
 ## Testing
 

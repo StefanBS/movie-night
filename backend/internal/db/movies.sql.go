@@ -12,11 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const clearNightMovie = `-- name: ClearNightMovie :one
+const clearNightMovie = `-- name: ClearNightMovie :exec
 UPDATE nights
 SET movie_id = NULL
 WHERE id = $1 AND group_id = $2
-RETURNING id
 `
 
 type ClearNightMovieParams struct {
@@ -24,12 +23,9 @@ type ClearNightMovieParams struct {
 	GroupID uuid.UUID `json:"group_id"`
 }
 
-// RETURNING the id lets a missing night surface as no rows (404).
-func (q *Queries) ClearNightMovie(ctx context.Context, arg ClearNightMovieParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, clearNightMovie, arg.NightID, arg.GroupID)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
+func (q *Queries) ClearNightMovie(ctx context.Context, arg ClearNightMovieParams) error {
+	_, err := q.db.Exec(ctx, clearNightMovie, arg.NightID, arg.GroupID)
+	return err
 }
 
 const setNightMovie = `-- name: SetNightMovie :exec

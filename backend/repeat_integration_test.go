@@ -29,7 +29,7 @@ func TestRepeatingNightsIntegration(t *testing.T) {
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(pool))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, client))
+	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(pool, client))
 
 	nightsPath := "/groups/" + seededGroup + "/nights"
 	weekly := &repeatDTO{Freq: "weekly", IntervalWeeks: i16(1)}
