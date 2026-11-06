@@ -231,14 +231,14 @@ func TestNewNightResponse(t *testing.T) {
 	}
 
 	t.Run("maps pick and attendees", func(t *testing.T) {
-		got := newNightResponse(mkNight(), []attendee{{ID: ada.String(), Name: "Ada", Role: "core"}})
+		got := newNightResponse(mkNight(), []attendee{{ID: ada.String(), Name: "Ada"}})
 		if got.ID != nightID.String() {
 			t.Errorf("ID = %q", got.ID)
 		}
 		if got.ScheduledFor != "2026-06-12" {
 			t.Errorf("ScheduledFor = %q, want 2026-06-12", got.ScheduledFor)
 		}
-		if len(got.Attendees) != 1 || got.Attendees[0].Name != "Ada" || got.Attendees[0].Role != "core" {
+		if len(got.Attendees) != 1 || got.Attendees[0].Name != "Ada" {
 			t.Errorf("attendees = %+v", got.Attendees)
 		}
 	})
@@ -354,9 +354,9 @@ func TestGroupAttendees(t *testing.T) {
 	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
 	blake := uuid.MustParse("a0000000-0000-0000-0000-000000000002")
 	rows := []db.ListAttendeesRow{
-		{NightID: n1, ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
-		{NightID: n1, ID: blake, Name: "Blake", Role: db.MembershipRoleCore},
-		{NightID: n2, ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
+		{NightID: n1, ID: ada, Name: "Ada"},
+		{NightID: n1, ID: blake, Name: "Blake"},
+		{NightID: n2, ID: ada, Name: "Ada"},
 	}
 	got := groupAttendees(rows)
 	if len(got[n1]) != 2 || len(got[n2]) != 1 {
@@ -386,7 +386,7 @@ func TestToNightResponses(t *testing.T) {
 		},
 	}
 	byNight := map[uuid.UUID][]attendee{
-		n1: {{ID: ada.String(), Name: "Ada", Role: "core"}},
+		n1: {{ID: ada.String(), Name: "Ada"}},
 	}
 	got := toNightResponses(rows, byNight)
 	if len(got) != 2 {

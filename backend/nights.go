@@ -154,7 +154,6 @@ func validateCreateNightRequest(req createNightRequest) (parsedCreateNight, erro
 type attendee struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
-	Role string `json:"role"`
 }
 
 // remindersDTO is a Night's shared reminder settings (ADR-0010): which slots
@@ -237,11 +236,11 @@ func movieDTOFromCols(row db.FullNight) *movieDTO {
 }
 
 // groupAttendees buckets attendee rows by their night (night_id), preserving the
-// query's role-then-name order within each night.
+// query's core-first, then-name order within each night.
 func groupAttendees(rows []db.ListAttendeesRow) map[uuid.UUID][]attendee {
 	byNight := make(map[uuid.UUID][]attendee)
 	for _, r := range rows {
-		byNight[r.NightID] = append(byNight[r.NightID], attendee{ID: r.ID.String(), Name: r.Name, Role: string(r.Role)})
+		byNight[r.NightID] = append(byNight[r.NightID], attendee{ID: r.ID.String(), Name: r.Name})
 	}
 	return byNight
 }
