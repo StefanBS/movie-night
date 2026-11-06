@@ -5,14 +5,13 @@ import { LinearGradient } from "expo-linear-gradient";
 import { createThemedStyles, fontFamily, radius, space, tabular } from "../theme";
 
 // Poster shows a real TMDB image when given a `uri`, untreated at 2:3, and
-// otherwise (or on error) the hue-per-title gradient tile. The tile is always
+// otherwise (or on error) a warm gradient tile. The tile is always
 // dark, whatever the theme; from 104px tall it carries the title in Newsreader
-// Medium. `hue` is a stable 0–360 derived from the title by the caller.
+// Medium.
 export function Poster({
   uri,
   title = "—",
   year,
-  hue = 30,
   w = 56,
   h = 84,
   rounded = radius.sm,
@@ -20,7 +19,6 @@ export function Poster({
   uri?: string | null;
   title?: string;
   year?: string | number;
-  hue?: number;
   w?: number;
   h?: number;
   // rounded is the corner radius: posters are radius.sm, except where a
@@ -45,7 +43,7 @@ export function Poster({
         <>
           {/* 160deg, as in the DS */}
           <LinearGradient
-            colors={[`hsl(${hue} 30% 26%)`, `hsl(${hue} 34% 12%)`]}
+            colors={["hsl(30 30% 26%)", "hsl(30 34% 12%)"]}
             start={{ x: 0.33, y: 0 }}
             end={{ x: 0.67, y: 1 }}
             style={StyleSheet.absoluteFill}

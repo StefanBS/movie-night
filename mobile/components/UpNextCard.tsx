@@ -133,24 +133,22 @@ export function UpNextCard({
           </View>
         </View>
 
-        {picker !== null ? (
-          <View style={styles.creditRow}>
-            <Avatar name={picker.name} size={28} />
-            <Text style={styles.credit} numberOfLines={1}>
-              {night.movie !== null ? (
-                <>
-                  {"Picked by "}
-                  <Text style={styles.creditName}>{firstName(picker.name)}</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.creditName}>{firstName(picker.name)}</Text>
-                  {" is picking"}
-                </>
-              )}
-            </Text>
-          </View>
-        ) : null}
+        <View style={styles.creditRow}>
+          <Avatar name={picker.name} size={28} />
+          <Text style={styles.credit} numberOfLines={1}>
+            {night.movie !== null ? (
+              <>
+                {"Picked by "}
+                <Text style={styles.creditName}>{firstName(picker.name)}</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.creditName}>{firstName(picker.name)}</Text>
+                {" is picking"}
+              </>
+            )}
+          </Text>
+        </View>
 
         {night.attendees.length > 0 ? (
           <View style={styles.comingRow}>

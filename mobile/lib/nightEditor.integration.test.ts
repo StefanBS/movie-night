@@ -1,52 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import http from "node:http";
 
 import { createNightEditor } from "./nightEditor";
-import type { Member } from "./members";
 import type { Movie } from "./movies";
 import type { Night } from "./nights";
+import { type Handler, json, startServer } from "./testServer";
 
 // Integration tests: the editor module for a saved Night against a real local
 // HTTP server over real fetch. No mocks — the test drives the editor only
 // through the interface the Night screens use.
 
-type Handler = (req: http.IncomingMessage, res: http.ServerResponse, body: string) => void;
-
-async function startServer(handler: Handler): Promise<{ url: string; close: () => Promise<void> }> {
-  const server = http.createServer((req, res) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (c) => chunks.push(c as Buffer));
-    req.on("end", () => handler(req, res, Buffer.concat(chunks).toString()));
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const addr = server.address();
-  if (addr === null || typeof addr === "string") {
-    throw new Error("server has no port");
-  }
-  return {
-    url: `http://127.0.0.1:${addr.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.closeAllConnections();
-        server.close((err) => (err ? reject(err) : resolve()));
-      }),
-  };
-}
-
-function json(res: http.ServerResponse, status: number, payload: unknown) {
-  res.statusCode = status;
-  res.setHeader("content-type", "application/json");
-  res.end(JSON.stringify(payload));
-}
-
 const GROUP = "g1";
 const NIGHT = "n1";
 const DUNE: Movie = { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: null, genres: [], runtimeMinutes: null };
-const MEMBERS: Member[] = [
-  { id: "ada", name: "Ada", role: "core", status: "active", joinedOn: "2026-01-01" },
-  { id: "blake", name: "Blake", role: "core", status: "active", joinedOn: "2026-01-01" },
-];
 const SAVED: Night = {
   id: NIGHT,
   scheduledFor: "2026-06-26",
@@ -57,8 +23,8 @@ const SAVED: Night = {
   repeat: null,
   movie: null,
   attendees: [
-    { id: "ada", name: "Ada", role: "core" },
-    { id: "blake", name: "Blake", role: "core" },
+    { id: "ada", name: "Ada" },
+    { id: "blake", name: "Blake" },
   ],
 };
 
@@ -103,7 +69,7 @@ async function withEditor(
   initialStep?: "pick" | "night",
 ) {
   const server = await startServer(handler);
-  const editor = createNightEditor({ baseUrl: server.url, groupId: GROUP, night: SAVED, members: MEMBERS, initialStep });
+  const editor = createNightEditor({ baseUrl: server.url, groupId: GROUP, night: SAVED, initialStep });
   try {
     await run(editor);
   } finally {
@@ -116,7 +82,6 @@ test("opens on the Night view by default, or where asked", async () => {
   await withEditor(backend(), async (editor) => {
     assert.equal(editor.state.step, "night");
     assert.equal(editor.state.night.id, NIGHT);
-    assert.equal(editor.state.members.length, 2);
   });
   await withEditor(backend(), async (editor) => assert.equal(editor.state.step, "pick"), "pick");
 });
@@ -146,6 +111,22 @@ test("search fills the results; a blank query clears them without a request", as
       assert.equal(searches, 1);
       assert.deepEqual(editor.state.results, []);
       assert.equal(editor.state.resultsFor, "");
+    },
+  );
+});
+
+test("the same query again (submit after the debounce) sends one request", async () => {
+  let searches = 0;
+  const base = backend();
+  await withEditor(
+    backend({ "GET /movies/search": (req, res, body) => (searches++, base(req, res, body)) }),
+    async (editor) => {
+      const running = editor.search("dune");
+      await editor.search("dune "); // while the first is in flight
+      await running;
+      await editor.search("dune"); // once it has answered
+      assert.equal(searches, 1);
+      assert.deepEqual(editor.state.results, [DUNE]);
     },
   );
 });
@@ -312,16 +293,14 @@ test("a write clears the previous error", async () => {
   );
 });
 
-test("refresh swaps in a fresher Night and roster but keeps the step and search", async () => {
+test("refresh swaps in a fresher Night but keeps the step and search", async () => {
   await withEditor(
     backend(),
     async (editor) => {
       await editor.search("dune");
       const moved = { ...SAVED, scheduledFor: "2026-07-03" };
-      const roster = [...MEMBERS, { ...MEMBERS[0], id: "cleo", name: "Cleo" }];
-      editor.refresh(moved, roster, performance.now());
+      editor.refresh(moved, performance.now());
       assert.equal(editor.state.night.scheduledFor, "2026-07-03");
-      assert.deepEqual(editor.state.members.map((m) => m.id), ["ada", "blake", "cleo"]);
       assert.equal(editor.state.step, "pick");
       assert.deepEqual(editor.state.results, [DUNE]);
     },
@@ -332,7 +311,7 @@ test("refresh swaps in a fresher Night and roster but keeps the step and search"
 test("refresh is ignored while a write runs, so the write's reply wins", async () => {
   await withEditor(backend(), async (editor) => {
     const write = editor.changePicker("blake");
-    editor.refresh({ ...SAVED, scheduledFor: "2026-07-03" }, MEMBERS, performance.now());
+    editor.refresh({ ...SAVED, scheduledFor: "2026-07-03" }, performance.now());
     await write;
     assert.equal(editor.state.night.scheduledFor, SAVED.scheduledFor);
     assert.equal(editor.state.night.pickerId, "blake");
@@ -344,10 +323,10 @@ test("a refresh whose load started before a write doesn't undo it", async () => 
     const loadStartedAt = performance.now();
     await editor.changePicker("blake");
     // The load read the Night before the write, then landed after it.
-    editor.refresh(SAVED, MEMBERS, loadStartedAt);
+    editor.refresh(SAVED, loadStartedAt);
     assert.equal(editor.state.night.pickerId, "blake");
     // A load that starts after the write applies.
-    editor.refresh({ ...SAVED, pickerId: "blake", scheduledFor: "2026-07-03" }, MEMBERS, performance.now());
+    editor.refresh({ ...SAVED, pickerId: "blake", scheduledFor: "2026-07-03" }, performance.now());
     assert.equal(editor.state.night.scheduledFor, "2026-07-03");
   });
 });

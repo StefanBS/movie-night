@@ -1,31 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import http from "node:http";
 
 import { fetchTurn, fetchTurnAmong, type TurnMember } from "./turn";
+import { startServer } from "./testServer";
 
 // Integration tests: fetchTurn against a real local HTTP server over a real
 // fetch round-trip. No mocks — a throwaway server stands in for the backend.
-
-type Handler = (req: http.IncomingMessage, res: http.ServerResponse) => void;
-
-async function startServer(
-  handler: Handler,
-): Promise<{ url: string; close: () => Promise<void> }> {
-  const server = http.createServer(handler);
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const addr = server.address();
-  if (addr === null || typeof addr === "string") {
-    throw new Error("server has no port");
-  }
-  return {
-    url: `http://127.0.0.1:${addr.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) =>
-        server.close((err) => (err ? reject(err) : resolve())),
-      ),
-  };
-}
 
 const GROUP = "11111111-1111-1111-1111-111111111111";
 

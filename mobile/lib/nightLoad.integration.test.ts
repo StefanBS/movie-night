@@ -5,39 +5,11 @@ import http from "node:http";
 import { createNightLoad, nightLoadView } from "./nightLoad";
 import type { Member } from "./members";
 import type { Night } from "./nights";
+import { type Handler, json, startServer } from "./testServer";
 
 // Integration tests: the Night routes' loading Session against a real local
 // HTTP server over real fetch. No mocks — the test drives the Session only
 // through the interface the Night view and Edit routes use.
-
-type Handler = (req: http.IncomingMessage, res: http.ServerResponse, body: string) => void;
-
-async function startServer(handler: Handler): Promise<{ url: string; close: () => Promise<void> }> {
-  const server = http.createServer((req, res) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (c) => chunks.push(c as Buffer));
-    req.on("end", () => handler(req, res, Buffer.concat(chunks).toString()));
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const addr = server.address();
-  if (addr === null || typeof addr === "string") {
-    throw new Error("server has no port");
-  }
-  return {
-    url: `http://127.0.0.1:${addr.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.closeAllConnections();
-        server.close((err) => (err ? reject(err) : resolve()));
-      }),
-  };
-}
-
-function json(res: http.ServerResponse, status: number, payload: unknown) {
-  res.statusCode = status;
-  res.setHeader("content-type", "application/json");
-  res.end(JSON.stringify(payload));
-}
 
 const GROUP = "g1";
 const NIGHT = "n1";
@@ -54,7 +26,7 @@ const SAVED: Night = {
   watchedAt: null,
   repeat: null,
   movie: null,
-  attendees: [{ id: "ada", name: "Ada", role: "core" }],
+  attendees: [{ id: "ada", name: "Ada" }],
 };
 const OTHER: Night = { ...SAVED, id: "n0", scheduledFor: "2026-06-19" };
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ActivityIndicator, Linking, ScrollView, Text, View } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 import { useRouter } from "expo-router";
@@ -13,6 +13,7 @@ import {
   TopBar,
 } from "../components";
 import { useIdentity } from "../components/IdentityProvider";
+import { useLoad } from "../components/useLoad";
 import { API_URL } from "../apiUrl";
 import { GROUP_ID } from "../lib/api";
 import { formatMonthYear } from "../lib/date";
@@ -27,9 +28,19 @@ export default function SettingsScreen() {
   const me = identity.state.identity;
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [group, setGroup] = useState<Group | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // The group name only changes here (via rename, which updates it directly),
+  // so loading once on mount is enough.
+  const {
+    data: group,
+    setData: setGroup,
+    loading,
+    error,
+  } = useLoad(
+    (signal): Promise<Group | null> => fetchGroup(API_URL, GROUP_ID, signal),
+    null,
+    "failed to load settings",
+    { refetchOnFocus: false },
+  );
 
   // Inline rename of the group name. `draft` holds the in-progress edit; saving
   // PATCHes and folds the row back to its display state on success.
@@ -37,27 +48,6 @@ export default function SettingsScreen() {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-
-  // The group name only changes here (via rename, which updates state directly),
-  // so a one-shot fetch on mount is enough — no focus refetch needed.
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        setGroup(await fetchGroup(API_URL, GROUP_ID, controller.signal));
-        setError(null);
-      } catch (e) {
-        if (!controller.signal.aborted) {
-          setError(errorMessage(e, "failed to load settings"));
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, []);
 
   const startEdit = () => {
     if (group === null) {

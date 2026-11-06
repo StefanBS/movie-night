@@ -1,3 +1,5 @@
+import { capitalize } from "./text";
+
 // A Night's reminder settings (ADR-0010), shared by the group: which slots are
 // on and who they go to. The picker's personal nudge goes out the night before
 // whatever these say. twoHoursBefore only fires on a Night with a start time
@@ -65,8 +67,7 @@ export function formatRemindersSummary(r: Reminders, startTime: string | null): 
   if (slots.length === 0) {
     return "Off";
   }
-  const text = slots.join(", ");
-  return text[0].toUpperCase() + text.slice(1);
+  return capitalize(slots.join(", "));
 }
 
 // reminderConfirmation is the in-app message shown once changed reminder

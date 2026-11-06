@@ -9,9 +9,8 @@ import { addToCalendar } from "../../calendarExport";
 import { firstName } from "../../lib/avatar";
 import { calendarRecurrence, seriesNote, type CalendarRecurrence } from "../../lib/calendarEntry";
 import { formatShortDate, formatWeekdayDate } from "../../lib/date";
-import type { Member } from "../../lib/members";
 import { isWatched, nightMeta, nightWording } from "../../lib/nightLifecycle";
-import { nightPickerName, type Night } from "../../lib/nights";
+import { nightPicker, type Night } from "../../lib/nights";
 import { formatRepeatLabel } from "../../lib/repeat";
 import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, radius, space, tabular, textPresets, useColors } from "../../theme";
 
@@ -29,7 +28,6 @@ type SheetAction = Omit<ComponentProps<typeof SheetRow>, "last">;
 // for deterministic date framing.
 export function NightView({
   night,
-  members,
   groupName,
   today,
   moreOpen,
@@ -39,21 +37,20 @@ export function NightView({
   onEdit,
 }: {
   night: Night;
-  members: Member[];
   groupName: string | null;
   today: string;
   moreOpen: boolean;
   onCloseMore: () => void;
   onPickFilm: () => void;
-  onClearFilm?: () => void;
-  onEdit?: () => void;
+  onClearFilm: () => void;
+  onEdit: () => void;
 }) {
   const colors = useColors();
   const styles = useStyles();
   const toast = useToast();
   const wording = nightWording(night.scheduledFor, today);
   const movie = night.movie;
-  const pickerName = nightPickerName(night, members);
+  const pickerName = nightPicker(night).name;
   const first = firstName(pickerName);
   const recurrence = calendarRecurrence(night.repeat);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -74,9 +71,7 @@ export function NightView({
   if (movie !== null) {
     actions.push({ icon: Film, label: "Change film", sub: `Keeps the night and ${first}'s pick`, onPress: act(onPickFilm) });
   }
-  if (onEdit !== undefined) {
-    actions.push({ icon: Pencil, label: "Edit night", sub: wording.editSub, onPress: act(onEdit) });
-  }
+  actions.push({ icon: Pencil, label: "Edit night", sub: wording.editSub, onPress: act(onEdit) });
   // The OS calendar form has no web version.
   if (wording.canAddToCalendar && Platform.OS !== "web") {
     actions.push({
@@ -86,7 +81,7 @@ export function NightView({
       onPress: act(() => (recurrence !== null ? setCalendarOpen(true) : void onAddToCalendar(null))),
     });
   }
-  if (movie !== null && !isWatched(night) && onClearFilm !== undefined) {
+  if (movie !== null && !isWatched(night)) {
     actions.push({
       icon: X,
       label: "Clear film",

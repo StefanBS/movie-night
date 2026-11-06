@@ -4,39 +4,11 @@ import http from "node:http";
 
 import { createIdentitySession, type NotificationAccess, type PushDevice, type TokenStorage } from "./identity";
 import type { Member } from "./members";
+import { type Handler, json, startServer } from "./testServer";
 
 // Integration tests: the Identity module against a real local HTTP server over
 // real fetch. A throwaway server stands in for the backend's identity routes,
 // and the test drives the module only through the interface the app uses.
-
-type Handler = (req: http.IncomingMessage, res: http.ServerResponse, body: string) => void;
-
-async function startServer(handler: Handler): Promise<{ url: string; close: () => Promise<void> }> {
-  const server = http.createServer((req, res) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (c) => chunks.push(c as Buffer));
-    req.on("end", () => handler(req, res, Buffer.concat(chunks).toString()));
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const addr = server.address();
-  if (addr === null || typeof addr === "string") {
-    throw new Error("server has no port");
-  }
-  return {
-    url: `http://127.0.0.1:${addr.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.closeAllConnections();
-        server.close((err) => (err ? reject(err) : resolve()));
-      }),
-  };
-}
-
-function json(res: http.ServerResponse, status: number, payload: unknown) {
-  res.statusCode = status;
-  res.setHeader("content-type", "application/json");
-  res.end(JSON.stringify(payload));
-}
 
 const GROUP = "g1";
 

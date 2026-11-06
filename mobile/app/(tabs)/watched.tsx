@@ -1,11 +1,10 @@
-import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
   Text,
   View,
 } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 
 import {
   Poster,
@@ -13,11 +12,11 @@ import {
   TabScrollView,
   TopBar,
 } from "../../components";
+import { useLoad } from "../../components/useLoad";
 import { API_URL } from "../../apiUrl";
 import { firstName } from "../../lib/avatar";
 import { GROUP_ID } from "../../lib/api";
 import { formatShortDate } from "../../lib/date";
-import { errorMessage } from "../../lib/errors";
 import { fetchGroup } from "../../lib/group";
 import { buildHistory, watchedSub } from "../../lib/history";
 import { watchedNights } from "../../lib/nightLifecycle";
@@ -28,40 +27,27 @@ export default function WatchedScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
-  const [nights, setNights] = useState<Night[]>([]);
-  const [since, setSince] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Refetch on focus (not just first mount): a night recorded on another tab
-  // must show up when the user returns here, and the tab screen stays mounted.
-  useFocusEffect(
-    useCallback(() => {
-      const controller = new AbortController();
-      // The group only feeds the "N nights since …" sub, so a failed fetch
-      // drops that line and leaves the list alone.
-      fetchGroup(API_URL, GROUP_ID, controller.signal).then(
-        (g) => setSince(g.createdOn),
-        () => {
-          if (!controller.signal.aborted) setSince(null);
-        },
-      );
-      (async () => {
-        try {
-          setNights(watchedNights(await listNights(API_URL, GROUP_ID, controller.signal)));
-          setError(null);
-        } catch (e) {
-          if (!controller.signal.aborted) {
-            setError(errorMessage(e, "failed to load history"));
-          }
-        } finally {
-          if (!controller.signal.aborted) {
-            setLoading(false);
-          }
-        }
-      })();
-      return () => controller.abort();
-    }, []),
+  // Refetch on focus (useLoad's default): a night recorded on another tab must
+  // show up when the user returns here, and the tab screen stays mounted. The
+  // group only feeds the "N nights since …" sub, so a failed group fetch drops
+  // that line and leaves the list alone.
+  const {
+    data: { nights, since },
+    loading,
+    error,
+  } = useLoad(
+    async (signal) => {
+      const [all, since] = await Promise.all([
+        listNights(API_URL, GROUP_ID, signal),
+        fetchGroup(API_URL, GROUP_ID, signal).then(
+          (g): string | null => g.createdOn,
+          () => null,
+        ),
+      ]);
+      return { nights: watchedNights(all), since };
+    },
+    { nights: [] as Night[], since: null as string | null },
+    "failed to load history",
   );
 
   if (loading) {
@@ -136,7 +122,7 @@ export default function WatchedScreen() {
                       {n.movie ? n.movie.title : "Untitled night"}
                     </Text>
                     <Text style={styles.rowMeta} numberOfLines={1}>
-                      {picker !== null ? `${firstName(picker.name)} · ` : ""}
+                      {`${firstName(picker.name)} · `}
                       {formatShortDate(n.scheduledFor)}
                     </Text>
                   </View>

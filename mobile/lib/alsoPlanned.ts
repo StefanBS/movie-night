@@ -12,9 +12,7 @@ export function alsoPlannedWhen(night: Night, locale?: string): string {
   return night.startTime === null ? date : `${date} · ${formatStartTime(night.startTime, locale)}`;
 }
 
-// alsoPlannedPicks is a row's line under the date ("Priya picks"), or null
-// when the picker is missing from the attendees.
-export function alsoPlannedPicks(night: Night): string | null {
-  const picker = nightPicker(night);
-  return picker === null ? null : `${firstName(picker.name)} picks`;
+// alsoPlannedPicks is a row's line under the date ("Priya picks").
+export function alsoPlannedPicks(night: Night): string {
+  return `${firstName(nightPicker(night).name)} picks`;
 }

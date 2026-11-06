@@ -1,6 +1,5 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import http from "node:http";
 
 import {
   createNight,
@@ -11,24 +10,7 @@ import {
   attachMovie,
   type Night,
 } from "./nights";
-
-type Handler = (req: http.IncomingMessage, res: http.ServerResponse) => void;
-
-async function startServer(handler: Handler): Promise<{ url: string; close: () => Promise<void> }> {
-  const server = http.createServer(handler);
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const addr = server.address();
-  if (addr === null || typeof addr === "string") {
-    throw new Error("server has no port");
-  }
-  return {
-    url: `http://127.0.0.1:${addr.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) =>
-        server.close((err) => (err ? reject(err) : resolve())),
-      ),
-  };
-}
+import { startServer } from "./testServer";
 
 const GROUP = "11111111-1111-1111-1111-111111111111";
 const NIGHT = "n1";
@@ -43,16 +25,8 @@ const night: Night = {
   watchedAt: null,
   repeat: null,
   movie: null,
-  attendees: [{ id: ADA, name: "Ada", role: "core" }],
+  attendees: [{ id: ADA, name: "Ada" }],
 };
-
-function collect(req: http.IncomingMessage): Promise<string> {
-  return new Promise((resolve) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (c) => chunks.push(c as Buffer));
-    req.on("end", () => resolve(Buffer.concat(chunks).toString()));
-  });
-}
 
 const NEW_NIGHT = { scheduledFor: "2026-06-12", startTime: null, attendees: [ADA], pickerId: ADA };
 
@@ -60,10 +34,10 @@ test("createNight posts the date, attendees and picker and parses the night", as
   let path = "";
   let method = "";
   let body = "";
-  const server = await startServer(async (req, res) => {
+  const server = await startServer((req, res, reqBody) => {
     path = req.url ?? "";
     method = req.method ?? "";
-    body = await collect(req);
+    body = reqBody;
     res.statusCode = 201;
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify(night));
@@ -151,12 +125,12 @@ test("changeNightPicker PATCHes the night as it is with the new picker", async (
   let method = "";
   let body = "";
   const BLAKE = "a0000000-0000-0000-0000-000000000002";
-  const saved: Night = { ...night, startTime: "20:00", repeat: { freq: "weekly", intervalWeeks: 1 }, attendees: [...night.attendees, { id: BLAKE, name: "Blake", role: "core" }] };
+  const saved: Night = { ...night, startTime: "20:00", repeat: { freq: "weekly", intervalWeeks: 1 }, attendees: [...night.attendees, { id: BLAKE, name: "Blake" }] };
   const changed: Night = { ...saved, pickerId: BLAKE };
-  const server = await startServer(async (req, res) => {
+  const server = await startServer((req, res, reqBody) => {
     path = req.url ?? "";
     method = req.method ?? "";
-    body = await collect(req);
+    body = reqBody;
     res.statusCode = 200;
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify(changed));
@@ -194,10 +168,10 @@ test("attachMovie posts the tmdbId and parses the night with its movie", async (
   let path = "";
   let method = "";
   let body = "";
-  const server = await startServer(async (req, res) => {
+  const server = await startServer((req, res, reqBody) => {
     path = req.url ?? "";
     method = req.method ?? "";
-    body = await collect(req);
+    body = reqBody;
     res.statusCode = 200;
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify(withMovie));
@@ -263,12 +237,12 @@ test("recordWatched PATCHes the night as it is, repeat included, with the confir
   let method = "";
   let body = "";
   const BLAKE = "a0000000-0000-0000-0000-000000000002";
-  const planned: Night = { ...night, startTime: "20:00", repeat: { freq: "weekly", intervalWeeks: 1 }, attendees: [...night.attendees, { id: BLAKE, name: "Blake", role: "core" }] };
+  const planned: Night = { ...night, startTime: "20:00", repeat: { freq: "weekly", intervalWeeks: 1 }, attendees: [...night.attendees, { id: BLAKE, name: "Blake" }] };
   const recorded: Night = { ...planned, pickerId: BLAKE, watchedAt: "2026-06-12T22:00:00Z" };
-  const server = await startServer(async (req, res) => {
+  const server = await startServer((req, res, reqBody) => {
     path = req.url ?? "";
     method = req.method ?? "";
-    body = await collect(req);
+    body = reqBody;
     res.statusCode = 200;
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify(recorded));

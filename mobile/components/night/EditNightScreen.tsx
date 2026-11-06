@@ -31,7 +31,7 @@ import type { Member } from "../../lib/members";
 import { createNightEdit } from "../../lib/nightEdit";
 import { isWatched, nightWording } from "../../lib/nightLifecycle";
 import { capitalize } from "../../lib/text";
-import type { Night } from "../../lib/nights";
+import { nightPicker, type Night } from "../../lib/nights";
 import { formatRepeatLabel } from "../../lib/repeat";
 import {
   formatRemindersSummary,
@@ -78,8 +78,7 @@ export function EditNightScreen({
   );
   const { date, startTime, attendees, reminders, repeat, rows, dirty, actionError } = state;
   const busy = state.busy !== null;
-  const pickerId = state.night.pickerId;
-  const picker = members.find((m) => m.id === pickerId) ?? null;
+  const picker = nightPicker(state.night);
   const wording = nightWording(date, today);
 
   const onSave = async () => {
@@ -174,7 +173,7 @@ export function EditNightScreen({
                 [
                   wording.countdown,
                   startTime !== null ? formatStartTime(startTime) : null,
-                  picker !== null ? wording.pickerTitle(firstName(picker.name)) : null,
+                  wording.pickerTitle(firstName(picker.name)),
                 ]
                   .filter((part) => part !== null)
                   .join(" · "),
@@ -220,7 +219,7 @@ export function EditNightScreen({
               const here = attendees.has(m.id);
               // The picker is always an attendee; change the picker (from the
               // Night) before taking them off the night.
-              const isPicker = m.id === pickerId;
+              const isPicker = m.id === picker.id;
               return (
                 <Pressable
                   key={m.id}

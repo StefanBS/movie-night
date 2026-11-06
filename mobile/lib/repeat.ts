@@ -9,10 +9,10 @@ export type Repeat =
   | { freq: "weekly"; intervalWeeks: 1 | 2 }
   | { freq: "monthly"; week: MonthWeek };
 
-// parseRepeat validates an untrusted repeat payload: null (or absent) for a
-// one-off, else a weekly or monthly rule. Throws on anything else.
+// parseRepeat validates an untrusted repeat payload: null for a one-off, else
+// a weekly or monthly rule. Throws on anything else.
 export function parseRepeat(raw: unknown): Repeat | null {
-  if (raw === null || raw === undefined) {
+  if (raw === null) {
     return null;
   }
   if (typeof raw !== "object") {

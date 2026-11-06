@@ -5,8 +5,7 @@ export type Movie = {
   title: string;
   releaseYear: number | null;
   posterUrl: string | null;
-  // TMDB genre names in TMDB order; [] when unknown (search results, movies
-  // cached before the backend stored them, or an older backend).
+  // TMDB genre names in TMDB order; [] when unknown (e.g. search results).
   genres: string[];
   // Running time in minutes; null when unknown. Formatting is the client's.
   runtimeMinutes: number | null;
@@ -32,26 +31,19 @@ export function parseMovie(raw: unknown): Movie {
   if (typeof title !== "string") {
     throw new Error("movie: title must be a string");
   }
-  if (releaseYear !== undefined && releaseYear !== null && typeof releaseYear !== "number") {
+  if (releaseYear !== null && typeof releaseYear !== "number") {
     throw new Error("movie: releaseYear must be a number or null");
   }
-  if (posterUrl !== undefined && posterUrl !== null && typeof posterUrl !== "string") {
+  if (posterUrl !== null && typeof posterUrl !== "string") {
     throw new Error("movie: posterUrl must be a string or null");
   }
-  if (genres !== undefined && genres !== null && !isStringArray(genres)) {
+  if (!isStringArray(genres)) {
     throw new Error("movie: genres must be an array of strings");
   }
-  if (runtimeMinutes !== undefined && runtimeMinutes !== null && typeof runtimeMinutes !== "number") {
+  if (runtimeMinutes !== null && typeof runtimeMinutes !== "number") {
     throw new Error("movie: runtimeMinutes must be a number or null");
   }
-  return {
-    tmdbId,
-    title,
-    releaseYear: releaseYear ?? null,
-    posterUrl: posterUrl ?? null,
-    genres: genres ?? [],
-    runtimeMinutes: runtimeMinutes ?? null,
-  };
+  return { tmdbId, title, releaseYear, posterUrl, genres, runtimeMinutes };
 }
 
 // parseMovies validates an untrusted search-results payload (an array) and

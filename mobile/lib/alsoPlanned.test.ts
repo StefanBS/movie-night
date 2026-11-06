@@ -12,8 +12,8 @@ function night(opts: Partial<Night> = {}): Night {
     pickerId: "p",
     movie: null,
     attendees: [
-      { id: "a", name: "Ada Lovelace", role: "core" },
-      { id: "p", name: "Priya Raman", role: "core" },
+      { id: "a", name: "Ada Lovelace" },
+      { id: "p", name: "Priya Raman" },
     ],
     reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
     watchedAt: null,
@@ -36,9 +36,8 @@ test("alsoPlannedWhen: a 24-hour locale keeps HH:MM", () => {
   assert.equal(alsoPlannedWhen(night({ startTime: "20:00" }), "en-GB"), "Sat 27 Jun · 20:00");
 });
 
-const picksCases: [string, Night, string | null][] = [
+const picksCases: [string, Night, string][] = [
   ["the picker's first name", night(), "Priya picks"],
-  ["picker missing from the attendees", night({ pickerId: "zzz" }), null],
 ];
 for (const [name, n, want] of picksCases) {
   test(`alsoPlannedPicks: ${name}`, () => {

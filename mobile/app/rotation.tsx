@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { AppButton, Badge, Banner, MemberRow, TopBar } from "../components";
+import { useLoad } from "../components/useLoad";
 import { API_URL } from "../apiUrl";
 import { firstName } from "../lib/avatar";
 import { GROUP_ID } from "../lib/api";
-import { errorMessage } from "../lib/errors";
 import { fetchTurn, pickerMeta, type TurnMember } from "../lib/turn";
 import { createThemedStyles, space, textPresets, useColors } from "../theme";
 
@@ -47,27 +46,13 @@ export default function RotationScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
-  const [order, setOrder] = useState<TurnMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    (async () => {
-      try {
-        setOrder(await fetchTurn(API_URL, GROUP_ID, controller.signal));
-      } catch (e) {
-        if (!controller.signal.aborted) {
-          setError(errorMessage(e, "failed to load the rotation"));
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    })();
-    return () => controller.abort();
-  }, []);
+  // A stack screen opened from Tonight, so it loads once on mount.
+  const { data: order, loading, error } = useLoad(
+    (signal) => fetchTurn(API_URL, GROUP_ID, signal),
+    [] as TurnMember[],
+    "failed to load the rotation",
+    { refetchOnFocus: false },
+  );
 
   const leadFirstName = order.length > 0 ? firstName(order[0].name) : "";
 

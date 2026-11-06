@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { TopBar } from "../../../components";
-import { RecordedView, WhoStep } from "../../../components/night";
+import { NightLoadStatus, RecordedView, WhoStep } from "../../../components/night";
 import { useHardwareBack } from "../../../components/useHardwareBack";
 import { useSession } from "../../../components/useSession";
 import { API_URL } from "../../../apiUrl";
@@ -11,7 +11,7 @@ import { GROUP_ID } from "../../../lib/api";
 import { todayLocalISO } from "../../../lib/date";
 import type { Member } from "../../../lib/members";
 import { createNightWatched } from "../../../lib/nightWatched";
-import { createThemedStyles, space, textPresets, useColors } from "../../../theme";
+import { createThemedStyles, space, textPresets } from "../../../theme";
 
 const TITLE = "We watched it";
 
@@ -27,7 +27,6 @@ export default function NightWatchedRoute() {
 // the Night, so Done is the receipt; a failed record keeps People and its
 // selection. It loads once, not on every focus: People holds a draft.
 function NightWatchedFlow({ id, from }: { id: string; from: string }) {
-  const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
   const [today] = useState(todayLocalISO);
@@ -45,18 +44,8 @@ function NightWatchedFlow({ id, from }: { id: string; from: string }) {
   const { night } = state;
 
   if (state.loading || state.error !== null || night === null) {
-    return (
-      <View style={styles.screen}>
-        <TopBar kind="title" title={TITLE} back={back} />
-        {state.loading ? (
-          <ActivityIndicator style={styles.center} size="large" color={colors.text.secondary} />
-        ) : (
-          <Text style={[styles.center, state.error !== null ? styles.error : styles.muted]}>
-            {state.error !== null ? `Couldn't load night: ${state.error}` : "Couldn't find that night."}
-          </Text>
-        )}
-      </View>
-    );
+    const view = state.loading ? "loading" : state.error !== null ? "failed" : "missing";
+    return <NightLoadStatus title={TITLE} back={back} view={view} error={state.error} />;
   }
 
   if (state.step === "done") {
@@ -99,8 +88,6 @@ function NightWatchedFlow({ id, from }: { id: string; from: string }) {
 
 const useStyles = createThemedStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.surface.page },
-  center: { marginTop: space[8], textAlign: "center", paddingHorizontal: space[5] },
   error: { ...textPresets.body, color: colors.text.danger },
-  muted: { ...textPresets.body, color: colors.text.secondary },
   banner: { paddingVertical: space[2], paddingHorizontal: space[5], textAlign: "center" },
 }));
