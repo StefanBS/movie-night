@@ -24,7 +24,7 @@ function NightDetailLoader({ id, from, pick }: { id: string; from: string; pick:
   const [load, state] = useSession(() =>
     createNightLoad({ baseUrl: API_URL, groupId: GROUP_ID, nightId: id }),
   );
-  const { night, groupName, error, loadStartedAt } = state;
+  const { night, error, loadStartedAt } = state;
   const today = todayLocalISO();
 
   useFocusEffect(
@@ -41,7 +41,6 @@ function NightDetailLoader({ id, from, pick }: { id: string; from: string; pick:
     <ExistingNightEditor
       key={night.id}
       night={night}
-      groupName={groupName}
       loadStartedAt={loadStartedAt}
       today={today}
       initialStep={pick ? "pick" : undefined}

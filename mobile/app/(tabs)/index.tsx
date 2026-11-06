@@ -13,11 +13,11 @@ import {
   TopBar,
   UpNextCard,
 } from "../../components";
+import { useGroup } from "../../components/GroupProvider";
 import { useLoad } from "../../components/useLoad";
 import { API_URL } from "../../apiUrl";
 import { firstName } from "../../lib/avatar";
 import { GROUP_ID } from "../../lib/api";
-import { fetchGroupName } from "../../lib/group";
 import { fetchTurn, pickerSummary, picksLabel, type TurnMember } from "../../lib/turn";
 import { listNights, nightPicker, type Night } from "../../lib/nights";
 import { alsoPlannedPicks, alsoPlannedWhen } from "../../lib/alsoPlanned";
@@ -107,27 +107,27 @@ export default function TonightScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
+  const { group } = useGroup();
   // Refetch the turn AND the planned nights on focus (useLoad's default): a
   // pick recorded, a roster change, or a night planned on another tab must show
   // up when the user returns — the tab screen stays mounted. `loading` gates
   // only the first load (all fetches together, so the card never flashes in
   // after the spotlight). A nights failure degrades to the spotlight — the turn
-  // fetch owns the screen's error state. The group name is header chrome,
-  // refetched with them so a rename in Settings shows here.
+  // fetch owns the screen's error state. The group name is header chrome from
+  // GroupProvider, which a rename in Settings updates.
   const {
-    data: { order, nights, groupName },
+    data: { order, nights },
     loading,
     error,
   } = useLoad(
     async (signal) => {
-      const [order, nights, groupName] = await Promise.all([
+      const [order, nights] = await Promise.all([
         fetchTurn(API_URL, GROUP_ID, signal),
         listNights(API_URL, GROUP_ID, signal).catch(() => [] as Night[]),
-        fetchGroupName(API_URL, GROUP_ID, signal),
       ]);
-      return { order, nights, groupName };
+      return { order, nights };
     },
-    { order: [] as TurnMember[], nights: [] as Night[], groupName: null as string | null },
+    { order: [] as TurnMember[], nights: [] as Night[] },
     "failed to load tonight",
   );
 
@@ -159,7 +159,7 @@ export default function TonightScreen() {
 
   return (
     <View style={styles.screen}>
-      <TopBar kind="home" group={groupName ?? ""} right={gear} />
+      <TopBar kind="home" group={group?.name ?? ""} right={gear} />
       {loading ? (
         <ActivityIndicator
           style={styles.center}

@@ -1,4 +1,6 @@
+import { errorMessage } from "./errors";
 import { requestJson } from "./http";
+import { createSessionCore, type Session } from "./session";
 
 export type Group = {
   name: string;
@@ -33,16 +35,6 @@ export function fetchGroup(
   return requestJson(`${baseUrl}/groups/${groupId}`, parseGroup, { signal });
 }
 
-// fetchGroupName loads just the group's name, for screens where it's a nicety
-// (a calendar entry's title): any failure resolves null instead of failing the
-// screen's load.
-export function fetchGroupName(baseUrl: string, groupId: string, signal?: AbortSignal): Promise<string | null> {
-  return fetchGroup(baseUrl, groupId, signal).then(
-    (g) => g.name,
-    () => null,
-  );
-}
-
 // renameGroup PATCHes a new group name and returns the updated group.
 export function renameGroup(
   baseUrl: string,
@@ -56,4 +48,72 @@ export function renameGroup(
     body: JSON.stringify({ name }),
     signal,
   });
+}
+
+export type GroupSessionState = {
+  // group is null until a load succeeds.
+  group: Group | null;
+  // error is the last fetch's failure, cleared by the next success. A failed
+  // refresh keeps the last group beside it.
+  error: string | null;
+};
+
+export type GroupSession = Session<GroupSessionState> & {
+  // load fetches the group unless it's already loaded or loading, so every
+  // screen can call it on focus: the first call loads it, and after a failure
+  // the next one retries.
+  load(): Promise<void>;
+  // refresh fetches the group even if it's loaded (the app coming back to the
+  // foreground), sharing a fetch already in flight.
+  refresh(): Promise<void>;
+  // set takes the group from a write's reply (a rename in Settings).
+  set(group: Group): void;
+};
+
+// createGroupSession holds the app's one copy of the group (name + since
+// date). Any phone in the club can rename it, but renames are rare and only
+// change a label, so it is fetched at launch and when the app returns to the
+// foreground, not on every screen.
+export function createGroupSession({ baseUrl, groupId }: { baseUrl: string; groupId: string }): GroupSession {
+  const core = createSessionCore<GroupSessionState>({ group: null, error: null });
+  let inFlight: Promise<void> | null = null;
+  // writes counts set() calls, so a fetch that started before a rename's
+  // reply arrived can't overwrite it with the older name.
+  let writes = 0;
+
+  const fetchOnce = () => {
+    inFlight ??= (async () => {
+      const before = writes;
+      try {
+        const group = await core.track((signal) => fetchGroup(baseUrl, groupId, signal));
+        if (writes === before) {
+          core.set({ group, error: null });
+        }
+      } catch (e) {
+        core.set({ error: errorMessage(e, "failed to load the group") });
+      } finally {
+        inFlight = null;
+      }
+    })();
+    return inFlight;
+  };
+
+  return {
+    get state() {
+      return core.state;
+    },
+    subscribe: core.subscribe,
+    dispose: core.dispose,
+
+    load() {
+      return core.state.group !== null ? Promise.resolve() : fetchOnce();
+    },
+
+    refresh: fetchOnce,
+
+    set(group) {
+      writes++;
+      core.set({ group, error: null });
+    },
+  };
 }

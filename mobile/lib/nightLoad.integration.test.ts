@@ -30,7 +30,7 @@ const SAVED: Night = {
 };
 const OTHER: Night = { ...SAVED, id: "n0", scheduledFor: "2026-06-19" };
 
-// backend fakes the four reads the Session makes, counting each one.
+// backend fakes the three reads the Session makes, counting each one.
 function backend(over: Partial<Record<string, Handler>> = {}) {
   const hits: Record<string, number> = {};
   const handler: Handler = (req, res, body) => {
@@ -42,7 +42,6 @@ function backend(over: Partial<Record<string, Handler>> = {}) {
       return;
     }
     if (key === `GET /groups/${GROUP}/nights/${NIGHT}`) return json(res, 200, SAVED);
-    if (key === `GET /groups/${GROUP}`) return json(res, 200, { name: "Friday Film Club", createdOn: "2026-01-01" });
     if (key === `GET /groups/${GROUP}/members`) return json(res, 200, MEMBERS);
     if (key === `GET /groups/${GROUP}/nights`) return json(res, 200, [SAVED, OTHER]);
     json(res, 404, { error: `no route ${key}` });
@@ -107,29 +106,6 @@ test("a failed planned-nights fetch only loses the dots", async () => {
     },
     true,
   );
-});
-
-test("loads the club name for the calendar title", async () => {
-  await withLoad(backend().handler, async (load) => {
-    await load.load();
-    assert.equal(load.state.groupName, "Friday Film Club");
-  });
-});
-
-test("a failed club fetch only loses the name, and a refresh keeps the last one", async () => {
-  let up = false;
-  const club: Handler = (_q, res) => (up ? json(res, 200, { name: "Friday Film Club", createdOn: "2026-01-01" }) : fail(_q, res));
-  await withLoad(backend({ [`GET /groups/${GROUP}`]: club }).handler, async (load) => {
-    await load.load();
-    assert.equal(nightLoadView(load.state), "ready");
-    assert.equal(load.state.groupName, null);
-    up = true;
-    await load.load();
-    assert.equal(load.state.groupName, "Friday Film Club");
-    up = false;
-    await load.load();
-    assert.equal(load.state.groupName, "Friday Film Club");
-  });
 });
 
 test("a Night the backend doesn't have is missing, not an error", async () => {

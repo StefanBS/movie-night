@@ -47,7 +47,6 @@ function backend(over: Partial<Record<string, Handler>> = {}): Handler {
       custom(req, res, body);
       return;
     }
-    if (key === `GET /groups/${GROUP}`) return json(res, 200, { name: "Friday Film Club", createdOn: "2026-01-01" });
     if (key === `GET /groups/${GROUP}/members`) return json(res, 200, ROSTER);
     if (key === `GET /groups/${GROUP}/nights`) return json(res, 200, [EXISTING]);
     if (key === `GET /groups/${GROUP}/turn`) {
@@ -94,22 +93,6 @@ test("load fills the roster and the calendar dots", async () => {
     assert.equal(plan.state.error, null);
     assert.deepEqual(plan.state.members.map((m) => m.id), ["ada", "blake", "frankie"]);
     assert.deepEqual([...plan.state.nightDates], ["2026-06-19"]);
-  });
-});
-
-test("load fetches the club name for the calendar title", async () => {
-  await withPlan(backend(), async (plan) => {
-    await plan.load();
-    assert.equal(plan.state.groupName, "Friday Film Club");
-  });
-});
-
-test("a failed club fetch only loses the name", async () => {
-  await withPlan(backend({ [`GET /groups/${GROUP}`]: (_q, res) => json(res, 500, { error: "boom" }) }), async (plan) => {
-    await plan.load();
-    assert.equal(plan.state.error, null);
-    assert.equal(plan.state.groupName, null);
-    assert.deepEqual(plan.state.members.map((m) => m.id), ["ada", "blake", "frankie"]);
   });
 });
 
