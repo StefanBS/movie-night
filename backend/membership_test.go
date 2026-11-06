@@ -78,13 +78,13 @@ func TestPlanMove(t *testing.T) {
 		want    membershipMove
 		wantErr bool
 	}{
-		{name: "deactivate active core leaves the rotation", action: actionDeactivate, role: core, status: active, want: membershipMove{}},
-		{name: "deactivate inactive core is a no-op", action: actionDeactivate, role: core, status: inactive, want: membershipMove{noOp: true}},
-		{name: "reactivate inactive core re-enters the rotation seeded", action: actionReactivate, role: core, status: inactive, want: membershipMove{seed: true}},
-		{name: "reactivate inactive guest stays out of the rotation", action: actionReactivate, role: guest, status: inactive, want: membershipMove{}},
-		{name: "reactivate active core is a no-op", action: actionReactivate, role: core, status: active, want: membershipMove{noOp: true}},
-		{name: "promote active guest enters the rotation seeded", action: actionPromote, role: guest, status: active, want: membershipMove{seed: true}},
-		{name: "promote active core is a no-op", action: actionPromote, role: core, status: active, want: membershipMove{noOp: true}},
+		{name: "deactivate active core leaves the rotation", action: actionDeactivate, role: core, status: active, want: membershipMove{role: core, status: inactive}},
+		{name: "deactivate inactive core is a no-op", action: actionDeactivate, role: core, status: inactive, want: membershipMove{role: core, status: inactive, noOp: true}},
+		{name: "reactivate inactive core re-enters the rotation seeded", action: actionReactivate, role: core, status: inactive, want: membershipMove{role: core, status: active, seed: true}},
+		{name: "reactivate inactive guest stays out of the rotation", action: actionReactivate, role: guest, status: inactive, want: membershipMove{role: guest, status: active}},
+		{name: "reactivate active core is a no-op", action: actionReactivate, role: core, status: active, want: membershipMove{role: core, status: active, noOp: true}},
+		{name: "promote active guest enters the rotation seeded", action: actionPromote, role: guest, status: active, want: membershipMove{role: core, status: active, seed: true, newSlot: true}},
+		{name: "promote active core is a no-op", action: actionPromote, role: core, status: active, want: membershipMove{role: core, status: active, noOp: true}},
 		{name: "promote inactive guest is rejected", action: actionPromote, role: guest, status: inactive, wantErr: true},
 	}
 	for _, tc := range cases {

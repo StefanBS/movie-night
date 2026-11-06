@@ -17,7 +17,7 @@ WHERE m.group_id = sqlc.arg(group_id) AND m.user_id = sqlc.arg(user_id);
 -- GetGroupMember for a membership change: locks the membership row for the
 -- rest of the write's transaction, so the state planMove checks is the state
 -- the change is written over.
-SELECT u.id AS user_id, u.name, m.role, m.status, m.baseline_picks, m.joined_at
+SELECT u.id AS user_id, u.name, m.role, m.status, m.baseline_picks, m.rotation_position, m.joined_at
 FROM memberships m
 JOIN users u ON u.id = m.user_id
 WHERE m.group_id = sqlc.arg(group_id) AND m.user_id = sqlc.arg(user_id)
@@ -30,22 +30,13 @@ SELECT user_id, role
 FROM memberships
 WHERE group_id = sqlc.arg(group_id) AND user_id = ANY(sqlc.arg(user_ids)::uuid[]);
 
--- name: DeactivateMembership :one
+-- name: UpdateMembership :one
+-- Writes the state planMove decided. left_at is stamped when the member leaves
+-- and cleared when they return.
 UPDATE memberships
-SET status = 'inactive', left_at = now()
-WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id)
-RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at;
-
--- name: ReactivateMembership :one
-UPDATE memberships
-SET status = 'active', left_at = NULL, baseline_picks = sqlc.arg(baseline_picks)
-WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id)
-RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at;
-
--- name: PromoteMembership :one
-UPDATE memberships
-SET role = 'core',
-    baseline_picks = sqlc.arg(baseline_picks), rotation_position = sqlc.arg(rotation_position)
+SET role = sqlc.arg(role), status = sqlc.arg(status),
+    baseline_picks = sqlc.arg(baseline_picks), rotation_position = sqlc.arg(rotation_position),
+    left_at = CASE WHEN sqlc.arg(status)::membership_status = 'inactive' THEN COALESCE(left_at, now()) END
 WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id)
 RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at;
 

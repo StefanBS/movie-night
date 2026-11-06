@@ -14,7 +14,7 @@ still only planned. The backend has no group timezone
 
 ## Decision
 - **A Night carries when it was recorded as watched:** `picks.watched_at`,
-  `timestamptz`, NULL until recorded. It is exposed through the `nights` view
+  `timestamptz`, NULL until recorded. It is exposed through the `full_nights` view
   and on the wire as `watchedAt` (RFC 3339, UTC) or null.
 - **Recording is part of the Night edit.** `PATCH /groups/{g}/nights/{n}` takes
   an optional `watched: true` and an optional `pickerId`, so the flow confirms

@@ -52,20 +52,14 @@ func joinMember(ctx context.Context, q *db.Queries, gid uuid.UUID, name string, 
 	if err != nil {
 		return memberResponse{}, err
 	}
-	return memberResponse{
-		ID:       user.ID.String(),
-		Name:     user.Name,
-		Role:     string(membership.Role),
-		Status:   string(membership.Status),
-		JoinedOn: formatTimestampDate(membership.JoinedAt),
-	}, nil
+	return memberFromMembership(membership, user.Name), nil
 }
 
 // moveMember applies a churn action to a member and returns them as they now
 // are. A no-op move returns them unchanged; a move planMove refuses returns its
 // error; a missing membership returns pgx.ErrNoRows. A move into the rotation
 // re-seeds the baseline; promote also takes the next slot, while reactivate
-// keeps the member's own. A reactivated guest stays out of the rotation, so its
+// keeps the member's own (planMove decides which). A reactivated guest stays out of the rotation, so its
 // baseline is kept.
 func moveMember(ctx context.Context, q *db.Queries, gid, uid uuid.UUID, action memberAction) (memberResponse, error) {
 	m, err := q.LockGroupMember(ctx, db.LockGroupMemberParams{GroupID: gid, UserID: uid})
@@ -79,30 +73,28 @@ func moveMember(ctx context.Context, q *db.Queries, gid, uid uuid.UUID, action m
 	if move.noOp {
 		return currentMember(m), nil
 	}
-	baseline, position := m.BaselinePicks, int32(0)
+	baseline, position := m.BaselinePicks, m.RotationPosition
 	if move.seed {
-		if baseline, position, err = rotationSeed(ctx, q, gid, uid); err != nil {
+		var slot int32
+		if baseline, slot, err = rotationSeed(ctx, q, gid, uid); err != nil {
 			return memberResponse{}, err
 		}
+		if move.newSlot {
+			position = slot
+		}
 	}
-	var updated db.Membership
-	switch action {
-	case actionDeactivate:
-		updated, err = q.DeactivateMembership(ctx, db.DeactivateMembershipParams{GroupID: gid, UserID: uid})
-	case actionReactivate:
-		updated, err = q.ReactivateMembership(ctx, db.ReactivateMembershipParams{GroupID: gid, UserID: uid, BaselinePicks: baseline})
-	case actionPromote:
-		updated, err = q.PromoteMembership(ctx, db.PromoteMembershipParams{
-			GroupID:          gid,
-			UserID:           uid,
-			BaselinePicks:    baseline,
-			RotationPosition: position,
-		})
-	}
+	updated, err := q.UpdateMembership(ctx, db.UpdateMembershipParams{
+		GroupID:          gid,
+		UserID:           uid,
+		Role:             move.role,
+		Status:           move.status,
+		BaselinePicks:    baseline,
+		RotationPosition: position,
+	})
 	if err != nil {
 		return memberResponse{}, err
 	}
-	return updatedMember(updated, m), nil
+	return memberFromMembership(updated, m.Name), nil
 }
 
 // rotationSeed computes where a member entering the rotation lands: the

@@ -272,8 +272,8 @@ func TestToNightResponse(t *testing.T) {
 	nightID := uuid.MustParse("b0000000-0000-0000-0000-0000000000aa")
 	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
 
-	mkNight := func() nightRow {
-		return nightRow{ID: nightID, ScheduledFor: pgtype.Date{Time: mustDate(t, "2026-06-12"), Valid: true}}
+	mkNight := func() db.FullNight {
+		return db.FullNight{ID: nightID, ScheduledFor: pgtype.Date{Time: mustDate(t, "2026-06-12"), Valid: true}}
 	}
 
 	t.Run("maps pick and attendees", func(t *testing.T) {
@@ -470,7 +470,7 @@ func TestToNightResponses(t *testing.T) {
 	n1 := uuid.MustParse("b0000000-0000-0000-0000-0000000000aa") // newest, has movie + attendees
 	n2 := uuid.MustParse("b0000000-0000-0000-0000-0000000000bb") // older, no movie, no attendees
 	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
-	rows := []nightRow{
+	rows := []db.FullNight{
 		{
 			ID:           n1,
 			PickerID:     ada,

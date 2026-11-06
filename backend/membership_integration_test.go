@@ -64,7 +64,7 @@ func TestMembershipChurnIntegration(t *testing.T) {
 		return 0, false
 	}
 
-	recordPick := func(t *testing.T, picker, date string) {
+	createNight := func(t *testing.T, picker, date string) {
 		t.Helper()
 		// A night is created with its picker, which credits them.
 		if code, _ := doReq(t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights", nightBody(date, picker)); code != http.StatusCreated {
@@ -74,10 +74,10 @@ func TestMembershipChurnIntegration(t *testing.T) {
 
 	// Build pick history so the average is non-trivial and Cleo carries history:
 	// Ada 2 credited, Blake 1, Cleo 1.
-	recordPick(t, ada, "2026-05-01")
-	recordPick(t, ada, "2026-05-08")
-	recordPick(t, blake, "2026-05-15")
-	recordPick(t, cleo, "2026-05-22")
+	createNight(t, ada, "2026-05-01")
+	createNight(t, ada, "2026-05-08")
+	createNight(t, blake, "2026-05-15")
+	createNight(t, cleo, "2026-05-22")
 
 	t.Run("join lands the new member at the average", func(t *testing.T) {
 		want := roundedTurnAvg(t)

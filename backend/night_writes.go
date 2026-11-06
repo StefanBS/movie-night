@@ -110,16 +110,17 @@ func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit 
 	if !edit.Watched {
 		return nil
 	}
-	if err := q.RecordNightWatched(ctx, db.RecordNightWatchedParams{NightID: nightID, GroupID: gid}); err != nil {
-		return err
+	// The series moves on and the repeat is cleared before watched_at is set:
+	// ck_night_watched_no_repeat refuses a Watched Night that still repeats.
+	if edit.Repeat != nil {
+		if err := moveSeriesOn(ctx, q, gid, nightID, picker, *edit.Repeat, edit.ScheduledFor.Time, false, now); err != nil {
+			return err
+		}
+		if err := q.ClearNightRepeat(ctx, db.ClearNightRepeatParams{NightID: nightID, GroupID: gid}); err != nil {
+			return err
+		}
 	}
-	if edit.Repeat == nil {
-		return nil
-	}
-	if err := moveSeriesOn(ctx, q, gid, nightID, picker, *edit.Repeat, edit.ScheduledFor.Time, false, now); err != nil {
-		return err
-	}
-	return q.ClearNightRepeat(ctx, db.ClearNightRepeatParams{NightID: nightID, GroupID: gid})
+	return q.RecordNightWatched(ctx, db.RecordNightWatchedParams{NightID: nightID, GroupID: gid})
 }
 
 // cancelNight deletes a Night ("Cancel this night"). A repeating Night's
