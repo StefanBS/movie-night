@@ -56,24 +56,12 @@ export function upNextAction(night: Night, today: string = todayLocalISO()): UpN
 
 // plannedNights is every Night not yet recorded as watched, soonest first. A
 // due Night from an earlier day comes first, so it stays on Tonight until it is
-// recorded. Its head is upNext and its tail is alsoPlanned.
+// recorded. Tonight's lineup (lib/tonight.ts) puts its head up next and lists
+// its tail as also planned.
 export function plannedNights(nights: Night[]): Night[] {
   return nights
     .filter((n) => !isWatched(n))
     .sort((a, b) => a.scheduledFor.localeCompare(b.scheduledFor));
-}
-
-// upNext is the home "Up next" selector: the soonest planned Night, or null
-// when none (the spotlight is then the fallback). Tonight's Night stays up
-// next, film or not, until it is recorded.
-export function upNext(nights: Night[]): Night | null {
-  return plannedNights(nights)[0] ?? null;
-}
-
-// alsoPlanned is Tonight's "Also planned" selector: the planned Nights after
-// upNext, soonest first. Empty when at most one Night is planned.
-export function alsoPlanned(nights: Night[]): Night[] {
-  return plannedNights(nights).slice(1);
 }
 
 // watchedNights is the Watched selector: the Nights recorded as watched, in

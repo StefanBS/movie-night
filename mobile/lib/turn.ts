@@ -44,14 +44,6 @@ export function parseTurn(raw: unknown): TurnMember[] {
   return raw.map(parseTurnMember);
 }
 
-// nextPickers is who picks after pickerId: the ranking without them, first
-// three. With no Night planned the picker is the ranking's head; a planned
-// Night's picker is already counted and has sunk (often to the bottom), so
-// the head is the next picker, not one to skip.
-export function nextPickers(order: TurnMember[], pickerId: string): TurnMember[] {
-  return order.filter((m) => m.id !== pickerId).slice(0, 3);
-}
-
 // fetchTurn loads a group's turn ranking from the backend. The optional signal
 // lets the caller cancel an in-flight request (e.g. on unmount).
 export function fetchTurn(

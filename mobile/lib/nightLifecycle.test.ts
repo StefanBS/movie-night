@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { alsoPlanned, watchedNights, isDue, nightDates, nightMeta, nightTiming, nightWording, plannedNights, upNext, upNextAction, type NightTiming, type UpNextAction } from "./nightLifecycle";
+import { watchedNights, isDue, nightDates, nightMeta, nightTiming, nightWording, plannedNights, upNextAction, type NightTiming, type UpNextAction } from "./nightLifecycle";
 import type { Night } from "./nights";
 
 const TODAY = "2026-06-22";
@@ -73,51 +73,6 @@ for (const [name, n, want] of actionCases) {
   });
 }
 
-// upNext
-
-const upNextCases: [string, Night[], string | null][] = [
-  ["no nights", [], null],
-  ["only watched nights", [night("p", "2026-06-20", WATCHED)], null],
-  ["tonight without a film", [night("t", TODAY)], "t"],
-  ["tonight with a film stays up next", [night("t", TODAY, { movie: aMovie })], "t"],
-  ["an upcoming night with a film", [night("u", "2026-06-26", { movie: aMovie })], "u"],
-  [
-    "the soonest of several",
-    [night("far", "2026-07-10"), night("soon", "2026-06-26"), night("mid", "2026-06-30")],
-    "soon",
-  ],
-  ["tonight beats upcoming", [night("u", "2026-06-23"), night("t", TODAY)], "t"],
-  ["skips watched, keeps upcoming", [night("p", "2026-06-10", { movie: aMovie, ...WATCHED }), night("u", "2026-07-01")], "u"],
-  ["yesterday's unwatched night stays up next until it's recorded", [night("t", TODAY), night("y", "2026-06-21")], "y"],
-  ["the older of two unwatched past nights", [night("y", "2026-06-21"), night("old", "2026-06-14")], "old"],
-  ["tonight once watched gives way to the next", [night("t", TODAY, WATCHED), night("u", "2026-06-26")], "u"],
-];
-for (const [name, nights, want] of upNextCases) {
-  test(`upNext: ${name}`, () => {
-    assert.equal(upNext(nights)?.id ?? null, want);
-  });
-}
-
-// alsoPlanned
-
-const alsoPlannedCases: [string, Night[], string[]][] = [
-  ["no nights", [], []],
-  ["one planned night is up next, so nothing else", [night("u", "2026-06-26")], []],
-  [
-    "the rest after up next, soonest first",
-    [night("far", "2026-07-10"), night("soon", "2026-06-26"), night("mid", "2026-06-30")],
-    ["mid", "far"],
-  ],
-  ["tonight is up next, so the upcoming one is also planned", [night("u", "2026-06-23"), night("t", TODAY)], ["u"]],
-  ["watched nights are never listed", [night("p", "2026-06-10", WATCHED), night("u", "2026-06-26"), night("v", "2026-07-01")], ["v"]],
-  ["an unwatched past night is up next, so tonight is also planned", [night("t", TODAY), night("y", "2026-06-21")], ["t"]],
-];
-for (const [name, nights, want] of alsoPlannedCases) {
-  test(`alsoPlanned: ${name}`, () => {
-    assert.deepEqual(ids(alsoPlanned(nights)), want);
-  });
-}
-
 // watchedNights
 
 const historyCases: [string, Night[], string[]][] = [
@@ -138,12 +93,12 @@ for (const [name, nights, want] of historyCases) {
   });
 }
 
-test("an unwatched past Night is up next and not on Watched; recorded, it moves over", () => {
+test("an unwatched past Night is planned and not on Watched; recorded, it moves over", () => {
   const due = night("y", "2026-06-21");
-  assert.equal(upNext([due])?.id, "y");
+  assert.deepEqual(ids(plannedNights([due])), ["y"]);
   assert.deepEqual(ids(watchedNights([due])), []);
   const recorded = { ...due, ...WATCHED };
-  assert.equal(upNext([recorded]), null);
+  assert.deepEqual(ids(plannedNights([recorded])), []);
   assert.deepEqual(ids(watchedNights([recorded])), ["y"]);
 });
 

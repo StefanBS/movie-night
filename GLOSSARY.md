@@ -79,7 +79,7 @@ How many credited picks a core member has, plus their join-time baseline. Picks 
 _Avoid_: score, turns used
 
 **Turn ranking**:
-The order of core members by served count (fewest first), then least-recent pick. Ranking for a Night considers that Night's attendees and ignores that Night's own pick.
+The order of core members by served count (fewest first), then least-recent pick. Ranking for a Night considers that Night's attendees and ignores that Night's own pick. The next picker is the soonest planned Night's picker, or the head of the ranking when no Night is planned; a planned Night's picker is already counted, so they are not the head.
 _Avoid_: queue, rotation order (for the computed result)
 
 ## Reminders

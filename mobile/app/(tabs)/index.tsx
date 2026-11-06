@@ -19,11 +19,11 @@ import { firstName } from "../../lib/avatar";
 import { GROUP_ID } from "../../lib/api";
 import { errorMessage } from "../../lib/errors";
 import { fetchGroup } from "../../lib/group";
-import { fetchTurn, nextPickers, pickerSummary, picksLabel, type TurnMember } from "../../lib/turn";
+import { fetchTurn, pickerSummary, picksLabel, type TurnMember } from "../../lib/turn";
 import { listNights, nightPicker, type Night } from "../../lib/nights";
-import { alsoPlanned, upNext } from "../../lib/nightLifecycle";
 import { alsoPlannedPicks, alsoPlannedWhen } from "../../lib/alsoPlanned";
 import { todayLocalISO } from "../../lib/date";
+import { tonightLineup } from "../../lib/tonight";
 import {
   borderWidth,
   createThemedStyles,
@@ -36,7 +36,7 @@ import {
   useColors,
 } from "../../theme";
 
-// OnDeck lists the next members after the picker (see nextPickers) as flush
+// OnDeck lists who picks after the next picker (lib/tonight.ts) as flush
 // rows with their pick counts.
 function OnDeck({ label, members }: { label: string; members: TurnMember[] }) {
   return (
@@ -176,14 +176,8 @@ export default function TonightScreen() {
     />
   );
 
-  const picker = order[0] ?? null;
-  const pickerFirstName = picker ? firstName(picker.name) : "";
+  const lineup = tonightLineup(order, nights);
   const today = todayLocalISO();
-  const scheduled = upNext(nights);
-  // Who's on deck follows whoever picks the next Night: the planned Night's
-  // own picker when there is one, else the head of the ranking.
-  const onDeck = nextPickers(order, scheduled?.pickerId ?? picker?.id ?? "");
-  const later = alsoPlanned(nights);
   const openNight = (night: Night) => {
     router.navigate({ pathname: "/night/[id]", params: { id: night.id, from: "Tonight" } });
   };
@@ -212,30 +206,30 @@ export default function TonightScreen() {
         <Text style={[styles.center, styles.error]}>
           {`Couldn't load tonight: ${error}`}
         </Text>
-      ) : picker === null ? (
+      ) : lineup.kind === "empty" ? (
         <View style={styles.body}>
           <Text style={styles.empty}>{"No one's in the rotation yet."}</Text>
         </View>
       ) : (
         <TabScrollView contentContainerStyle={styles.content}>
-          {scheduled !== null ? (
+          {lineup.kind === "planned" ? (
             <>
               <UpNextCard
-                night={scheduled}
+                night={lineup.night}
                 today={today}
-                onChooseFilm={() => openPick(scheduled)}
-                onWatched={() => openWatched(scheduled)}
-                onOpen={() => openNight(scheduled)}
-                onEdit={() => openEdit(scheduled)}
+                onChooseFilm={() => openPick(lineup.night)}
+                onWatched={() => openWatched(lineup.night)}
+                onOpen={() => openNight(lineup.night)}
+                onEdit={() => openEdit(lineup.night)}
               />
-              <AlsoPlanned nights={later} onOpen={openNight} />
-              {onDeck.length > 0 ? <OnDeck label="Then" members={onDeck} /> : null}
+              <AlsoPlanned nights={lineup.alsoPlanned} onOpen={openNight} />
+              {lineup.onDeck.length > 0 ? <OnDeck label="Then" members={lineup.onDeck} /> : null}
             </>
           ) : (
             <>
               <View style={styles.hero}>
-                <PickerHero name={picker.name} meta="Next up · no night planned yet" />
-                <Text style={styles.heroSummary}>{pickerSummary(picker)}</Text>
+                <PickerHero name={lineup.picker.name} meta="Next up · no night planned yet" />
+                <Text style={styles.heroSummary}>{pickerSummary(lineup.picker)}</Text>
               </View>
               <View style={styles.actions}>
                 <AppButton
@@ -243,13 +237,13 @@ export default function TonightScreen() {
                   onPress={() => router.navigate("/night/new")}
                 />
                 <AppButton
-                  title={`${pickerFirstName} can't make it`}
+                  title={`${firstName(lineup.picker.name)} can't make it`}
                   variant="ghost"
                   onPress={() => {}}
                 />
               </View>
-              {onDeck.length > 0 ? (
-                <OnDeck label={`After ${pickerFirstName}`} members={onDeck} />
+              {lineup.onDeck.length > 0 ? (
+                <OnDeck label={`After ${firstName(lineup.picker.name)}`} members={lineup.onDeck} />
               ) : null}
               <View style={styles.linkRow}>
                 <AppButton
