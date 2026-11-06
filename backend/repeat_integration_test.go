@@ -38,11 +38,7 @@ func TestRepeatingNightsIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		code, n := doJSON[nightResponse](t, mux, http.MethodPost, nightsPath, string(body))
-		if code != http.StatusCreated {
-			t.Fatalf("create night on %s = %d", date, code)
-		}
-		return n
+		return mustCreateNight(t, mux, seededGroup, string(body))
 	}
 	// mkFilmNight is mkNight today (UTC) with a film, so it can be recorded,
 	// and reminders that differ from the defaults.
@@ -148,9 +144,7 @@ func TestRepeatingNightsIntegration(t *testing.T) {
 
 	t.Run("a taken next date joins the series", func(t *testing.T) {
 		n := mkFilmNight(t, weekly)
-		if code, _ := doReq(t, mux, http.MethodPost, nightsPath, nightBody(utcDay(7), cleo)); code != http.StatusCreated {
-			t.Fatalf("create the later night = %d", code)
-		}
+		mustCreateNight(t, mux, seededGroup, nightBody(utcDay(7), cleo))
 		record(t, n)
 		next := nightOn(t, utcDay(7))
 		if next == nil || next.PickerID != cleo || !slices.Equal(attendeeIDs(*next), []string{cleo}) {
@@ -189,10 +183,7 @@ func TestRepeatingNightsIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		code, n := doJSON[nightResponse](t, mux, http.MethodPost, nightsPath, string(body))
-		if code != http.StatusCreated {
-			t.Fatalf("create guest night = %d", code)
-		}
+		n := mustCreateNight(t, mux, seededGroup, string(body))
 		if code, _ := attachMovie(t, mux, seededGroup, n.ID, `{"tmdbId":438631}`); code != http.StatusOK {
 			t.Fatalf("attach status = %d", code)
 		}

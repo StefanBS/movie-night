@@ -78,11 +78,6 @@ func TestMovieAttachIntegration(t *testing.T) {
 		return seedNight(t, "2026-06-12")
 	}
 
-	attach := func(t *testing.T, group, nightID, body string) (int, nightResponse) {
-		t.Helper()
-		return attachMovie(t, mux, group, nightID, body)
-	}
-
 	t.Run("search returns mapped results", func(t *testing.T) {
 		code, got := doJSON[[]movieDTO](t, mux, http.MethodGet, "/movies/search?q=dune", "")
 		if code != http.StatusOK {
@@ -114,7 +109,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	t.Run("attach stores and returns genres and runtime", func(t *testing.T) {
 		night := mkNight(t)
-		code, n := attach(t, seededGroup, night, `{"tmdbId":438631}`)
+		code, n := attachMovie(t, mux, seededGroup, night, `{"tmdbId":438631}`)
 		if code != http.StatusOK {
 			t.Fatalf("attach status = %d, want 200", code)
 		}
@@ -137,7 +132,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	t.Run("no genres and runtime 0 store {} and return [] and null", func(t *testing.T) {
 		night := mkNight(t)
-		_, n := attach(t, seededGroup, night, `{"tmdbId":555}`)
+		_, n := attachMovie(t, mux, seededGroup, night, `{"tmdbId":555}`)
 		if n.Movie == nil || n.Movie.Genres == nil || len(n.Movie.Genres) != 0 || n.Movie.RuntimeMinutes != nil {
 			t.Fatalf("night movie = %+v, want genres [] and runtime nil", n.Movie)
 		}
@@ -149,12 +144,12 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	t.Run("re-attach refreshes stale genres and runtime", func(t *testing.T) {
 		night := mkNight(t)
-		attach(t, seededGroup, night, `{"tmdbId":438631}`)
+		attachMovie(t, mux, seededGroup, night, `{"tmdbId":438631}`)
 		if _, err := pool.Exec(context.Background(),
 			"UPDATE movies SET genres='{Stale}', runtime_minutes=1 WHERE tmdb_id=438631"); err != nil {
 			t.Fatalf("stale movie: %v", err)
 		}
-		_, n := attach(t, seededGroup, night, `{"tmdbId":438631}`)
+		_, n := attachMovie(t, mux, seededGroup, night, `{"tmdbId":438631}`)
 		if n.Movie == nil || !slices.Equal(n.Movie.Genres, []string{"Science Fiction", "Adventure"}) ||
 			n.Movie.RuntimeMinutes == nil || *n.Movie.RuntimeMinutes != 155 {
 			t.Fatalf("night movie after re-attach = %+v", n.Movie)
@@ -186,7 +181,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	t.Run("attach sets the movie on the night and caches it", func(t *testing.T) {
 		night := mkNight(t)
-		code, n := attach(t, seededGroup, night, `{"tmdbId":438631}`)
+		code, n := attachMovie(t, mux, seededGroup, night, `{"tmdbId":438631}`)
 		if code != http.StatusOK {
 			t.Fatalf("attach status = %d, want 200", code)
 		}
@@ -217,7 +212,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	t.Run("attach a movie with no poster yields null posterUrl", func(t *testing.T) {
 		night := mkNight(t)
-		code, n := attach(t, seededGroup, night, `{"tmdbId":555}`)
+		code, n := attachMovie(t, mux, seededGroup, night, `{"tmdbId":555}`)
 		if code != http.StatusOK {
 			t.Fatalf("attach status = %d, want 200", code)
 		}
@@ -228,8 +223,8 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	t.Run("re-attach a different movie updates the night (correction)", func(t *testing.T) {
 		night := mkNight(t)
-		attach(t, seededGroup, night, `{"tmdbId":438631}`)
-		code, n := attach(t, seededGroup, night, `{"tmdbId":841}`)
+		attachMovie(t, mux, seededGroup, night, `{"tmdbId":438631}`)
+		code, n := attachMovie(t, mux, seededGroup, night, `{"tmdbId":841}`)
 		if code != http.StatusOK {
 			t.Fatalf("re-attach status = %d, want 200", code)
 		}
@@ -240,9 +235,9 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	t.Run("same tmdbId on two nights reuses one movies row", func(t *testing.T) {
 		n1 := mkNight(t)
-		attach(t, seededGroup, n1, `{"tmdbId":438631}`)
+		attachMovie(t, mux, seededGroup, n1, `{"tmdbId":438631}`)
 		n2 := seedNight(t, "2026-06-13") // a genuinely separate night
-		attach(t, seededGroup, n2, `{"tmdbId":438631}`)
+		attachMovie(t, mux, seededGroup, n2, `{"tmdbId":438631}`)
 		var count int
 		if err := pool.QueryRow(context.Background(),
 			"SELECT count(*) FROM movies WHERE tmdb_id=438631").Scan(&count); err != nil {
@@ -255,17 +250,17 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	t.Run("unknown tmdbId yields 404", func(t *testing.T) {
 		night := mkNight(t)
-		if code, _ := attach(t, seededGroup, night, `{"tmdbId":999999}`); code != http.StatusNotFound {
+		if code, _ := attachMovie(t, mux, seededGroup, night, `{"tmdbId":999999}`); code != http.StatusNotFound {
 			t.Fatalf("status = %d, want 404", code)
 		}
 	})
 
 	t.Run("malformed body and unknown night", func(t *testing.T) {
 		night := mkNight(t)
-		if code, _ := attach(t, seededGroup, night, `{"tmdbId":0}`); code != http.StatusBadRequest {
+		if code, _ := attachMovie(t, mux, seededGroup, night, `{"tmdbId":0}`); code != http.StatusBadRequest {
 			t.Errorf("non-positive tmdbId status = %d, want 400", code)
 		}
-		if code, _ := attach(t, seededGroup, unknownNight, `{"tmdbId":438631}`); code != http.StatusNotFound {
+		if code, _ := attachMovie(t, mux, seededGroup, unknownNight, `{"tmdbId":438631}`); code != http.StatusNotFound {
 			t.Errorf("unknown-night status = %d, want 404", code)
 		}
 	})

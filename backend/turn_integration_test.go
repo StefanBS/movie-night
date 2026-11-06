@@ -17,10 +17,10 @@ func seedTurnPicks(t *testing.T, pool *pgxpool.Pool) {
 	execSeed(t, pool, []seedStmt{
 		{
 			sql: `INSERT INTO nights (group_id, picker_id, is_credited, scheduled_for) VALUES
-				($1, 'a0000000-0000-0000-0000-000000000001', false, '2026-05-20'),
-				($1, 'a0000000-0000-0000-0000-000000000002', true,  '2026-05-01'),
-				($1, 'a0000000-0000-0000-0000-000000000003', true,  '2026-04-10')`,
-			args: []any{seededGroup},
+				($1, $2, false, '2026-05-20'),
+				($1, $3, true,  '2026-05-01'),
+				($1, $4, true,  '2026-04-10')`,
+			args: []any{seededGroup, ada, blake, cleo},
 		},
 		{sql: pickersAttend, args: []any{seededGroup}},
 	})
