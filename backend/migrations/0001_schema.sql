@@ -75,13 +75,19 @@ CREATE TYPE repeat_freq AS ENUM ('weekly', 'monthly');
 -- A repeating Night carries its rule (ADR-0014): weekly every 1 or 2 weeks on
 -- the Night's weekday, or monthly on the Nth (1–4) or last (-1) of that
 -- weekday. All three NULL is a Night that doesn't repeat.
+--
+-- The picker is a member of the group and one of the Night's attendees
+-- (fk_night_picker_attends, added after attendances). The API maps each named
+-- constraint to its own response (nightConstraintErrors), so a rule checked
+-- here is not checked again in Go.
 CREATE TABLE nights (
     id                      uuid              PRIMARY KEY DEFAULT uuidv7(),
     group_id                uuid              NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     scheduled_for           date              NOT NULL,
     start_time              time,
-    -- RESTRICT: a picker's row must outlive their Nights.
-    picker_id               uuid              NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    picker_id               uuid              NOT NULL,
+    -- Whether the picker was core when they were set as picker: a snapshot,
+    -- not recomputed when their role later changes.
     is_credited             boolean           NOT NULL DEFAULT true,
     -- RESTRICT keeps a film any Night references.
     movie_id                uuid              REFERENCES movies(id) ON DELETE RESTRICT,
@@ -94,6 +100,12 @@ CREATE TABLE nights (
     repeat_interval_weeks   smallint,
     repeat_week_of_month    smallint,
     created_at              timestamptz       NOT NULL DEFAULT now(),
+    -- The target of attendances' fk_attendance_night.
+    CONSTRAINT uq_night_group UNIQUE (id, group_id),
+    -- NO ACTION, not RESTRICT: a picker's membership must outlive their
+    -- Nights, but deleting a whole group still cascades through both.
+    CONSTRAINT fk_night_picker_member FOREIGN KEY (group_id, picker_id)
+        REFERENCES memberships (group_id, user_id),
     CONSTRAINT ck_night_repeat CHECK (
         (repeat_freq IS NULL AND repeat_interval_weeks IS NULL AND repeat_week_of_month IS NULL)
         OR (repeat_freq = 'weekly' AND repeat_interval_weeks IN (1, 2) AND repeat_week_of_month IS NULL)
@@ -109,11 +121,28 @@ CREATE INDEX ix_night_scheduled_for ON nights (scheduled_for);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+-- Who attends a Night. group_id is the Night's group, carried so an attendee
+-- must be a member of it (inactive members included: attendance records
+-- presence, and the turn ranking filters to active core).
 CREATE TABLE attendances (
-    night_id uuid NOT NULL REFERENCES nights(id) ON DELETE CASCADE,
-    user_id  uuid NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
-    PRIMARY KEY (night_id, user_id)
+    night_id uuid NOT NULL,
+    group_id uuid NOT NULL,
+    user_id  uuid NOT NULL,
+    PRIMARY KEY (night_id, user_id),
+    CONSTRAINT fk_attendance_night FOREIGN KEY (night_id, group_id)
+        REFERENCES nights (id, group_id) ON DELETE CASCADE,
+    CONSTRAINT fk_attendance_member FOREIGN KEY (group_id, user_id)
+        REFERENCES memberships (group_id, user_id) ON DELETE CASCADE
 );
+-- +goose StatementEnd
+
+-- +goose StatementBegin
+-- The picker is an attendee (ADR-0008). Deferred to COMMIT, so a Night and its
+-- attendees can be written in either order, and an edit can drop the old
+-- picker's attendance before it sets the new picker.
+ALTER TABLE nights ADD CONSTRAINT fk_night_picker_attends
+    FOREIGN KEY (id, picker_id) REFERENCES attendances (night_id, user_id)
+    DEFERRABLE INITIALLY DEFERRED;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -171,6 +200,7 @@ CREATE TABLE reminders_sent (
 
 -- +goose Down
 -- +goose StatementBegin
+ALTER TABLE IF EXISTS nights DROP CONSTRAINT IF EXISTS fk_night_picker_attends;
 DROP TABLE IF EXISTS reminders_sent, devices, attendances;
 DROP VIEW IF EXISTS full_nights;
 DROP TABLE IF EXISTS nights, movies, memberships, groups, users;

@@ -118,9 +118,9 @@ Table movies {
 Table nights {
   id            uuid         [pk, default: `uuidv7()`]
   group_id      uuid         [not null]
-  picker_id     uuid         [not null, note: 'The attendee who chose. Every night has one (ADR-0008); a free/guest pick is just uncredited']
+  picker_id     uuid         [not null, note: 'The attendee who chose: a member of the group and one of the night\'s attendees (FKs; the attendee check is deferred to COMMIT). Every night has one (ADR-0008); a free/guest pick is just uncredited']
   movie_id      uuid         [null, note: 'Attached after planning; NULL on a planned night with no movie yet (set via POST .../nights/{id}/movie)']
-  is_credited   boolean      [not null, default: true, note: 'TRUE only for normal core picks; guest/free picks are FALSE so they never affect standings (ADR-0006)']
+  is_credited   boolean      [not null, default: true, note: 'TRUE only for normal core picks; guest/free picks are FALSE so they never affect standings (ADR-0006). Set in SQL from the picker\'s role whenever the picker is set; a snapshot, not recomputed']
   scheduled_for date         [not null]
   created_at    timestamptz  [not null, default: `now()`]
   start_time    time         [null, note: 'Zone-less wall-clock time, read on each device\'s own clock; NULL = none (ADR-0011)']
@@ -142,12 +142,12 @@ Table nights {
 }
 
 Table attendances {
-  id      uuid [pk, default: `uuidv7()`]
   night_id uuid [not null]
+  group_id uuid [not null, note: 'The night\'s group, so an attendee must be a member of it']
   user_id  uuid [not null]
 
   Indexes {
-    (night_id, user_id) [unique, name: 'uq_attendance_night_user']
+    (night_id, user_id) [pk]
   }
 
   Note: 'Who was present on a given night. Feeds the "present tonight" set for the rotation (ADR-0004/0005).'
@@ -202,8 +202,8 @@ Table watchlist_items {
 // References
 // ---------------------------------------------------------------------------
 // delete rules: memberships/attendances/reviews/watchlist cascade with their
-// parent; nights restrict on movie (keep history) and on picker (people are
-// deactivated, never deleted — ADR-0006).
+// parent; nights restrict on movie (keep history) and on the picker's
+// membership (people are deactivated, never deleted — ADR-0006).
 
 Ref: devices.user_id > users.id [delete: cascade]
 
@@ -211,14 +211,16 @@ Ref: memberships.group_id > groups.id [delete: cascade]
 Ref: memberships.user_id  > users.id  [delete: cascade]
 
 Ref: nights.group_id > groups.id [delete: cascade]
-Ref: nights.picker_id > users.id [delete: restrict]
+Ref: nights.(group_id, picker_id) > memberships.(group_id, user_id) [delete: no action]
+// The picker attends: deferrable, initially deferred (checked at COMMIT).
+Ref: nights.(id, picker_id) > attendances.(night_id, user_id)
 
 Ref: reminders_sent.night_id > nights.id [delete: cascade]
 Ref: reminders_sent.user_id  > users.id [delete: cascade]
 Ref: nights.movie_id  > movies.id [delete: restrict]
 
-Ref: attendances.night_id > nights.id [delete: cascade]
-Ref: attendances.user_id > users.id [delete: cascade]
+Ref: attendances.(night_id, group_id) > nights.(id, group_id) [delete: cascade]
+Ref: attendances.(group_id, user_id) > memberships.(group_id, user_id) [delete: cascade]
 
 Ref: reviews.night_id > nights.id [delete: cascade]
 Ref: reviews.user_id > users.id [delete: cascade]

@@ -1,13 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
-	"maps"
-	"strings"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
@@ -38,12 +42,11 @@ func TestNightCreateRequestValidation(t *testing.T) {
 	const b = "a0000000-0000-0000-0000-000000000002"
 
 	tests := []struct {
-		name          string
-		req           createNightRequest
-		wantErr       bool
-		wantNotAttend bool   // the error is errPickerNotAttendee (a 422, not a 400)
-		wantCount     int    // attendee count when valid
-		wantStart     string // "" = no start time
+		name      string
+		req       createNightRequest
+		wantErr   bool
+		wantCount int    // attendee count when valid
+		wantStart string // "" = no start time
 	}{
 		{name: "with a start time", req: createNightRequest{ScheduledFor: "2026-06-12", StartTime: str("19:30"), Attendees: []string{a}, PickerID: a}, wantCount: 1, wantStart: "19:30"},
 		{name: "bad start time", req: createNightRequest{ScheduledFor: "2026-06-12", StartTime: str("7pm"), Attendees: []string{a}, PickerID: a}, wantErr: true},
@@ -53,8 +56,8 @@ func TestNightCreateRequestValidation(t *testing.T) {
 		{name: "bad date", req: createNightRequest{ScheduledFor: "12-06-2026", Attendees: []string{a}, PickerID: a}, wantErr: true},
 		{name: "bad attendee uuid", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{"nope"}, PickerID: a}, wantErr: true},
 		{name: "missing picker", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a}}, wantErr: true},
-		{name: "picker not attending", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a}, PickerID: b}, wantErr: true, wantNotAttend: true},
-		{name: "no attendees", req: createNightRequest{ScheduledFor: "2026-06-12", PickerID: a}, wantErr: true, wantNotAttend: true},
+		// That the picker attends is the schema's rule, checked on the write.
+		{name: "picker not attending", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a}, PickerID: b}, wantCount: 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -62,9 +65,6 @@ func TestNightCreateRequestValidation(t *testing.T) {
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")
-				}
-				if got := errors.Is(err, errPickerNotAttendee); got != tt.wantNotAttend {
-					t.Fatalf("errors.Is(err, errPickerNotAttendee) = %v, want %v (err %v)", got, tt.wantNotAttend, err)
 				}
 				return
 			}
@@ -210,39 +210,6 @@ func TestValidateReminders(t *testing.T) {
 	}
 }
 
-// The picker must be one of the Night's attendees; their role decides credit.
-func TestAttendeeRole(t *testing.T) {
-	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
-	frankie := uuid.MustParse("a0000000-0000-0000-0000-000000000006")
-	stranger := uuid.MustParse("a0000000-0000-0000-0000-0000000000ff")
-	attendees := []db.ListAttendeesRow{
-		{ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
-		{ID: frankie, Name: "Frankie", Role: db.MembershipRoleGuest},
-	}
-	tests := []struct {
-		name      string
-		attendees []db.ListAttendeesRow
-		picker    uuid.UUID
-		want      db.MembershipRole
-		wantErr   error
-	}{
-		{name: "core attendee", attendees: attendees, picker: ada, want: db.MembershipRoleCore},
-		{name: "guest attendee", attendees: attendees, picker: frankie, want: db.MembershipRoleGuest},
-		{name: "not attending", attendees: attendees, picker: stranger, wantErr: errPickerNotAttendee},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := attendeeRole(tt.attendees, tt.picker)
-			if !errors.Is(err, tt.wantErr) {
-				t.Fatalf("err = %v, want %v", err, tt.wantErr)
-			}
-			if got != tt.want {
-				t.Errorf("role = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestPresentIDsIsNonNilWhenEmpty(t *testing.T) {
 	// An attendee-less night must rank NOBODY, so present must be empty-non-nil
 	// (encodes as SQL '{}'), never nil (which RankGroupTurn treats as "rank all").
@@ -368,69 +335,6 @@ func TestToMovieResults(t *testing.T) {
 	}
 }
 
-func TestAttendeeRoles(t *testing.T) {
-	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
-	blake := uuid.MustParse("a0000000-0000-0000-0000-000000000002")
-	stranger := uuid.MustParse("a0000000-0000-0000-0000-0000000000ff")
-	members := []db.FilterGroupMembersRow{
-		{UserID: ada, Role: db.MembershipRoleCore},
-		{UserID: blake, Role: db.MembershipRoleGuest},
-	}
-
-	tests := []struct {
-		name      string
-		attendees []uuid.UUID
-		members   []db.FilterGroupMembersRow
-		wantRoles map[uuid.UUID]db.MembershipRole
-		wantBad   uuid.UUID // the id the error must name; uuid.Nil = no error
-	}{
-		{
-			name:      "every attendee is a member",
-			attendees: []uuid.UUID{ada, blake},
-			members:   members,
-			wantRoles: map[uuid.UUID]db.MembershipRole{ada: db.MembershipRoleCore, blake: db.MembershipRoleGuest},
-		},
-		{
-			name:      "a non-member is named",
-			attendees: []uuid.UUID{ada, stranger, blake},
-			members:   members,
-			wantBad:   stranger,
-		},
-		{
-			name:      "the first missing attendee in request order is named",
-			attendees: []uuid.UUID{blake, ada},
-			members:   members[:1],
-			wantBad:   blake,
-		},
-		{
-			name:      "no attendees passes trivially",
-			attendees: []uuid.UUID{},
-			members:   nil,
-			wantRoles: map[uuid.UUID]db.MembershipRole{},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			roles, err := attendeeRoles(tt.attendees, tt.members)
-			if tt.wantBad != uuid.Nil {
-				if !errors.Is(err, errNotMember) {
-					t.Fatalf("err = %v, want errNotMember", err)
-				}
-				if !strings.Contains(err.Error(), tt.wantBad.String()) {
-					t.Fatalf("err = %q, want it to name %s", err, tt.wantBad)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected err: %v", err)
-			}
-			if !maps.Equal(roles, tt.wantRoles) {
-				t.Fatalf("roles = %v, want %v", roles, tt.wantRoles)
-			}
-		})
-	}
-}
-
 func TestGroupAttendees(t *testing.T) {
 	n1 := uuid.MustParse("b0000000-0000-0000-0000-0000000000aa")
 	n2 := uuid.MustParse("b0000000-0000-0000-0000-0000000000bb")
@@ -530,6 +434,44 @@ func TestRecordableAsWatched(t *testing.T) {
 			}
 			if got := recordableAsWatched(d, tt.now); got != tt.want {
 				t.Errorf("recordableAsWatched(%s, %v) = %v, want %v", tt.scheduledFor, tt.now, got, tt.want)
+			}
+		})
+	}
+}
+
+// A Night write that breaks a schema rule answers by the constraint's name; any
+// other database error is a 500.
+func TestWriteNightError(t *testing.T) {
+	violation := func(code, constraint string) error {
+		return fmt.Errorf("commit: %w", &pgconn.PgError{Code: code, ConstraintName: constraint})
+	}
+	tests := []struct {
+		name     string
+		err      error
+		wantCode int
+		wantMsg  string
+	}{
+		{name: "date taken", err: violation("23505", "uq_night_per_group_date"), wantCode: http.StatusConflict, wantMsg: "there is already a night on that date"},
+		{name: "picker not attending, at commit", err: violation("23503", "fk_night_picker_attends"), wantCode: http.StatusUnprocessableEntity, wantMsg: "picker is not an attendee of this night"},
+		{name: "picker not a member", err: violation("23503", "fk_night_picker_member"), wantCode: http.StatusUnprocessableEntity, wantMsg: "picker is not a member of this group"},
+		{name: "attendee not a member", err: violation("23503", "fk_attendance_member"), wantCode: http.StatusUnprocessableEntity, wantMsg: "attendee is not a member of this group"},
+		{name: "watched without a film", err: violation("23514", "ck_night_watched_has_film"), wantCode: http.StatusUnprocessableEntity, wantMsg: "a watched night must have a film"},
+		{name: "watched and repeating", err: violation("23514", "ck_night_watched_no_repeat"), wantCode: http.StatusUnprocessableEntity, wantMsg: "a watched night can't repeat"},
+		{name: "another constraint is a bug", err: violation("23505", "movies_tmdb_id_key"), wantCode: http.StatusInternalServerError, wantMsg: "internal server error"},
+		{name: "missing night", err: pgx.ErrNoRows, wantCode: http.StatusNotFound, wantMsg: "night not found"},
+		{name: "dated ahead", err: errWatchedDateAhead, wantCode: http.StatusUnprocessableEntity, wantMsg: errWatchedDateAhead.Error()},
+		{name: "anything else", err: errors.New("boom"), wantCode: http.StatusInternalServerError, wantMsg: "internal server error"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			writeNightError(rec, uuid.Nil, "test", tt.err)
+			var body struct{ Error string }
+			if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+				t.Fatalf("decode body %q: %v", rec.Body, err)
+			}
+			if rec.Code != tt.wantCode || body.Error != tt.wantMsg {
+				t.Errorf("got %d %q, want %d %q", rec.Code, body.Error, tt.wantCode, tt.wantMsg)
 			}
 		})
 	}

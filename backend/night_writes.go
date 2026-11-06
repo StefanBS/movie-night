@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"slices"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
@@ -16,25 +16,23 @@ import (
 
 // The writes that decide a Night's picker, attendees or film live here, and each runs
 // inside the caller's withTx. A write to an existing Night locks it first
-// (LockNight), so the ADR-0008 rules are checked against a Night no other write
-// can change before this one commits: the picker is an attendee, attendees are
-// members, and whether a pick is credited follows from the picker's role. The
-// writes return at most an id; handlers read the result through GetNight.
+// (LockNight), so no other write can change it before this one commits. The
+// schema holds the Night rules (ADR-0008, ADR-0012, ADR-0014): the picker is
+// an attendee, attendees and the picker are members, a Watched Night has a
+// film and doesn't repeat, and the queries credit a pick by the picker's role.
+// writeNightError maps each broken constraint to its response; only the
+// clock-dependent ADR-0013 bound is checked here. The writes return at most an
+// id; handlers read the result through GetNight.
 
-// createNight checks a validated Night's attendees and inserts it, crediting
-// the pick by the picker's role. Returns the new Night's id.
+// createNight inserts a validated Night and its attendees. Returns the new
+// Night's id.
 func createNight(ctx context.Context, q *db.Queries, gid uuid.UUID, night parsedCreateNight) (uuid.UUID, error) {
-	roles, err := memberRoles(ctx, q, gid, night.Attendees)
-	if err != nil {
-		return uuid.Nil, err
-	}
 	freq, intervalWeeks, weekOfMonth := repeatColumns(night.Repeat)
 	return q.CreateNight(ctx, db.CreateNightParams{
 		GroupID:             gid,
 		ScheduledFor:        night.ScheduledFor,
 		StartTime:           night.StartTime,
 		PickerID:            night.Picker,
-		IsCredited:          creditedForRole(roles[night.Picker]),
 		Attendees:           night.Attendees,
 		RepeatFreq:          freq,
 		RepeatIntervalWeeks: intervalWeeks,
@@ -43,13 +41,12 @@ func createNight(ctx context.Context, q *db.Queries, gid uuid.UUID, night parsed
 }
 
 // editNight replaces a Night's editable fields and attendee set, and when the
-// edit says so changes its picker and records it as watched (ADR-0012). The
-// picker, new or kept, must be an attendee, and only a Night with a film can
-// be recorded. A Night being recorded, or already a Watched Night, must be
-// dated no later than recordableAsWatched allows at now (ADR-0013), and a
-// Watched Night can't repeat. Recording a repeating Night moves its series on
-// (ADR-0014). A taken date fails on the UpdateNight statement, after the
-// attendee writes; the rollback undoes them.
+// edit says so changes its picker and records it as watched (ADR-0012). A
+// Night being recorded, or already a Watched Night, must be dated no later
+// than recordableAsWatched allows at now (ADR-0013). Recording a repeating
+// Night moves its series on (ADR-0014). The schema's rules fail on the
+// statement that breaks them, or at COMMIT for the picker being an attendee;
+// the rollback undoes the writes before it.
 func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit nightEdit, now time.Time) error {
 	locked, err := q.LockNight(ctx, db.LockNightParams{NightID: nightID, GroupID: gid})
 	if err != nil {
@@ -59,35 +56,17 @@ func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit 
 	if edit.Picker.Valid {
 		picker = edit.Picker.Bytes
 	}
-	if !slices.Contains(edit.Attendees, picker) {
-		return errPickerNotAttendee
-	}
-	roles, err := memberRoles(ctx, q, gid, edit.Attendees)
-	if err != nil {
-		return err
-	}
-	if edit.Watched && !locked.HasMovie {
-		return errWatchedWithoutFilm
-	}
 	if (edit.Watched || locked.IsWatched) && !recordableAsWatched(edit.ScheduledFor, now) {
 		return errWatchedDateAhead
-	}
-	if locked.IsWatched && edit.Repeat != nil {
-		return errWatchedRepeats
 	}
 	if err := q.RemoveAttendeesNotIn(ctx, db.RemoveAttendeesNotInParams{NightID: nightID, Keep: edit.Attendees}); err != nil {
 		return err
 	}
-	if err := q.AddAttendees(ctx, db.AddAttendeesParams{NightID: nightID, UserIds: edit.Attendees}); err != nil {
+	if err := q.AddAttendees(ctx, db.AddAttendeesParams{NightID: nightID, GroupID: gid, UserIds: edit.Attendees}); err != nil {
 		return err
 	}
 	if edit.Picker.Valid {
-		if err := q.SetNightPicker(ctx, db.SetNightPickerParams{
-			NightID:    nightID,
-			GroupID:    gid,
-			PickerID:   picker,
-			IsCredited: creditedForRole(roles[picker]),
-		}); err != nil {
+		if err := q.SetNightPicker(ctx, db.SetNightPickerParams{NightID: nightID, GroupID: gid, PickerID: picker}); err != nil {
 			return err
 		}
 	}
@@ -164,16 +143,12 @@ func setFilm(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, movie m
 	})
 }
 
-// clearFilm detaches a Night's film. A Watched Night keeps its film, since a
-// Night needs one to be recorded and recording is not undone. Clearing a Night
+// clearFilm detaches a Night's film. A Watched Night keeps its film
+// (ck_night_watched_has_film), since recording is not undone. Clearing a Night
 // that has no film is not an error.
 func clearFilm(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID) error {
-	locked, err := q.LockNight(ctx, db.LockNightParams{NightID: nightID, GroupID: gid})
-	if err != nil {
+	if _, err := q.LockNight(ctx, db.LockNightParams{NightID: nightID, GroupID: gid}); err != nil {
 		return err
-	}
-	if locked.IsWatched {
-		return errWatchedFilmCleared
 	}
 	return q.ClearNightMovie(ctx, db.ClearNightMovieParams{NightID: nightID, GroupID: gid})
 }
@@ -217,54 +192,51 @@ func moveSeriesOn(ctx context.Context, q *db.Queries, gid, from, picker uuid.UUI
 	if len(ranked) > 0 {
 		picker = ranked[0].ID
 	}
-	role, err := attendeeRole(attendees, picker)
-	if err != nil {
-		return err
-	}
 	_, err = q.CreateNextInSeries(ctx, db.CreateNextInSeriesParams{
 		GroupID:      gid,
 		FromNight:    from,
 		ScheduledFor: pgtype.Date{Time: next, Valid: true},
 		PickerID:     picker,
-		IsCredited:   creditedForRole(role),
 	})
 	return err
 }
 
-// memberRoles returns each attendee's role in the group, or errNotMember for
-// the first one who has no membership.
-func memberRoles(ctx context.Context, q *db.Queries, gid uuid.UUID, attendees []uuid.UUID) (map[uuid.UUID]db.MembershipRole, error) {
-	members, err := q.FilterGroupMembers(ctx, db.FilterGroupMembersParams{GroupID: gid, UserIds: attendees})
-	if err != nil {
-		return nil, err
-	}
-	return attendeeRoles(attendees, members)
+// nightConstraintError is the response for a Night write that broke a named
+// schema constraint: its status and the message the app shows.
+type nightConstraintError struct {
+	status int
+	msg    string
 }
 
-// attendeeRole finds the picker among a Night's attendees and returns their
-// role, or errPickerNotAttendee. Pure.
-func attendeeRole(attendees []db.ListAttendeesRow, picker uuid.UUID) (db.MembershipRole, error) {
-	i := slices.IndexFunc(attendees, func(a db.ListAttendeesRow) bool { return a.ID == picker })
-	if i < 0 {
-		return "", errPickerNotAttendee
-	}
-	return attendees[i].Role, nil
+// nightConstraintErrors maps each Night rule the schema enforces, by
+// constraint name, to its response. A violation of any other constraint is a
+// bug, so it stays a 500.
+var nightConstraintErrors = map[string]nightConstraintError{
+	"uq_night_per_group_date":    {http.StatusConflict, "there is already a night on that date"},
+	"fk_night_picker_attends":    {http.StatusUnprocessableEntity, "picker is not an attendee of this night"},
+	"fk_night_picker_member":     {http.StatusUnprocessableEntity, "picker is not a member of this group"},
+	"fk_attendance_member":       {http.StatusUnprocessableEntity, "attendee is not a member of this group"},
+	"ck_night_watched_has_film":  {http.StatusUnprocessableEntity, "a watched night must have a film"},
+	"ck_night_watched_no_repeat": {http.StatusUnprocessableEntity, "a watched night can't repeat"},
 }
 
 // writeNightError maps a failed Night write to its response: a missing Night
-// is a 404; a broken ADR-0008 rule or Watched Night rule (no film, dated
-// ahead, repeating, film cleared) a 422; a date another Night holds a 409; and
-// anything else a 500.
+// is a 404; a broken schema rule its nightConstraintErrors entry, whether the
+// statement or a deferred check at COMMIT broke it; a Night dated too far
+// ahead to be watched a 422; and anything else a 500.
 func writeNightError(w http.ResponseWriter, gid uuid.UUID, op string, err error) {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		if e, ok := nightConstraintErrors[pgErr.ConstraintName]; ok {
+			writeJSONError(w, e.status, e.msg)
+			return
+		}
+	}
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		writeJSONError(w, http.StatusNotFound, "night not found")
-	case errors.Is(err, errPickerNotAttendee), errors.Is(err, errNotMember),
-		errors.Is(err, errWatchedWithoutFilm), errors.Is(err, errWatchedDateAhead),
-		errors.Is(err, errWatchedRepeats), errors.Is(err, errWatchedFilmCleared):
+	case errors.Is(err, errWatchedDateAhead):
 		writeJSONError(w, http.StatusUnprocessableEntity, err.Error())
-	case isUniqueViolation(err):
-		writeJSONError(w, http.StatusConflict, errNightDateTaken)
 	default:
 		internalError(w, gid, op, err)
 	}

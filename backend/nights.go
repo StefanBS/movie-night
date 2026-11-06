@@ -4,11 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -34,18 +32,6 @@ type parsedCreateNight struct {
 	Repeat       *repeatRule
 }
 
-// errPickerNotAttendee is the 422 shared by create, edit and a series moving
-// on: a Night's picker is always one of its attendees.
-var errPickerNotAttendee = errors.New("picker is not an attendee of this night")
-
-// errWatchedWithoutFilm is the 422 for recording a Night that has no film yet:
-// there is nothing to have watched (ADR-0012).
-var errWatchedWithoutFilm = errors.New("night has no film to record as watched")
-
-// errWatchedFilmCleared is the 422 for clearing a Watched Night's film: a
-// Night needs its film to be recorded, and recording is not undone.
-var errWatchedFilmCleared = errors.New("a watched night keeps its film")
-
 // errWatchedDateAhead is the 422 for recording a Night that hasn't happened,
 // or moving a Watched Night to a date that hasn't (ADR-0013).
 var errWatchedDateAhead = errors.New("night is dated too far ahead to be recorded as watched")
@@ -59,15 +45,6 @@ var errWatchedDateAhead = errors.New("night is dated too far ahead to be recorde
 func recordableAsWatched(scheduledFor pgtype.Date, now time.Time) bool {
 	return !scheduledFor.Time.After(utcDay(now, 1))
 }
-
-// errWatchedRepeats is the 422 for setting a repeat on a Watched Night: a
-// series moves on from a Night when it's recorded, so a recorded Night can't
-// carry one (ADR-0014).
-var errWatchedRepeats = errors.New("a watched night can't repeat")
-
-// errNotMember is the 422 for an attendee who has no membership in the group;
-// attendeeRoles wraps it with the offending id.
-var errNotMember = errors.New("attendee is not a member of this group")
 
 // parseAttendeeIDs parses and de-duplicates attendee UUID strings, preserving
 // first-seen order. Always returns a non-nil slice. Pure.
@@ -140,8 +117,8 @@ func formatStartTimeWire(t pgtype.Time) *string {
 
 // validateCreateNightRequest validates a decoded body: scheduledFor must be an
 // ISO (YYYY-MM-DD) date, startTime (optional) an HH:MM time, every attendee and
-// the picker must be UUIDs, the picker must be among the attendees
-// (errPickerNotAttendee), and a repeat (optional) must match the date. Pure —
+// the picker must be UUIDs, and a repeat (optional) must match the date. That
+// the picker attends is the schema's rule (fk_night_picker_attends). Pure —
 // no DB, no clock.
 func validateCreateNightRequest(req createNightRequest) (parsedCreateNight, error) {
 	scheduledFor, err := parseScheduledFor(req.ScheduledFor)
@@ -163,9 +140,6 @@ func validateCreateNightRequest(req createNightRequest) (parsedCreateNight, erro
 	repeat, err := parseRepeat(req.Repeat, scheduledFor.Time)
 	if err != nil {
 		return parsedCreateNight{}, err
-	}
-	if !slices.Contains(attendees, picker) {
-		return parsedCreateNight{}, errPickerNotAttendee
 	}
 	return parsedCreateNight{
 		ScheduledFor: scheduledFor,
@@ -356,8 +330,7 @@ func validateReminders(req remindersDTO) error {
 	return nil
 }
 
-// validateUpdateNightRequest parses the whole edited Night. The picker rule
-// needs the stored Night, so editNight checks it. Pure.
+// validateUpdateNightRequest parses the whole edited Night. Pure.
 func validateUpdateNightRequest(req updateNightRequest) (nightEdit, error) {
 	scheduledFor, err := parseScheduledFor(req.ScheduledFor)
 	if err != nil {
@@ -397,31 +370,6 @@ func validateUpdateNightRequest(req updateNightRequest) (nightEdit, error) {
 	}, nil
 }
 
-// creditedForRole derives is_credited from the picker's role: a core pick moves
-// the rotation (credited); a guest pick never does. Pure.
-func creditedForRole(role db.MembershipRole) bool {
-	return role == db.MembershipRoleCore
-}
-
-// attendeeRoles checks attendees against the FilterGroupMembers rows for them
-// and returns each one's role, or errNotMember naming the first attendee (in
-// request order) with no membership in the group. Inactive members are
-// intentionally allowed: attendance records presence, and the pick order filters
-// to active core (RankGroupTurn), so an inactive attendee — like a guest — is
-// recorded but never appears in the order. Pure.
-func attendeeRoles(attendees []uuid.UUID, members []db.FilterGroupMembersRow) (map[uuid.UUID]db.MembershipRole, error) {
-	roles := make(map[uuid.UUID]db.MembershipRole, len(members))
-	for _, m := range members {
-		roles[m.UserID] = m.Role
-	}
-	for _, uid := range attendees {
-		if _, ok := roles[uid]; !ok {
-			return nil, fmt.Errorf("%w: %s", errNotMember, uid)
-		}
-	}
-	return roles, nil
-}
-
 // loadNight fetches a night scoped to its group, mapping a miss to 404 and any
 // other error to 500. It hands back the row so a caller that needs the night
 // itself — not just proof it exists — does not read it a second time. ok=false
@@ -451,22 +399,11 @@ func writeNight(w http.ResponseWriter, r *http.Request, store *db.Queries, gid, 
 	respondJSON(w, code, newNightResponse(night, groupAttendees(rows)[night.ID]))
 }
 
-// isUniqueViolation reports whether err is a Postgres unique-constraint
-// violation — for nights, uq_night_per_group_date.
-func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23505"
-}
-
-// errNightDateTaken is the 409 for create and edit: at most one night per
-// group per date.
-const errNightDateTaken = "there is already a night on that date"
-
 // createNightHandler serves POST /groups/{groupId}/nights. A night is created
 // whole — date, attendees and picker in one request (ADR-0008); unfinished plans
-// live on the client, so there is no picker-less night to resume. createNight
-// checks every attendee is a member and credits the pick by the picker's role.
-// A second night on the same date is a 409.
+// live on the client, so there is no picker-less night to resume. A picker who
+// doesn't attend, or a non-member, is a 422 and a second night on the same
+// date a 409 (writeNightError).
 func createNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
@@ -478,10 +415,6 @@ func createNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		parsed, err := validateCreateNightRequest(req)
-		if errors.Is(err, errPickerNotAttendee) {
-			writeJSONError(w, http.StatusUnprocessableEntity, err.Error())
-			return
-		}
 		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return

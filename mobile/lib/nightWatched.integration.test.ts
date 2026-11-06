@@ -214,14 +214,14 @@ test("record saves who came and who picked as watched, then shows Done; back ret
 });
 
 test("a failed record shows the error and stays on People with the selection intact", async () => {
-  const refuse: Handler = (_q, res) => json(res, 422, { error: "night has no film to record as watched" });
+  const refuse: Handler = (_q, res) => json(res, 422, { error: "a watched night must have a film" });
   await withFlow(backend({ [`PATCH /groups/${GROUP}/nights/n1`]: refuse }), async (flow) => {
     await flow.load();
     await flow.toggle("ada");
     assert.equal(await flow.record(), null);
     assert.equal(flow.state.step, "who");
     assert.equal(flow.state.busy, null);
-    assert.equal(flow.state.actionError, "night has no film to record as watched");
+    assert.equal(flow.state.actionError, "a watched night must have a film");
     assert.deepEqual([...flow.state.attendeeIds].sort(), ["ada", "blake", "cleo"]);
     assert.equal(flow.state.pickerId, "blake");
     assert.equal(flow.state.night?.watchedAt, null);

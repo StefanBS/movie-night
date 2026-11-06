@@ -219,8 +219,8 @@ func TestNightEditsIntegration(t *testing.T) {
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("patch status = %d, want 422", code)
 		}
-		if !strings.Contains(string(body), unknownUser) {
-			t.Fatalf("body = %s, want it to name %s", body, unknownUser)
+		if !strings.Contains(string(body), "attendee is not a member of this group") {
+			t.Fatalf("body = %s, want the non-member error", body)
 		}
 		unchanged(t, n)
 	})

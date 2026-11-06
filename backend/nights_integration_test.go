@@ -168,8 +168,8 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		if code != http.StatusUnprocessableEntity {
 			t.Fatalf("status = %d, want 422", code)
 		}
-		if !strings.Contains(string(body), unknownUser) {
-			t.Fatalf("body = %s, want it to name %s", body, unknownUser)
+		if !strings.Contains(string(body), "attendee is not a member of this group") {
+			t.Fatalf("body = %s, want the non-member error", body)
 		}
 		// The date is still free: nothing was written before the 422.
 		createNight(t, nightBody("2026-06-12", ada))
@@ -295,7 +295,8 @@ func TestNightsListIntegration(t *testing.T) {
 		        VALUES ($1, $2, $3, true, '2026-06-01')`, args: []any{night2, seededGroup, blake}},
 		{sql: `INSERT INTO nights (id, group_id, picker_id, is_credited, scheduled_for)
 		        VALUES ($1, $2, $3, true, '2099-07-01')`, args: []any{upcoming, seededGroup, cleo}},
-		{sql: `INSERT INTO attendances (night_id, user_id) VALUES ($1, $2), ($1, $3)`, args: []any{night1, ada, blake}},
+		{sql: `INSERT INTO attendances (night_id, group_id, user_id) VALUES ($1, $2, $3), ($1, $2, $4)`, args: []any{night1, seededGroup, ada, blake}},
+		{sql: `INSERT INTO attendances (night_id, group_id, user_id) VALUES ($1, $2, $3), ($4, $2, $5)`, args: []any{night2, seededGroup, blake, upcoming, cleo}},
 	})
 
 	do := func(t *testing.T, path string) (int, []nightResponse) {

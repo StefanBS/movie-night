@@ -23,13 +23,6 @@ JOIN users u ON u.id = m.user_id
 WHERE m.group_id = sqlc.arg(group_id) AND m.user_id = sqlc.arg(user_id)
 FOR UPDATE OF m;
 
--- name: FilterGroupMembers :many
--- The ids among user_ids that hold a membership in the group (active or
--- inactive), with their role; an id without one is simply absent.
-SELECT user_id, role
-FROM memberships
-WHERE group_id = sqlc.arg(group_id) AND user_id = ANY(sqlc.arg(user_ids)::uuid[]);
-
 -- name: UpdateMembership :exec
 -- Writes the state planMove decided.
 UPDATE memberships

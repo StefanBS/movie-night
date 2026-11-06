@@ -3,17 +3,19 @@
 -- of a full Night.
 
 -- name: CreateNight :one
--- Inserts the night and its attendees in one statement, so a night never exists
--- without the attendees its picker is drawn from. Attendees must be deduped.
+-- Inserts the night and its attendees in one statement. Attendees must be
+-- deduped. The pick is credited when the picker is core (ADR-0006).
 WITH night AS (
   INSERT INTO nights (group_id, scheduled_for, start_time, picker_id, is_credited,
                      repeat_freq, repeat_interval_weeks, repeat_week_of_month)
-  VALUES (sqlc.arg(group_id), sqlc.arg(scheduled_for), sqlc.arg(start_time), sqlc.arg(picker_id), sqlc.arg(is_credited),
+  VALUES (sqlc.arg(group_id), sqlc.arg(scheduled_for), sqlc.arg(start_time), sqlc.arg(picker_id),
+          EXISTS (SELECT 1 FROM memberships m
+                  WHERE m.group_id = sqlc.arg(group_id) AND m.user_id = sqlc.arg(picker_id) AND m.role = 'core'),
           sqlc.narg(repeat_freq), sqlc.narg(repeat_interval_weeks), sqlc.narg(repeat_week_of_month))
-  RETURNING id
+  RETURNING id, group_id
 ), attended AS (
-  INSERT INTO attendances (night_id, user_id)
-  SELECT night.id, unnest(sqlc.arg(attendees)::uuid[]) FROM night
+  INSERT INTO attendances (night_id, group_id, user_id)
+  SELECT night.id, night.group_id, unnest(sqlc.arg(attendees)::uuid[]) FROM night
 )
 SELECT id FROM night;
 
@@ -28,11 +30,9 @@ ORDER BY scheduled_for DESC;
 
 -- name: LockNight :one
 -- Locks the night row for the rest of the write's transaction and returns its
--- picker, whether it has a film, whether it is recorded as watched, and its
--- date and repeat, so no other write can change them or the attendees until it
--- commits.
+-- picker, whether it is recorded as watched, and its date and repeat, so no
+-- other write can change them or the attendees until it commits.
 SELECT picker_id,
-       (movie_id IS NOT NULL)::boolean AS has_movie,
        (watched_at IS NOT NULL)::boolean AS is_watched,
        scheduled_for, repeat_freq, repeat_interval_weeks, repeat_week_of_month
 FROM nights
@@ -45,14 +45,17 @@ WHERE night_id = sqlc.arg(night_id) AND NOT (user_id = ANY(sqlc.arg(keep)::uuid[
 
 -- name: AddAttendees :exec
 -- Adds each user who isn't attending yet; existing attendances are left as-is.
-INSERT INTO attendances (night_id, user_id)
-SELECT sqlc.arg(night_id), unnest(sqlc.arg(user_ids)::uuid[])
+INSERT INTO attendances (night_id, group_id, user_id)
+SELECT sqlc.arg(night_id), sqlc.arg(group_id), unnest(sqlc.arg(user_ids)::uuid[])
 ON CONFLICT (night_id, user_id) DO NOTHING;
 
 -- name: SetNightPicker :exec
+-- Credits the pick when the new picker is core (ADR-0006).
 UPDATE nights
-SET picker_id = sqlc.arg(picker_id), is_credited = sqlc.arg(is_credited)
-WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
+SET picker_id = sqlc.arg(picker_id),
+    is_credited = EXISTS (SELECT 1 FROM memberships m
+                          WHERE m.group_id = sqlc.arg(group_id) AND m.user_id = sqlc.arg(picker_id) AND m.role = 'core')
+WHERE nights.id = sqlc.arg(night_id) AND nights.group_id = sqlc.arg(group_id);
 
 -- name: UpdateNight :exec
 -- Replaces every editable field at once. A NULL start_time clears it, and
@@ -88,20 +91,23 @@ FOR UPDATE;
 -- name: CreateNextInSeries :one
 -- Opens the next Night of a series (ADR-0014) from the Night it moves on from:
 -- its start time, reminders, repeat and attendees, on the new date with the
--- given picker and no film. Attendances are read as the transaction left them.
+-- given picker and no film, credited when the picker is core (ADR-0006).
+-- Attendances are read as the transaction left them.
 WITH night AS (
   INSERT INTO nights (group_id, scheduled_for, start_time, picker_id, is_credited,
                      remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience,
                      repeat_freq, repeat_interval_weeks, repeat_week_of_month)
-  SELECT src.group_id, sqlc.arg(scheduled_for), src.start_time, sqlc.arg(picker_id), sqlc.arg(is_credited),
+  SELECT src.group_id, sqlc.arg(scheduled_for), src.start_time, sqlc.arg(picker_id),
+         EXISTS (SELECT 1 FROM memberships m
+                 WHERE m.group_id = src.group_id AND m.user_id = sqlc.arg(picker_id) AND m.role = 'core'),
          src.remind_night_before, src.remind_morning_of, src.remind_two_hours_before, src.remind_audience,
          src.repeat_freq, src.repeat_interval_weeks, src.repeat_week_of_month
   FROM nights AS src
   WHERE src.id = sqlc.arg(from_night) AND src.group_id = sqlc.arg(group_id)
-  RETURNING id
+  RETURNING id, group_id
 ), attended AS (
-  INSERT INTO attendances (night_id, user_id)
-  SELECT night.id, a.user_id FROM night, attendances a WHERE a.night_id = sqlc.arg(from_night)
+  INSERT INTO attendances (night_id, group_id, user_id)
+  SELECT night.id, night.group_id, a.user_id FROM night, attendances a WHERE a.night_id = sqlc.arg(from_night)
 )
 SELECT id FROM night;
 
@@ -126,10 +132,10 @@ WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
 -- core members first, then by name.
 SELECT a.night_id, u.id, u.name, m.role
 FROM attendances a
-JOIN nights n ON n.id = a.night_id AND n.group_id = sqlc.arg(group_id)
 JOIN users u ON u.id = a.user_id
-JOIN memberships m ON m.user_id = a.user_id AND m.group_id = sqlc.arg(group_id)
-WHERE sqlc.narg(night_id)::uuid IS NULL OR a.night_id = sqlc.narg(night_id)::uuid
+JOIN memberships m ON m.group_id = a.group_id AND m.user_id = a.user_id
+WHERE a.group_id = sqlc.arg(group_id)
+  AND (sqlc.narg(night_id)::uuid IS NULL OR a.night_id = sqlc.narg(night_id)::uuid)
 ORDER BY
   CASE WHEN m.role = 'core' THEN 0 ELSE 1 END,
   u.name;
