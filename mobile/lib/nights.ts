@@ -225,14 +225,15 @@ export type NightChanges = {
   repeat: Repeat | null;
 };
 
-// updateNight saves a Night's date, start time, attendees, reminders and repeat in one request that either
+// updateNight saves a Night's date, start time, attendees, reminders and repeat
+// (and optionally its picker and watched mark) in one request that either
 // fully applies or changes nothing. The backend rejects dropping the picker or
 // a non-member (422) and a date that already has a Night (409).
 export function updateNight(
   baseUrl: string,
   groupId: string,
   nightId: string,
-  changes: NightChanges,
+  changes: NightChanges & { pickerId?: string; watched?: boolean },
   signal?: AbortSignal,
 ): Promise<Night> {
   return fetchNight(`${baseUrl}/groups/${groupId}/nights/${nightId}`, {
@@ -275,12 +276,13 @@ export function recordWatched(
   { attendees, pickerId }: Attendance,
   signal?: AbortSignal,
 ): Promise<Night> {
-  return fetchNight(`${baseUrl}/groups/${groupId}/nights/${night.id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...savedChanges(night), attendees, pickerId, watched: true }),
+  return updateNight(
+    baseUrl,
+    groupId,
+    night.id,
+    { ...savedChanges(night), attendees, pickerId, watched: true },
     signal,
-  });
+  );
 }
 
 // changeNightPicker changes a saved Night's picker (who must be attending) in
@@ -294,12 +296,7 @@ export function changeNightPicker(
   pickerId: string,
   signal?: AbortSignal,
 ): Promise<Night> {
-  return fetchNight(`${baseUrl}/groups/${groupId}/nights/${night.id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...savedChanges(night), pickerId }),
-    signal,
-  });
+  return updateNight(baseUrl, groupId, night.id, { ...savedChanges(night), pickerId }, signal);
 }
 
 // savedChanges is a saved Night's editable fields as they stand, the base of a

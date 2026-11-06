@@ -29,35 +29,6 @@ func (q *Queries) CreateUser(ctx context.Context, name string) (CreateUserRow, e
 	return i, err
 }
 
-const deactivateMembership = `-- name: DeactivateMembership :one
-UPDATE memberships
-SET status = 'inactive', left_at = now()
-WHERE group_id = $1 AND user_id = $2
-RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at
-`
-
-type DeactivateMembershipParams struct {
-	GroupID uuid.UUID `json:"group_id"`
-	UserID  uuid.UUID `json:"user_id"`
-}
-
-func (q *Queries) DeactivateMembership(ctx context.Context, arg DeactivateMembershipParams) (Membership, error) {
-	row := q.db.QueryRow(ctx, deactivateMembership, arg.GroupID, arg.UserID)
-	var i Membership
-	err := row.Scan(
-		&i.ID,
-		&i.GroupID,
-		&i.UserID,
-		&i.Role,
-		&i.Status,
-		&i.BaselinePicks,
-		&i.RotationPosition,
-		&i.JoinedAt,
-		&i.LeftAt,
-	)
-	return i, err
-}
-
 const filterGroupMembers = `-- name: FilterGroupMembers :many
 SELECT user_id, role
 FROM memberships
@@ -173,7 +144,7 @@ func (q *Queries) InsertMembership(ctx context.Context, arg InsertMembershipPara
 }
 
 const lockGroupMember = `-- name: LockGroupMember :one
-SELECT u.id AS user_id, u.name, m.role, m.status, m.baseline_picks, m.joined_at
+SELECT u.id AS user_id, u.name, m.role, m.status, m.baseline_picks, m.rotation_position, m.joined_at
 FROM memberships m
 JOIN users u ON u.id = m.user_id
 WHERE m.group_id = $1 AND m.user_id = $2
@@ -186,12 +157,13 @@ type LockGroupMemberParams struct {
 }
 
 type LockGroupMemberRow struct {
-	UserID        uuid.UUID          `json:"user_id"`
-	Name          string             `json:"name"`
-	Role          MembershipRole     `json:"role"`
-	Status        MembershipStatus   `json:"status"`
-	BaselinePicks int32              `json:"baseline_picks"`
-	JoinedAt      pgtype.Timestamptz `json:"joined_at"`
+	UserID           uuid.UUID          `json:"user_id"`
+	Name             string             `json:"name"`
+	Role             MembershipRole     `json:"role"`
+	Status           MembershipStatus   `json:"status"`
+	BaselinePicks    int32              `json:"baseline_picks"`
+	RotationPosition int32              `json:"rotation_position"`
+	JoinedAt         pgtype.Timestamptz `json:"joined_at"`
 }
 
 // GetGroupMember for a membership change: locks the membership row for the
@@ -206,74 +178,8 @@ func (q *Queries) LockGroupMember(ctx context.Context, arg LockGroupMemberParams
 		&i.Role,
 		&i.Status,
 		&i.BaselinePicks,
-		&i.JoinedAt,
-	)
-	return i, err
-}
-
-const promoteMembership = `-- name: PromoteMembership :one
-UPDATE memberships
-SET role = 'core',
-    baseline_picks = $1, rotation_position = $2
-WHERE group_id = $3 AND user_id = $4
-RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at
-`
-
-type PromoteMembershipParams struct {
-	BaselinePicks    int32     `json:"baseline_picks"`
-	RotationPosition int32     `json:"rotation_position"`
-	GroupID          uuid.UUID `json:"group_id"`
-	UserID           uuid.UUID `json:"user_id"`
-}
-
-func (q *Queries) PromoteMembership(ctx context.Context, arg PromoteMembershipParams) (Membership, error) {
-	row := q.db.QueryRow(ctx, promoteMembership,
-		arg.BaselinePicks,
-		arg.RotationPosition,
-		arg.GroupID,
-		arg.UserID,
-	)
-	var i Membership
-	err := row.Scan(
-		&i.ID,
-		&i.GroupID,
-		&i.UserID,
-		&i.Role,
-		&i.Status,
-		&i.BaselinePicks,
 		&i.RotationPosition,
 		&i.JoinedAt,
-		&i.LeftAt,
-	)
-	return i, err
-}
-
-const reactivateMembership = `-- name: ReactivateMembership :one
-UPDATE memberships
-SET status = 'active', left_at = NULL, baseline_picks = $1
-WHERE group_id = $2 AND user_id = $3
-RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at
-`
-
-type ReactivateMembershipParams struct {
-	BaselinePicks int32     `json:"baseline_picks"`
-	GroupID       uuid.UUID `json:"group_id"`
-	UserID        uuid.UUID `json:"user_id"`
-}
-
-func (q *Queries) ReactivateMembership(ctx context.Context, arg ReactivateMembershipParams) (Membership, error) {
-	row := q.db.QueryRow(ctx, reactivateMembership, arg.BaselinePicks, arg.GroupID, arg.UserID)
-	var i Membership
-	err := row.Scan(
-		&i.ID,
-		&i.GroupID,
-		&i.UserID,
-		&i.Role,
-		&i.Status,
-		&i.BaselinePicks,
-		&i.RotationPosition,
-		&i.JoinedAt,
-		&i.LeftAt,
 	)
 	return i, err
 }
@@ -315,5 +221,49 @@ func (q *Queries) RotationSeedInputs(ctx context.Context, arg RotationSeedInputs
 	row := q.db.QueryRow(ctx, rotationSeedInputs, arg.GroupID, arg.UserID)
 	var i RotationSeedInputsRow
 	err := row.Scan(&i.AvgServed, &i.CreditedCount, &i.MaxPosition)
+	return i, err
+}
+
+const updateMembership = `-- name: UpdateMembership :one
+UPDATE memberships
+SET role = $1, status = $2,
+    baseline_picks = $3, rotation_position = $4,
+    left_at = CASE WHEN $2::membership_status = 'inactive' THEN COALESCE(left_at, now()) END
+WHERE group_id = $5 AND user_id = $6
+RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at
+`
+
+type UpdateMembershipParams struct {
+	Role             MembershipRole   `json:"role"`
+	Status           MembershipStatus `json:"status"`
+	BaselinePicks    int32            `json:"baseline_picks"`
+	RotationPosition int32            `json:"rotation_position"`
+	GroupID          uuid.UUID        `json:"group_id"`
+	UserID           uuid.UUID        `json:"user_id"`
+}
+
+// Writes the state planMove decided. left_at is stamped when the member leaves
+// and cleared when they return.
+func (q *Queries) UpdateMembership(ctx context.Context, arg UpdateMembershipParams) (Membership, error) {
+	row := q.db.QueryRow(ctx, updateMembership,
+		arg.Role,
+		arg.Status,
+		arg.BaselinePicks,
+		arg.RotationPosition,
+		arg.GroupID,
+		arg.UserID,
+	)
+	var i Membership
+	err := row.Scan(
+		&i.ID,
+		&i.GroupID,
+		&i.UserID,
+		&i.Role,
+		&i.Status,
+		&i.BaselinePicks,
+		&i.RotationPosition,
+		&i.JoinedAt,
+		&i.LeftAt,
+	)
 	return i, err
 }

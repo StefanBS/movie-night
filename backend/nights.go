@@ -216,7 +216,7 @@ func toAttendee(id uuid.UUID, name string, role db.MembershipRole) attendee {
 // The detail path and the history-list path read attendees in different row
 // shapes but both build through here, so a new field is added once. Attendees
 // is normalized to non-nil so an empty list encodes as [] rather than null.
-func newNightResponse(night nightRow, atts []attendee) nightResponse {
+func newNightResponse(night db.FullNight, atts []attendee) nightResponse {
 	if atts == nil {
 		atts = []attendee{}
 	}
@@ -248,12 +248,8 @@ func formatTimestampWire(t pgtype.Timestamptz) *string {
 	return &s
 }
 
-// nightRow is a full Night: a row of the full_nights view, which every Night read
-// selects from, so this is the one shape a Night response is built from.
-type nightRow = db.FullNight
-
 // toNightResponse maps a night row + attendee rows to the night DTO.
-func toNightResponse(night nightRow, rows []db.ListNightAttendeesRow) nightResponse {
+func toNightResponse(night db.FullNight, rows []db.ListNightAttendeesRow) nightResponse {
 	attendees := make([]attendee, 0, len(rows))
 	for _, r := range rows {
 		attendees = append(attendees, toAttendee(r.ID, r.Name, r.Role))
@@ -264,7 +260,7 @@ func toNightResponse(night nightRow, rows []db.ListNightAttendeesRow) nightRespo
 // movieDTOFromCols builds the movie DTO from a night row's nullable LEFT JOIN
 // columns; nil when the night has no movie attached. It is the only movie-row
 // mapper, so a new movie field is added here and to the full_nights view.
-func movieDTOFromCols(row nightRow) *movieDTO {
+func movieDTOFromCols(row db.FullNight) *movieDTO {
 	if !row.MovieTmdbID.Valid {
 		return nil
 	}
@@ -292,7 +288,7 @@ func groupAttendees(rows []db.ListNightsAttendeesRow) map[uuid.UUID][]attendee {
 // and the attendees grouped by night. A nil byNight (no night had attendees) is
 // fine: reads from a nil map yield the zero value, which newNightResponse
 // normalizes to [].
-func toNightResponses(rows []nightRow, byNight map[uuid.UUID][]attendee) []nightResponse {
+func toNightResponses(rows []db.FullNight, byNight map[uuid.UUID][]attendee) []nightResponse {
 	out := make([]nightResponse, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, newNightResponse(row, byNight[row.ID]))
@@ -466,11 +462,11 @@ func attendeeRoles(attendees []uuid.UUID, members []db.FilterGroupMembersRow) (m
 // other error to 500. It hands back the row so a caller that needs the night
 // itself — not just proof it exists — does not read it a second time. ok=false
 // means a response was already written.
-func loadNight(w http.ResponseWriter, r *http.Request, store *db.Queries, gid, nightID uuid.UUID) (nightRow, bool) {
+func loadNight(w http.ResponseWriter, r *http.Request, store *db.Queries, gid, nightID uuid.UUID) (db.FullNight, bool) {
 	night, err := store.GetNight(r.Context(), db.GetNightParams{NightID: nightID, GroupID: gid})
 	if err != nil {
 		storeError(w, gid, "get night", err, http.StatusNotFound, "night not found")
-		return nightRow{}, false
+		return db.FullNight{}, false
 	}
 	return night, true
 }

@@ -301,7 +301,7 @@ say "This reads the newest registered push token from the local database and sen
 if confirm "Send a test push now?"; then
   DATABASE_URL="${DATABASE_URL:-$(grep -E '^DATABASE_URL=' "$REPO_DIR/backend/.env" 2>/dev/null | cut -d= -f2- | tr -d "'\"")}"
   DATABASE_URL="${DATABASE_URL:-postgres://movie:movie@localhost:5432/movienight?sslmode=disable}"
-  PUSH_TOKEN=$(psql "$DATABASE_URL" -Atc "SELECT push_token FROM devices WHERE push_token IS NOT NULL ORDER BY last_seen_at DESC LIMIT 1" 2>/dev/null || true)
+  PUSH_TOKEN=$(psql "$DATABASE_URL" -Atc "SELECT push_token FROM devices WHERE push_token IS NOT NULL ORDER BY created_at DESC LIMIT 1" 2>/dev/null || true)
   if [[ -z "$PUSH_TOKEN" ]]; then
     warn "No registered push token found. Reopen the app with the backend running, then retry."
     SKIPPED+=("test push (no device has registered a push token yet)")

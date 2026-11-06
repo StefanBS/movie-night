@@ -194,7 +194,7 @@ export function createNightEditor({
       return write(
         memberId,
         (signal) => changeNightPicker(baseUrl, groupId, core.state.night, memberId, signal),
-        "failed to record pick",
+        "failed to change picker",
       );
     },
 

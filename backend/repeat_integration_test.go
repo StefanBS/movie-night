@@ -174,7 +174,10 @@ func TestRepeatingNightsIntegration(t *testing.T) {
 	t.Run("a watched night on the next date is passed over", func(t *testing.T) {
 		n := mkFilmNight(t, weekly)
 		later := mkNight(t, utcDay(7), nil)
-		if _, err := pool.Exec(context.Background(), "UPDATE nights SET watched_at = now() WHERE id = $1", later.ID); err != nil {
+		if _, err := pool.Exec(context.Background(),
+			// A Watched Night has a film (ck_night_watched_has_film): borrow n's.
+			"UPDATE nights SET watched_at = now(), movie_id = (SELECT movie_id FROM nights WHERE id = $2) WHERE id = $1",
+			later.ID, n.ID); err != nil {
 			t.Fatalf("record the later night: %v", err)
 		}
 		record(t, n)

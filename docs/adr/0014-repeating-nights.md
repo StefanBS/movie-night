@@ -15,7 +15,7 @@ is credited when it's created ([ADR-0012](0012-night-recorded-as-watched.md)).
 - **The rule rides on one Night at a time.** `picks` gains nullable
   `repeat_freq` (`weekly` | `monthly`), `repeat_interval_weeks` (1 or 2) and
   `repeat_week_of_month` (1–4, or -1 for the last), kept consistent by a CHECK
-  and exposed through the `nights` view. On the wire it is `repeat`: `null`,
+  and exposed through the `full_nights` view. On the wire it is `repeat`: `null`,
   `{"freq":"weekly","intervalWeeks":1|2}` or `{"freq":"monthly","week":n}`.
   The weekday is always the Night's own.
 - **Monthly stores its week.** It is the Nth weekday of the month, taken from

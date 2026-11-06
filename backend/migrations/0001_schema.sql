@@ -34,7 +34,7 @@ CREATE TABLE memberships (
     id                uuid              PRIMARY KEY DEFAULT uuidv7(),
     group_id          uuid              NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     user_id           uuid              NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
-    role              membership_role   NOT NULL DEFAULT 'core',
+    role              membership_role   NOT NULL,
     status            membership_status NOT NULL DEFAULT 'active',
     baseline_picks    integer           NOT NULL DEFAULT 0,
     rotation_position integer           NOT NULL,
@@ -101,7 +101,10 @@ CREATE TABLE nights (
         (repeat_freq IS NULL AND repeat_interval_weeks IS NULL AND repeat_week_of_month IS NULL)
         OR (repeat_freq = 'weekly' AND repeat_interval_weeks IN (1, 2) AND repeat_week_of_month IS NULL)
         OR (repeat_freq = 'monthly' AND repeat_interval_weeks IS NULL AND repeat_week_of_month IN (1, 2, 3, 4, -1))
-    )
+    ),
+    -- A Watched Night has a film and doesn't repeat (ADR-0012, ADR-0014).
+    CONSTRAINT ck_night_watched_has_film CHECK (watched_at IS NULL OR movie_id IS NOT NULL),
+    CONSTRAINT ck_night_watched_no_repeat CHECK (watched_at IS NULL OR repeat_freq IS NULL)
 );
 CREATE UNIQUE INDEX uq_night_per_group_date ON nights (group_id, scheduled_for);
 CREATE INDEX ix_night_picker_credited ON nights (picker_id, is_credited);

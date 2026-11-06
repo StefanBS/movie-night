@@ -58,12 +58,16 @@ const (
 )
 
 // membershipMove is what a churn action does to a member in a given state:
-// noOp echoes the current state back unchanged (the actions are idempotent);
-// seed means the move crosses into the rotation and must be re-seeded
-// (ADR-0006).
+// the role and status it ends in; noOp echoes the current state back unchanged
+// (the actions are idempotent); seed means the move crosses into the rotation
+// and must be re-seeded (ADR-0006); newSlot means it also takes the next
+// rotation slot instead of keeping its own.
 type membershipMove struct {
-	noOp bool
-	seed bool
+	role    db.MembershipRole
+	status  db.MembershipStatus
+	noOp    bool
+	seed    bool
+	newSlot bool
 }
 
 // inRotation reports whether a membership in this state takes turns: only
@@ -93,10 +97,15 @@ func planMove(action memberAction, role db.MembershipRole, status db.MembershipS
 	default:
 		return membershipMove{}, fmt.Errorf("unknown member action %q", action)
 	}
+	move := membershipMove{role: toRole, status: toStatus}
 	if toRole == role && toStatus == status {
-		return membershipMove{noOp: true}, nil
+		move.noOp = true
+		return move, nil
 	}
-	return membershipMove{seed: !inRotation(role, status) && inRotation(toRole, toStatus)}, nil
+	move.seed = !inRotation(role, status) && inRotation(toRole, toStatus)
+	// A returner keeps their slot; a promoted guest has none, so takes the next.
+	move.newSlot = move.seed && toRole != role
+	return move, nil
 }
 
 // currentMember renders an unchanged membership row as the response DTO — used
@@ -111,16 +120,15 @@ func currentMember(m db.LockGroupMemberRow) memberResponse {
 	}
 }
 
-// updatedMember renders a membership after a transition. The name comes from the
-// locked row m because the transition queries (Deactivate/Reactivate/Promote)
-// return the memberships row, which carries no user name.
-func updatedMember(updated db.Membership, m db.LockGroupMemberRow) memberResponse {
+// memberFromMembership renders a written membership row as the response DTO.
+// The name is passed in because a memberships row carries no user name.
+func memberFromMembership(m db.Membership, name string) memberResponse {
 	return memberResponse{
-		ID:       updated.UserID.String(),
-		Name:     m.Name,
-		Role:     string(updated.Role),
-		Status:   string(updated.Status),
-		JoinedOn: formatTimestampDate(updated.JoinedAt),
+		ID:       m.UserID.String(),
+		Name:     name,
+		Role:     string(m.Role),
+		Status:   string(m.Status),
+		JoinedOn: formatTimestampDate(m.JoinedAt),
 	}
 }
 
