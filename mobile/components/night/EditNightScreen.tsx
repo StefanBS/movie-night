@@ -22,15 +22,10 @@ import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
 import { firstName } from "../../lib/avatar";
 import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
-import {
-  formatShortDate,
-  formatStartTime,
-  formatWeekdayDate,
-} from "../../lib/date";
+import { formatShortDate, formatWeekdayDate } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import { createNightEdit } from "../../lib/nightEdit";
-import { isWatched, nightWording } from "../../lib/nightLifecycle";
-import { capitalize } from "../../lib/text";
+import { isWatched, nightLine } from "../../lib/nightLifecycle";
 import { nightPicker, type Night } from "../../lib/nights";
 import { formatRepeatLabel } from "../../lib/repeat";
 import {
@@ -79,7 +74,6 @@ export function EditNightScreen({
   const { date, startTime, attendees, reminders, repeat, rows, dirty, actionError } = state;
   const busy = state.busy !== null;
   const picker = nightPicker(state.night);
-  const wording = nightWording(date, today);
 
   const onSave = async () => {
     const remindersChanged = !sameReminders(reminders, state.night.reminders);
@@ -169,14 +163,10 @@ export function EditNightScreen({
               {formatWeekdayDate(date)}
             </Text>
             <Text style={styles.heroMeta}>
-              {capitalize(
-                [
-                  wording.countdown,
-                  startTime !== null ? formatStartTime(startTime) : null,
-                  wording.pickerTitle(firstName(picker.name)),
-                ]
-                  .filter((part) => part !== null)
-                  .join(" · "),
+              {nightLine(
+                { scheduledFor: date, startTime },
+                { countdown: "label", picker: firstName(picker.name) },
+                today,
               )}
             </Text>
           </View>

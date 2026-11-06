@@ -20,7 +20,8 @@ import { firstName } from "../../lib/avatar";
 import { GROUP_ID } from "../../lib/api";
 import { fetchTurn, pickerSummary, picksLabel, type TurnMember } from "../../lib/turn";
 import { listNights, nightPicker, type Night } from "../../lib/nights";
-import { alsoPlannedPicks, alsoPlannedWhen } from "../../lib/alsoPlanned";
+import { alsoPlannedPicks } from "../../lib/alsoPlanned";
+import { nightLine } from "../../lib/nightLifecycle";
 import { todayLocalISO } from "../../lib/date";
 import { tonightLineup } from "../../lib/tonight";
 import {
@@ -73,12 +74,13 @@ function AlsoPlanned({ nights, onOpen }: { nights: Night[]; onOpen: (night: Nigh
         {nights.map((n, i) => {
           const picker = nightPicker(n);
           const picks = alsoPlannedPicks(n);
+          const when = nightLine(n, { date: "compact" });
           return (
             <Pressable
               key={n.id}
               onPress={() => onOpen(n)}
               accessibilityRole="button"
-              accessibilityLabel={`${alsoPlannedWhen(n)}, ${picks}`}
+              accessibilityLabel={`${when}, ${picks}`}
               style={({ pressed }) => [
                 styles.plannedRow,
                 i < nights.length - 1 && styles.plannedDivider,
@@ -88,7 +90,7 @@ function AlsoPlanned({ nights, onOpen }: { nights: Night[]; onOpen: (night: Nigh
               <Avatar name={picker.name} size={28} />
               <View style={styles.plannedText}>
                 <Text style={styles.plannedWhen} numberOfLines={1}>
-                  {alsoPlannedWhen(n)}
+                  {when}
                 </Text>
                 <Text style={styles.plannedPicks} numberOfLines={1}>
                   {picks}
