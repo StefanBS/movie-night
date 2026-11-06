@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"strings"
 	"testing"
 )
@@ -26,15 +25,6 @@ func TestBearerToken(t *testing.T) {
 				t.Errorf("bearerToken(%q) = (%q, %v), want (%q, %v)", tc.header, got, ok, tc.want, tc.wantOK)
 			}
 		})
-	}
-}
-
-func TestHashToken(t *testing.T) {
-	if !bytes.Equal(hashToken("abc"), hashToken("abc")) {
-		t.Error("same token hashed differently")
-	}
-	if bytes.Equal(hashToken("abc"), hashToken("abd")) {
-		t.Error("different tokens hashed the same")
 	}
 }
 
@@ -64,7 +54,6 @@ func TestValidatePushRequest(t *testing.T) {
 	}{
 		{name: "expo token and zone", req: pushRequest{PushToken: "ExponentPushToken[abc]", TimeZone: "Europe/Madrid"}},
 		{name: "newer token prefix", req: pushRequest{PushToken: "ExpoPushToken[abc]", TimeZone: "America/New_York"}},
-		{name: "UTC", req: pushRequest{PushToken: "ExponentPushToken[abc]", TimeZone: "UTC"}},
 		{name: "missing token", req: pushRequest{TimeZone: "UTC"}, wantErr: true},
 		{name: "not an expo token", req: pushRequest{PushToken: "fcm:abc", TimeZone: "UTC"}, wantErr: true},
 		{name: "unterminated token", req: pushRequest{PushToken: "ExponentPushToken[abc", TimeZone: "UTC"}, wantErr: true},

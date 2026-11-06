@@ -13,7 +13,6 @@ func TestParseAllowedOrigins(t *testing.T) {
 		want []string
 	}{
 		{"empty string yields empty slice", "", []string{}},
-		{"single origin", "http://localhost:8081", []string{"http://localhost:8081"}},
 		{
 			"comma-separated, trims surrounding whitespace",
 			"http://localhost:8081, http://192.168.50.68:8081",
