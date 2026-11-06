@@ -26,7 +26,6 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}/turn", nightTurnHandler(q))
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(pool))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
 
 	// run starts every subtest from the seed baseline: no nights, so dates never
@@ -72,13 +71,15 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		return got
 	}
 
-	recordPick := func(t *testing.T, nightID, pickerID string) nightResponse {
+	// changePicker changes a saved Night's picker through PATCH, keeping the rest.
+	changePicker := func(t *testing.T, n nightResponse, pickerID string) nightResponse {
 		t.Helper()
-		code, n := doJSON[nightResponse](t, mux, http.MethodPost, "/groups/"+seededGroup+"/nights/"+nightID+"/pick", `{"pickerId":"`+pickerID+`"}`)
+		code, got := doJSON[nightResponse](t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID,
+			editBody(t, n, func(r *updateNightRequest) { r.PickerID = &pickerID }))
 		if code != http.StatusOK {
-			t.Fatalf("record pick status = %d, want 200", code)
+			t.Fatalf("change picker status = %d, want 200", code)
 		}
-		return n
+		return got
 	}
 
 	names := func(rows []turnResponse) []string {
@@ -221,20 +222,12 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 	})
 
-	run("recording a non-attendee yields 422", func(t *testing.T) {
-		n := createNight(t, nightBody("2026-06-12", ada))
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/pick", `{"pickerId":"`+blake+`"}`); code != http.StatusUnprocessableEntity {
-			t.Fatalf("status = %d, want 422 (Blake is not an attendee)", code)
-		}
-	})
-
-	run("recording on an unknown night yields 404; malformed picker yields 400", func(t *testing.T) {
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+unknownNight+"/pick", `{"pickerId":"`+ada+`"}`); code != http.StatusNotFound {
-			t.Errorf("unknown-night status = %d, want 404", code)
-		}
-		n := createNight(t, nightBody("2026-06-12", ada))
-		if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/nights/"+n.ID+"/pick", `{"pickerId":"nope"}`); code != http.StatusBadRequest {
-			t.Errorf("malformed-picker status = %d, want 400", code)
+	run("changing the picker to a guest does not move standings", func(t *testing.T) {
+		baseline := names(groupTurn(t))
+		n := createNight(t, nightBody("2026-06-12", ada, frankie)) // Ada credited
+		changePicker(t, n, frankie)
+		if after := names(groupTurn(t)); strings.Join(after, ",") != strings.Join(baseline, ",") {
+			t.Fatalf("group order = %v, want the baseline %v (Ada no longer credited, Frankie never is)", after, baseline)
 		}
 	})
 
@@ -243,7 +236,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		before := names(turn(t, n.ID))
 		// Re-recording (a correction) must not reshuffle the order the picker is
 		// chosen from, or a re-advance would hand the pick to someone else.
-		recordPick(t, n.ID, blake)
+		changePicker(t, n, blake)
 		if after := names(turn(t, n.ID)); strings.Join(after, ",") != strings.Join(before, ",") {
 			t.Fatalf("order after correcting to Blake = %v, want unchanged %v", after, before)
 		}
@@ -269,7 +262,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		if order := names(groupTurn(t)); order[2] != "Ada" {
 			t.Fatalf("after creating with Ada, group order = %v, want Ada last", order)
 		}
-		recordPick(t, n.ID, blake) // correction: now Blake credited instead
+		changePicker(t, n, blake) // correction: now Blake credited instead
 		if order := names(groupTurn(t)); order[0] != "Ada" || order[2] != "Blake" {
 			t.Fatalf("after correcting to Blake, group order = %v, want Ada first and Blake last", order)
 		}

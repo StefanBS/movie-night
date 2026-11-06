@@ -185,23 +185,6 @@ export async function getNightTurn(
   return requestJson(url, parseTurn, { signal });
 }
 
-// recordNightPick changes the night's picker (who must be attending). The backend derives
-// is_credited from the picker's role, so the client sends only the id.
-export function recordNightPick(
-  baseUrl: string,
-  groupId: string,
-  nightId: string,
-  pickerId: string,
-  signal?: AbortSignal,
-): Promise<Night> {
-  return fetchNight(`${baseUrl}/groups/${groupId}/nights/${nightId}/pick`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pickerId }),
-    signal,
-  });
-}
-
 // attachMovie sets (or changes) the night's movie. The client sends only the
 // tmdbId; the backend re-fetches canonical metadata from TMDB.
 export function attachMovie(
@@ -292,17 +275,41 @@ export function recordWatched(
   { attendees, pickerId }: Attendance,
   signal?: AbortSignal,
 ): Promise<Night> {
-  const changes: NightChanges = {
-    scheduledFor: night.scheduledFor,
-    startTime: night.startTime,
-    attendees,
-    reminders: night.reminders,
-    repeat: night.repeat,
-  };
   return fetchNight(`${baseUrl}/groups/${groupId}/nights/${night.id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...changes, pickerId, watched: true }),
+    body: JSON.stringify({ ...savedChanges(night), attendees, pickerId, watched: true }),
     signal,
   });
+}
+
+// changeNightPicker changes a saved Night's picker (who must be attending) in
+// the whole-Night PATCH, sending everything else as it is. The backend derives
+// whether the pick is credited from the picker's role, so a guest's pick never
+// moves standings.
+export function changeNightPicker(
+  baseUrl: string,
+  groupId: string,
+  night: Night,
+  pickerId: string,
+  signal?: AbortSignal,
+): Promise<Night> {
+  return fetchNight(`${baseUrl}/groups/${groupId}/nights/${night.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...savedChanges(night), pickerId }),
+    signal,
+  });
+}
+
+// savedChanges is a saved Night's editable fields as they stand, the base of a
+// PATCH that changes only who came, who picked or whether it was watched.
+function savedChanges(night: Night): NightChanges {
+  return {
+    scheduledFor: night.scheduledFor,
+    startTime: night.startTime,
+    attendees: night.attendees.map((a) => a.id),
+    reminders: night.reminders,
+    repeat: night.repeat,
+  };
 }

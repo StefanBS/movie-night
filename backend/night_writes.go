@@ -42,28 +42,6 @@ func createNight(ctx context.Context, q *db.Queries, gid uuid.UUID, night parsed
 	})
 }
 
-// recordPick sets (or changes) a Night's picker, who must be one of its
-// attendees as they stand once the lock is held.
-func recordPick(ctx context.Context, q *db.Queries, gid, nightID, picker uuid.UUID) error {
-	if _, err := q.LockNight(ctx, db.LockNightParams{NightID: nightID, GroupID: gid}); err != nil {
-		return err
-	}
-	attendees, err := q.ListNightAttendees(ctx, db.ListNightAttendeesParams{GroupID: gid, NightID: nightID})
-	if err != nil {
-		return err
-	}
-	role, err := attendeeRole(attendees, picker)
-	if err != nil {
-		return err
-	}
-	return q.SetNightPicker(ctx, db.SetNightPickerParams{
-		NightID:    nightID,
-		GroupID:    gid,
-		PickerID:   picker,
-		IsCredited: creditedForRole(role),
-	})
-}
-
 // editNight replaces a Night's editable fields and attendee set, and when the
 // edit says so changes its picker and records it as watched (ADR-0012). The
 // picker, new or kept, must be an attendee, and only a Night with a film can

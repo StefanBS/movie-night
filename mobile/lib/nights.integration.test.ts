@@ -6,7 +6,7 @@ import {
   createNight,
   getNightTurn,
   listNights,
-  recordNightPick,
+  changeNightPicker,
   recordWatched,
   attachMovie,
   type Night,
@@ -146,25 +146,34 @@ test("createNight surfaces the backend's message for a taken date (409)", async 
   }
 });
 
-test("recordNightPick posts the pickerId and parses the night", async () => {
+test("changeNightPicker PATCHes the night as it is with the new picker", async () => {
   let path = "";
   let method = "";
   let body = "";
-  const nightWithPicker: Night = { ...night, pickerId: "a0000000-0000-0000-0000-000000000002" };
+  const BLAKE = "a0000000-0000-0000-0000-000000000002";
+  const saved: Night = { ...night, startTime: "20:00", repeat: { freq: "weekly", intervalWeeks: 1 }, attendees: [...night.attendees, { id: BLAKE, name: "Blake", role: "core" }] };
+  const changed: Night = { ...saved, pickerId: BLAKE };
   const server = await startServer(async (req, res) => {
     path = req.url ?? "";
     method = req.method ?? "";
     body = await collect(req);
     res.statusCode = 200;
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify(nightWithPicker));
+    res.end(JSON.stringify(changed));
   });
   try {
-    const got = await recordNightPick(server.url, GROUP, NIGHT, nightWithPicker.pickerId);
-    assert.equal(method, "POST");
-    assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/pick`);
-    assert.deepEqual(JSON.parse(body), { pickerId: nightWithPicker.pickerId });
-    assert.deepEqual(got, nightWithPicker);
+    const got = await changeNightPicker(server.url, GROUP, saved, BLAKE);
+    assert.equal(method, "PATCH");
+    assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}`);
+    assert.deepEqual(JSON.parse(body), {
+      scheduledFor: saved.scheduledFor,
+      startTime: "20:00",
+      attendees: [ADA, BLAKE],
+      reminders: saved.reminders,
+      repeat: { freq: "weekly", intervalWeeks: 1 },
+      pickerId: BLAKE,
+    });
+    assert.deepEqual(got, changed);
   } finally {
     await server.close();
   }

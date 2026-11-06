@@ -356,11 +356,6 @@ type nightStore interface {
 	ListNightsAttendees(ctx context.Context, arg db.ListNightsAttendeesParams) ([]db.ListNightsAttendeesRow, error)
 }
 
-// recordPickRequest is the JSON body of POST .../nights/{nightId}/pick.
-type recordPickRequest struct {
-	PickerID string `json:"pickerId"`
-}
-
 // updateNightRequest is the JSON body of PATCH .../nights/{nightId}: the whole
 // editable Night, which replaces the stored one. A null (or omitted) startTime
 // clears it; attendees replace the whole set, and a null (or omitted) repeat
@@ -609,36 +604,6 @@ func nightTurnHandler(store nightStore) http.HandlerFunc {
 			return
 		}
 		respondJSON(w, http.StatusOK, toTurnResponses(ranked), gid, "encode turn response")
-	}
-}
-
-// recordNightPickHandler serves POST /groups/{groupId}/nights/{nightId}/pick.
-// It sets (or changes — the correction path) the night's picker. The picker MUST
-// be an attendee; is_credited is derived from their role, so a guest pick never
-// moves standings. RankGroupTurn recomputes served-counts from the nights table on
-// read, so re-recording simply re-attributes — there is no stored counter to fix.
-func recordNightPickHandler(pool *pgxpool.Pool) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		gid, nightID, ok := pathGroupNight(w, r)
-		if !ok {
-			return
-		}
-		req, ok := decodeJSON[recordPickRequest](w, r)
-		if !ok {
-			return
-		}
-		pickerID, ok := parseUUID(w, req.PickerID, "invalid picker id")
-		if !ok {
-			return
-		}
-		err := withTx(r.Context(), pool, func(q *db.Queries) error {
-			return recordPick(r.Context(), q, gid, nightID, pickerID)
-		})
-		if err != nil {
-			writeNightError(w, gid, "record pick", err)
-			return
-		}
-		writeNight(w, r, db.New(pool), gid, nightID, http.StatusOK)
 	}
 }
 
