@@ -24,21 +24,21 @@ func (q *Queries) ClearPushToken(ctx context.Context, pushToken pgtype.Text) err
 
 const listReminderCandidates = `-- name: ListReminderCandidates :many
 SELECT
-  p.id AS night_id, p.scheduled_for, p.start_time, p.picker_id,
-  p.remind_night_before, p.remind_morning_of, p.remind_two_hours_before, p.remind_audience,
+  n.id AS night_id, n.scheduled_for, n.start_time, n.picker_id,
+  n.remind_night_before, n.remind_morning_of, n.remind_two_hours_before, n.remind_audience,
   g.name AS group_name,
   pu.name AS picker_name,
-  (SELECT count(*) FROM attendances c WHERE c.pick_id = p.id)::int AS going,
+  (SELECT count(*) FROM attendances c WHERE c.night_id = n.id)::int AS going,
   a.user_id, d.push_token::text AS push_token, d.time_zone::text AS time_zone
-FROM nights p
-JOIN groups g ON g.id = p.group_id
-JOIN users pu ON pu.id = p.picker_id
-JOIN attendances a ON a.pick_id = p.id
-JOIN memberships m ON m.group_id = p.group_id AND m.user_id = a.user_id AND m.status = 'active'
+FROM nights n
+JOIN groups g ON g.id = n.group_id
+JOIN users pu ON pu.id = n.picker_id
+JOIN attendances a ON a.night_id = n.id
+JOIN memberships m ON m.group_id = n.group_id AND m.user_id = a.user_id AND m.status = 'active'
 JOIN users u ON u.id = a.user_id AND NOT u.reminders_muted
 JOIN devices d ON d.user_id = a.user_id AND d.push_token IS NOT NULL AND d.time_zone IS NOT NULL
-WHERE p.scheduled_for BETWEEN $1 AND $2
-ORDER BY p.id, a.user_id, d.id
+WHERE n.scheduled_for BETWEEN $1 AND $2
+ORDER BY n.id, a.user_id, d.id
 `
 
 type ListReminderCandidatesParams struct {

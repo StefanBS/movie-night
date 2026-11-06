@@ -171,9 +171,9 @@ just db-reset       # destroy the container AND its data volume
   [`../docs/schema.dbml`](../docs/schema.dbml).
 - **Queries** — `internal/db/query/`. Run `just sqlc` after edits to regenerate
   `internal/db` (marked `DO NOT EDIT` — change the SQL, not the Go). A full
-  Night is read only through the `nights` view (`picks` + its movie), so a new
-  Night column goes into that view, not into individual queries; writes go to
-  `picks` and return at most the id.
+  Night is read only through the `full_nights` view (`nights` + its movie), so a
+  new Night column goes into that view, not into individual queries; writes go
+  to `nights` and return at most the id.
 - **Seed** — `seed.sql`, idempotent fixtures keyed on fixed UUIDs (not a
   migration). The seeded group `11111111-1111-1111-1111-111111111111` is shared
   with the mobile app and integration tests.

@@ -245,9 +245,9 @@ func formatTimestampWire(t pgtype.Timestamptz) *string {
 	return &s
 }
 
-// nightRow is a full Night: a row of the nights view, which every Night read
+// nightRow is a full Night: a row of the full_nights view, which every Night read
 // selects from, so this is the one shape a Night response is built from.
-type nightRow = db.Night
+type nightRow = db.FullNight
 
 // toNightResponse maps a night row + attendee rows to the night DTO.
 func toNightResponse(night nightRow, rows []db.ListNightAttendeesRow) nightResponse {
@@ -260,7 +260,7 @@ func toNightResponse(night nightRow, rows []db.ListNightAttendeesRow) nightRespo
 
 // movieDTOFromCols builds the movie DTO from a night row's nullable LEFT JOIN
 // columns; nil when the night has no movie attached. It is the only movie-row
-// mapper, so a new movie field is added here and to the nights view.
+// mapper, so a new movie field is added here and to the full_nights view.
 func movieDTOFromCols(row nightRow) *movieDTO {
 	if !row.MovieTmdbID.Valid {
 		return nil
@@ -275,12 +275,12 @@ func movieDTOFromCols(row nightRow) *movieDTO {
 	}
 }
 
-// groupAttendees buckets attendee rows by their night (pick_id), preserving the
+// groupAttendees buckets attendee rows by their night (night_id), preserving the
 // query's role-then-name order within each night.
 func groupAttendees(rows []db.ListNightsAttendeesRow) map[uuid.UUID][]attendee {
 	byNight := make(map[uuid.UUID][]attendee, len(rows))
 	for _, r := range rows {
-		byNight[r.PickID] = append(byNight[r.PickID], toAttendee(r.ID, r.Name, r.Role))
+		byNight[r.NightID] = append(byNight[r.NightID], toAttendee(r.ID, r.Name, r.Role))
 	}
 	return byNight
 }
@@ -345,13 +345,13 @@ func presentIDs(rows []db.ListNightAttendeesRow) []uuid.UUID {
 // written (same pattern as turnStore/pickStore/memberStore). The picker and
 // attendee writes take the pool instead and run in night_writes.go.
 type nightStore interface {
-	GetNight(ctx context.Context, arg db.GetNightParams) (db.Night, error)
+	GetNight(ctx context.Context, arg db.GetNightParams) (db.FullNight, error)
 	ListNightAttendees(ctx context.Context, arg db.ListNightAttendeesParams) ([]db.ListNightAttendeesRow, error)
 	RankGroupTurn(ctx context.Context, arg db.RankGroupTurnParams) ([]db.RankGroupTurnRow, error)
 	UpsertMovie(ctx context.Context, arg db.UpsertMovieParams) (uuid.UUID, error)
 	SetNightMovie(ctx context.Context, arg db.SetNightMovieParams) error
 	ClearNightMovie(ctx context.Context, arg db.ClearNightMovieParams) (uuid.UUID, error)
-	ListNights(ctx context.Context, groupID uuid.UUID) ([]db.Night, error)
+	ListNights(ctx context.Context, groupID uuid.UUID) ([]db.FullNight, error)
 	ListNightsAttendees(ctx context.Context, arg db.ListNightsAttendeesParams) ([]db.ListNightsAttendeesRow, error)
 }
 
@@ -614,7 +614,7 @@ func nightTurnHandler(store nightStore) http.HandlerFunc {
 // recordNightPickHandler serves POST /groups/{groupId}/nights/{nightId}/pick.
 // It sets (or changes — the correction path) the night's picker. The picker MUST
 // be an attendee; is_credited is derived from their role, so a guest pick never
-// moves standings. RankGroupTurn recomputes served-counts from the picks table on
+// moves standings. RankGroupTurn recomputes served-counts from the nights table on
 // read, so re-recording simply re-attributes — there is no stored counter to fix.
 func recordNightPickHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

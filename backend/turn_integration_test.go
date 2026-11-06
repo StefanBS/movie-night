@@ -18,7 +18,7 @@ func seedTurnPicks(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	execSeed(t, pool, []seedStmt{
 		{
-			sql: `INSERT INTO picks (group_id, picker_id, is_credited, scheduled_for) VALUES
+			sql: `INSERT INTO nights (group_id, picker_id, is_credited, scheduled_for) VALUES
 				($1, 'a0000000-0000-0000-0000-000000000001', false, '2026-05-20'),
 				($1, 'a0000000-0000-0000-0000-000000000002', true,  '2026-05-01'),
 				($1, 'a0000000-0000-0000-0000-000000000003', true,  '2026-04-10')`,
@@ -44,7 +44,7 @@ func seedBaselineGroup(t *testing.T, pool *pgxpool.Pool) string {
 		{sql: `INSERT INTO memberships (group_id, user_id, role, status, baseline_picks, rotation_position) VALUES
 			($1, 'a0000000-0000-0000-0000-000000000007', 'core', 'active', 2, 1),
 			($1, 'a0000000-0000-0000-0000-000000000008', 'core', 'active', 0, 2)`, args: []any{group}},
-		{sql: `INSERT INTO picks (group_id, picker_id, is_credited, scheduled_for) VALUES
+		{sql: `INSERT INTO nights (group_id, picker_id, is_credited, scheduled_for) VALUES
 			($1, 'a0000000-0000-0000-0000-000000000008', true, '2026-03-01')`, args: []any{group}},
 	})
 	return group

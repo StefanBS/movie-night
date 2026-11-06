@@ -224,19 +224,42 @@ func (ns NullRepeatFreq) Value() (driver.Value, error) {
 }
 
 type Attendance struct {
-	ID     uuid.UUID `json:"id"`
-	PickID uuid.UUID `json:"pick_id"`
-	UserID uuid.UUID `json:"user_id"`
+	ID      uuid.UUID `json:"id"`
+	NightID uuid.UUID `json:"night_id"`
+	UserID  uuid.UUID `json:"user_id"`
 }
 
 type Device struct {
-	ID         uuid.UUID          `json:"id"`
-	UserID     uuid.UUID          `json:"user_id"`
-	TokenHash  []byte             `json:"token_hash"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	LastSeenAt pgtype.Timestamptz `json:"last_seen_at"`
-	PushToken  pgtype.Text        `json:"push_token"`
-	TimeZone   pgtype.Text        `json:"time_zone"`
+	ID        uuid.UUID          `json:"id"`
+	UserID    uuid.UUID          `json:"user_id"`
+	TokenHash []byte             `json:"token_hash"`
+	PushToken pgtype.Text        `json:"push_token"`
+	TimeZone  pgtype.Text        `json:"time_zone"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+type FullNight struct {
+	ID                   uuid.UUID          `json:"id"`
+	GroupID              uuid.UUID          `json:"group_id"`
+	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
+	StartTime            pgtype.Time        `json:"start_time"`
+	PickerID             uuid.UUID          `json:"picker_id"`
+	IsCredited           bool               `json:"is_credited"`
+	RemindNightBefore    bool               `json:"remind_night_before"`
+	RemindMorningOf      bool               `json:"remind_morning_of"`
+	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience   `json:"remind_audience"`
+	WatchedAt            pgtype.Timestamptz `json:"watched_at"`
+	RepeatFreq           NullRepeatFreq     `json:"repeat_freq"`
+	RepeatIntervalWeeks  pgtype.Int2        `json:"repeat_interval_weeks"`
+	RepeatWeekOfMonth    pgtype.Int2        `json:"repeat_week_of_month"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	MovieTmdbID          pgtype.Int4        `json:"movie_tmdb_id"`
+	MovieTitle           pgtype.Text        `json:"movie_title"`
+	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
+	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
+	MovieGenres          []string           `json:"movie_genres"`
+	MovieRuntimeMinutes  pgtype.Int4        `json:"movie_runtime_minutes"`
 }
 
 type Group struct {
@@ -258,57 +281,32 @@ type Membership struct {
 }
 
 type Movie struct {
-	ID             uuid.UUID          `json:"id"`
-	TmdbID         int32              `json:"tmdb_id"`
-	Title          string             `json:"title"`
-	ReleaseYear    pgtype.Int4        `json:"release_year"`
-	CachedAt       pgtype.Timestamptz `json:"cached_at"`
-	PosterPath     pgtype.Text        `json:"poster_path"`
-	Genres         []string           `json:"genres"`
-	RuntimeMinutes pgtype.Int4        `json:"runtime_minutes"`
+	ID             uuid.UUID   `json:"id"`
+	TmdbID         int32       `json:"tmdb_id"`
+	Title          string      `json:"title"`
+	ReleaseYear    pgtype.Int4 `json:"release_year"`
+	PosterPath     pgtype.Text `json:"poster_path"`
+	Genres         []string    `json:"genres"`
+	RuntimeMinutes pgtype.Int4 `json:"runtime_minutes"`
 }
 
 type Night struct {
 	ID                   uuid.UUID          `json:"id"`
 	GroupID              uuid.UUID          `json:"group_id"`
-	PickerID             uuid.UUID          `json:"picker_id"`
-	IsCredited           bool               `json:"is_credited"`
 	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	StartTime            pgtype.Time        `json:"start_time"`
-	RemindNightBefore    bool               `json:"remind_night_before"`
-	RemindMorningOf      bool               `json:"remind_morning_of"`
-	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
-	RemindAudience       ReminderAudience   `json:"remind_audience"`
-	MovieTmdbID          pgtype.Int4        `json:"movie_tmdb_id"`
-	MovieTitle           pgtype.Text        `json:"movie_title"`
-	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
-	MoviePosterPath      pgtype.Text        `json:"movie_poster_path"`
-	MovieGenres          []string           `json:"movie_genres"`
-	MovieRuntimeMinutes  pgtype.Int4        `json:"movie_runtime_minutes"`
-	WatchedAt            pgtype.Timestamptz `json:"watched_at"`
-	RepeatFreq           NullRepeatFreq     `json:"repeat_freq"`
-	RepeatIntervalWeeks  pgtype.Int2        `json:"repeat_interval_weeks"`
-	RepeatWeekOfMonth    pgtype.Int2        `json:"repeat_week_of_month"`
-}
-
-type Pick struct {
-	ID                   uuid.UUID          `json:"id"`
-	GroupID              uuid.UUID          `json:"group_id"`
 	PickerID             uuid.UUID          `json:"picker_id"`
 	IsCredited           bool               `json:"is_credited"`
-	ScheduledFor         pgtype.Date        `json:"scheduled_for"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	MovieID              pgtype.UUID        `json:"movie_id"`
 	RemindNightBefore    bool               `json:"remind_night_before"`
 	RemindMorningOf      bool               `json:"remind_morning_of"`
-	RemindAudience       ReminderAudience   `json:"remind_audience"`
-	StartTime            pgtype.Time        `json:"start_time"`
 	RemindTwoHoursBefore bool               `json:"remind_two_hours_before"`
+	RemindAudience       ReminderAudience   `json:"remind_audience"`
 	WatchedAt            pgtype.Timestamptz `json:"watched_at"`
 	RepeatFreq           NullRepeatFreq     `json:"repeat_freq"`
 	RepeatIntervalWeeks  pgtype.Int2        `json:"repeat_interval_weeks"`
 	RepeatWeekOfMonth    pgtype.Int2        `json:"repeat_week_of_month"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 }
 
 type RemindersSent struct {
@@ -321,7 +319,6 @@ type RemindersSent struct {
 type User struct {
 	ID             uuid.UUID          `json:"id"`
 	Name           string             `json:"name"`
-	LetterboxdUser pgtype.Text        `json:"letterboxd_user"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	RemindersMuted bool               `json:"reminders_muted"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }

@@ -391,7 +391,7 @@ func TestNightEditsIntegration(t *testing.T) {
 		}
 		// Push the stored time back, so a second recording that overwrote it
 		// would be visible even within the same second.
-		if _, err := pool.Exec(context.Background(), "UPDATE picks SET watched_at = watched_at - interval '1 day' WHERE id = $1", n.ID); err != nil {
+		if _, err := pool.Exec(context.Background(), "UPDATE nights SET watched_at = watched_at - interval '1 day' WHERE id = $1", n.ID); err != nil {
 			t.Fatalf("age watched_at: %v", err)
 		}
 		_, before := doJSON[nightResponse](t, mux, http.MethodGet, path, "")

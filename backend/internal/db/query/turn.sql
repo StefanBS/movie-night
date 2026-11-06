@@ -10,9 +10,9 @@ LEFT JOIN (
   SELECT picker_id,
          COUNT(*) FILTER (WHERE is_credited)           AS credited_count,
          (MAX(scheduled_for) FILTER (WHERE is_credited))::date AS last_picked_on
-  FROM picks
-  WHERE picks.group_id = sqlc.arg(group_id)
-    AND (sqlc.narg(exclude_night)::uuid IS NULL OR picks.id <> sqlc.narg(exclude_night)::uuid)
+  FROM nights
+  WHERE nights.group_id = sqlc.arg(group_id)
+    AND (sqlc.narg(exclude_night)::uuid IS NULL OR nights.id <> sqlc.narg(exclude_night)::uuid)
   GROUP BY picker_id
 ) p ON p.picker_id = m.user_id
 WHERE m.group_id = sqlc.arg(group_id)

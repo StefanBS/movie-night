@@ -47,6 +47,28 @@ func (q *Queries) DeleteDevice(ctx context.Context, tokenHash []byte) (int64, er
 	return result.RowsAffected(), nil
 }
 
+const getDeviceIdentity = `-- name: GetDeviceIdentity :one
+SELECT u.id AS user_id, u.name, u.reminders_muted
+FROM devices d
+JOIN users u ON u.id = d.user_id
+WHERE d.token_hash = $1
+`
+
+type GetDeviceIdentityRow struct {
+	UserID         uuid.UUID `json:"user_id"`
+	Name           string    `json:"name"`
+	RemindersMuted bool      `json:"reminders_muted"`
+}
+
+// Resolves a token hash to its identity; no row means the token is unknown or
+// was released.
+func (q *Queries) GetDeviceIdentity(ctx context.Context, tokenHash []byte) (GetDeviceIdentityRow, error) {
+	row := q.db.QueryRow(ctx, getDeviceIdentity, tokenHash)
+	var i GetDeviceIdentityRow
+	err := row.Scan(&i.UserID, &i.Name, &i.RemindersMuted)
+	return i, err
+}
+
 const registerPush = `-- name: RegisterPush :execrows
 WITH me AS (
   SELECT d.id FROM devices d WHERE d.token_hash = $3
@@ -55,7 +77,7 @@ WITH me AS (
   WHERE o.push_token = $1 AND o.id NOT IN (SELECT me.id FROM me)
 )
 UPDATE devices t
-SET push_token = $1, time_zone = $2, last_seen_at = now()
+SET push_token = $1, time_zone = $2
 WHERE t.id IN (SELECT me.id FROM me)
 `
 
@@ -101,29 +123,6 @@ type SetRemindersMutedRow struct {
 func (q *Queries) SetRemindersMuted(ctx context.Context, arg SetRemindersMutedParams) (SetRemindersMutedRow, error) {
 	row := q.db.QueryRow(ctx, setRemindersMuted, arg.RemindersMuted, arg.TokenHash)
 	var i SetRemindersMutedRow
-	err := row.Scan(&i.UserID, &i.Name, &i.RemindersMuted)
-	return i, err
-}
-
-const touchDevice = `-- name: TouchDevice :one
-UPDATE devices d
-SET last_seen_at = now()
-FROM users u
-WHERE d.token_hash = $1 AND u.id = d.user_id
-RETURNING u.id AS user_id, u.name, u.reminders_muted
-`
-
-type TouchDeviceRow struct {
-	UserID         uuid.UUID `json:"user_id"`
-	Name           string    `json:"name"`
-	RemindersMuted bool      `json:"reminders_muted"`
-}
-
-// Resolves a token hash to its identity and records that the device was seen;
-// no row means the token is unknown or was released.
-func (q *Queries) TouchDevice(ctx context.Context, tokenHash []byte) (TouchDeviceRow, error) {
-	row := q.db.QueryRow(ctx, touchDevice, tokenHash)
-	var i TouchDeviceRow
 	err := row.Scan(&i.UserID, &i.Name, &i.RemindersMuted)
 	return i, err
 }

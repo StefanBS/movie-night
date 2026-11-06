@@ -3,14 +3,13 @@ INSERT INTO devices (user_id, token_hash)
 VALUES (sqlc.arg(user_id), sqlc.arg(token_hash))
 RETURNING id, user_id;
 
--- name: TouchDevice :one
--- Resolves a token hash to its identity and records that the device was seen;
--- no row means the token is unknown or was released.
-UPDATE devices d
-SET last_seen_at = now()
-FROM users u
-WHERE d.token_hash = sqlc.arg(token_hash) AND u.id = d.user_id
-RETURNING u.id AS user_id, u.name, u.reminders_muted;
+-- name: GetDeviceIdentity :one
+-- Resolves a token hash to its identity; no row means the token is unknown or
+-- was released.
+SELECT u.id AS user_id, u.name, u.reminders_muted
+FROM devices d
+JOIN users u ON u.id = d.user_id
+WHERE d.token_hash = sqlc.arg(token_hash);
 
 -- name: DeleteDevice :execrows
 DELETE FROM devices WHERE token_hash = sqlc.arg(token_hash);
@@ -27,7 +26,7 @@ WITH me AS (
   WHERE o.push_token = sqlc.arg(push_token) AND o.id NOT IN (SELECT me.id FROM me)
 )
 UPDATE devices t
-SET push_token = sqlc.arg(push_token), time_zone = sqlc.arg(time_zone), last_seen_at = now()
+SET push_token = sqlc.arg(push_token), time_zone = sqlc.arg(time_zone)
 WHERE t.id IN (SELECT me.id FROM me);
 
 -- name: SetRemindersMuted :one

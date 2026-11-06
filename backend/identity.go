@@ -48,7 +48,7 @@ type claimResponse struct {
 type identityStore interface {
 	GetGroupMember(ctx context.Context, arg db.GetGroupMemberParams) (db.GetGroupMemberRow, error)
 	CreateDevice(ctx context.Context, arg db.CreateDeviceParams) (db.CreateDeviceRow, error)
-	TouchDevice(ctx context.Context, tokenHash []byte) (db.TouchDeviceRow, error)
+	GetDeviceIdentity(ctx context.Context, tokenHash []byte) (db.GetDeviceIdentityRow, error)
 	DeleteDevice(ctx context.Context, tokenHash []byte) (int64, error)
 	RegisterPush(ctx context.Context, arg db.RegisterPushParams) (int64, error)
 	SetRemindersMuted(ctx context.Context, arg db.SetRemindersMutedParams) (db.SetRemindersMutedRow, error)
@@ -168,9 +168,9 @@ func getIdentityHandler(store identityStore) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		row, err := store.TouchDevice(r.Context(), hashToken(token))
+		row, err := store.GetDeviceIdentity(r.Context(), hashToken(token))
 		if err != nil {
-			storeError(w, uuid.Nil, "touch device", err, http.StatusUnauthorized, "unknown token")
+			storeError(w, uuid.Nil, "get device identity", err, http.StatusUnauthorized, "unknown token")
 			return
 		}
 		respondJSON(w, http.StatusOK, identityResponse{ID: row.UserID.String(), Name: row.Name, RemindersMuted: row.RemindersMuted}, uuid.Nil, "encode identity response")

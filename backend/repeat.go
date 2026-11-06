@@ -127,7 +127,7 @@ func toRepeatDTO(rule *repeatRule) *repeatDTO {
 	return dto
 }
 
-// repeatColumns is a rule as the picks repeat columns store it, all NULL for
+// repeatColumns is a rule as the nights repeat columns store it, all NULL for
 // none. Pure.
 func repeatColumns(rule *repeatRule) (db.NullRepeatFreq, pgtype.Int2, pgtype.Int2) {
 	if rule == nil {
@@ -140,8 +140,8 @@ func repeatColumns(rule *repeatRule) (db.NullRepeatFreq, pgtype.Int2, pgtype.Int
 	return freq, pgtype.Int2{}, pgtype.Int2{Int16: rule.WeekOfMonth, Valid: true}
 }
 
-// repeatFromColumns reads the picks repeat columns back into a rule, nil when
-// the Night doesn't repeat. The ck_pick_repeat constraint keeps them
+// repeatFromColumns reads the nights repeat columns back into a rule, nil when
+// the Night doesn't repeat. The ck_night_repeat constraint keeps them
 // consistent. Pure.
 func repeatFromColumns(freq db.NullRepeatFreq, intervalWeeks, weekOfMonth pgtype.Int2) *repeatRule {
 	if !freq.Valid {

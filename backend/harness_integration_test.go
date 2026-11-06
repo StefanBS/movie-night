@@ -119,11 +119,11 @@ func migrate(connStr string) error {
 
 // freshDB truncates every table and returns the shared pool, so each test starts
 // from an empty schema. Tests run sequentially, so the shared database is safe;
-// CASCADE drops the FK-dependent rows (memberships, attendances, picks) too.
+// CASCADE drops the FK-dependent rows (memberships, attendances, nights) too.
 func freshDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	if _, err := testPool.Exec(context.Background(),
-		`TRUNCATE groups, users, memberships, picks, attendances, movies CASCADE`); err != nil {
+		`TRUNCATE groups, users, memberships, nights, attendances, movies CASCADE`); err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
 	return testPool
@@ -186,8 +186,8 @@ func seedFixtures(t *testing.T, pool *pgxpool.Pool) {
 func clearAllPicks(t *testing.T, pool *pgxpool.Pool, group string) {
 	t.Helper()
 	if _, err := pool.Exec(context.Background(),
-		"DELETE FROM picks WHERE group_id = $1", group); err != nil {
-		t.Fatalf("clear all picks: %v", err)
+		"DELETE FROM nights WHERE group_id = $1", group); err != nil {
+		t.Fatalf("clear all nights: %v", err)
 	}
 }
 
