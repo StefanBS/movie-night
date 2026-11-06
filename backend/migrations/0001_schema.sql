@@ -166,6 +166,35 @@ LEFT JOIN movies m ON m.id = n.movie_id;
 -- +goose StatementEnd
 
 -- +goose StatementBegin
+-- Each active core member's served count (ADR-0005): baseline_picks plus their
+-- credited Nights, with the date of their last credited Night. The one
+-- definition of the fairness standard: the turn ranking orders by it and a
+-- member entering the rotation is seeded from its average (ADR-0006).
+-- exclude_night (nullable) leaves that Night out of the counts, so ranking a
+-- Night reflects standings as if it were still undecided.
+CREATE FUNCTION served_counts(p_group_id uuid, p_exclude_night uuid)
+RETURNS TABLE (user_id uuid, served_count int, last_picked_on date)
+LANGUAGE sql STABLE AS $$
+  SELECT m.user_id,
+         (m.baseline_picks + COALESCE(p.credited_count, 0))::int,
+         p.last_picked_on
+  FROM memberships m
+  LEFT JOIN (
+    SELECT n.picker_id,
+           COUNT(*) FILTER (WHERE n.is_credited)                    AS credited_count,
+           (MAX(n.scheduled_for) FILTER (WHERE n.is_credited))::date AS last_picked_on
+    FROM nights n
+    WHERE n.group_id = p_group_id
+      AND (p_exclude_night IS NULL OR n.id <> p_exclude_night)
+    GROUP BY n.picker_id
+  ) p ON p.picker_id = m.user_id
+  WHERE m.group_id = p_group_id
+    AND m.status = 'active'
+    AND m.role = 'core'
+$$;
+-- +goose StatementEnd
+
+-- +goose StatementBegin
 -- An install's claimed identity (ADR-0009). Only a SHA-256 hash of the bearer
 -- token is stored; the raw token lives on the device. Releasing an identity
 -- deletes the row, which revokes the token. push_token and time_zone stay NULL
@@ -201,6 +230,7 @@ CREATE TABLE reminders_sent (
 -- +goose Down
 -- +goose StatementBegin
 ALTER TABLE IF EXISTS nights DROP CONSTRAINT IF EXISTS fk_night_picker_attends;
+DROP FUNCTION IF EXISTS served_counts(uuid, uuid);
 DROP TABLE IF EXISTS reminders_sent, devices, attendances;
 DROP VIEW IF EXISTS full_nights;
 DROP TABLE IF EXISTS nights, movies, memberships, groups, users;

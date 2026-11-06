@@ -35,15 +35,8 @@ WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id);
 -- in time: the active-core average served-count, the credited nights user_id
 -- already has (0 for a user with no nights), and the highest rotation slot.
 SELECT
-  (SELECT COALESCE(AVG(m.baseline_picks + COALESCE(p.cnt, 0)), 0)
-     FROM memberships m
-     LEFT JOIN (
-       SELECT picker_id, COUNT(*) FILTER (WHERE is_credited) AS cnt
-       FROM nights pk
-       WHERE pk.group_id = sqlc.arg(group_id)
-       GROUP BY picker_id
-     ) p ON p.picker_id = m.user_id
-    WHERE m.group_id = sqlc.arg(group_id) AND m.status = 'active' AND m.role = 'core')::float8 AS avg_served,
+  (SELECT COALESCE(AVG(s.served_count), 0)
+     FROM served_counts(sqlc.arg(group_id), NULL) AS s(user_id, served_count, last_picked_on))::float8 AS avg_served,
   (SELECT COUNT(*) FILTER (WHERE c.is_credited)
      FROM nights c
     WHERE c.group_id = sqlc.arg(group_id) AND c.picker_id = sqlc.arg(user_id))::int AS credited_count,
