@@ -28,8 +28,9 @@ export default function SettingsScreen() {
   const me = identity.state.identity;
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  // The group only changes here: a rename hands its reply to GroupProvider,
-  // so every screen shows the new name without refetching it. Until it loads,
+  // A rename hands its reply to GroupProvider, so every screen on this phone
+  // shows the new name without refetching it (other phones pick it up when
+  // they return to the foreground). Until it loads,
   // the row shows a spinner, or the launch load's error (opening Settings
   // retries it).
   const { group, setGroup, error } = useGroup();

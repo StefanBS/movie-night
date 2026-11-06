@@ -53,7 +53,8 @@ export function renameGroup(
 export type GroupSessionState = {
   // group is null until a load succeeds.
   group: Group | null;
-  // error is the last load's failure, cleared by the next success.
+  // error is the last fetch's failure, cleared by the next success. A failed
+  // refresh keeps the last group beside it.
   error: string | null;
 };
 
@@ -62,16 +63,40 @@ export type GroupSession = Session<GroupSessionState> & {
   // screen can call it on focus: the first call loads it, and after a failure
   // the next one retries.
   load(): Promise<void>;
+  // refresh fetches the group even if it's loaded (the app coming back to the
+  // foreground), sharing a fetch already in flight.
+  refresh(): Promise<void>;
   // set takes the group from a write's reply (a rename in Settings).
   set(group: Group): void;
 };
 
 // createGroupSession holds the app's one copy of the group (name + since
-// date). The group only changes through a rename on this phone, so it is
-// fetched once, not on every screen.
+// date). Any phone in the club can rename it, but renames are rare and only
+// change a label, so it is fetched at launch and when the app returns to the
+// foreground, not on every screen.
 export function createGroupSession({ baseUrl, groupId }: { baseUrl: string; groupId: string }): GroupSession {
   const core = createSessionCore<GroupSessionState>({ group: null, error: null });
-  let loading: Promise<void> | null = null;
+  let inFlight: Promise<void> | null = null;
+  // writes counts set() calls, so a fetch that started before a rename's
+  // reply arrived can't overwrite it with the older name.
+  let writes = 0;
+
+  const fetchOnce = () => {
+    inFlight ??= (async () => {
+      const before = writes;
+      try {
+        const group = await core.track((signal) => fetchGroup(baseUrl, groupId, signal));
+        if (writes === before) {
+          core.set({ group, error: null });
+        }
+      } catch (e) {
+        core.set({ error: errorMessage(e, "failed to load the group") });
+      } finally {
+        inFlight = null;
+      }
+    })();
+    return inFlight;
+  };
 
   return {
     get state() {
@@ -81,23 +106,13 @@ export function createGroupSession({ baseUrl, groupId }: { baseUrl: string; grou
     dispose: core.dispose,
 
     load() {
-      if (core.state.group !== null) {
-        return Promise.resolve();
-      }
-      loading ??= (async () => {
-        try {
-          const group = await core.track((signal) => fetchGroup(baseUrl, groupId, signal));
-          core.set({ group: core.state.group ?? group, error: null });
-        } catch (e) {
-          core.set({ error: errorMessage(e, "failed to load the group") });
-        } finally {
-          loading = null;
-        }
-      })();
-      return loading;
+      return core.state.group !== null ? Promise.resolve() : fetchOnce();
     },
 
+    refresh: fetchOnce,
+
     set(group) {
+      writes++;
       core.set({ group, error: null });
     },
   };
