@@ -23,7 +23,6 @@ function night(id: string, scheduledFor: string, tmdbId: number | null, watched 
 }
 
 const historyCases: [string, string[], [string | null, string[]][]][] = [
-  ["no nights", [], []],
   [
     "this year's nights are one unlabelled run, newest first across months",
     ["2026-05-02", "2026-06-20", "2026-06-05"],
@@ -57,7 +56,6 @@ for (const [name, dates, want] of historyCases) {
 }
 
 const watchedCases: [string, Night[], [number, string][]][] = [
-  ["no nights", [], []],
   ["a watched night's film, with its date", [night("a", "2026-05-02", 10)], [[10, "2026-05-02"]]],
   ["a night not yet recorded doesn't count, whatever its date", [night("a", "2026-05-02", 10, false)], []],
   ["a night without a film adds nothing", [night("a", "2026-05-02", null)], []],

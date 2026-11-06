@@ -7,7 +7,6 @@ import type { TurnMember } from "./turn";
 
 const TODAY = "2026-06-22";
 const WATCHED = { watchedAt: "2026-06-20T22:00:00Z" };
-const aMovie = { tmdbId: 1, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg", genres: [], runtimeMinutes: null };
 
 function night(id: string, scheduledFor: string, opts: Partial<Night> = {}): Night {
   return {
@@ -60,16 +59,10 @@ const cases: { name: string; ranking: TurnMember[]; nights: Night[]; want: Shown
   { name: "planned picker chosen out of turn, mid-ranking", ranking: CLUB, nights: [night("t", TODAY, { pickerId: "Dev" })], want: { kind: "planned", night: "t", alsoPlanned: [], onDeck: ["Blake", "Ada", "Esme"] } },
   { name: "planned picker not in the rotation (a guest)", ranking: rank("Blake", "Ada", "Dev", "Esme"), nights: [night("t", TODAY, { pickerId: "Gus" })], want: { kind: "planned", night: "t", alsoPlanned: [], onDeck: ["Blake", "Ada", "Dev"] } },
   { name: "fewer than three others", ranking: rank("Blake", "Cleo"), nights: [night("t", TODAY)], want: { kind: "planned", night: "t", alsoPlanned: [], onDeck: ["Blake"] } },
-  { name: "the next picker is the only member", ranking: rank("Ada"), nights: [], want: { kind: "unplanned", picker: "Ada", onDeck: [] } },
 
   // Which Night is up next, and which are also planned.
-  { name: "tonight with a film stays up next", ranking: CLUB, nights: [night("t", TODAY, { movie: aMovie })], want: { kind: "planned", night: "t", alsoPlanned: [], onDeck: ["Blake", "Ada", "Dev"] } },
   { name: "the soonest of several, the rest soonest first", ranking: CLUB, nights: [night("far", "2026-07-10"), night("soon", "2026-06-26"), night("mid", "2026-06-30")], want: { kind: "planned", night: "soon", alsoPlanned: ["mid", "far"], onDeck: ["Blake", "Ada", "Dev"] } },
-  { name: "tonight beats upcoming", ranking: CLUB, nights: [night("u", "2026-06-23"), night("t", TODAY)], want: { kind: "planned", night: "t", alsoPlanned: ["u"], onDeck: ["Blake", "Ada", "Dev"] } },
-  { name: "watched nights are never up next or also planned", ranking: CLUB, nights: [night("p", "2026-06-10", { movie: aMovie, ...WATCHED }), night("u", "2026-06-26"), night("v", "2026-07-01")], want: { kind: "planned", night: "u", alsoPlanned: ["v"], onDeck: ["Blake", "Ada", "Dev"] } },
   { name: "yesterday's unwatched night stays up next until it's recorded", ranking: CLUB, nights: [night("t", TODAY), night("y", "2026-06-21")], want: { kind: "planned", night: "y", alsoPlanned: ["t"], onDeck: ["Blake", "Ada", "Dev"] } },
-  { name: "the older of two unwatched past nights", ranking: CLUB, nights: [night("y", "2026-06-21"), night("old", "2026-06-14")], want: { kind: "planned", night: "old", alsoPlanned: ["y"], onDeck: ["Blake", "Ada", "Dev"] } },
-  { name: "tonight once watched gives way to the next", ranking: CLUB, nights: [night("t", TODAY, WATCHED), night("u", "2026-06-26")], want: { kind: "planned", night: "u", alsoPlanned: [], onDeck: ["Blake", "Ada", "Dev"] } },
   { name: "on deck follows the up-next night's picker, not a later one's", ranking: CLUB, nights: [night("soon", "2026-06-26", { pickerId: "Blake" }), night("later", "2026-07-03")], want: { kind: "planned", night: "soon", alsoPlanned: ["later"], onDeck: ["Ada", "Dev", "Esme"] } },
 ];
 

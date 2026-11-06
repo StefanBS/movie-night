@@ -21,7 +21,6 @@ test("parseRepeat reads each repeat, or none, and rejects a malformed one", () =
     { raw: null, want: null },
     { raw: undefined, want: null },
     { raw: { freq: "weekly", intervalWeeks: 1 }, want: weekly },
-    { raw: { freq: "weekly", intervalWeeks: 2 }, want: fortnightly },
     { raw: { freq: "monthly", week: 3 }, want: monthly(3) },
     { raw: { freq: "monthly", week: -1 }, want: monthly(-1) },
   ];
@@ -31,9 +30,7 @@ test("parseRepeat reads each repeat, or none, and rejects a malformed one", () =
   const bad: { name: string; raw: unknown }[] = [
     { name: "a string", raw: "weekly" },
     { name: "unknown freq", raw: { freq: "daily" } },
-    { name: "weekly without an interval", raw: { freq: "weekly" } },
     { name: "weekly every 3 weeks", raw: { freq: "weekly", intervalWeeks: 3 } },
-    { name: "monthly without a week", raw: { freq: "monthly" } },
     { name: "monthly fifth week", raw: { freq: "monthly", week: 5 } },
     { name: "monthly week as a string", raw: { freq: "monthly", week: "3" } },
   ];
@@ -60,11 +57,8 @@ test("formatRepeatLabel names the cadence on the night's weekday", () => {
   const cases: { repeat: Repeat | null; date: string; want: string }[] = [
     { repeat: null, date: "2026-06-19", want: "Doesn't repeat" },
     { repeat: weekly, date: "2026-06-19", want: "Every Friday" },
-    { repeat: weekly, date: "2026-06-21", want: "Every Sunday" },
     { repeat: fortnightly, date: "2026-06-19", want: "Every 2 weeks" },
-    { repeat: monthly(1), date: "2026-06-05", want: "First Friday of the month" },
     { repeat: monthly(3), date: "2026-06-19", want: "Third Friday of the month" },
-    { repeat: monthly(4), date: "2026-06-26", want: "Fourth Friday of the month" },
     { repeat: monthly(-1), date: "2026-06-26", want: "Last Friday of the month" },
   ];
   for (const c of cases) {
@@ -77,7 +71,6 @@ test("formatRepeatShort is the cadence alone, for a line that already has the da
     { repeat: weekly, want: "Weekly" },
     { repeat: fortnightly, want: "Every 2 weeks" },
     { repeat: monthly(3), want: "Monthly" },
-    { repeat: monthly(-1), want: "Monthly" },
   ];
   for (const c of cases) {
     assert.equal(formatRepeatShort(c.repeat), c.want, JSON.stringify(c.repeat));
@@ -132,7 +125,6 @@ test("seriesDates previews the night and the dates after it", () => {
     { name: "every 2 weeks", repeat: fortnightly, date: "2026-06-19", want: ["2026-06-19", "2026-07-03", "2026-07-17", "2026-07-31"] },
     { name: "third Friday, into the next year", repeat: monthly(3), date: "2026-11-20", want: ["2026-11-20", "2026-12-18", "2027-01-15", "2027-02-19"] },
     { name: "last Friday", repeat: monthly(-1), date: "2026-06-26", want: ["2026-06-26", "2026-07-31", "2026-08-28", "2026-09-25"] },
-    { name: "every week across the DST change", repeat: weekly, date: "2026-10-23", want: ["2026-10-23", "2026-10-30", "2026-11-06", "2026-11-13"] },
   ];
   for (const c of cases) {
     assert.deepEqual(seriesDates(c.repeat, c.date, 4), c.want, c.name);

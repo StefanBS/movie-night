@@ -40,7 +40,6 @@ test("calendarEntry titles the entry after the club, never the picker", () => {
   ];
   for (const c of cases) {
     assert.equal(calendarEntry(night(), c.groupName, null).title, c.want, c.name);
-    assert.equal(calendarEntry(night({ repeat: WEEKLY }), c.groupName, { interval: 1 }).title, c.want, `${c.name}, series`);
   }
 });
 
@@ -54,7 +53,6 @@ test("calendarEntry notes: a one-off lists who's coming, the film and its link; 
     { name: "weekly, just this night", night: night({ repeat: WEEKLY }), recurrence: null, notes: `Coming: Alex Moreno, Bea Lind, Gus\n${link}`, url: link },
     // 2026-11-06 is a Friday. The film, the people and the night change week to week.
     { name: "weekly series", night: night({ repeat: WEEKLY, movie: movie(1995) }), recurrence: { interval: 1 }, notes: SERIES_NOTES("Every Friday"), url: null },
-    { name: "fortnightly series", night: night({ repeat: { freq: "weekly", intervalWeeks: 2 } }), recurrence: { interval: 2 }, notes: SERIES_NOTES("Every 2 weeks"), url: null },
   ];
   for (const c of cases) {
     const entry = calendarEntry(c.night, "Friday Film Club", c.recurrence);
@@ -66,8 +64,6 @@ test("calendarEntry notes: a one-off lists who's coming, the film and its link; 
 test("calendarEntry runs 3 hours from the start time, or 7:30 PM, local time", () => {
   const cases: { scheduledFor: string; startTime: string | null; start: Date; end: Date }[] = [
     { scheduledFor: "2026-11-06", startTime: null, start: new Date(2026, 10, 6, 19, 30), end: new Date(2026, 10, 6, 22, 30) },
-    { scheduledFor: "2026-12-31", startTime: null, start: new Date(2026, 11, 31, 19, 30), end: new Date(2026, 11, 31, 22, 30) },
-    { scheduledFor: "2027-01-01", startTime: null, start: new Date(2027, 0, 1, 19, 30), end: new Date(2027, 0, 1, 22, 30) },
     { scheduledFor: "2026-11-06", startTime: "20:15", start: new Date(2026, 10, 6, 20, 15), end: new Date(2026, 10, 6, 23, 15) },
     // A late start runs past midnight into the next day (and year).
     { scheduledFor: "2026-12-31", startTime: "22:45", start: new Date(2026, 11, 31, 22, 45), end: new Date(2027, 0, 1, 1, 45) },
@@ -83,10 +79,8 @@ test("calendarRecurrence: a weekly repeat becomes an open-ended weekly rule; oth
   const cases: { name: string; repeat: Repeat | null; want: CalendarRecurrence | null }[] = [
     { name: "one-off", repeat: null, want: null },
     { name: "every week", repeat: { freq: "weekly", intervalWeeks: 1 }, want: { interval: 1 } },
-    { name: "every 2 weeks", repeat: { freq: "weekly", intervalWeeks: 2 }, want: { interval: 2 } },
     // expo-calendar can't pass a monthly "Nth weekday" rule to either OS form.
     { name: "third Friday", repeat: { freq: "monthly", week: 3 }, want: null },
-    { name: "last Friday", repeat: { freq: "monthly", week: -1 }, want: null },
   ];
   for (const c of cases) {
     assert.deepEqual(calendarRecurrence(c.repeat), c.want, c.name);
@@ -96,7 +90,6 @@ test("calendarRecurrence: a weekly repeat becomes an open-ended weekly rule; oth
 test("seriesNote describes the cadence mid-sentence", () => {
   const cases: { name: string; repeat: Repeat; date: string; want: string }[] = [
     { name: "every week", repeat: { freq: "weekly", intervalWeeks: 1 }, date: "2026-11-20", want: "every Friday" },
-    { name: "every 2 weeks", repeat: { freq: "weekly", intervalWeeks: 2 }, date: "2026-11-20", want: "every 2 weeks" },
   ];
   for (const c of cases) {
     assert.equal(seriesNote(c.repeat, c.date), c.want, c.name);

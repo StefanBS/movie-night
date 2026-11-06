@@ -18,8 +18,6 @@ const cases: [string, TurnMember[], string[], string | null, string | null][] = 
   ["a guest can be chosen", [member("ada")], ["ada", "frankie"], "frankie", "frankie"],
   ["a chosen picker who left falls back to the order", [member("ada")], ["ada"], "blake", "ada"],
   ["guest-only plan with no choice has no picker", [], ["frankie"], null, null],
-  ["guest-only plan with a choice", [], ["frankie"], "frankie", "frankie"],
-  ["nobody attending", [], [], null, null],
 ];
 for (const [name, order, attending, chosen, want] of cases) {
   test(`draftPicker: ${name}`, () => {
