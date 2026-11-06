@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 
-import { AppButton, Avatar, Badge, SectionLabel } from "../";
+import { AppButton, Badge, MemberRow, SectionLabel } from "../";
 import { AttendCheck } from "./AttendCheck";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
@@ -8,7 +8,7 @@ import { firstName } from "../../lib/avatar";
 import { formatWeekdayDate, relativeLabel } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import { nightWording } from "../../lib/nightLifecycle";
-import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, pressedOpacity, space, textPresets, trackPx } from "../../theme";
+import { createThemedStyles, fontFamily, space, textPresets } from "../../theme";
 
 // WhoStep — attendance toggles for the full roster, for a plan that is not yet
 // a Night (ADR-0008). The picker (pickerId — next up among those in, unless the
@@ -64,41 +64,32 @@ export function WhoStep({
           const here = attendeeIds.has(m.id);
           const isPicker = picker?.id === m.id;
           return (
-            <Pressable
+            <MemberRow
               key={m.id}
+              name={m.name}
+              meta={isPicker ? "Gets the pick" : undefined}
+              metaTone="accent"
+              highlighted={isPicker}
+              dimmed={!here}
+              divider={i < members.length - 1}
               onPress={() => onToggle(m)}
               disabled={busy !== null}
-              style={({ pressed }) => [
-                styles.attendRow,
-                i < members.length - 1 && styles.attendDivider,
-                pressed && styles.rowPressed,
-              ]}
-            >
-              <View style={!here && styles.avatarOut}>
-                <Avatar name={m.name} />
-              </View>
-              <View style={[styles.rowText, !here && styles.textOut]}>
-                <Text style={[styles.name, isPicker && styles.namePicker]} numberOfLines={1}>
-                  {m.name}
-                </Text>
-                {isPicker ? <Text style={styles.getsPick}>Gets the pick</Text> : null}
-              </View>
-              {here && !isPicker ? (
-                <Pressable
-                  onPress={() => onChoosePicker(m.id)}
-                  disabled={busy !== null}
-                  hitSlop={space[2]}
-                  accessibilityLabel={`Make ${m.name} the picker`}
-                >
-                  <Text style={styles.makePicker}>Make picker</Text>
-                </Pressable>
-              ) : null}
-              {busy === m.id ? (
-                <Text style={styles.tag}>…</Text>
-              ) : (
-                <AttendCheck on={here} />
-              )}
-            </Pressable>
+              right={
+                <View style={styles.trailing}>
+                  {here && !isPicker ? (
+                    <Pressable
+                      onPress={() => onChoosePicker(m.id)}
+                      disabled={busy !== null}
+                      hitSlop={space[2]}
+                      accessibilityLabel={`Make ${m.name} the picker`}
+                    >
+                      <Text style={styles.makePicker}>Make picker</Text>
+                    </Pressable>
+                  ) : null}
+                  {busy === m.id ? <Text style={styles.tag}>…</Text> : <AttendCheck on={here} />}
+                </View>
+              }
+            />
           );
         })}
       </ScrollView>
@@ -136,28 +127,7 @@ const useStyles = createThemedStyles((colors) => ({
   },
   heading: { ...textPresets.screenTitle, color: colors.text.primary, flexShrink: 1 },
   hint: { ...textPresets.meta, color: colors.text.secondary },
-  attendRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space[3],
-    paddingVertical: 11,
-  },
-  attendDivider: {
-    borderBottomWidth: borderWidth.hairline,
-    borderBottomColor: colors.border.hairline,
-  },
-  avatarOut: { opacity: 0.4 },
-  textOut: { opacity: 0.5 },
-  rowPressed: { opacity: pressedOpacity },
-  rowText: { flex: 1 },
-  name: { fontFamily: fontFamily.sansMedium, fontSize: fontSize.base, lineHeight: lh(fontSize.base, "snug"), color: colors.text.primary },
-  namePicker: {
-    fontFamily: fontFamily.display,
-    fontSize: fontSize.lg,
-    lineHeight: lh(fontSize.lg, "snug"),
-    letterSpacing: trackPx(fontSize.lg, "title"),
-  },
-  getsPick: { ...textPresets.meta, fontFamily: fontFamily.sansSemibold, fontSize: 13, color: colors.accent.strong, marginTop: 2 },
+  trailing: { flexDirection: "row", alignItems: "center", gap: space[3] },
   makePicker: { ...textPresets.meta, fontFamily: fontFamily.sansSemibold, fontSize: 13, color: colors.text.link },
   tag: { ...textPresets.tag, color: colors.text.secondary },
 }));

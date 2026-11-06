@@ -2,7 +2,7 @@ import { useState, type ComponentProps } from "react";
 import { Platform, ScrollView, Text, View } from "react-native";
 import { CalendarPlus, Clapperboard, Film, Pencil, Repeat, X } from "lucide-react-native";
 
-import { AppButton, Avatar, Poster, SectionLabel, Sheet, SheetRow, useToast } from "../";
+import { AppButton, MemberRow, Poster, SectionLabel, Sheet, SheetRow, useToast } from "../";
 import { useGroup } from "../GroupProvider";
 import { Credit } from "./Credit";
 import { WizardFooter } from "./WizardFooter";
@@ -134,13 +134,12 @@ export function NightView({
 
         <SectionLabel>{wording.attendeesSection(night.attendees.length)}</SectionLabel>
         {night.attendees.map((a, i) => (
-          <View key={a.id} style={[styles.person, i < night.attendees.length - 1 && styles.divider]}>
-            <Avatar name={a.name} size={32} />
-            <Text style={styles.personName} numberOfLines={1}>
-              {a.name}
-            </Text>
-            {a.id === night.pickerId ? <Text style={styles.tag}>Picker</Text> : null}
-          </View>
+          <MemberRow
+            key={a.id}
+            name={a.name}
+            divider={i < night.attendees.length - 1}
+            right={a.id === night.pickerId ? <Text style={styles.tag}>Picker</Text> : undefined}
+          />
         ))}
       </ScrollView>
 
@@ -215,8 +214,5 @@ const useStyles = createThemedStyles((colors) => ({
     borderTopColor: colors.border.hairline,
   },
   note: { ...textPresets.meta, lineHeight: lh(fontSize.sm, "normal"), color: colors.text.secondary, marginTop: 14 },
-  person: { flexDirection: "row", alignItems: "center", gap: space[3], paddingVertical: 10 },
-  divider: { borderBottomWidth: borderWidth.hairline, borderBottomColor: colors.border.hairline },
-  personName: { flex: 1, fontFamily: fontFamily.sansMedium, fontSize: fontSize.base, lineHeight: lh(fontSize.base), color: colors.text.primary },
   tag: { ...textPresets.meta, fontSize: 13, color: colors.text.tertiary },
 }));

@@ -1,10 +1,10 @@
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 
 import {
   AppButton,
-  Avatar,
+  MemberRow,
   Calendar,
   SectionLabel,
   SettingsRow,
@@ -38,7 +38,7 @@ import {
   reminderConfirmation,
   sameReminders,
 } from "../../lib/reminders";
-import { borderWidth, createThemedStyles, fontFamily, fontSize, pressedOpacity, radius, lh, space, textPresets, useColors } from "../../theme";
+import { borderWidth, createThemedStyles, fontFamily, radius, space, textPresets, useColors } from "../../theme";
 
 // EditNightScreen renders the edit module (lib/nightEdit), opened from Tonight
 // or a Night; `back` names that screen. Change the date and start time, toggle who's coming, then save both in one
@@ -221,30 +221,17 @@ export function EditNightScreen({
               // Night) before taking them off the night.
               const isPicker = m.id === picker.id;
               return (
-                <Pressable
+                <MemberRow
                   key={m.id}
+                  name={m.name}
+                  meta={isPicker ? "Picker" : undefined}
+                  dimmed={!here}
+                  divider={i < rows.length - 1}
                   onPress={() => edit.toggle(m.id)}
                   disabled={busy || isPicker}
                   accessibilityHint={isPicker ? "Change the picker first" : undefined}
-                  style={({ pressed }) => [
-                    styles.attendRow,
-                    i < rows.length - 1 && styles.attendDivider,
-                    pressed && styles.rowPressed,
-                  ]}
-                >
-                  <View style={!here && styles.avatarOut}>
-                    <Avatar name={m.name} size={32} />
-                  </View>
-                  <View style={[styles.memberText, !here && styles.textOut]}>
-                    <Text style={styles.memberName} numberOfLines={1}>
-                      {m.name}
-                    </Text>
-                    {isPicker ? (
-                      <Text style={styles.pickerHint}>Picker</Text>
-                    ) : null}
-                  </View>
-                  <AttendCheck on={here} size={22} />
-                </Pressable>
+                  right={<AttendCheck on={here} />}
+                />
               );
             })}
           </View>
@@ -296,22 +283,6 @@ const useStyles = createThemedStyles((colors) => ({
     borderBottomWidth: borderWidth.hairline,
     borderBottomColor: colors.border.hairline,
   },
-  attendRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space[3],
-    paddingVertical: 10,
-  },
-  attendDivider: {
-    borderBottomWidth: borderWidth.hairline,
-    borderBottomColor: colors.border.hairline,
-  },
-  avatarOut: { opacity: 0.4 },
-  textOut: { opacity: 0.5 },
-  rowPressed: { opacity: pressedOpacity },
-  memberText: { flex: 1 },
-  memberName: { fontFamily: fontFamily.sansMedium, fontSize: fontSize.base, lineHeight: lh(fontSize.base, "snug"), color: colors.text.primary },
-  pickerHint: { ...textPresets.meta, fontSize: 13, color: colors.text.tertiary, marginTop: 2 },
   calendarCard: {
     padding: space[4],
     backgroundColor: colors.surface.card,
