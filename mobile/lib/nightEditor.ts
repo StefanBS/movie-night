@@ -1,5 +1,4 @@
 import { errorMessage } from "./errors";
-import type { Member } from "./members";
 import { searchMovies, type Movie } from "./movies";
 import { attachMovie, changeNightPicker, detachMovie, listNights, type Night } from "./nights";
 import { createSessionCore, type Session } from "./session";
@@ -14,7 +13,6 @@ export type EditorStep = "pick" | "night";
 
 export type NightEditorState = {
   night: Night;
-  members: Member[];
   step: EditorStep;
   busy: string | null;
   actionError: string | null;
@@ -40,29 +38,26 @@ export type NightEditor = Session<NightEditorState> & {
   attach(tmdbId: number): Promise<Night | null>;
   clearFilm(): Promise<Night | null>;
   changePicker(memberId: string): Promise<Night | null>;
-  // refresh swaps in a Night and roster loaded since, keeping the step, search
+  // refresh swaps in a Night loaded since, keeping the step, search
   // and errors. loadStartedAt (performance.now()) is when that load began: a
   // load that began before the last write finished may have read the Night
   // before it, so it is ignored, as is any refresh while a write runs.
-  refresh(night: Night, members: Member[], loadStartedAt: number): void;
+  refresh(night: Night, loadStartedAt: number): void;
 };
 
 export function createNightEditor({
   baseUrl,
   groupId,
   night,
-  members,
   initialStep = "night",
 }: {
   baseUrl: string;
   groupId: string;
   night: Night;
-  members: Member[];
   initialStep?: EditorStep;
 }): NightEditor {
   const core = createSessionCore<NightEditorState>({
     night,
-    members,
     step: initialStep,
     busy: null,
     actionError: null,
@@ -75,6 +70,8 @@ export function createNightEditor({
 
   let lastWriteAt = -Infinity;
   let searchController: AbortController | null = null;
+  // searchingFor is the query searchController is answering ("" when idle).
+  let searchingFor = "";
   let groupNightsRequested = false;
 
   // loadGroupNights fetches the group's Nights the first time the Pick step
@@ -137,14 +134,22 @@ export function createNightEditor({
 
     async search(query) {
       const q = query.trim();
+      // Submitting the field and the typing debounce both ask for the same
+      // query; one request answers both.
+      const { resultsFor, searchError } = core.state;
+      if (q !== "" && (q === searchingFor || (searchController === null && q === resultsFor && searchError === null))) {
+        return;
+      }
       searchController?.abort();
       searchController = null;
+      searchingFor = "";
       if (q === "") {
         core.set({ results: [], resultsFor: "", searching: false, searchError: null });
         return;
       }
       const controller = new AbortController();
       searchController = controller;
+      searchingFor = q;
       core.set({ searching: true, searchError: null });
       try {
         const results = await core.track((signal) => searchMovies(baseUrl, q, signal), controller);
@@ -159,6 +164,7 @@ export function createNightEditor({
       } finally {
         if (searchController === controller) {
           searchController = null;
+          searchingFor = "";
         }
       }
     },
@@ -198,11 +204,11 @@ export function createNightEditor({
       );
     },
 
-    refresh(night, members, loadStartedAt) {
+    refresh(night, loadStartedAt) {
       if (core.state.busy !== null || loadStartedAt < lastWriteAt) {
         return;
       }
-      core.set({ night, members });
+      core.set({ night });
     },
   };
 }

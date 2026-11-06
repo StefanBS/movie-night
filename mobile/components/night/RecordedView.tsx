@@ -52,13 +52,11 @@ export function RecordedView({
           </View>
           {movie !== null ? <Text style={styles.title}>{movie.title}</Text> : null}
           {details !== "" ? <Text style={styles.details}>{details}</Text> : null}
-          {picker !== null ? (
-            <Text style={styles.credit}>
-              {"Picked by "}
-              <Text style={styles.creditName}>{firstName(picker.name)}</Text>
-              {` · ${formatShortDate(night.scheduledFor)}`}
-            </Text>
-          ) : null}
+          <Text style={styles.credit}>
+            {"Picked by "}
+            <Text style={styles.creditName}>{firstName(picker.name)}</Text>
+            {` · ${formatShortDate(night.scheduledFor)}`}
+          </Text>
         </View>
 
         <View style={styles.section}>

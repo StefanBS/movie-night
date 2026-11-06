@@ -1,7 +1,6 @@
-import { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { ChevronRight, Settings } from "lucide-react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 
 import {
   AppButton,
@@ -14,11 +13,11 @@ import {
   TopBar,
   UpNextCard,
 } from "../../components";
+import { useLoad } from "../../components/useLoad";
 import { API_URL } from "../../apiUrl";
 import { firstName } from "../../lib/avatar";
 import { GROUP_ID } from "../../lib/api";
-import { errorMessage } from "../../lib/errors";
-import { fetchGroup } from "../../lib/group";
+import { fetchGroupName } from "../../lib/group";
 import { fetchTurn, pickerSummary, picksLabel, type TurnMember } from "../../lib/turn";
 import { listNights, nightPicker, type Night } from "../../lib/nights";
 import { alsoPlannedPicks, alsoPlannedWhen } from "../../lib/alsoPlanned";
@@ -79,23 +78,21 @@ function AlsoPlanned({ nights, onOpen }: { nights: Night[]; onOpen: (night: Nigh
               key={n.id}
               onPress={() => onOpen(n)}
               accessibilityRole="button"
-              accessibilityLabel={[alsoPlannedWhen(n), picks].filter((t) => t !== null).join(", ")}
+              accessibilityLabel={`${alsoPlannedWhen(n)}, ${picks}`}
               style={({ pressed }) => [
                 styles.plannedRow,
                 i < nights.length - 1 && styles.plannedDivider,
                 pressed && styles.pressed,
               ]}
             >
-              {picker !== null ? <Avatar name={picker.name} size={28} /> : null}
+              <Avatar name={picker.name} size={28} />
               <View style={styles.plannedText}>
                 <Text style={styles.plannedWhen} numberOfLines={1}>
                   {alsoPlannedWhen(n)}
                 </Text>
-                {picks !== null ? (
-                  <Text style={styles.plannedPicks} numberOfLines={1}>
-                    {picks}
-                  </Text>
-                ) : null}
+                <Text style={styles.plannedPicks} numberOfLines={1}>
+                  {picks}
+                </Text>
               </View>
               <ChevronRight size={18} color={colors.text.tertiary} />
             </Pressable>
@@ -110,61 +107,28 @@ export default function TonightScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
-  const [order, setOrder] = useState<TurnMember[]>([]);
-  const [nights, setNights] = useState<Night[]>([]);
-  const [groupName, setGroupName] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Refetch the turn AND the planned nights on focus (not just mount): a pick
-  // recorded, a roster change, or a night planned on another tab must show up
-  // when the user returns — the tab screen stays mounted. `loading` gates only
-  // the first load (both fetches together, so the card never flashes in after
-  // the spotlight); later focuses refresh in the background. A nights failure
-  // degrades to the spotlight — the turn fetch owns the screen's error state.
-  useFocusEffect(
-    useCallback(() => {
-      const controller = new AbortController();
-      (async () => {
-        try {
-          const [turn, planned] = await Promise.all([
-            fetchTurn(API_URL, GROUP_ID, controller.signal),
-            listNights(API_URL, GROUP_ID, controller.signal).catch(() => [] as Night[]),
-          ]);
-          setOrder(turn);
-          setNights(planned);
-          setError(null);
-        } catch (e) {
-          if (!controller.signal.aborted) {
-            setError(errorMessage(e, "failed to load tonight"));
-          }
-        } finally {
-          if (!controller.signal.aborted) {
-            setLoading(false);
-          }
-        }
-      })();
-      return () => controller.abort();
-    }, []),
-  );
-
-  // The group name is secondary header chrome, fetched independently of the
-  // turn. Refetch on focus (not just mount) so a rename in Settings
-  // shows here when the user returns — tab screens stay mounted. A failure just
-  // leaves the header line blank rather than driving the screen's error state.
-  useFocusEffect(
-    useCallback(() => {
-      const controller = new AbortController();
-      (async () => {
-        try {
-          const g = await fetchGroup(API_URL, GROUP_ID, controller.signal);
-          setGroupName(g.name);
-        } catch {
-          // Ignored — the turn fetch owns the screen's error state.
-        }
-      })();
-      return () => controller.abort();
-    }, []),
+  // Refetch the turn AND the planned nights on focus (useLoad's default): a
+  // pick recorded, a roster change, or a night planned on another tab must show
+  // up when the user returns — the tab screen stays mounted. `loading` gates
+  // only the first load (all fetches together, so the card never flashes in
+  // after the spotlight). A nights failure degrades to the spotlight — the turn
+  // fetch owns the screen's error state. The group name is header chrome,
+  // refetched with them so a rename in Settings shows here.
+  const {
+    data: { order, nights, groupName },
+    loading,
+    error,
+  } = useLoad(
+    async (signal) => {
+      const [order, nights, groupName] = await Promise.all([
+        fetchTurn(API_URL, GROUP_ID, signal),
+        listNights(API_URL, GROUP_ID, signal).catch(() => [] as Night[]),
+        fetchGroupName(API_URL, GROUP_ID, signal),
+      ]);
+      return { order, nights, groupName };
+    },
+    { order: [] as TurnMember[], nights: [] as Night[], groupName: null as string | null },
+    "failed to load tonight",
   );
 
   const gear = (

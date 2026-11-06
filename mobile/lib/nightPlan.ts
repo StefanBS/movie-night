@@ -1,7 +1,7 @@
 import { errorMessage } from "./errors";
 import { fetchGroupName } from "./group";
 import { fetchMembers, type Member } from "./members";
-import { draftPicker } from "./nightDraft";
+import { createPicking } from "./nightDraft";
 import { nightDates } from "./nightLifecycle";
 import { createNight, listNights, type Night } from "./nights";
 import { createSessionCore, type Session } from "./session";
@@ -72,18 +72,7 @@ export function createNightPlan({
     busy: null,
     actionError: null,
   });
-  let chosen: string | null = null;
-  let rank: AbortController | null = null;
-
-  // setPicking updates the attendees/order and re-derives who picks from them.
-  const setPicking = (patch: Partial<Pick<NightPlanState, "attendeeIds" | "order">>) => {
-    const attendeeIds = patch.attendeeIds ?? core.state.attendeeIds;
-    const order = patch.order ?? core.state.order;
-    if (chosen !== null && !attendeeIds.has(chosen)) {
-      chosen = null; // they left, so the pick goes back to the order
-    }
-    core.set({ ...patch, pickerId: draftPicker(order, attendeeIds, chosen) });
-  };
+  const picking = createPicking(core, (present, signal) => fetchTurnAmong(baseUrl, groupId, present, signal));
 
   return {
     get state() {
@@ -117,37 +106,8 @@ export function createNightPlan({
       core.set({ step: "when" });
     },
 
-    async toggle(memberId) {
-      const next = new Set(core.state.attendeeIds);
-      if (next.has(memberId)) {
-        next.delete(memberId);
-      } else {
-        next.add(memberId);
-      }
-      setPicking({ attendeeIds: next });
-
-      rank?.abort();
-      const controller = new AbortController();
-      rank = controller;
-      try {
-        const order = await core.track(
-          (signal) => fetchTurnAmong(baseUrl, groupId, [...next], signal),
-          controller,
-        );
-        if (rank === controller) {
-          setPicking({ order });
-        }
-      } catch (e) {
-        if (!controller.signal.aborted) {
-          core.set({ actionError: errorMessage(e, "failed to load pick order") });
-        }
-      }
-    },
-
-    choosePicker(memberId) {
-      chosen = memberId;
-      setPicking({});
-    },
+    toggle: picking.toggle,
+    choosePicker: picking.choosePicker,
 
     async create() {
       const { busy, pickerId, date, startTime, attendeeIds } = core.state;

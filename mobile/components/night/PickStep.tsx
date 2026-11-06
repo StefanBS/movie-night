@@ -8,10 +8,9 @@ import { WizardFooter } from "./WizardFooter";
 import { firstName } from "../../lib/avatar";
 import { formatShortDate } from "../../lib/date";
 import { watchedOn } from "../../lib/history";
-import type { Member } from "../../lib/members";
 import type { Movie } from "../../lib/movies";
 import { nightWording } from "../../lib/nightLifecycle";
-import { nightPickerName, type Night } from "../../lib/nights";
+import { nightPicker, type Night } from "../../lib/nights";
 import { borderWidth, createThemedStyles, fontFamily, lh, pressedOpacity, space, tabular, textPresets, useColors } from "../../theme";
 
 // How long typing has to pause before the search runs.
@@ -26,7 +25,6 @@ const SEARCH_DEBOUNCE_MS = 300;
 // from the editor (lib/nightEditor).
 export function PickStep({
   night,
-  members,
   today,
   busy,
   results,
@@ -40,7 +38,6 @@ export function PickStep({
   onSkip,
 }: {
   night: Night;
-  members: Member[];
   today: string;
   busy: string | null;
   results: Movie[];
@@ -69,7 +66,7 @@ export function PickStep({
       setChangingPicker(false);
     }
   };
-  const pickerName = nightPickerName(night, members);
+  const pickerName = nightPicker(night).name;
   const first = firstName(pickerName);
   const wording = nightWording(night.scheduledFor, today);
   const query = movieQuery.trim();

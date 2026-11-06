@@ -19,7 +19,6 @@ const monthly = (week: 1 | 2 | 3 | 4 | -1): Repeat => ({ freq: "monthly", week }
 test("parseRepeat reads each repeat, or none, and rejects a malformed one", () => {
   const good: { raw: unknown; want: Repeat | null }[] = [
     { raw: null, want: null },
-    { raw: undefined, want: null },
     { raw: { freq: "weekly", intervalWeeks: 1 }, want: weekly },
     { raw: { freq: "monthly", week: 3 }, want: monthly(3) },
     { raw: { freq: "monthly", week: -1 }, want: monthly(-1) },
@@ -28,6 +27,7 @@ test("parseRepeat reads each repeat, or none, and rejects a malformed one", () =
     assert.deepEqual(parseRepeat(c.raw), c.want, JSON.stringify(c.raw));
   }
   const bad: { name: string; raw: unknown }[] = [
+    { name: "missing", raw: undefined },
     { name: "a string", raw: "weekly" },
     { name: "unknown freq", raw: { freq: "daily" } },
     { name: "weekly every 3 weeks", raw: { freq: "weekly", intervalWeeks: 3 } },

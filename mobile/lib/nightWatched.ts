@@ -1,6 +1,6 @@
 import { errorMessage } from "./errors";
 import { fetchMembers, type Member } from "./members";
-import { draftPicker } from "./nightDraft";
+import { createPicking } from "./nightDraft";
 import { getNightOrNull, getNightTurn, recordWatched, type Night } from "./nights";
 import { createSessionCore, type Session } from "./session";
 import type { TurnMember } from "./turn";
@@ -66,22 +66,9 @@ export function createNightWatched({
     busy: null,
     actionError: null,
   });
-  // chosen is the picker the user (or the plan) settled on: the planned
-  // picker to start with, so the pick stays theirs while they're here.
-  let chosen: string | null = null;
-  let rank: AbortController | null = null;
-  // ranked settles when the latest rerank does, so record() saves the picker
-  // of the order it asked for, not the one on hand when it was tapped.
-  let ranked: Promise<void> = Promise.resolve();
-
-  const setPicking = (patch: Partial<Pick<NightWatchedState, "attendeeIds" | "order">>) => {
-    const attendeeIds = patch.attendeeIds ?? core.state.attendeeIds;
-    const order = patch.order ?? core.state.order;
-    if (chosen !== null && !attendeeIds.has(chosen)) {
-      chosen = null; // they left, so the pick goes back to the order
-    }
-    core.set({ ...patch, pickerId: draftPicker(order, attendeeIds, chosen) });
-  };
+  const picking = createPicking(core, (present, signal) =>
+    getNightTurn(baseUrl, groupId, nightId, signal, present),
+  );
 
   return {
     get state() {
@@ -102,54 +89,23 @@ export function createNightWatched({
           const order = night === null ? [] : await getNightTurn(baseUrl, groupId, nightId, signal);
           return [night, members, order] as const;
         });
-        chosen = night?.pickerId ?? null;
         core.set({ night, members, loading: false });
-        setPicking({ attendeeIds: new Set(night?.attendees.map((a) => a.id)), order });
+        // The planned picker stays theirs while they're attending.
+        picking.reset(new Set(night?.attendees.map((a) => a.id)), order, night?.pickerId ?? null);
       } catch (e) {
         core.set({ error: errorMessage(e, "failed to load the night"), loading: false });
       }
     },
 
-    toggle(memberId) {
-      const next = new Set(core.state.attendeeIds);
-      if (!next.delete(memberId)) {
-        next.add(memberId);
-      }
-      setPicking({ attendeeIds: next });
-
-      rank?.abort();
-      const controller = new AbortController();
-      rank = controller;
-      ranked = (async () => {
-        try {
-          const order = await core.track(
-            (signal) => getNightTurn(baseUrl, groupId, nightId, signal, [...next]),
-            controller,
-          );
-          if (rank === controller) {
-            core.set({ actionError: null });
-            setPicking({ order });
-          }
-        } catch (e) {
-          if (!controller.signal.aborted) {
-            core.set({ actionError: errorMessage(e, "failed to load pick order") });
-          }
-        }
-      })();
-      return ranked;
-    },
-
-    choosePicker(memberId) {
-      chosen = memberId;
-      setPicking({});
-    },
+    toggle: picking.toggle,
+    choosePicker: picking.choosePicker,
 
     async record() {
       if (core.state.busy !== null) {
         return null;
       }
       core.set({ busy: "record" });
-      await ranked;
+      await picking.settled();
       const { pickerId, attendeeIds, night } = core.state;
       if (pickerId === null || night === null) {
         core.set({ busy: null });

@@ -1,19 +1,13 @@
 import { useCallback } from "react";
-import {
-  ActivityIndicator,
-  Text,
-  View,
-} from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
-import { TopBar } from "../../../components";
 import { EditNightScreen } from "../../../components/night/EditNightScreen";
+import { NightLoadStatus } from "../../../components/night/NightLoadStatus";
 import { useSession } from "../../../components/useSession";
 import { API_URL } from "../../../apiUrl";
 import { GROUP_ID } from "../../../lib/api";
 import { todayLocalISO } from "../../../lib/date";
 import { createNightLoad, nightLoadView } from "../../../lib/nightLoad";
-import { createThemedStyles, space, textPresets, useColors } from "../../../theme";
 
 export default function NightEditRoute() {
   // `from` names the screen that opened Edit night ("Tonight", "Night"), for
@@ -27,14 +21,11 @@ export default function NightEditRoute() {
 // refresh must not unmount it. The draft keeps the Night it opened with; a
 // refresh only updates the calendar's dots.
 function NightEditLoader({ id, from }: { id: string; from: string }) {
-  const colors = useColors();
-  const styles = useStyles();
   const router = useRouter();
   const [load, state] = useSession(() =>
     createNightLoad({ baseUrl: API_URL, groupId: GROUP_ID, nightId: id, withNightDates: true }),
   );
   const { night, members, nightDates, error } = state;
-  const view = nightLoadView(state);
   const today = todayLocalISO();
   const back = { label: from, onPress: () => router.back() };
 
@@ -44,47 +35,8 @@ function NightEditLoader({ id, from }: { id: string; from: string }) {
     }, [load]),
   );
 
-  if (view === "loading") {
-    return (
-      <View style={styles.screen}>
-        <TopBar
-          kind="title"
-          title="Edit night"
-          back={back}
-        />
-        <ActivityIndicator style={styles.center} size="large" color={colors.text.secondary} />
-      </View>
-    );
-  }
-
-  if (view === "failed") {
-    return (
-      <View style={styles.screen}>
-        <TopBar
-          kind="title"
-          title="Edit night"
-          back={back}
-        />
-        <Text style={[styles.center, styles.error]}>
-          {`Couldn't load night: ${error}`}
-        </Text>
-      </View>
-    );
-  }
-
   if (night === null) {
-    return (
-      <View style={styles.screen}>
-        <TopBar
-          kind="title"
-          title="Edit night"
-          back={back}
-        />
-        <View style={styles.body}>
-          <Text style={styles.muted}>{"Couldn't find that night."}</Text>
-        </View>
-      </View>
-    );
+    return <NightLoadStatus title="Edit night" back={back} view={nightLoadView(state)} error={error} />;
   }
 
   return (
@@ -100,11 +52,3 @@ function NightEditLoader({ id, from }: { id: string; from: string }) {
     />
   );
 }
-
-const useStyles = createThemedStyles((colors) => ({
-  screen: { flex: 1, backgroundColor: colors.surface.page },
-  center: { flex: 1, textAlignVertical: "center", textAlign: "center", paddingHorizontal: space[5] },
-  body: { paddingHorizontal: space[5], paddingTop: space[6] },
-  error: { ...textPresets.body, color: colors.text.danger },
-  muted: { ...textPresets.body, color: colors.text.secondary },
-}));

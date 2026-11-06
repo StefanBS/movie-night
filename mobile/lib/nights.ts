@@ -1,5 +1,4 @@
 import { requestJson, requestJsonOrNull, requestNoContent } from "./http";
-import type { Member } from "./members";
 import { parseMovie, type Movie } from "./movies";
 import { parseReminders, type Reminders } from "./reminders";
 import { parseRepeat, type Repeat } from "./repeat";
@@ -8,7 +7,6 @@ import { parseTurn, type TurnMember } from "./turn";
 export type Attendee = {
   id: string;
   name: string;
-  role: "core" | "guest";
 };
 
 // Night is one dated movie night. Every Night has a picker, who is always one
@@ -34,31 +32,22 @@ function parseAttendee(raw: unknown, index: number): Attendee {
   if (typeof raw !== "object" || raw === null) {
     throw new Error(`attendee ${index}: expected an object`);
   }
-  const { id, name, role } = raw as Record<string, unknown>;
+  const { id, name } = raw as Record<string, unknown>;
   if (typeof id !== "string") {
     throw new Error(`attendee ${index}: id must be a string`);
   }
   if (typeof name !== "string") {
     throw new Error(`attendee ${index}: name must be a string`);
   }
-  if (role !== "core" && role !== "guest") {
-    throw new Error(`attendee ${index}: role must be "core" or "guest"`);
-  }
-  return { id, name, role };
+  return { id, name };
 }
 
 const START_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-// nightPicker is the Night's picker among its attendees, or null if the
-// payload somehow lacks them (every Night has one, ADR-0008).
-export function nightPicker(night: Night): Attendee | null {
-  return night.attendees.find((a) => a.id === night.pickerId) ?? null;
-}
-
-// nightPickerName is the picker's full name: from the Night's attendees, else
-// from the group's members, else "" when neither has them.
-export function nightPickerName(night: Night, members: Pick<Member, "id" | "name">[]): string {
-  return nightPicker(night)?.name ?? members.find((m) => m.id === night.pickerId)?.name ?? "";
+// nightPicker is the Night's picker among its attendees. parseNight guarantees
+// there is one (ADR-0008).
+export function nightPicker(night: Night): Attendee {
+  return night.attendees.find((a) => a.id === night.pickerId)!;
 }
 
 // parseNight validates an untrusted JSON payload and returns a typed Night,
@@ -74,7 +63,7 @@ export function parseNight(raw: unknown): Night {
   if (typeof scheduledFor !== "string") {
     throw new Error("night: scheduledFor must be a string");
   }
-  if (startTime !== undefined && startTime !== null && (typeof startTime !== "string" || !START_TIME.test(startTime))) {
+  if (startTime !== null && (typeof startTime !== "string" || !START_TIME.test(startTime))) {
     throw new Error("night: startTime must be HH:MM or null");
   }
   if (typeof pickerId !== "string") {
@@ -83,19 +72,22 @@ export function parseNight(raw: unknown): Night {
   if (!Array.isArray(attendees)) {
     throw new Error("night: attendees must be an array");
   }
-  if (watchedAt !== undefined && watchedAt !== null && typeof watchedAt !== "string") {
+  if (watchedAt !== null && typeof watchedAt !== "string") {
     throw new Error("night: watchedAt must be a string or null");
   }
-  const parsedMovie = movie === undefined || movie === null ? null : parseMovie(movie);
+  const parsedAttendees = attendees.map(parseAttendee);
+  if (!parsedAttendees.some((a) => a.id === pickerId)) {
+    throw new Error("night: pickerId must be one of the attendees");
+  }
   return {
     id,
     scheduledFor,
-    startTime: startTime ?? null,
+    startTime,
     pickerId,
-    movie: parsedMovie,
-    attendees: attendees.map(parseAttendee),
+    movie: movie === null ? null : parseMovie(movie),
+    attendees: parsedAttendees,
     reminders: parseReminders(reminders),
-    watchedAt: watchedAt ?? null,
+    watchedAt,
     repeat: parseRepeat(repeat),
   };
 }

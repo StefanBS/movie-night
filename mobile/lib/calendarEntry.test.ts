@@ -16,9 +16,9 @@ function night(opts: Partial<Night> = {}): Night {
     pickerId: "b",
     movie: null,
     attendees: [
-      { id: "a", name: "Alex Moreno", role: "core" },
-      { id: "b", name: "Bea Lind", role: "core" },
-      { id: "g", name: "Gus", role: "guest" },
+      { id: "a", name: "Alex Moreno" },
+      { id: "b", name: "Bea Lind" },
+      { id: "g", name: "Gus" },
     ],
     reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
     watchedAt: null,

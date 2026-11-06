@@ -1,37 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import http from "node:http";
 
 import { searchMovies } from "./movies";
 import { attachMovie, type Night } from "./nights";
-
-type Handler = (req: http.IncomingMessage, res: http.ServerResponse) => void | Promise<void>;
-
-async function startServer(handler: Handler): Promise<{ url: string; close: () => Promise<void> }> {
-  const server = http.createServer((req, res) => {
-    void handler(req, res);
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const addr = server.address();
-  if (addr === null || typeof addr === "string") {
-    throw new Error("server has no port");
-  }
-  return {
-    url: `http://127.0.0.1:${addr.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) =>
-        server.close((err) => (err ? reject(err) : resolve())),
-      ),
-  };
-}
-
-function collect(req: http.IncomingMessage): Promise<string> {
-  return new Promise((resolve) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (c) => chunks.push(c as Buffer));
-    req.on("end", () => resolve(Buffer.concat(chunks).toString()));
-  });
-}
+import { startServer } from "./testServer";
 
 const GROUP = "11111111-1111-1111-1111-111111111111";
 const NIGHT = "n1";
@@ -46,8 +18,8 @@ test("searchMovies fetches from the search path and parses the result array", as
     res.setHeader("content-type", "application/json");
     res.end(
       JSON.stringify([
-        { tmdbId: 438631, title: "Dune", releaseYear: 2021 },
-        { tmdbId: 693134, title: "Dune: Part Two", releaseYear: 2024 },
+        { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: null, genres: [], runtimeMinutes: null },
+        { tmdbId: 693134, title: "Dune: Part Two", releaseYear: 2024, posterUrl: null, genres: [], runtimeMinutes: null },
       ]),
     );
   });
@@ -68,7 +40,7 @@ test("searchMovies handles a movie with null releaseYear", async () => {
   const server = await startServer((_req, res) => {
     res.statusCode = 200;
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify([{ tmdbId: 1, title: "Unknown", releaseYear: null }]));
+    res.end(JSON.stringify([{ tmdbId: 1, title: "Unknown", releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null }]));
   });
   try {
     const got = await searchMovies(server.url, "unknown");
@@ -95,15 +67,15 @@ test("attachMovie posts the tmdbId and returns the night with its movie", async 
       genres: ["Science Fiction", "Adventure"],
       runtimeMinutes: 155,
     },
-    attendees: [],
+    attendees: [{ id: "u1", name: "Ada" }],
   };
   let path = "";
   let method = "";
   let body = "";
-  const server = await startServer(async (req, res) => {
+  const server = await startServer((req, res, reqBody) => {
     path = req.url ?? "";
     method = req.method ?? "";
-    body = await collect(req);
+    body = reqBody;
     res.statusCode = 200;
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify(nightWithMovie));

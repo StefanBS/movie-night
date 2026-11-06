@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { borderWidth, createThemedStyles, fontFamily, fontSize, radius, tabular, trackPx } from "../theme";
 
-type Tone = "solid" | "accent" | "neutral" | "muted" | "danger";
+type Tone = "solid" | "accent" | "neutral";
 
 // Badge is the small sentence-case status pill (Next up, Recorded ✓, Guest).
 // `solid` is the filled accent pill, for the picker only; `accent` is the
@@ -44,14 +44,10 @@ const useTones = createThemedStyles((colors) => ({
   solid: { backgroundColor: colors.accent.base },
   accent: { backgroundColor: colors.surface.spotlight },
   neutral: { backgroundColor: colors.surface.subtle },
-  muted: { borderColor: colors.border.hairline },
-  danger: { backgroundColor: colors.surface.danger },
 }));
 
 const useTexts = createThemedStyles((colors) => ({
   solid: { color: colors.text.onAccent },
   accent: { color: colors.accent.strong },
   neutral: { color: colors.text.secondary },
-  muted: { color: colors.text.tertiary },
-  danger: { color: colors.text.danger },
 }));

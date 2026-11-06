@@ -68,7 +68,6 @@ export default function NightScreen() {
       <ExistingNightEditor
         key={created.id}
         night={created}
-        members={state.members}
         groupName={state.groupName}
         today={today}
         initialStep="pick"

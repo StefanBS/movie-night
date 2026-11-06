@@ -1,45 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import http from "node:http";
 
 import { createNightWatched } from "./nightWatched";
 import type { Member } from "./members";
 import type { Night } from "./nights";
 import type { TurnMember } from "./turn";
+import { type Handler, json, startServer } from "./testServer";
 
 // Integration tests: the "We watched it" module against a real local HTTP
 // server over real fetch. No mocks — a throwaway server stands in for the
 // backend, and the test drives the module only through the interface the
 // route uses.
-
-type Handler = (req: http.IncomingMessage, res: http.ServerResponse, body: string) => void;
-
-async function startServer(handler: Handler): Promise<{ url: string; close: () => Promise<void> }> {
-  const server = http.createServer((req, res) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (c) => chunks.push(c as Buffer));
-    req.on("end", () => handler(req, res, Buffer.concat(chunks).toString()));
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const addr = server.address();
-  if (addr === null || typeof addr === "string") {
-    throw new Error("server has no port");
-  }
-  return {
-    url: `http://127.0.0.1:${addr.port}`,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.closeAllConnections();
-        server.close((err) => (err ? reject(err) : resolve()));
-      }),
-  };
-}
-
-function json(res: http.ServerResponse, status: number, payload: unknown) {
-  res.statusCode = status;
-  res.setHeader("content-type", "application/json");
-  res.end(JSON.stringify(payload));
-}
 
 const GROUP = "g1";
 
@@ -61,8 +32,8 @@ const PLANNED: Night = {
   pickerId: "blake",
   movie: { tmdbId: 7, title: "Past Lives", releaseYear: 2023, posterUrl: null, genres: [], runtimeMinutes: 106 },
   attendees: [
-    { id: "blake", name: "blake", role: "core" },
-    { id: "cleo", name: "cleo", role: "core" },
+    { id: "blake", name: "blake" },
+    { id: "cleo", name: "cleo" },
   ],
   reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
   watchedAt: null,

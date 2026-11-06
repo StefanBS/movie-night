@@ -1,6 +1,5 @@
-import { useCallback, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { ChevronRight, Plus } from "lucide-react-native";
 
 import {
@@ -11,9 +10,9 @@ import {
   TabScrollView,
   TopBar,
 } from "../../components";
+import { useLoad } from "../../components/useLoad";
 import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
-import { errorMessage } from "../../lib/errors";
 import { fetchMembers, type Member } from "../../lib/members";
 import { fetchTurn, pickerMeta, type TurnMember } from "../../lib/turn";
 import { buildClubSections, clubSummary } from "../../lib/club";
@@ -23,35 +22,20 @@ export default function ClubScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
-  const [members, setMembers] = useState<Member[]>([]);
-  const [turn, setTurn] = useState<TurnMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useFocusEffect(
-    useCallback(() => {
-      const controller = new AbortController();
-      (async () => {
-        try {
-          const [m, t] = await Promise.all([
-            fetchMembers(API_URL, GROUP_ID, controller.signal),
-            fetchTurn(API_URL, GROUP_ID, controller.signal),
-          ]);
-          setMembers(m);
-          setTurn(t);
-          setError(null);
-        } catch (e) {
-          if (!controller.signal.aborted) {
-            setError(errorMessage(e, "failed to load the club"));
-          }
-        } finally {
-          if (!controller.signal.aborted) {
-            setLoading(false);
-          }
-        }
-      })();
-      return () => controller.abort();
-    }, []),
+  const {
+    data: { members, turn },
+    loading,
+    error,
+  } = useLoad(
+    async (signal) => {
+      const [members, turn] = await Promise.all([
+        fetchMembers(API_URL, GROUP_ID, signal),
+        fetchTurn(API_URL, GROUP_ID, signal),
+      ]);
+      return { members, turn };
+    },
+    { members: [] as Member[], turn: [] as TurnMember[] },
+    "failed to load the club",
   );
 
   const sections = buildClubSections(members, turn);

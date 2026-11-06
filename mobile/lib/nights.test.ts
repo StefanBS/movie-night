@@ -1,20 +1,23 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { nightPicker, nightPickerName, parseNight, parseNights, type Night } from "./nights";
+import { nightPicker, parseNight, parseNights, type Night } from "./nights";
 
 const reminders = { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" };
 
 const valid = {
   id: "n1",
   scheduledFor: "2026-06-12",
+  startTime: null,
   pickerId: "u1",
   movie: null,
   attendees: [
-    { id: "u1", name: "Ada", role: "core" },
-    { id: "u6", name: "Frankie", role: "guest" },
+    { id: "u1", name: "Ada" },
+    { id: "u6", name: "Frankie" },
   ],
   reminders,
+  watchedAt: null,
+  repeat: null,
 };
 
 test("parses a valid night with attendees", () => {
@@ -22,7 +25,7 @@ test("parses a valid night with attendees", () => {
   assert.equal(n.id, "n1");
   assert.equal(n.scheduledFor, "2026-06-12");
   assert.equal(n.attendees.length, 2);
-  assert.equal(n.attendees[1].role, "guest");
+  assert.equal(n.attendees[1].name, "Frankie");
 });
 
 test("parses a night's start time, or none", () => {
@@ -43,15 +46,17 @@ test("parses a night's repeat, or none", () => {
   assert.throws(() => parseNight({ ...valid, repeat: { freq: "daily" } }), /repeat/);
 });
 
-test("rejects a bad attendee role", () => {
-  assert.throws(
-    () => parseNight({ ...valid, attendees: [{ id: "u1", name: "Ada", role: "admin" }] }),
-    /role/,
-  );
+test("rejects a picker who isn't attending", () => {
+  assert.throws(() => parseNight({ ...valid, pickerId: "zzz" }), /pickerId/);
+});
+
+test("rejects a missing field rather than reading it as none", () => {
+  const { startTime: _, ...noStartTime } = valid;
+  assert.throws(() => parseNight(noStartTime), /startTime/);
 });
 
 test("rejects non-array attendees", () => {
-  assert.throws(() => parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId: "u1", attendees: {} }), /attendees/);
+  assert.throws(() => parseNight({ ...valid, attendees: {} }), /attendees/);
 });
 
 test("rejects a non-object", () => {
@@ -67,7 +72,7 @@ test("rejects a non-string scheduledFor", () => {
 });
 
 test("parseNight rejects a null pickerId (every Night has a picker)", () => {
-  assert.throws(() => parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId: null, attendees: [] }), /pickerId/);
+  assert.throws(() => parseNight({ ...valid, pickerId: null }), /pickerId/);
 });
 
 test("parseNight reads an attached movie", () => {
@@ -102,7 +107,7 @@ test("parseNight reads the reminder settings and rejects missing ones", () => {
 });
 
 test("parseNights parses an array of nights", () => {
-  const ns = parseNights([valid, { id: "n2", scheduledFor: "2026-07-01", pickerId: "u2", attendees: [], reminders }]);
+  const ns = parseNights([valid, { ...valid, id: "n2" }]);
   assert.equal(ns.length, 2);
   assert.equal(ns[0].id, "n1");
   assert.equal(ns[1].id, "n2");
@@ -125,38 +130,14 @@ const pickerNight: Night = {
   pickerId: "p",
   movie: null,
   attendees: [
-    { id: "a", name: "Ada Lovelace", role: "core" },
-    { id: "p", name: "Priya Raman", role: "core" },
+    { id: "a", name: "Ada Lovelace" },
+    { id: "p", name: "Priya Raman" },
   ],
   reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
   watchedAt: null,
   repeat: null,
 };
 
-const pickerCases: [string, Night, string | null][] = [
-  ["found among the attendees", pickerNight, "Priya Raman"],
-  ["missing from the attendees", { ...pickerNight, pickerId: "zzz" }, null],
-];
-for (const [name, n, want] of pickerCases) {
-  test(`nightPicker: ${name}`, () => {
-    assert.equal(nightPicker(n)?.name ?? null, want);
-  });
-}
-
-// nightPickerName
-
-const pickerMembers = [
-  { id: "p", name: "Priya R." },
-  { id: "t", name: "Tomas Berg" },
-];
-
-const pickerNameCases: [string, Night, string][] = [
-  ["found among the attendees, ahead of the members", pickerNight, "Priya Raman"],
-  ["found only among the members", { ...pickerNight, pickerId: "t" }, "Tomas Berg"],
-  ["in neither", { ...pickerNight, pickerId: "zzz" }, ""],
-];
-for (const [name, n, want] of pickerNameCases) {
-  test(`nightPickerName: ${name}`, () => {
-    assert.equal(nightPickerName(n, pickerMembers), want);
-  });
-}
+test("nightPicker: found among the attendees", () => {
+  assert.equal(nightPicker(pickerNight).name, "Priya Raman");
+});

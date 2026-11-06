@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { AppButton, Avatar, Badge, Poster, SectionLabel, Stat, TopBar } from "../../components";
+import { useLoad } from "../../components/useLoad";
 import { API_URL } from "../../apiUrl";
 import { firstName } from "../../lib/avatar";
 import { GROUP_ID } from "../../lib/api";
@@ -87,40 +88,27 @@ export default function MemberProfileScreen() {
   const styles = useStyles();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [profile, setProfile] = useState<MemberProfile | null>(null);
-  const [picks, setPicks] = useState<Night[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  useFocusEffect(
-    useCallback(() => {
-      const controller = new AbortController();
-      (async () => {
-        try {
-          // The picks are the page's content, so a failed nights load fails
-          // the screen like the roster does.
-          const [m, t, n] = await Promise.all([
-            fetchMembers(API_URL, GROUP_ID, controller.signal),
-            fetchTurn(API_URL, GROUP_ID, controller.signal),
-            listNights(API_URL, GROUP_ID, controller.signal),
-          ]);
-          setProfile(memberProfile(m, t, id));
-          setPicks(memberPicks(n, id));
-          setError(null);
-        } catch (e) {
-          if (!controller.signal.aborted) {
-            setError(errorMessage(e, "failed to load the member"));
-          }
-        } finally {
-          if (!controller.signal.aborted) {
-            setLoading(false);
-          }
-        }
-      })();
-      return () => controller.abort();
-    }, [id]),
+  // The picks are the page's content, so a failed nights load fails the
+  // screen like the roster does.
+  const {
+    data: { profile, picks },
+    loading,
+    error,
+    setError,
+  } = useLoad(
+    async (signal) => {
+      const [m, t, n] = await Promise.all([
+        fetchMembers(API_URL, GROUP_ID, signal),
+        fetchTurn(API_URL, GROUP_ID, signal),
+        listNights(API_URL, GROUP_ID, signal),
+      ]);
+      return { profile: memberProfile(m, t, id), picks: memberPicks(n, id) };
+    },
+    { profile: null as MemberProfile | null, picks: [] as Night[] },
+    "failed to load the member",
+    { key: id },
   );
+  const [busy, setBusy] = useState(false);
 
   const act = async (member: Member, action: MemberAction) => {
     setBusy(true);

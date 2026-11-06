@@ -9,7 +9,6 @@ import { PickStep } from "./PickStep";
 import { NightView } from "./NightView";
 import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
-import type { Member } from "../../lib/members";
 import { createNightEditor, type EditorStep } from "../../lib/nightEditor";
 import type { Night } from "../../lib/nights";
 import { createThemedStyles, space, textPresets, useColors } from "../../theme";
@@ -23,7 +22,6 @@ import { createThemedStyles, space, textPresets, useColors } from "../../theme";
 // Night's calendar entry (null: "Movie night").
 export function ExistingNightEditor({
   night,
-  members,
   groupName,
   loadStartedAt,
   today,
@@ -32,25 +30,24 @@ export function ExistingNightEditor({
   onEdit,
 }: {
   night: Night;
-  members: Member[];
   groupName: string | null;
   loadStartedAt?: number;
   today: string;
   initialStep?: EditorStep;
   back: { label: string; onPress: () => void };
-  onEdit?: () => void;
+  onEdit: () => void;
 }) {
   const colors = useColors();
   const styles = useStyles();
   const [moreOpen, setMoreOpen] = useState(false);
   const [editor, state] = useSession(() =>
-    createNightEditor({ baseUrl: API_URL, groupId: GROUP_ID, night, members, initialStep }),
+    createNightEditor({ baseUrl: API_URL, groupId: GROUP_ID, night, initialStep }),
   );
   useEffect(() => {
     if (loadStartedAt !== undefined) {
-      editor.refresh(night, members, loadStartedAt);
+      editor.refresh(night, loadStartedAt);
     }
-  }, [editor, night, members, loadStartedAt]);
+  }, [editor, night, loadStartedAt]);
   const current = state.night;
 
   const picking = state.step === "pick";
@@ -82,7 +79,6 @@ export function ExistingNightEditor({
       {picking ? (
         <PickStep
           night={current}
-          members={state.members}
           today={today}
           busy={state.busy}
           results={state.results}
@@ -98,7 +94,6 @@ export function ExistingNightEditor({
       ) : (
         <NightView
           night={current}
-          members={state.members}
           groupName={groupName}
           today={today}
           moreOpen={moreOpen}
