@@ -6,14 +6,12 @@ import { StartTimeRow } from "./StartTimeRow";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
 import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
-import { nightLineParts } from "../../lib/nightLifecycle";
-import { createThemedStyles, fontFamily, radius, space, textPresets } from "../../theme";
+import { createThemedStyles, radius, space, textPresets } from "../../theme";
 
 // WhenStep is the wizard's first step: the Calendar (opening on the chosen
 // date's month, with today ringed, so tonight is one tap away) and an optional
-// start time, with a sticky footer that sums up the choice in one line
-// ("Friday, Jun 19 · 8:00 PM · in 4 days", lib/nightLifecycle nightLineParts). It owns its
-// own selection/month — it reports the chosen date and start time on "Next".
+// start time, with a sticky footer holding "Next". It owns its own
+// selection/month — it reports the chosen date and start time on "Next".
 // `initial` and `initialStartTime` restore them when the user comes back.
 export function WhenStep({
   today,
@@ -34,11 +32,6 @@ export function WhenStep({
   const [selected, setSelected] = useState(initial);
   const [startTime, setStartTime] = useState(initialStartTime);
   const [month, setMonth] = useState<YearMonth>(() => yearMonthOf(initial));
-  const [summaryDate, ...summaryRest] = nightLineParts(
-    { scheduledFor: selected, startTime },
-    { date: "long", countdown: "trail" },
-    today,
-  );
 
   return (
     <View style={styles.flex}>
@@ -66,10 +59,6 @@ export function WhenStep({
       </ScrollView>
 
       <WizardFooter>
-        <Text style={styles.summary} allowFontScaling={false}>
-          <Text style={styles.summaryDate}>{summaryDate}</Text>
-          {summaryRest.map((part) => ` · ${part}`).join("")}
-        </Text>
         <AppButton
           title="Next: who's coming →"
           fullWidth
@@ -99,7 +88,4 @@ const useStyles = createThemedStyles((colors) => ({
     borderRadius: radius.lg,
     overflow: "hidden",
   },
-  // No `tabular`: Schibsted's tabular figures widen the comma ("Friday , Nov 13").
-  summary: { ...textPresets.meta, color: colors.text.secondary },
-  summaryDate: { fontFamily: fontFamily.sansBold, color: colors.text.primary },
 }));

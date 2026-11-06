@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Text,
   View,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 
 import { TopBar } from "../../components";
 import { WhenStep, WhoStep, ExistingNightEditor } from "../../components/night";
@@ -14,6 +14,7 @@ import { API_URL } from "../../apiUrl";
 import { GROUP_ID } from "../../lib/api";
 import { todayLocalISO } from "../../lib/date";
 import type { Member } from "../../lib/members";
+import { createNightLoad } from "../../lib/nightLoad";
 import { createNightPlan } from "../../lib/nightPlan";
 import type { Night } from "../../lib/nights";
 import { createThemedStyles, space, textPresets, useColors } from "../../theme";
@@ -65,15 +66,12 @@ export default function NightScreen() {
 
   if (created !== null) {
     return (
-      <ExistingNightEditor
+      <PlannedNight
         key={created.id}
-        night={created}
+        created={created}
         today={today}
-        initialStep="pick"
-        back={{ label: from, onPress: () => router.back() }}
-        onEdit={() =>
-          router.push({ pathname: "/night/edit/[id]", params: { id: created.id, from: "Night" } })
-        }
+        from={from}
+        onClose={() => router.back()}
       />
     );
   }
@@ -120,6 +118,46 @@ export default function NightScreen() {
         onNext={plan.chooseDate}
       />
     </View>
+  );
+}
+
+// PlannedNight is the Night the Plan saved, in the editor on its film step. It
+// reloads the Night on every focus, as the Night route does, so coming back
+// from "Edit night" in the ⋯ sheet shows the saved changes under the
+// still-mounted editor. Until the first reload lands it shows the Night
+// create() returned.
+function PlannedNight({
+  created,
+  today,
+  from,
+  onClose,
+}: {
+  created: Night;
+  today: string;
+  from: string;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const [load, { night, loadStartedAt }] = useSession(() =>
+    createNightLoad({ baseUrl: API_URL, groupId: GROUP_ID, nightId: created.id }),
+  );
+  useFocusEffect(
+    useCallback(() => {
+      void load.load();
+    }, [load]),
+  );
+  return (
+    <ExistingNightEditor
+      night={night ?? created}
+      loadStartedAt={night === null ? undefined : loadStartedAt}
+      today={today}
+      initialStep="pick"
+      back={{ label: from, onPress: onClose }}
+      onDone={onClose}
+      onEdit={() =>
+        router.push({ pathname: "/night/edit/[id]", params: { id: created.id, from: "Night" } })
+      }
+    />
   );
 }
 

@@ -168,9 +168,8 @@ export type NightLineParts = {
   // countdown says how far off the Night is: "label" leads with "tonight" /
   // "in 3 days" while it is still ahead; "relative" leads with "Tonight" /
   // "This Thursday", or for a past Night is the whole line, its full date (a
-  // record, never the time); "trail" ends the date and time with "in 4 days",
-  // only for a Night after today.
-  countdown?: "label" | "relative" | "trail";
+  // record, never the time).
+  countdown?: "label" | "relative";
   // date is "long" ("Friday, Jun 19"), "short" ("Jun 19") or "compact"
   // ("Fri 19 Jun"). Left out when the relative countdown already is the date.
   date?: "long" | "short" | "compact";
@@ -184,10 +183,9 @@ export type NightLineParts = {
 export type NightWhen = { scheduledFor: string; startTime: string | null; repeat?: Repeat | null };
 
 // nightLineParts is a Night's "when" line as parts, in a fixed order: the
-// leading countdown, the date, the start time, the trailing countdown, the
-// repeat, the picker. For a caller that styles one part on its own.
-// `locale` reaches formatStartTime, for deterministic tests.
-export function nightLineParts(
+// countdown, the date, the start time, the repeat, the picker. `locale`
+// reaches formatStartTime, for deterministic tests.
+function nightLineParts(
   night: NightWhen,
   parts: NightLineParts,
   today: string = todayLocalISO(),
@@ -212,9 +210,6 @@ export function nightLineParts(
   }
   if (startTime !== null) {
     out.push(formatStartTime(startTime, locale));
-  }
-  if (parts.countdown === "trail" && timing === "upcoming") {
-    out.push(countdownLabel(scheduledFor, today));
   }
   if (parts.repeat === true && night.repeat != null) {
     out.push(formatRepeatShort(night.repeat));

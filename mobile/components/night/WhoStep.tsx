@@ -1,11 +1,11 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 
-import { AppButton, Badge, MemberRow, SectionLabel } from "../";
+import { AppButton, MemberRow, SectionLabel } from "../";
 import { AttendCheck } from "./AttendCheck";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
 import { firstName } from "../../lib/avatar";
-import { formatWeekdayDate, relativeLabel } from "../../lib/date";
+import { formatWeekdayDate } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import { nightWording } from "../../lib/nightLifecycle";
 import { createThemedStyles, fontFamily, space, textPresets } from "../../theme";
@@ -49,12 +49,9 @@ export function WhoStep({
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content}>
         {stepper ? <Stepper current={1} /> : null}
-        <View style={styles.headingRow}>
-          <Text style={styles.heading} numberOfLines={1}>
-            {formatWeekdayDate(scheduledFor)}
-          </Text>
-          <Badge label={relativeLabel(scheduledFor, today)} tone="neutral" />
-        </View>
+        <Text style={styles.heading} numberOfLines={1}>
+          {formatWeekdayDate(scheduledFor)}
+        </Text>
         <Text style={styles.hint}>
           {wording.whoHint}
         </Text>
@@ -118,15 +115,8 @@ const useStyles = createThemedStyles((colors) => ({
     paddingTop: space[3],
     paddingBottom: space[6],
   },
-  headingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: space[3],
-    marginTop: space[4],
-  },
-  heading: { ...textPresets.screenTitle, color: colors.text.primary, flexShrink: 1 },
-  hint: { ...textPresets.meta, color: colors.text.secondary },
+  heading: { ...textPresets.screenTitle, color: colors.text.primary, marginTop: space[4] },
+  hint: { ...textPresets.meta, color: colors.text.secondary, marginTop: space[2] },
   trailing: { flexDirection: "row", alignItems: "center", gap: space[3] },
   makePicker: { ...textPresets.meta, fontFamily: fontFamily.sansSemibold, fontSize: 13, color: colors.text.link },
   tag: { ...textPresets.tag, color: colors.text.secondary },

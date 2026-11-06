@@ -18,7 +18,8 @@ import { createThemedStyles, space, textPresets, useColors } from "../../theme";
 // key={night.id} when the loaded night changes. A route that refreshes the
 // Night passes loadStartedAt with it, and the editor takes the refreshed copy
 // without remounting, so its step survives. `back` names the screen the
-// Night view returns to ("Tonight", "Watched", …).
+// Night view returns to ("Tonight", "Watched", …). `onDone`, for a Night just
+// planned, puts a "Done" in the Night view's footer that ends the flow.
 export function ExistingNightEditor({
   night,
   loadStartedAt,
@@ -26,6 +27,7 @@ export function ExistingNightEditor({
   initialStep,
   back,
   onEdit,
+  onDone,
 }: {
   night: Night;
   loadStartedAt?: number;
@@ -33,6 +35,7 @@ export function ExistingNightEditor({
   initialStep?: EditorStep;
   back: { label: string; onPress: () => void };
   onEdit: () => void;
+  onDone?: () => void;
 }) {
   const colors = useColors();
   const styles = useStyles();
@@ -96,6 +99,7 @@ export function ExistingNightEditor({
           onPickFilm={editor.pickFilm}
           onClearFilm={editor.clearFilm}
           onEdit={onEdit}
+          onDone={onDone}
         />
       )}
     </View>
