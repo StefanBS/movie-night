@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -136,14 +137,28 @@ type seedStmt struct {
 	args []any
 }
 
-// execSeed runs fixture statements in order, failing the test on the first error.
+// pickersAttend is a fixture statement that makes each picker of group $1's
+// Nights one of its attendees, as fk_night_picker_attends requires.
+const pickersAttend = `INSERT INTO attendances (night_id, group_id, user_id)
+	SELECT id, group_id, picker_id FROM nights WHERE group_id = $1
+	ON CONFLICT DO NOTHING`
+
+// execSeed runs fixture statements in order in one transaction, failing the
+// test on the first error. One transaction lets a fixture insert a Night before
+// the attendances its deferred picker check (fk_night_picker_attends) needs.
 func execSeed(t *testing.T, pool *pgxpool.Pool, stmts []seedStmt) {
 	t.Helper()
 	ctx := context.Background()
-	for _, s := range stmts {
-		if _, err := pool.Exec(ctx, s.sql, s.args...); err != nil {
-			t.Fatalf("seed fixture: %v", err)
+	err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+		for _, s := range stmts {
+			if _, err := tx.Exec(ctx, s.sql, s.args...); err != nil {
+				return err
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("seed fixture: %v", err)
 	}
 }
 

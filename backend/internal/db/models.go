@@ -225,6 +225,7 @@ func (ns NullRepeatFreq) Value() (driver.Value, error) {
 
 type Attendance struct {
 	NightID uuid.UUID `json:"night_id"`
+	GroupID uuid.UUID `json:"group_id"`
 	UserID  uuid.UUID `json:"user_id"`
 }
 

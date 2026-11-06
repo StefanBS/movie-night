@@ -29,44 +29,6 @@ func (q *Queries) CreateUser(ctx context.Context, name string) (CreateUserRow, e
 	return i, err
 }
 
-const filterGroupMembers = `-- name: FilterGroupMembers :many
-SELECT user_id, role
-FROM memberships
-WHERE group_id = $1 AND user_id = ANY($2::uuid[])
-`
-
-type FilterGroupMembersParams struct {
-	GroupID uuid.UUID   `json:"group_id"`
-	UserIds []uuid.UUID `json:"user_ids"`
-}
-
-type FilterGroupMembersRow struct {
-	UserID uuid.UUID      `json:"user_id"`
-	Role   MembershipRole `json:"role"`
-}
-
-// The ids among user_ids that hold a membership in the group (active or
-// inactive), with their role; an id without one is simply absent.
-func (q *Queries) FilterGroupMembers(ctx context.Context, arg FilterGroupMembersParams) ([]FilterGroupMembersRow, error) {
-	rows, err := q.db.Query(ctx, filterGroupMembers, arg.GroupID, arg.UserIds)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []FilterGroupMembersRow
-	for rows.Next() {
-		var i FilterGroupMembersRow
-		if err := rows.Scan(&i.UserID, &i.Role); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getGroupMember = `-- name: GetGroupMember :one
 SELECT u.id AS user_id, u.name, u.reminders_muted, m.status
 FROM memberships m

@@ -53,19 +53,29 @@ func TestMovieAttachIntegration(t *testing.T) {
 
 	mux := newRoutes(pool, client)
 
-	// mkNight clears the group's nights and inserts a fresh night, returning its
-	// id. Attaching a movie needs only a night to exist, so it is seeded directly
-	// rather than through create — emptyGroup has no members to pick.
-	mkNight := func(t *testing.T, group string) string {
+	// seedNight inserts a Night Ada picks on date, with her attending, and
+	// returns its id. Attaching a movie needs only a Night to exist, so it is
+	// seeded directly rather than through create.
+	seedNight := func(t *testing.T, date string) string {
 		t.Helper()
-		clearAllPicks(t, pool, group)
 		var id string
 		if err := pool.QueryRow(context.Background(),
-			`INSERT INTO nights (group_id, picker_id, scheduled_for) VALUES ($1, $2, '2026-06-12') RETURNING id`,
-			group, ada).Scan(&id); err != nil {
+			`WITH night AS (
+				INSERT INTO nights (group_id, picker_id, scheduled_for) VALUES ($1, $2, $3) RETURNING id, group_id, picker_id
+			), attended AS (
+				INSERT INTO attendances (night_id, group_id, user_id) SELECT id, group_id, picker_id FROM night
+			)
+			SELECT id FROM night`,
+			seededGroup, ada, date).Scan(&id); err != nil {
 			t.Fatalf("seed night: %v", err)
 		}
 		return id
+	}
+	// mkNight clears the group's nights and seeds a fresh one.
+	mkNight := func(t *testing.T) string {
+		t.Helper()
+		clearAllPicks(t, pool, seededGroup)
+		return seedNight(t, "2026-06-12")
 	}
 
 	attach := func(t *testing.T, group, nightID, body string) (int, nightResponse) {
@@ -103,7 +113,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 	}
 
 	t.Run("attach stores and returns genres and runtime", func(t *testing.T) {
-		night := mkNight(t, seededGroup)
+		night := mkNight(t)
 		code, n := attach(t, seededGroup, night, `{"tmdbId":438631}`)
 		if code != http.StatusOK {
 			t.Fatalf("attach status = %d, want 200", code)
@@ -126,7 +136,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 	})
 
 	t.Run("no genres and runtime 0 store {} and return [] and null", func(t *testing.T) {
-		night := mkNight(t, seededGroup)
+		night := mkNight(t)
 		_, n := attach(t, seededGroup, night, `{"tmdbId":555}`)
 		if n.Movie == nil || n.Movie.Genres == nil || len(n.Movie.Genres) != 0 || n.Movie.RuntimeMinutes != nil {
 			t.Fatalf("night movie = %+v, want genres [] and runtime nil", n.Movie)
@@ -138,7 +148,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 	})
 
 	t.Run("re-attach refreshes stale genres and runtime", func(t *testing.T) {
-		night := mkNight(t, seededGroup)
+		night := mkNight(t)
 		attach(t, seededGroup, night, `{"tmdbId":438631}`)
 		if _, err := pool.Exec(context.Background(),
 			"UPDATE movies SET genres='{Stale}', runtime_minutes=1 WHERE tmdb_id=438631"); err != nil {
@@ -152,7 +162,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 	})
 
 	t.Run("a movie with no genres or runtime returns [] and null", func(t *testing.T) {
-		night := mkNight(t, seededGroup)
+		night := mkNight(t)
 		// TMDB can know a film without its genres or runtime.
 		if _, err := pool.Exec(context.Background(), `
 			WITH m AS (INSERT INTO movies (tmdb_id, title) VALUES (777, 'Sparse Film') RETURNING id)
@@ -167,7 +177,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 	})
 
 	t.Run("a night with no film returns movie null", func(t *testing.T) {
-		night := mkNight(t, seededGroup)
+		night := mkNight(t)
 		code, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+night, "")
 		if code != http.StatusOK || got.Movie != nil {
 			t.Fatalf("detail status %d movie = %+v, want nil", code, got.Movie)
@@ -175,7 +185,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 	})
 
 	t.Run("attach sets the movie on the night and caches it", func(t *testing.T) {
-		night := mkNight(t, seededGroup)
+		night := mkNight(t)
 		code, n := attach(t, seededGroup, night, `{"tmdbId":438631}`)
 		if code != http.StatusOK {
 			t.Fatalf("attach status = %d, want 200", code)
@@ -206,7 +216,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 	})
 
 	t.Run("attach a movie with no poster yields null posterUrl", func(t *testing.T) {
-		night := mkNight(t, seededGroup)
+		night := mkNight(t)
 		code, n := attach(t, seededGroup, night, `{"tmdbId":555}`)
 		if code != http.StatusOK {
 			t.Fatalf("attach status = %d, want 200", code)
@@ -217,7 +227,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 	})
 
 	t.Run("re-attach a different movie updates the night (correction)", func(t *testing.T) {
-		night := mkNight(t, seededGroup)
+		night := mkNight(t)
 		attach(t, seededGroup, night, `{"tmdbId":438631}`)
 		code, n := attach(t, seededGroup, night, `{"tmdbId":841}`)
 		if code != http.StatusOK {
@@ -229,10 +239,10 @@ func TestMovieAttachIntegration(t *testing.T) {
 	})
 
 	t.Run("same tmdbId on two nights reuses one movies row", func(t *testing.T) {
-		n1 := mkNight(t, seededGroup)
+		n1 := mkNight(t)
 		attach(t, seededGroup, n1, `{"tmdbId":438631}`)
-		n2 := mkNight(t, emptyGroup) // a second group → a genuinely separate night
-		attach(t, emptyGroup, n2, `{"tmdbId":438631}`)
+		n2 := seedNight(t, "2026-06-13") // a genuinely separate night
+		attach(t, seededGroup, n2, `{"tmdbId":438631}`)
 		var count int
 		if err := pool.QueryRow(context.Background(),
 			"SELECT count(*) FROM movies WHERE tmdb_id=438631").Scan(&count); err != nil {
@@ -244,14 +254,14 @@ func TestMovieAttachIntegration(t *testing.T) {
 	})
 
 	t.Run("unknown tmdbId yields 404", func(t *testing.T) {
-		night := mkNight(t, seededGroup)
+		night := mkNight(t)
 		if code, _ := attach(t, seededGroup, night, `{"tmdbId":999999}`); code != http.StatusNotFound {
 			t.Fatalf("status = %d, want 404", code)
 		}
 	})
 
 	t.Run("malformed body and unknown night", func(t *testing.T) {
-		night := mkNight(t, seededGroup)
+		night := mkNight(t)
 		if code, _ := attach(t, seededGroup, night, `{"tmdbId":0}`); code != http.StatusBadRequest {
 			t.Errorf("non-positive tmdbId status = %d, want 400", code)
 		}
@@ -267,7 +277,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 		}
 		// Drive attach through a router so {groupId}/{nightId} path values populate;
 		// with a nil client the handler must 503 after loadNight passes.
-		night := mkNight(t, seededGroup)
+		night := mkNight(t)
 		m2 := newRoutes(pool, nil)
 		if code, _ := doReq(t, m2, http.MethodPost,
 			"/groups/"+seededGroup+"/nights/"+night+"/movie", `{"tmdbId":438631}`); code != http.StatusServiceUnavailable {

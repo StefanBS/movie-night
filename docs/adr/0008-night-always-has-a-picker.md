@@ -38,6 +38,9 @@ called a night "recorded" once it had a picker while the mobile app called it
 ## Consequences
 - `picker_id` is required; the open-night index, the current-night endpoint and
   server-side resume are removed. Existing nights always open on the Night view.
+- The schema holds the rule: a deferred foreign key from a Night's
+  `(id, picker_id)` to its attendances, checked at COMMIT, so a Night and its
+  attendees can be written in one transaction in any order.
 - This refines the "planned first, attached later" wording in
   [ADR-0004](0004-people-and-membership-roles.md) and ADR-0007: a night is
   planned with its picker; only the film attaches later.
