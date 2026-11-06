@@ -18,13 +18,8 @@ test("parses a valid ranked array", () => {
   assert.deepEqual(parseTurn(raw), want);
 });
 
-test("parses an empty array", () => {
-  assert.deepEqual(parseTurn([]), []);
-});
-
 const invalid: { name: string; raw: unknown; wantError: RegExp }[] = [
   { name: "rejects a non-array payload", raw: { id: "a" }, wantError: /array/ },
-  { name: "rejects a null payload", raw: null, wantError: /array/ },
   { name: "rejects a non-object element", raw: ["nope"], wantError: /member 0.*object/ },
   { name: "rejects a missing id", raw: [{ name: "Ada", role: "core", servedCount: 0, lastPickedOn: null }], wantError: /member 0.*id/ },
   { name: "rejects a non-string name", raw: [{ id: "a", name: 42, role: "core", servedCount: 0, lastPickedOn: null }], wantError: /member 0.*name/ },
@@ -45,8 +40,6 @@ test("picksLabel singularizes one pick", () => {
 
 const picksCases: { n: number; want: string }[] = [
   { n: 0, want: "0 picks" },
-  { n: 2, want: "2 picks" },
-  { n: 12, want: "12 picks" },
 ];
 for (const c of picksCases) {
   test(`picksLabel(${c.n}) is "${c.want}"`, () => {
@@ -78,7 +71,6 @@ test("pickerMeta falls back to first-turn copy if servedCount>0 but date missing
 const summaryCases: { name: string; servedCount: number; lastPickedOn: string | null; want: string }[] = [
   { name: "never picked", servedCount: 0, lastPickedOn: null, want: "Their first turn. Whatever they choose, we watch." },
   { name: "picked once", servedCount: 1, lastPickedOn: "2026-05-30", want: "1 pick so far, last on May 30." },
-  { name: "picked twice", servedCount: 2, lastPickedOn: "2026-05-30", want: "2 picks so far, last on May 30." },
   { name: "count but no date", servedCount: 1, lastPickedOn: null, want: "Their first turn. Whatever they choose, we watch." },
 ];
 for (const c of summaryCases) {

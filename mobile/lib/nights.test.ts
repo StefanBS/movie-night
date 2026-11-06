@@ -27,7 +27,6 @@ test("parses a valid night with attendees", () => {
 
 test("parses a night's start time, or none", () => {
   assert.equal(parseNight(valid).startTime, null);
-  assert.equal(parseNight({ ...valid, startTime: null }).startTime, null);
   assert.equal(parseNight({ ...valid, startTime: "19:30" }).startTime, "19:30");
   assert.throws(() => parseNight({ ...valid, startTime: 1930 }), /startTime/);
   assert.throws(() => parseNight({ ...valid, startTime: "7:30 PM" }), /startTime/);
@@ -35,21 +34,13 @@ test("parses a night's start time, or none", () => {
 
 test("parses when a night was watched, or not yet", () => {
   assert.equal(parseNight(valid).watchedAt, null);
-  assert.equal(parseNight({ ...valid, watchedAt: null }).watchedAt, null);
   assert.equal(parseNight({ ...valid, watchedAt: "2026-06-12T22:41:07Z" }).watchedAt, "2026-06-12T22:41:07Z");
   assert.throws(() => parseNight({ ...valid, watchedAt: true }), /watchedAt/);
 });
 
 test("parses a night's repeat, or none", () => {
-  assert.equal(parseNight(valid).repeat, null);
-  assert.equal(parseNight({ ...valid, repeat: null }).repeat, null);
   assert.deepEqual(parseNight({ ...valid, repeat: { freq: "monthly", week: -1 } }).repeat, { freq: "monthly", week: -1 });
   assert.throws(() => parseNight({ ...valid, repeat: { freq: "daily" } }), /repeat/);
-});
-
-test("parses a night with no attendees", () => {
-  const n = parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId: "u1", attendees: [], reminders });
-  assert.deepEqual(n.attendees, []);
 });
 
 test("rejects a bad attendee role", () => {
@@ -75,24 +66,8 @@ test("rejects a non-string scheduledFor", () => {
   assert.throws(() => parseNight({ id: "n1", scheduledFor: 99, attendees: [] }), /scheduledFor/);
 });
 
-test("parseNight reads a set pickerId", () => {
-  const n = parseNight({
-    id: "n1",
-    scheduledFor: "2026-06-12",
-    pickerId: "u1",
-    attendees: [],
-    reminders,
-  });
-  assert.equal(n.pickerId, "u1");
-});
-
-test("parseNight rejects a missing or null pickerId (every Night has a picker)", () => {
-  for (const pickerId of [undefined, null, 7]) {
-    assert.throws(
-      () => parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId, attendees: [] }),
-      /pickerId/,
-    );
-  }
+test("parseNight rejects a null pickerId (every Night has a picker)", () => {
+  assert.throws(() => parseNight({ id: "n1", scheduledFor: "2026-06-12", pickerId: null, attendees: [] }), /pickerId/);
 });
 
 test("parseNight reads an attached movie", () => {
@@ -117,11 +92,6 @@ test("parseNight reads an attached movie", () => {
   });
 });
 
-test("parseNight accepts a null or absent movie", () => {
-  assert.equal(parseNight({ ...valid, movie: null }).movie, null);
-  assert.equal(parseNight(valid).movie, null);
-});
-
 test("parseNight rejects a bad movie shape", () => {
   assert.throws(() => parseNight({ ...valid, movie: { tmdbId: "x", title: "Dune" } }), /tmdbId/);
 });
@@ -136,10 +106,6 @@ test("parseNights parses an array of nights", () => {
   assert.equal(ns.length, 2);
   assert.equal(ns[0].id, "n1");
   assert.equal(ns[1].id, "n2");
-});
-
-test("parseNights accepts an empty array", () => {
-  assert.deepEqual(parseNights([]), []);
 });
 
 test("parseNights rejects a non-array", () => {

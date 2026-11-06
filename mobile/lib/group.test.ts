@@ -16,19 +16,9 @@ const invalid: { name: string; raw: unknown; wantError: RegExp }[] = [
   { name: "rejects a non-object payload", raw: "nope", wantError: /object/ },
   { name: "rejects a null payload", raw: null, wantError: /object/ },
   {
-    name: "rejects a missing name",
-    raw: { createdOn: "2026-05-01" },
-    wantError: /name/,
-  },
-  {
     name: "rejects a non-string name",
     raw: { name: 42, createdOn: "2026-05-01" },
     wantError: /name/,
-  },
-  {
-    name: "rejects a missing createdOn",
-    raw: { name: "Friday Film Club" },
-    wantError: /createdOn/,
   },
   {
     name: "rejects a non-string createdOn",

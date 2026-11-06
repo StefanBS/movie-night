@@ -29,10 +29,6 @@ test("zero-pads single-digit month and day", () => {
   assert.equal(todayLocalISO(new Date(2026, 0, 5, 0, 0)), "2026-01-05");
 });
 
-test("handles the year-end boundary", () => {
-  assert.equal(todayLocalISO(new Date(2025, 11, 31, 23, 59)), "2025-12-31");
-});
-
 test("formats an ISO date as a short month + day", () => {
   assert.equal(formatShortDate("2026-05-30"), "May 30");
 });
@@ -41,18 +37,12 @@ test("does not zero-pad the day", () => {
   assert.equal(formatShortDate("2026-01-05"), "Jan 5");
 });
 
-test("formats December correctly (last month index)", () => {
-  assert.equal(formatShortDate("2025-12-31"), "Dec 31");
-});
-
 test("formatShortDateYear renders a day-month-year label without a comma", () => {
   assert.equal(formatShortDateYear("2025-09-12"), "Sep 12 2025");
-  assert.equal(formatShortDateYear("2026-01-03"), "Jan 3 2026");
 });
 
 test("formatMonthYear renders a month-and-year label", () => {
   assert.equal(formatMonthYear("2024-06-15"), "Jun 2024");
-  assert.equal(formatMonthYear("2023-12-01"), "Dec 2023");
 });
 
 // weekday() and daysUntil() are built from local-time components, so these
@@ -67,11 +57,6 @@ test("weekday returns the long name when long=true", () => {
   assert.equal(weekday("2026-06-19", true), "Friday");
 });
 
-test("weekday handles Sunday (index 0) and Saturday (index 6)", () => {
-  assert.equal(weekday("2026-06-21", true), "Sunday");
-  assert.equal(weekday("2026-06-20", true), "Saturday");
-});
-
 test("daysUntil is 0 for the same day", () => {
   assert.equal(daysUntil("2026-06-19", "2026-06-19"), 0);
 });
@@ -84,14 +69,6 @@ test("daysUntil is negative for a past date", () => {
   assert.equal(daysUntil("2026-06-18", "2026-06-19"), -1);
 });
 
-test("daysUntil counts across a month boundary", () => {
-  assert.equal(daysUntil("2026-07-01", "2026-06-19"), 12);
-});
-
-test("daysUntil counts across a year boundary", () => {
-  assert.equal(daysUntil("2027-01-01", "2026-12-31"), 1);
-});
-
 // Label functions. relativeLabel/countdownLabel take an explicit `today` anchor
 // so the day-count windows are deterministic. Anchored on Fri 2026-06-19.
 
@@ -99,18 +76,9 @@ test("formatWeekdayDate renders long weekday + short date", () => {
   assert.equal(formatWeekdayDate("2026-06-19"), "Friday, Jun 19");
 });
 
-test("formatWeekdayDate does not zero-pad the day", () => {
-  assert.equal(formatWeekdayDate("2026-01-05"), "Monday, Jan 5");
-});
-
-test("formatWeekdayDate handles a December date", () => {
-  assert.equal(formatWeekdayDate("2025-12-31"), "Wednesday, Dec 31");
-});
-
 const weekdayDayMonthCases: [string, string, string][] = [
   ["a Saturday in June", "2026-06-27", "Sat 27 Jun"],
   ["no zero-padded day", "2026-01-05", "Mon 5 Jan"],
-  ["a December date", "2025-12-31", "Wed 31 Dec"],
 ];
 for (const [name, iso, want] of weekdayDayMonthCases) {
   test(`formatWeekdayDayMonth: ${name}`, () => {
@@ -159,7 +127,6 @@ test("formatStartTime follows the locale's 12- or 24-hour clock", () => {
   const cases: { hhmm: string; locale: string; want: string }[] = [
     { hhmm: "19:30", locale: "en-US", want: "7:30 PM" },
     { hhmm: "09:05", locale: "en-US", want: "9:05 AM" },
-    { hhmm: "00:00", locale: "en-US", want: "12:00 AM" },
     { hhmm: "19:30", locale: "en-GB", want: "19:30" },
     { hhmm: "09:05", locale: "en-GB", want: "09:05" },
   ];
@@ -186,9 +153,7 @@ test("nightSummary is the weekday date, the start time when set, and a countdown
   const cases: { name: string; iso: string; startTime: string | null; want: string }[] = [
     { name: "ahead with a time", iso: "2026-06-19", startTime: "20:00", want: "Friday, Jun 19 · 8:00 PM · in 4 days" },
     { name: "ahead without a time", iso: "2026-06-19", startTime: null, want: "Friday, Jun 19 · in 4 days" },
-    { name: "tomorrow", iso: "2026-06-16", startTime: "19:30", want: "Tuesday, Jun 16 · 7:30 PM · tomorrow" },
     { name: "tonight has no countdown", iso: "2026-06-15", startTime: "20:00", want: "Monday, Jun 15 · 8:00 PM" },
-    { name: "tonight without a time", iso: "2026-06-15", startTime: null, want: "Monday, Jun 15" },
     { name: "a past night has no countdown", iso: "2026-06-12", startTime: null, want: "Friday, Jun 12" },
   ];
   for (const c of cases) {

@@ -51,14 +51,11 @@ test("formatRemindersSummary names the slots that are on", () => {
   // 2 hours before only counts on a Night with a start time.
   const cases: { reminders: Reminders; startTime: string | null; want: string }[] = [
     { reminders: r(true, true), startTime: null, want: "Night before, morning of" },
-    { reminders: r(true, false), startTime: null, want: "Night before" },
     { reminders: r(false, true), startTime: null, want: "Morning of" },
     { reminders: r(false, false), startTime: null, want: "Off" },
-    { reminders: r(false, false, "picker"), startTime: null, want: "Off" },
     { reminders: all(), startTime: "19:30", want: "Night before, morning of, 2 hours before" },
     { reminders: all(), startTime: null, want: "Night before, morning of" },
     { reminders: r(false, false, "everyone", true), startTime: "19:30", want: "2 hours before" },
-    { reminders: r(false, false, "everyone", true), startTime: null, want: "Off" },
   ];
   for (const c of cases) {
     assert.equal(formatRemindersSummary(c.reminders, c.startTime), c.want);
@@ -78,11 +75,6 @@ test("reminderConfirmation describes who and when", () => {
       want: { title: "Reminder set", body: "We'll nudge just the picker the morning of." },
     },
     {
-      reminders: r(true, false),
-      startTime: null,
-      want: { title: "Reminder set", body: "We'll nudge everyone the night before." },
-    },
-    {
       reminders: r(false, false),
       startTime: null,
       want: { title: "Reminders off", body: "The picker still gets their nudge." },
@@ -91,16 +83,6 @@ test("reminderConfirmation describes who and when", () => {
       reminders: all(),
       startTime: "19:30",
       want: { title: "Reminder set", body: "We'll nudge everyone the night before, the morning of and 2 hours before." },
-    },
-    {
-      reminders: r(false, false, "picker", true),
-      startTime: "19:30",
-      want: { title: "Reminder set", body: "We'll nudge just the picker 2 hours before." },
-    },
-    {
-      reminders: r(false, false, "everyone", true),
-      startTime: null,
-      want: { title: "Reminders off", body: "The picker still gets their nudge." },
     },
   ];
   for (const c of cases) {

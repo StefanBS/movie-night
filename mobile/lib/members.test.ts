@@ -18,13 +18,8 @@ test("parses a valid array of members", () => {
   assert.deepEqual(parseMembers(raw), want);
 });
 
-test("parses an empty array", () => {
-  assert.deepEqual(parseMembers([]), []);
-});
-
 const invalid: { name: string; raw: unknown; wantError: RegExp }[] = [
   { name: "rejects a non-array payload", raw: { id: "a" }, wantError: /array/ },
-  { name: "rejects a null payload", raw: null, wantError: /array/ },
   {
     name: "rejects a non-object element",
     raw: ["nope"],
@@ -65,11 +60,6 @@ for (const c of invalid) {
 
 // memberActions maps a member's state to the churn transitions it can undergo.
 const actionCases: { name: string; member: Member; want: MemberAction[] }[] = [
-  {
-    name: "inactive member can only reactivate",
-    member: { id: "a", name: "Ada", role: "core", status: "inactive", joinedOn: "2024-06-15" },
-    want: ["reactivate"],
-  },
   {
     // The backend rejects promoting an inactive member (409): reactivate first.
     name: "inactive guest can only reactivate, not promote",

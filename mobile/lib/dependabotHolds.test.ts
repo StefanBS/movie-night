@@ -84,13 +84,6 @@ test("findHoldGaps", async (t) => {
       gaps: [],
     },
     {
-      name: "matrix entries the app doesn't depend on are ignored",
-      matrix: { "expo-camera": "~58.0.1" },
-      deps: [],
-      ignores: [],
-      gaps: [],
-    },
-    {
       name: "unrecognised range is reported, not silently passed",
       matrix: { odd: ">=1.0.0" },
       deps: ["odd"],

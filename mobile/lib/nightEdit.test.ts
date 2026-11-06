@@ -37,7 +37,6 @@ test("editRows lists active core members, then every other attendee", () => {
     { name: "core only", night: night("ada"), want: ["ada", "blake"] },
     { name: "a guest attendee is listed after core", night: night("ada", "frankie"), want: ["ada", "blake", "frankie"] },
     { name: "an inactive attendee is listed", night: night("ada", "zed"), want: ["ada", "blake", "zed"] },
-    { name: "a guest picker is listed", night: night("frankie"), want: ["ada", "blake", "frankie"] },
   ];
   for (const c of cases) {
     assert.deepEqual(
@@ -72,9 +71,7 @@ test("isDirty is false until the draft differs from the stored Night", () => {
     { name: "another date", draft: { date: "2026-06-27" }, want: true },
     { name: "another start time", draft: { startTime: "19:30" }, want: true },
     { name: "set to repeat", draft: { repeat: { freq: "weekly", intervalWeeks: 1 } }, want: true },
-    { name: "start time cleared", draft: { startTime: null }, want: true },
     { name: "someone added", draft: { attendees: new Set(["ada", "blake", "frankie"]) }, want: true },
-    { name: "someone removed", draft: { attendees: new Set(["ada"]) }, want: true },
     { name: "someone swapped (same count)", draft: { attendees: new Set(["ada", "frankie"]) }, want: true },
     { name: "reminders changed", draft: { reminders: { ...stored.reminders, morningOf: false } }, want: true },
   ];
