@@ -31,7 +31,6 @@ CREATE TABLE groups (
 -- member entering the rotation to the active-core average; rotation_position
 -- is the turn ranking's last tiebreak.
 CREATE TABLE memberships (
-    id                uuid              PRIMARY KEY DEFAULT uuidv7(),
     group_id          uuid              NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
     user_id           uuid              NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
     role              membership_role   NOT NULL,
@@ -39,10 +38,8 @@ CREATE TABLE memberships (
     baseline_picks    integer           NOT NULL DEFAULT 0,
     rotation_position integer           NOT NULL,
     joined_at         timestamptz       NOT NULL DEFAULT now(),
-    left_at           timestamptz
+    PRIMARY KEY (group_id, user_id)
 );
-CREATE UNIQUE INDEX uq_membership_group_user ON memberships (group_id, user_id);
-CREATE INDEX ix_membership_active_core ON memberships (group_id, status, role);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -107,16 +104,16 @@ CREATE TABLE nights (
     CONSTRAINT ck_night_watched_no_repeat CHECK (watched_at IS NULL OR repeat_freq IS NULL)
 );
 CREATE UNIQUE INDEX uq_night_per_group_date ON nights (group_id, scheduled_for);
-CREATE INDEX ix_night_picker_credited ON nights (picker_id, is_credited);
+-- The reminder scheduler reads Nights by date across every group each minute.
+CREATE INDEX ix_night_scheduled_for ON nights (scheduled_for);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
 CREATE TABLE attendances (
-    id       uuid PRIMARY KEY DEFAULT uuidv7(),
     night_id uuid NOT NULL REFERENCES nights(id) ON DELETE CASCADE,
-    user_id  uuid NOT NULL REFERENCES users(id)  ON DELETE CASCADE
+    user_id  uuid NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
+    PRIMARY KEY (night_id, user_id)
 );
-CREATE UNIQUE INDEX uq_attendance_night_user ON attendances (night_id, user_id);
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -129,7 +126,6 @@ SELECT
   n.remind_night_before, n.remind_morning_of, n.remind_two_hours_before, n.remind_audience,
   n.watched_at,
   n.repeat_freq, n.repeat_interval_weeks, n.repeat_week_of_month,
-  n.created_at,
   m.tmdb_id         AS movie_tmdb_id,
   m.title           AS movie_title,
   m.release_year    AS movie_release_year,

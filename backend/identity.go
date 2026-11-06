@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -34,6 +33,10 @@ type identityResponse struct {
 	ID             string `json:"id"`
 	Name           string `json:"name"`
 	RemindersMuted bool   `json:"remindersMuted"`
+}
+
+func toIdentity(id uuid.UUID, name string, remindersMuted bool) identityResponse {
+	return identityResponse{ID: id.String(), Name: name, RemindersMuted: remindersMuted}
 }
 
 // claimResponse is identityResponse plus the bearer token, returned once.
@@ -137,14 +140,14 @@ func claimIdentityHandler(store *db.Queries) http.HandlerFunc {
 			internalError(w, gid, "generate token", err)
 			return
 		}
-		if _, err := store.CreateDevice(r.Context(), db.CreateDeviceParams{UserID: uid, TokenHash: hashToken(token)}); err != nil {
+		if err := store.CreateDevice(r.Context(), db.CreateDeviceParams{UserID: uid, TokenHash: hashToken(token)}); err != nil {
 			internalError(w, gid, "create device", err)
 			return
 		}
 		respondJSON(w, http.StatusCreated, claimResponse{
 			Token:    token,
-			Identity: identityResponse{ID: m.UserID.String(), Name: m.Name, RemindersMuted: m.RemindersMuted},
-		}, gid, "encode claim response")
+			Identity: toIdentity(m.UserID, m.Name, m.RemindersMuted),
+		})
 	}
 }
 
@@ -161,7 +164,7 @@ func getIdentityHandler(store *db.Queries) http.HandlerFunc {
 			storeError(w, uuid.Nil, "get device identity", err, http.StatusUnauthorized, "unknown token")
 			return
 		}
-		respondJSON(w, http.StatusOK, identityResponse{ID: row.UserID.String(), Name: row.Name, RemindersMuted: row.RemindersMuted}, uuid.Nil, "encode identity response")
+		respondJSON(w, http.StatusOK, toIdentity(row.UserID, row.Name, row.RemindersMuted))
 	}
 }
 
@@ -201,8 +204,8 @@ func registerPushHandler(store *db.Queries) http.HandlerFunc {
 		}
 		n, err := store.RegisterPush(r.Context(), db.RegisterPushParams{
 			TokenHash: hashToken(token),
-			PushToken: pgtype.Text{String: req.PushToken, Valid: true},
-			TimeZone:  pgtype.Text{String: req.TimeZone, Valid: true},
+			PushToken: pgText(req.PushToken),
+			TimeZone:  pgText(req.TimeZone),
 		})
 		if err != nil {
 			internalError(w, uuid.Nil, "register push", err)
@@ -241,6 +244,6 @@ func setPreferencesHandler(store *db.Queries) http.HandlerFunc {
 			storeError(w, uuid.Nil, "set reminders muted", err, http.StatusUnauthorized, "unknown token")
 			return
 		}
-		respondJSON(w, http.StatusOK, identityResponse{ID: row.UserID.String(), Name: row.Name, RemindersMuted: row.RemindersMuted}, uuid.Nil, "encode identity response")
+		respondJSON(w, http.StatusOK, toIdentity(row.UserID, row.Name, row.RemindersMuted))
 	}
 }

@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
 func TestNightEditsIntegration(t *testing.T) {
@@ -20,15 +18,7 @@ func TestNightEditsIntegration(t *testing.T) {
 	upstream := fakeTMDB(t)
 	client := &tmdbClient{baseURL: upstream.URL, token: "test", client: upstream.Client()}
 
-	mux := http.NewServeMux()
-	q := db.New(pool)
-	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
-	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
-	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
-	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(pool))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(pool, client))
-	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/movie", clearNightMovieHandler(pool))
-	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
+	mux := newRoutes(pool, client)
 
 	do := func(t *testing.T, method, path, body string) (int, []byte) {
 		t.Helper()

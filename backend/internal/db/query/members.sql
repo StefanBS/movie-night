@@ -5,10 +5,10 @@ RETURNING id, name;
 -- name: InsertMembership :one
 INSERT INTO memberships (group_id, user_id, role, status, baseline_picks, rotation_position)
 VALUES (sqlc.arg(group_id), sqlc.arg(user_id), sqlc.arg(role), sqlc.arg(status), sqlc.arg(baseline_picks), sqlc.arg(rotation_position))
-RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at;
+RETURNING joined_at;
 
 -- name: GetGroupMember :one
-SELECT u.id AS user_id, u.name, u.reminders_muted, m.role, m.status, m.baseline_picks, m.joined_at
+SELECT u.id AS user_id, u.name, u.reminders_muted, m.status
 FROM memberships m
 JOIN users u ON u.id = m.user_id
 WHERE m.group_id = sqlc.arg(group_id) AND m.user_id = sqlc.arg(user_id);
@@ -30,15 +30,12 @@ SELECT user_id, role
 FROM memberships
 WHERE group_id = sqlc.arg(group_id) AND user_id = ANY(sqlc.arg(user_ids)::uuid[]);
 
--- name: UpdateMembership :one
--- Writes the state planMove decided. left_at is stamped when the member leaves
--- and cleared when they return.
+-- name: UpdateMembership :exec
+-- Writes the state planMove decided.
 UPDATE memberships
 SET role = sqlc.arg(role), status = sqlc.arg(status),
-    baseline_picks = sqlc.arg(baseline_picks), rotation_position = sqlc.arg(rotation_position),
-    left_at = CASE WHEN sqlc.arg(status)::membership_status = 'inactive' THEN COALESCE(left_at, now()) END
-WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id)
-RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at;
+    baseline_picks = sqlc.arg(baseline_picks), rotation_position = sqlc.arg(rotation_position)
+WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id);
 
 -- name: RotationSeedInputs :one
 -- Everything a member entering the rotation is seeded from, read at one point

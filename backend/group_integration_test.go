@@ -5,18 +5,13 @@ package main
 import (
 	"net/http"
 	"testing"
-
-	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
 func TestGroupIntegration(t *testing.T) {
 	pool := freshDB(t)
 	seedFixtures(t, pool)
-	q := db.New(pool)
 
-	mux := http.NewServeMux()
-	mux.Handle("GET /groups/{groupId}", getGroupHandler(q))
-	mux.Handle("PATCH /groups/{groupId}", renameGroupHandler(q))
+	mux := newRoutes(pool, nil)
 
 	const unknownGroup = "33333333-3333-3333-3333-333333333333"
 

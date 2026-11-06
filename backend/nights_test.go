@@ -136,7 +136,7 @@ func TestUpdateNightRequestValidation(t *testing.T) {
 			if got.Attendees == nil || len(got.Attendees) != tt.wantAttendees {
 				t.Errorf("attendees = %v, want %d (non-nil)", got.Attendees, tt.wantAttendees)
 			}
-			if got.Reminders.Audience != db.ReminderAudienceEveryone {
+			if got.Reminders.Audience != "everyone" {
 				t.Errorf("reminders = %+v, want everyone", got.Reminders)
 			}
 		})
@@ -190,34 +190,21 @@ func TestUpdateNightRequestPickerAndWatched(t *testing.T) {
 	}
 }
 
-func TestParseReminders(t *testing.T) {
+func TestValidateReminders(t *testing.T) {
 	tests := []struct {
 		name    string
 		req     remindersDTO
-		want    nightReminders
 		wantErr bool
 	}{
-		{name: "everyone", req: remindersDTO{NightBefore: true, MorningOf: false, TwoHoursBefore: true, Audience: "everyone"},
-			want: nightReminders{NightBefore: true, MorningOf: false, TwoHoursBefore: true, Audience: db.ReminderAudienceEveryone}},
-		{name: "just the picker, all slots off", req: remindersDTO{Audience: "picker"},
-			want: nightReminders{Audience: db.ReminderAudiencePicker}},
+		{name: "everyone", req: remindersDTO{NightBefore: true, TwoHoursBefore: true, Audience: "everyone"}},
+		{name: "just the picker, all slots off", req: remindersDTO{Audience: "picker"}},
 		{name: "unknown audience", req: remindersDTO{NightBefore: true, Audience: "all"}, wantErr: true},
 		{name: "missing audience", req: remindersDTO{NightBefore: true}, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseReminders(tt.req)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatalf("expected error, got %+v", got)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("got %+v, want %+v", got, tt.want)
+			if err := validateReminders(tt.req); (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -228,13 +215,13 @@ func TestAttendeeRole(t *testing.T) {
 	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
 	frankie := uuid.MustParse("a0000000-0000-0000-0000-000000000006")
 	stranger := uuid.MustParse("a0000000-0000-0000-0000-0000000000ff")
-	attendees := []db.ListNightAttendeesRow{
+	attendees := []db.ListAttendeesRow{
 		{ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
 		{ID: frankie, Name: "Frankie", Role: db.MembershipRoleGuest},
 	}
 	tests := []struct {
 		name      string
-		attendees []db.ListNightAttendeesRow
+		attendees []db.ListAttendeesRow
 		picker    uuid.UUID
 		want      db.MembershipRole
 		wantErr   error
@@ -268,7 +255,7 @@ func TestPresentIDsIsNonNilWhenEmpty(t *testing.T) {
 	}
 }
 
-func TestToNightResponse(t *testing.T) {
+func TestNewNightResponse(t *testing.T) {
 	nightID := uuid.MustParse("b0000000-0000-0000-0000-0000000000aa")
 	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
 
@@ -277,10 +264,7 @@ func TestToNightResponse(t *testing.T) {
 	}
 
 	t.Run("maps pick and attendees", func(t *testing.T) {
-		rows := []db.ListNightAttendeesRow{
-			{ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
-		}
-		got := toNightResponse(mkNight(), rows)
+		got := newNightResponse(mkNight(), []attendee{{ID: ada.String(), Name: "Ada", Role: "core"}})
 		if got.ID != nightID.String() {
 			t.Errorf("ID = %q", got.ID)
 		}
@@ -293,7 +277,7 @@ func TestToNightResponse(t *testing.T) {
 	})
 
 	t.Run("nil rows yields non-nil empty attendees slice", func(t *testing.T) {
-		got := toNightResponse(mkNight(), nil)
+		got := newNightResponse(mkNight(), nil)
 		if got.Attendees == nil {
 			t.Errorf("Attendees must be non-nil even when rows is nil")
 		}
@@ -307,7 +291,7 @@ func TestToNightResponse(t *testing.T) {
 		n.RemindNightBefore = true
 		n.RemindTwoHoursBefore = true
 		n.RemindAudience = db.ReminderAudiencePicker
-		got := toNightResponse(n, nil).Reminders
+		got := newNightResponse(n, nil).Reminders
 		want := remindersDTO{NightBefore: true, MorningOf: false, TwoHoursBefore: true, Audience: "picker"}
 		if got != want {
 			t.Errorf("Reminders = %+v, want %+v", got, want)
@@ -315,18 +299,18 @@ func TestToNightResponse(t *testing.T) {
 	})
 
 	t.Run("startTime is null when unset and HH:MM when set", func(t *testing.T) {
-		if got := toNightResponse(mkNight(), nil).StartTime; got != nil {
+		if got := newNightResponse(mkNight(), nil).StartTime; got != nil {
 			t.Errorf("StartTime = %q, want nil", *got)
 		}
 		n := mkNight()
 		n.StartTime = pgtype.Time{Microseconds: (19*60 + 5) * 60 * 1e6, Valid: true}
-		if got := toNightResponse(n, nil).StartTime; !equalPtr(got, "19:05") {
+		if got := newNightResponse(n, nil).StartTime; !equalPtr(got, "19:05") {
 			t.Errorf("StartTime = %v, want 19:05", got)
 		}
 	})
 
 	t.Run("movie is null when unset and populated when set", func(t *testing.T) {
-		none := toNightResponse(mkNight(), nil)
+		none := newNightResponse(mkNight(), nil)
 		if none.Movie != nil {
 			t.Errorf("Movie = %v, want nil", none.Movie)
 		}
@@ -335,7 +319,7 @@ func TestToNightResponse(t *testing.T) {
 		n.MovieTitle = pgtype.Text{String: "Dune", Valid: true}
 		n.MovieReleaseYear = pgtype.Int4{Int32: 2021, Valid: true}
 		n.MoviePosterPath = pgtype.Text{String: "/dune.jpg", Valid: true}
-		got := toNightResponse(n, nil)
+		got := newNightResponse(n, nil)
 		if got.Movie == nil || got.Movie.TMDBID != 438631 || got.Movie.Title != "Dune" ||
 			got.Movie.ReleaseYear == nil || *got.Movie.ReleaseYear != 2021 {
 			t.Errorf("Movie = %+v", got.Movie)
@@ -346,7 +330,7 @@ func TestToNightResponse(t *testing.T) {
 		noYear := mkNight() // release year and poster zero values → Valid false
 		noYear.MovieTmdbID = pgtype.Int4{Int32: 841, Valid: true}
 		noYear.MovieTitle = pgtype.Text{String: "Dune", Valid: true}
-		got2 := toNightResponse(noYear, nil)
+		got2 := newNightResponse(noYear, nil)
 		if got2.Movie == nil || got2.Movie.ReleaseYear != nil {
 			t.Errorf("Movie release year = %+v, want nil", got2.Movie)
 		}
@@ -452,7 +436,7 @@ func TestGroupAttendees(t *testing.T) {
 	n2 := uuid.MustParse("b0000000-0000-0000-0000-0000000000bb")
 	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
 	blake := uuid.MustParse("a0000000-0000-0000-0000-000000000002")
-	rows := []db.ListNightsAttendeesRow{
+	rows := []db.ListAttendeesRow{
 		{NightID: n1, ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
 		{NightID: n1, ID: blake, Name: "Blake", Role: db.MembershipRoleCore},
 		{NightID: n2, ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
@@ -540,7 +524,7 @@ func TestRecordableAsWatched(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d, err := parseDate(tt.scheduledFor)
+			d, err := parseScheduledFor(tt.scheduledFor)
 			if err != nil {
 				t.Fatal(err)
 			}

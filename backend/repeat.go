@@ -14,24 +14,16 @@ import (
 // the next one on nextSeriesDate. Dates are calendar dates with no zone
 // (ADR-0011), so the math here works on UTC midnights and DST never applies.
 
-// repeatFreq is how a series repeats: every N weeks on the Night's weekday,
-// or monthly on the Nth (or last) of that weekday.
-type repeatFreq = db.RepeatFreq
-
-const (
-	repeatWeekly  = db.RepeatFreqWeekly
-	repeatMonthly = db.RepeatFreqMonthly
-)
-
 // lastWeekOfMonth is the monthly WeekOfMonth for "the last <weekday>". A
 // Night on a 5th weekday repeats on the last one, which every month has.
 const lastWeekOfMonth = -1
 
-// repeatRule is a validated repeat. IntervalWeeks (1 or 2) is set only for
+// repeatRule is a validated repeat: every N weeks on the Night's weekday, or
+// monthly on the Nth (or last) of that weekday. IntervalWeeks (1 or 2) is set only for
 // weekly, WeekOfMonth (1–4, or lastWeekOfMonth) only for monthly. The weekday
 // is always the Night's own.
 type repeatRule struct {
-	Freq          repeatFreq
+	Freq          db.RepeatFreq
 	IntervalWeeks int16
 	WeekOfMonth   int16
 }
@@ -41,8 +33,7 @@ type repeatRule struct {
 // Night recorded (or cancelled) late doesn't open one that is already past.
 // Pure.
 func nextSeriesDate(rule repeatRule, night, now time.Time) time.Time {
-	y, m, d := now.UTC().Date()
-	today := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	today := utcDay(now, 0)
 	next := nextOccurrence(rule, night)
 	for next.Before(today) {
 		next = nextOccurrence(rule, next)
@@ -54,7 +45,7 @@ func nextSeriesDate(rule repeatRule, night, now time.Time) time.Time {
 // Pure.
 func nextOccurrence(rule repeatRule, from time.Time) time.Time {
 	y, m, d := from.Date()
-	if rule.Freq == repeatWeekly {
+	if rule.Freq == db.RepeatFreqWeekly {
 		return time.Date(y, m, d+7*int(rule.IntervalWeeks), 0, 0, 0, 0, time.UTC)
 	}
 	return weekdayInMonth(y, m+1, from.Weekday(), rule.WeekOfMonth)
@@ -90,13 +81,13 @@ func parseRepeat(dto *repeatDTO, date time.Time) (*repeatRule, error) {
 	if dto == nil {
 		return nil, nil
 	}
-	switch repeatFreq(dto.Freq) {
-	case repeatWeekly:
+	switch db.RepeatFreq(dto.Freq) {
+	case db.RepeatFreqWeekly:
 		if dto.Week != nil || dto.IntervalWeeks == nil || *dto.IntervalWeeks < 1 || *dto.IntervalWeeks > 2 {
 			return nil, fmt.Errorf("invalid repeat: weekly takes an intervalWeeks of 1 or 2")
 		}
-		return &repeatRule{Freq: repeatWeekly, IntervalWeeks: *dto.IntervalWeeks}, nil
-	case repeatMonthly:
+		return &repeatRule{Freq: db.RepeatFreqWeekly, IntervalWeeks: *dto.IntervalWeeks}, nil
+	case db.RepeatFreqMonthly:
 		if dto.IntervalWeeks != nil || dto.Week == nil {
 			return nil, fmt.Errorf("invalid repeat: monthly takes a week")
 		}
@@ -107,7 +98,7 @@ func parseRepeat(dto *repeatDTO, date time.Time) (*repeatRule, error) {
 		if weekdayInMonth(date.Year(), date.Month(), date.Weekday(), week) != date {
 			return nil, fmt.Errorf("invalid repeat: week %d doesn't match scheduledFor", week)
 		}
-		return &repeatRule{Freq: repeatMonthly, WeekOfMonth: week}, nil
+		return &repeatRule{Freq: db.RepeatFreqMonthly, WeekOfMonth: week}, nil
 	default:
 		return nil, fmt.Errorf("invalid repeat freq")
 	}
@@ -119,7 +110,7 @@ func toRepeatDTO(rule *repeatRule) *repeatDTO {
 		return nil
 	}
 	dto := &repeatDTO{Freq: string(rule.Freq)}
-	if rule.Freq == repeatWeekly {
+	if rule.Freq == db.RepeatFreqWeekly {
 		dto.IntervalWeeks = &rule.IntervalWeeks
 	} else {
 		dto.Week = &rule.WeekOfMonth
@@ -134,7 +125,7 @@ func repeatColumns(rule *repeatRule) (db.NullRepeatFreq, pgtype.Int2, pgtype.Int
 		return db.NullRepeatFreq{}, pgtype.Int2{}, pgtype.Int2{}
 	}
 	freq := db.NullRepeatFreq{RepeatFreq: rule.Freq, Valid: true}
-	if rule.Freq == repeatWeekly {
+	if rule.Freq == db.RepeatFreqWeekly {
 		return freq, pgtype.Int2{Int16: rule.IntervalWeeks, Valid: true}, pgtype.Int2{}
 	}
 	return freq, pgtype.Int2{}, pgtype.Int2{Int16: rule.WeekOfMonth, Valid: true}

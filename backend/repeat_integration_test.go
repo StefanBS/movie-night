@@ -22,14 +22,7 @@ func TestRepeatingNightsIntegration(t *testing.T) {
 	upstream := fakeTMDB(t)
 	client := &tmdbClient{baseURL: upstream.URL, token: "test", client: upstream.Client()}
 
-	mux := http.NewServeMux()
-	q := db.New(pool)
-	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
-	mux.Handle("GET /groups/{groupId}/nights", listNightsHandler(q))
-	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
-	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
-	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(pool))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(pool, client))
+	mux := newRoutes(pool, client)
 
 	nightsPath := "/groups/" + seededGroup + "/nights"
 	weekly := &repeatDTO{Freq: "weekly", IntervalWeeks: i16(1)}
@@ -217,7 +210,7 @@ func TestRepeatingNightsIntegration(t *testing.T) {
 		if code, _ := doReq(t, mux, http.MethodDelete, nightsPath+"/"+n.ID, ""); code != http.StatusNoContent {
 			t.Fatalf("delete = %d, want 204", code)
 		}
-		next := nightOn(t, nextSeriesDate(repeatRule{Freq: repeatWeekly, IntervalWeeks: 1}, mustDate(t, "2026-06-19"), time.Now()).Format(dateLayout))
+		next := nightOn(t, nextSeriesDate(repeatRule{Freq: db.RepeatFreqWeekly, IntervalWeeks: 1}, mustDate(t, "2026-06-19"), time.Now()).Format(dateLayout))
 		if next == nil {
 			t.Fatal("no next night after cancelling")
 		}

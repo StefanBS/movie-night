@@ -12,10 +12,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createDevice = `-- name: CreateDevice :one
+const createDevice = `-- name: CreateDevice :exec
 INSERT INTO devices (user_id, token_hash)
 VALUES ($1, $2)
-RETURNING id, user_id
 `
 
 type CreateDeviceParams struct {
@@ -23,16 +22,9 @@ type CreateDeviceParams struct {
 	TokenHash []byte    `json:"token_hash"`
 }
 
-type CreateDeviceRow struct {
-	ID     uuid.UUID `json:"id"`
-	UserID uuid.UUID `json:"user_id"`
-}
-
-func (q *Queries) CreateDevice(ctx context.Context, arg CreateDeviceParams) (CreateDeviceRow, error) {
-	row := q.db.QueryRow(ctx, createDevice, arg.UserID, arg.TokenHash)
-	var i CreateDeviceRow
-	err := row.Scan(&i.ID, &i.UserID)
-	return i, err
+func (q *Queries) CreateDevice(ctx context.Context, arg CreateDeviceParams) error {
+	_, err := q.db.Exec(ctx, createDevice, arg.UserID, arg.TokenHash)
+	return err
 }
 
 const deleteDevice = `-- name: DeleteDevice :execrows

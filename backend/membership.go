@@ -108,30 +108,6 @@ func planMove(action memberAction, role db.MembershipRole, status db.MembershipS
 	return move, nil
 }
 
-// currentMember renders an unchanged membership row as the response DTO — used
-// by the idempotent no-op branches that echo the current state back.
-func currentMember(m db.LockGroupMemberRow) memberResponse {
-	return memberResponse{
-		ID:       m.UserID.String(),
-		Name:     m.Name,
-		Role:     string(m.Role),
-		Status:   string(m.Status),
-		JoinedOn: formatTimestampDate(m.JoinedAt),
-	}
-}
-
-// memberFromMembership renders a written membership row as the response DTO.
-// The name is passed in because a memberships row carries no user name.
-func memberFromMembership(m db.Membership, name string) memberResponse {
-	return memberResponse{
-		ID:       m.UserID.String(),
-		Name:     name,
-		Role:     string(m.Role),
-		Status:   string(m.Status),
-		JoinedOn: formatTimestampDate(m.JoinedAt),
-	}
-}
-
 // joinMemberHandler serves POST /groups/{groupId}/members: a new person joins
 // as an active member with the role the body names (joinMember).
 func joinMemberHandler(pool *pgxpool.Pool) http.HandlerFunc {
@@ -149,17 +125,14 @@ func joinMemberHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		var member memberResponse
-		err = withTx(r.Context(), pool, func(q *db.Queries) error {
-			var err error
-			member, err = joinMember(r.Context(), q, gid, name, role)
-			return err
+		member, err := withTxResult(r.Context(), pool, func(q *db.Queries) (memberResponse, error) {
+			return joinMember(r.Context(), q, gid, name, role)
 		})
 		if err != nil {
 			writeMemberError(w, gid, "join member", err)
 			return
 		}
-		respondJSON(w, http.StatusCreated, member, gid, "encode member response")
+		respondJSON(w, http.StatusCreated, member)
 	}
 }
 
@@ -171,16 +144,13 @@ func moveMemberHandler(pool *pgxpool.Pool, action memberAction) http.HandlerFunc
 		if !ok {
 			return
 		}
-		var member memberResponse
-		err := withTx(r.Context(), pool, func(q *db.Queries) error {
-			var err error
-			member, err = moveMember(r.Context(), q, gid, uid, action)
-			return err
+		member, err := withTxResult(r.Context(), pool, func(q *db.Queries) (memberResponse, error) {
+			return moveMember(r.Context(), q, gid, uid, action)
 		})
 		if err != nil {
 			writeMemberError(w, gid, string(action)+" member", err)
 			return
 		}
-		respondJSON(w, http.StatusOK, member, gid, "encode member response")
+		respondJSON(w, http.StatusOK, member)
 	}
 }

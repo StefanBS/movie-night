@@ -224,7 +224,6 @@ func (ns NullRepeatFreq) Value() (driver.Value, error) {
 }
 
 type Attendance struct {
-	ID      uuid.UUID `json:"id"`
 	NightID uuid.UUID `json:"night_id"`
 	UserID  uuid.UUID `json:"user_id"`
 }
@@ -253,7 +252,6 @@ type FullNight struct {
 	RepeatFreq           NullRepeatFreq     `json:"repeat_freq"`
 	RepeatIntervalWeeks  pgtype.Int2        `json:"repeat_interval_weeks"`
 	RepeatWeekOfMonth    pgtype.Int2        `json:"repeat_week_of_month"`
-	CreatedAt            pgtype.Timestamptz `json:"created_at"`
 	MovieTmdbID          pgtype.Int4        `json:"movie_tmdb_id"`
 	MovieTitle           pgtype.Text        `json:"movie_title"`
 	MovieReleaseYear     pgtype.Int4        `json:"movie_release_year"`
@@ -269,7 +267,6 @@ type Group struct {
 }
 
 type Membership struct {
-	ID               uuid.UUID          `json:"id"`
 	GroupID          uuid.UUID          `json:"group_id"`
 	UserID           uuid.UUID          `json:"user_id"`
 	Role             MembershipRole     `json:"role"`
@@ -277,7 +274,6 @@ type Membership struct {
 	BaselinePicks    int32              `json:"baseline_picks"`
 	RotationPosition int32              `json:"rotation_position"`
 	JoinedAt         pgtype.Timestamptz `json:"joined_at"`
-	LeftAt           pgtype.Timestamptz `json:"left_at"`
 }
 
 type Movie struct {

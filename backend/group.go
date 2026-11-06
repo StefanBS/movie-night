@@ -37,7 +37,7 @@ type groupResponse struct {
 func toGroupResponse(g db.Group) groupResponse {
 	return groupResponse{
 		Name:      g.Name,
-		CreatedOn: formatTimestampDate(g.CreatedAt),
+		CreatedOn: formatDay(g.CreatedAt.Time),
 	}
 }
 
@@ -54,7 +54,7 @@ func getGroupHandler(store *db.Queries) http.HandlerFunc {
 			storeError(w, gid, "get group", err, http.StatusNotFound, "group not found")
 			return
 		}
-		respondJSON(w, http.StatusOK, toGroupResponse(g), gid, "encode group response")
+		respondJSON(w, http.StatusOK, toGroupResponse(g))
 	}
 }
 
@@ -80,6 +80,6 @@ func renameGroupHandler(store *db.Queries) http.HandlerFunc {
 			storeError(w, gid, "rename group", err, http.StatusNotFound, "group not found")
 			return
 		}
-		respondJSON(w, http.StatusOK, toGroupResponse(g), gid, "encode group response")
+		respondJSON(w, http.StatusOK, toGroupResponse(g))
 	}
 }

@@ -68,7 +68,7 @@ func (q *Queries) FilterGroupMembers(ctx context.Context, arg FilterGroupMembers
 }
 
 const getGroupMember = `-- name: GetGroupMember :one
-SELECT u.id AS user_id, u.name, u.reminders_muted, m.role, m.status, m.baseline_picks, m.joined_at
+SELECT u.id AS user_id, u.name, u.reminders_muted, m.status
 FROM memberships m
 JOIN users u ON u.id = m.user_id
 WHERE m.group_id = $1 AND m.user_id = $2
@@ -80,13 +80,10 @@ type GetGroupMemberParams struct {
 }
 
 type GetGroupMemberRow struct {
-	UserID         uuid.UUID          `json:"user_id"`
-	Name           string             `json:"name"`
-	RemindersMuted bool               `json:"reminders_muted"`
-	Role           MembershipRole     `json:"role"`
-	Status         MembershipStatus   `json:"status"`
-	BaselinePicks  int32              `json:"baseline_picks"`
-	JoinedAt       pgtype.Timestamptz `json:"joined_at"`
+	UserID         uuid.UUID        `json:"user_id"`
+	Name           string           `json:"name"`
+	RemindersMuted bool             `json:"reminders_muted"`
+	Status         MembershipStatus `json:"status"`
 }
 
 func (q *Queries) GetGroupMember(ctx context.Context, arg GetGroupMemberParams) (GetGroupMemberRow, error) {
@@ -96,10 +93,7 @@ func (q *Queries) GetGroupMember(ctx context.Context, arg GetGroupMemberParams) 
 		&i.UserID,
 		&i.Name,
 		&i.RemindersMuted,
-		&i.Role,
 		&i.Status,
-		&i.BaselinePicks,
-		&i.JoinedAt,
 	)
 	return i, err
 }
@@ -107,7 +101,7 @@ func (q *Queries) GetGroupMember(ctx context.Context, arg GetGroupMemberParams) 
 const insertMembership = `-- name: InsertMembership :one
 INSERT INTO memberships (group_id, user_id, role, status, baseline_picks, rotation_position)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at
+RETURNING joined_at
 `
 
 type InsertMembershipParams struct {
@@ -119,7 +113,7 @@ type InsertMembershipParams struct {
 	RotationPosition int32            `json:"rotation_position"`
 }
 
-func (q *Queries) InsertMembership(ctx context.Context, arg InsertMembershipParams) (Membership, error) {
+func (q *Queries) InsertMembership(ctx context.Context, arg InsertMembershipParams) (pgtype.Timestamptz, error) {
 	row := q.db.QueryRow(ctx, insertMembership,
 		arg.GroupID,
 		arg.UserID,
@@ -128,19 +122,9 @@ func (q *Queries) InsertMembership(ctx context.Context, arg InsertMembershipPara
 		arg.BaselinePicks,
 		arg.RotationPosition,
 	)
-	var i Membership
-	err := row.Scan(
-		&i.ID,
-		&i.GroupID,
-		&i.UserID,
-		&i.Role,
-		&i.Status,
-		&i.BaselinePicks,
-		&i.RotationPosition,
-		&i.JoinedAt,
-		&i.LeftAt,
-	)
-	return i, err
+	var joined_at pgtype.Timestamptz
+	err := row.Scan(&joined_at)
+	return joined_at, err
 }
 
 const lockGroupMember = `-- name: LockGroupMember :one
@@ -224,13 +208,11 @@ func (q *Queries) RotationSeedInputs(ctx context.Context, arg RotationSeedInputs
 	return i, err
 }
 
-const updateMembership = `-- name: UpdateMembership :one
+const updateMembership = `-- name: UpdateMembership :exec
 UPDATE memberships
 SET role = $1, status = $2,
-    baseline_picks = $3, rotation_position = $4,
-    left_at = CASE WHEN $2::membership_status = 'inactive' THEN COALESCE(left_at, now()) END
+    baseline_picks = $3, rotation_position = $4
 WHERE group_id = $5 AND user_id = $6
-RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at
 `
 
 type UpdateMembershipParams struct {
@@ -242,10 +224,9 @@ type UpdateMembershipParams struct {
 	UserID           uuid.UUID        `json:"user_id"`
 }
 
-// Writes the state planMove decided. left_at is stamped when the member leaves
-// and cleared when they return.
-func (q *Queries) UpdateMembership(ctx context.Context, arg UpdateMembershipParams) (Membership, error) {
-	row := q.db.QueryRow(ctx, updateMembership,
+// Writes the state planMove decided.
+func (q *Queries) UpdateMembership(ctx context.Context, arg UpdateMembershipParams) error {
+	_, err := q.db.Exec(ctx, updateMembership,
 		arg.Role,
 		arg.Status,
 		arg.BaselinePicks,
@@ -253,17 +234,5 @@ func (q *Queries) UpdateMembership(ctx context.Context, arg UpdateMembershipPara
 		arg.GroupID,
 		arg.UserID,
 	)
-	var i Membership
-	err := row.Scan(
-		&i.ID,
-		&i.GroupID,
-		&i.UserID,
-		&i.Role,
-		&i.Status,
-		&i.BaselinePicks,
-		&i.RotationPosition,
-		&i.JoinedAt,
-		&i.LeftAt,
-	)
-	return i, err
+	return err
 }

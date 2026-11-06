@@ -13,7 +13,6 @@ import (
 	// even on a host or image without /usr/share/zoneinfo.
 	_ "time/tzdata"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
@@ -40,8 +39,6 @@ func main() {
 		log.Fatalf("connect to database: %v", err)
 	}
 
-	queries := db.New(pool)
-
 	tmdb := newTMDBClient(os.Getenv("TMDB_READ_TOKEN"))
 	if tmdb == nil {
 		log.Print("TMDB not configured (TMDB_READ_TOKEN unset); /movies/search and attach return 503")
@@ -52,35 +49,9 @@ func main() {
 	// Reminders (ADR-0010) go out from this process every minute until shutdown.
 	// EXPO_ACCESS_TOKEN is only needed once push security is enabled for the
 	// project in EAS.
-	go runReminders(ctx, queries, newExpoPusher(os.Getenv("EXPO_ACCESS_TOKEN")), time.Minute)
+	go runReminders(ctx, db.New(pool), newExpoPusher(os.Getenv("EXPO_ACCESS_TOKEN")), time.Minute)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		// uuid.Nil: this route is not group-scoped (see logScope).
-		respondJSON(w, http.StatusOK, map[string]string{"status": "ok"}, uuid.Nil, "encode healthz")
-	})
-	mux.Handle("POST /identity", claimIdentityHandler(queries))
-	mux.Handle("GET /identity", getIdentityHandler(queries))
-	mux.Handle("DELETE /identity", releaseIdentityHandler(queries))
-	mux.Handle("PUT /identity/push", registerPushHandler(queries))
-	mux.Handle("PUT /identity/preferences", setPreferencesHandler(queries))
-	mux.Handle("GET /groups/{groupId}", getGroupHandler(queries))
-	mux.Handle("PATCH /groups/{groupId}", renameGroupHandler(queries))
-	mux.Handle("GET /groups/{groupId}/members", membersHandler(queries))
-	mux.Handle("GET /groups/{groupId}/turn", turnHandler(queries))
-	mux.Handle("POST /groups/{groupId}/members", joinMemberHandler(pool))
-	mux.Handle("POST /groups/{groupId}/members/{userId}/deactivate", moveMemberHandler(pool, actionDeactivate))
-	mux.Handle("POST /groups/{groupId}/members/{userId}/reactivate", moveMemberHandler(pool, actionReactivate))
-	mux.Handle("POST /groups/{groupId}/members/{userId}/promote", moveMemberHandler(pool, actionPromote))
-	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
-	mux.Handle("GET /groups/{groupId}/nights", listNightsHandler(queries))
-	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(queries))
-	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
-	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(pool))
-	mux.Handle("GET /groups/{groupId}/nights/{nightId}/turn", nightTurnHandler(queries))
-	mux.Handle("GET /movies/search", searchMoviesHandler(tmdb))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(pool, tmdb))
-	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/movie", clearNightMovieHandler(pool))
+	mux := newRoutes(pool, tmdb)
 
 	// Browsers enforce CORS; native apps and curl do not. Allowed web origins
 	// come from CORS_ALLOWED_ORIGINS (comma-separated) so the policy is the same
@@ -115,4 +86,38 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("graceful shutdown failed: %v", err)
 	}
+}
+
+// newRoutes is the API's route table. main serves it, and the integration
+// tests drive the same table, so a route can't differ between the two. A nil
+// tmdb makes the movie routes answer 503.
+func newRoutes(pool *pgxpool.Pool, tmdb *tmdbClient) *http.ServeMux {
+	queries := db.New(pool)
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+	mux.Handle("POST /identity", claimIdentityHandler(queries))
+	mux.Handle("GET /identity", getIdentityHandler(queries))
+	mux.Handle("DELETE /identity", releaseIdentityHandler(queries))
+	mux.Handle("PUT /identity/push", registerPushHandler(queries))
+	mux.Handle("PUT /identity/preferences", setPreferencesHandler(queries))
+	mux.Handle("GET /groups/{groupId}", getGroupHandler(queries))
+	mux.Handle("PATCH /groups/{groupId}", renameGroupHandler(queries))
+	mux.Handle("GET /groups/{groupId}/members", membersHandler(queries))
+	mux.Handle("GET /groups/{groupId}/turn", turnHandler(queries))
+	mux.Handle("POST /groups/{groupId}/members", joinMemberHandler(pool))
+	mux.Handle("POST /groups/{groupId}/members/{userId}/deactivate", moveMemberHandler(pool, actionDeactivate))
+	mux.Handle("POST /groups/{groupId}/members/{userId}/reactivate", moveMemberHandler(pool, actionReactivate))
+	mux.Handle("POST /groups/{groupId}/members/{userId}/promote", moveMemberHandler(pool, actionPromote))
+	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
+	mux.Handle("GET /groups/{groupId}/nights", listNightsHandler(queries))
+	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(queries))
+	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
+	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(pool))
+	mux.Handle("GET /groups/{groupId}/nights/{nightId}/turn", nightTurnHandler(queries))
+	mux.Handle("GET /movies/search", searchMoviesHandler(tmdb))
+	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(pool, tmdb))
+	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/movie", clearNightMovieHandler(pool))
+	return mux
 }

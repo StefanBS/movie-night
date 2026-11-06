@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-
-	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
 // nightBody builds a create-night body: the picker plus the other attendees.
@@ -20,13 +18,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	pool := freshDB(t)
 	seedFixtures(t, pool)
 
-	mux := http.NewServeMux()
-	q := db.New(pool)
-	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
-	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
-	mux.Handle("GET /groups/{groupId}/nights/{nightId}/turn", nightTurnHandler(q))
-	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
-	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
+	mux := newRoutes(pool, nil)
 
 	// run starts every subtest from the seed baseline: no nights, so dates never
 	// collide (one night per date) and standings come from baseline alone.
@@ -285,9 +277,7 @@ func TestNightsListIntegration(t *testing.T) {
 	pool := freshDB(t)
 	seedFixtures(t, pool)
 
-	mux := http.NewServeMux()
-	q := db.New(pool)
-	mux.Handle("GET /groups/{groupId}/nights", listNightsHandler(q))
+	mux := newRoutes(pool, nil)
 
 	const (
 		night1   = "b0000000-0000-0000-0000-0000000000a1" // older, has movie + attendees

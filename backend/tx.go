@@ -17,3 +17,15 @@ func withTx(ctx context.Context, pool *pgxpool.Pool, fn func(q *db.Queries) erro
 		return fn(db.New(tx))
 	})
 }
+
+// withTxResult is withTx for a write that hands back a value, such as the row
+// it created.
+func withTxResult[T any](ctx context.Context, pool *pgxpool.Pool, fn func(q *db.Queries) (T, error)) (T, error) {
+	var out T
+	err := withTx(ctx, pool, func(q *db.Queries) error {
+		var err error
+		out, err = fn(q)
+		return err
+	})
+	return out, err
+}
