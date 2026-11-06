@@ -46,7 +46,7 @@ func toGroupResponse(g db.Group) groupResponse {
 
 // groupStore is the subset of *db.Queries the group handlers need; the real
 // *db.Queries satisfies it, so no mock is ever written (same pattern as
-// memberStore/nightStore/turnStore).
+// nightStore/turnStore).
 type groupStore interface {
 	GetGroup(ctx context.Context, id uuid.UUID) (db.Group, error)
 	RenameGroup(ctx context.Context, arg db.RenameGroupParams) (db.Group, error)

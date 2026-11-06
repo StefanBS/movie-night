@@ -94,7 +94,7 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/groups/{groupId}/members` | Join as active core, seeded to the current average. Body `{"name"}`. |
+| `POST` | `/groups/{groupId}/members` | Join as an active member. Body `{"name","role"}`, both required; `role` is `"core"` (enters the rotation seeded to the current average) or `"guest"`. |
 | `POST` | `/groups/{groupId}/members/{userId}/deactivate` | Mark inactive (leaves the rotation). |
 | `POST` | `/groups/{groupId}/members/{userId}/reactivate` | Restore; re-seeds if it re-enters the rotation. |
 | `POST` | `/groups/{groupId}/members/{userId}/promote` | Active guest → active core. `409` for an inactive member (reactivate first). |

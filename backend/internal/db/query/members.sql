@@ -13,6 +13,16 @@ FROM memberships m
 JOIN users u ON u.id = m.user_id
 WHERE m.group_id = sqlc.arg(group_id) AND m.user_id = sqlc.arg(user_id);
 
+-- name: LockGroupMember :one
+-- GetGroupMember for a membership change: locks the membership row for the
+-- rest of the write's transaction, so the state planMove checks is the state
+-- the change is written over.
+SELECT u.id AS user_id, u.name, m.role, m.status, m.baseline_picks, m.joined_at
+FROM memberships m
+JOIN users u ON u.id = m.user_id
+WHERE m.group_id = sqlc.arg(group_id) AND m.user_id = sqlc.arg(user_id)
+FOR UPDATE OF m;
+
 -- name: FilterGroupMembers :many
 -- The ids among user_ids that hold a membership in the group (active or
 -- inactive), with their role; an id without one is simply absent.
@@ -33,13 +43,10 @@ WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id)
 RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at;
 
 -- name: PromoteMembership :one
--- Promote only touches an active membership: an inactive member is reactivated
--- first (planMove), so a member deactivated since the handler's read matches no
--- row instead of being reactivated into a new slot.
 UPDATE memberships
 SET role = 'core',
     baseline_picks = sqlc.arg(baseline_picks), rotation_position = sqlc.arg(rotation_position)
-WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id) AND status = 'active'
+WHERE group_id = sqlc.arg(group_id) AND user_id = sqlc.arg(user_id)
 RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at;
 
 -- name: RotationSeedInputs :one

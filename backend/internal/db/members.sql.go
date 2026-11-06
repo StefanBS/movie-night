@@ -172,11 +172,50 @@ func (q *Queries) InsertMembership(ctx context.Context, arg InsertMembershipPara
 	return i, err
 }
 
+const lockGroupMember = `-- name: LockGroupMember :one
+SELECT u.id AS user_id, u.name, m.role, m.status, m.baseline_picks, m.joined_at
+FROM memberships m
+JOIN users u ON u.id = m.user_id
+WHERE m.group_id = $1 AND m.user_id = $2
+FOR UPDATE OF m
+`
+
+type LockGroupMemberParams struct {
+	GroupID uuid.UUID `json:"group_id"`
+	UserID  uuid.UUID `json:"user_id"`
+}
+
+type LockGroupMemberRow struct {
+	UserID        uuid.UUID          `json:"user_id"`
+	Name          string             `json:"name"`
+	Role          MembershipRole     `json:"role"`
+	Status        MembershipStatus   `json:"status"`
+	BaselinePicks int32              `json:"baseline_picks"`
+	JoinedAt      pgtype.Timestamptz `json:"joined_at"`
+}
+
+// GetGroupMember for a membership change: locks the membership row for the
+// rest of the write's transaction, so the state planMove checks is the state
+// the change is written over.
+func (q *Queries) LockGroupMember(ctx context.Context, arg LockGroupMemberParams) (LockGroupMemberRow, error) {
+	row := q.db.QueryRow(ctx, lockGroupMember, arg.GroupID, arg.UserID)
+	var i LockGroupMemberRow
+	err := row.Scan(
+		&i.UserID,
+		&i.Name,
+		&i.Role,
+		&i.Status,
+		&i.BaselinePicks,
+		&i.JoinedAt,
+	)
+	return i, err
+}
+
 const promoteMembership = `-- name: PromoteMembership :one
 UPDATE memberships
 SET role = 'core',
     baseline_picks = $1, rotation_position = $2
-WHERE group_id = $3 AND user_id = $4 AND status = 'active'
+WHERE group_id = $3 AND user_id = $4
 RETURNING id, group_id, user_id, role, status, baseline_picks, rotation_position, joined_at, left_at
 `
 
@@ -187,9 +226,6 @@ type PromoteMembershipParams struct {
 	UserID           uuid.UUID `json:"user_id"`
 }
 
-// Promote only touches an active membership: an inactive member is reactivated
-// first (planMove), so a member deactivated since the handler's read matches no
-// row instead of being reactivated into a new slot.
 func (q *Queries) PromoteMembership(ctx context.Context, arg PromoteMembershipParams) (Membership, error) {
 	row := q.db.QueryRow(ctx, promoteMembership,
 		arg.BaselinePicks,

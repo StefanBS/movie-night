@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
@@ -16,10 +18,10 @@ func TestMembershipChurnIntegration(t *testing.T) {
 	q := db.New(pool)
 
 	mux := http.NewServeMux()
-	mux.Handle("POST /groups/{groupId}/members", joinMemberHandler(q))
-	mux.Handle("POST /groups/{groupId}/members/{userId}/deactivate", deactivateMemberHandler(q))
-	mux.Handle("POST /groups/{groupId}/members/{userId}/reactivate", reactivateMemberHandler(q))
-	mux.Handle("POST /groups/{groupId}/members/{userId}/promote", promoteMemberHandler(q))
+	mux.Handle("POST /groups/{groupId}/members", joinMemberHandler(pool))
+	mux.Handle("POST /groups/{groupId}/members/{userId}/deactivate", moveMemberHandler(pool, actionDeactivate))
+	mux.Handle("POST /groups/{groupId}/members/{userId}/reactivate", moveMemberHandler(pool, actionReactivate))
+	mux.Handle("POST /groups/{groupId}/members/{userId}/promote", moveMemberHandler(pool, actionPromote))
 	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
 	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
 
@@ -79,7 +81,7 @@ func TestMembershipChurnIntegration(t *testing.T) {
 
 	t.Run("join lands the new member at the average", func(t *testing.T) {
 		want := roundedTurnAvg(t)
-		code, m := do(t, http.MethodPost, "/groups/"+seededGroup+"/members", `{"name":"Newbie"}`)
+		code, m := do(t, http.MethodPost, "/groups/"+seededGroup+"/members", `{"name":"Newbie","role":"core"}`)
 		if code != http.StatusCreated {
 			t.Fatalf("status = %d, want 201", code)
 		}
@@ -182,10 +184,11 @@ func TestMembershipChurnIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid role is rejected", func(t *testing.T) {
-		code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/members", `{"name":"Nope","role":"admin"}`)
-		if code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want 400", code)
+	t.Run("a missing or invalid role is rejected", func(t *testing.T) {
+		for _, body := range []string{`{"name":"Nope"}`, `{"name":"Nope","role":"admin"}`} {
+			if code, _ := do(t, http.MethodPost, "/groups/"+seededGroup+"/members", body); code != http.StatusBadRequest {
+				t.Errorf("body %s: status = %d, want 400", body, code)
+			}
 		}
 	})
 
@@ -201,9 +204,39 @@ func TestMembershipChurnIntegration(t *testing.T) {
 			t.Errorf("malformed user promote: status = %d, want 400", code)
 		}
 		// Empty join name → 400.
-		code, _ = do(t, http.MethodPost, "/groups/"+seededGroup+"/members", `{"name":"   "}`)
+		code, _ = do(t, http.MethodPost, "/groups/"+seededGroup+"/members", `{"name":"   ","role":"core"}`)
 		if code != http.StatusBadRequest {
 			t.Errorf("empty join name: status = %d, want 400", code)
 		}
 	})
+}
+
+// TestJoinMemberIsAtomicIntegration drives joinMember directly: a join into a
+// group that doesn't exist fails on the membership insert, after the user row
+// is written, and the transaction must take that user row back out with it.
+func TestJoinMemberIsAtomicIntegration(t *testing.T) {
+	pool := freshDB(t)
+	seedFixtures(t, pool)
+	ctx := t.Context()
+
+	countUsers := func(t *testing.T) int {
+		t.Helper()
+		var n int
+		if err := pool.QueryRow(ctx, "SELECT count(*) FROM users").Scan(&n); err != nil {
+			t.Fatalf("count users: %v", err)
+		}
+		return n
+	}
+
+	before := countUsers(t)
+	err := withTx(ctx, pool, func(q *db.Queries) error {
+		_, err := joinMember(ctx, q, uuid.MustParse("33333333-3333-3333-3333-333333333333"), "Orphan", db.MembershipRoleGuest)
+		return err
+	})
+	if err == nil {
+		t.Fatal("joinMember into an unknown group succeeded, want an error")
+	}
+	if after := countUsers(t); after != before {
+		t.Errorf("users = %d after the failed join, want %d (no orphaned user)", after, before)
+	}
 }
