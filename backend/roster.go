@@ -1,10 +1,7 @@
 package main
 
 import (
-	"context"
 	"net/http"
-
-	"github.com/google/uuid"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -35,15 +32,8 @@ func toMemberResponses(rows []db.ListGroupMembersRow) []memberResponse {
 	return out
 }
 
-// rosterStore is the subset of *db.Queries the handler needs. Declaring it as an
-// interface keeps the handler wireable; the integration test passes the real
-// *db.Queries, so no mock implementation is ever written.
-type rosterStore interface {
-	ListGroupMembers(ctx context.Context, groupID uuid.UUID) ([]db.ListGroupMembersRow, error)
-}
-
 // membersHandler serves GET /groups/{groupId}/members.
-func membersHandler(store rosterStore) http.HandlerFunc {
+func membersHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
 		if !ok {
