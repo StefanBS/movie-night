@@ -116,10 +116,9 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `POST` | `/groups/{groupId}/nights` | Create a night with its picker; `201`. Body `{"scheduledFor","startTime"?,"attendees","pickerId","repeat"?}` (`startTime` `HH:MM`, omitted or `null` for none; `repeat` omitted or `null` for a one-off); `422` if the picker isn't an attendee, `409` if the date is taken. |
 | `GET` | `/groups/{groupId}/nights` | Every night, past and upcoming, newest first. |
 | `GET` | `/groups/{groupId}/nights/{nightId}` | A night and its attendees. |
-| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Replace the whole editable Night (date, start time, attendee set, reminder settings) in one transaction — a rejected edit changes nothing. Body `{"scheduledFor","startTime","attendees","reminders","repeat"}` (`startTime` `null` for none, `repeat` `null` to end the series), plus optional `"pickerId"` (change the picker in the same edit) and `"watched": true` (record the Night as watched; the first `watchedAt` is kept, ADR-0012; on a repeating Night it also opens the next one, ADR-0014); `422` if the attendees leave out the picker or include a non-member, or `watched` is sent for a Night with no film, or the Night is (or would become) a Watched Night dated more than a day past the server's UTC date ([ADR-0013](../docs/adr/0013-watched-night-date-bound.md)), or a Watched Night is given a repeat, `409` if the date is taken. |
+| `PATCH` | `/groups/{groupId}/nights/{nightId}` | Replace the whole editable Night (date, start time, attendee set, reminder settings) in one transaction — a rejected edit changes nothing. Body `{"scheduledFor","startTime","attendees","reminders","repeat"}` (`startTime` `null` for none, `repeat` `null` to end the series), plus optional `"pickerId"` (change the picker in the same edit; a guest's pick doesn't move standings) and `"watched": true` (record the Night as watched; the first `watchedAt` is kept, ADR-0012; on a repeating Night it also opens the next one, ADR-0014); `422` if the attendees leave out the picker or include a non-member, or `watched` is sent for a Night with no film, or the Night is (or would become) a Watched Night dated more than a day past the server's UTC date ([ADR-0013](../docs/adr/0013-watched-night-date-bound.md)), or a Watched Night is given a repeat, `409` if the date is taken. |
 | `DELETE` | `/groups/{groupId}/nights/{nightId}` | Cancel/delete the night; `204`. Idempotent. Cancelling a repeating night opens the next one in its series ([ADR-0014](../docs/adr/0014-repeating-nights.md)). |
 | `GET` | `/groups/{groupId}/nights/{nightId}/turn` | Least-served ranking over the night's attendees, ignoring the night's own pick. Optional `present=<uuid>,…` ranks that set instead (a draft of who came). |
-| `POST` | `/groups/{groupId}/nights/{nightId}/pick` | Change the picker (must be an attendee; guest picks don't move standings). Body `{"pickerId"}`. |
 
 **Movies** ([ADR-0007](../docs/adr/0007-tmdb-proxy-source-of-truth.md)) — `503` when `TMDB_READ_TOKEN` is unset.
 
@@ -192,8 +191,8 @@ backend/
 ├── turn.go            # least-served ranking response mapping
 ├── membership.go      # join / deactivate / reactivate / promote (churn)
 ├── identity.go        # claimed identity, bearer tokens, push registration
-├── nights.go          # night lifecycle handlers: create, read, edit, pick
-├── night_writes.go    # create/edit/pick writes, each in one transaction
+├── nights.go          # night lifecycle handlers: create, read, edit, delete
+├── night_writes.go    # Night writes (create, edit, cancel, film), each in one transaction
 ├── tx.go              # withTx — one transaction for a multi-statement write
 ├── movies.go          # movie search/attach handlers (TMDB-backed)
 ├── tmdb.go            # TMDB client

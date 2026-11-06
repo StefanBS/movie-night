@@ -1,7 +1,7 @@
 import { errorMessage } from "./errors";
 import type { Member } from "./members";
 import { searchMovies, type Movie } from "./movies";
-import { attachMovie, detachMovie, listNights, recordNightPick, type Night } from "./nights";
+import { attachMovie, changeNightPicker, detachMovie, listNights, type Night } from "./nights";
 import { createSessionCore, type Session } from "./session";
 
 // The editor module for a saved Night: choosing or clearing its film and
@@ -193,7 +193,7 @@ export function createNightEditor({
     changePicker(memberId) {
       return write(
         memberId,
-        (signal) => recordNightPick(baseUrl, groupId, nightId, memberId, signal),
+        (signal) => changeNightPicker(baseUrl, groupId, core.state.night, memberId, signal),
         "failed to record pick",
       );
     },

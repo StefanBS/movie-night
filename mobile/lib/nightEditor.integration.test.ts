@@ -81,9 +81,9 @@ function backend(over: Partial<Record<string, Handler>> = {}): Handler {
     if (key === "GET /movies/search") return json(res, 200, url.searchParams.get("q") === "dune" ? [DUNE] : []);
     if (key === `POST ${base}/movie`) return json(res, 200, (night = { ...night, movie: DUNE }));
     if (key === `DELETE ${base}/movie`) return json(res, 200, (night = { ...night, movie: null }));
-    if (key === `POST ${base}/pick`) {
-      const { pickerId } = JSON.parse(body) as { pickerId: string };
-      return json(res, 200, (night = { ...night, pickerId }));
+    if (key === `PATCH ${base}`) {
+      const { pickerId } = JSON.parse(body) as { pickerId?: string };
+      return json(res, 200, (night = { ...night, pickerId: pickerId ?? night.pickerId }));
     }
     json(res, 404, { error: `no route ${key}` });
   };
@@ -256,7 +256,7 @@ test("only one write runs at a time", async () => {
   const base = backend();
   await withEditor(
     backend({
-      [`POST /groups/${GROUP}/nights/${NIGHT}/pick`]: (req, res, body) => (writes++, base(req, res, body)),
+      [`PATCH /groups/${GROUP}/nights/${NIGHT}`]: (req, res, body) => (writes++, base(req, res, body)),
       [`POST /groups/${GROUP}/nights/${NIGHT}/movie`]: (req, res, body) => (writes++, base(req, res, body)),
     }),
     async (editor) => {
@@ -299,7 +299,7 @@ test("a write clears the previous error", async () => {
   const base = backend();
   await withEditor(
     backend({
-      [`POST /groups/${GROUP}/nights/${NIGHT}/pick`]: (req, res, body) =>
+      [`PATCH /groups/${GROUP}/nights/${NIGHT}`]: (req, res, body) =>
         fail ? json(res, 422, { error: "picker is not an attendee of this night" }) : base(req, res, body),
     }),
     async (editor) => {

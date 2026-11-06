@@ -25,7 +25,6 @@ func TestNightEditsIntegration(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(pool))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(pool))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(pool, client))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/movie", clearNightMovieHandler(pool))
@@ -294,7 +293,7 @@ func TestNightEditsIntegration(t *testing.T) {
 			{"detail", http.MethodGet, base, ""},
 			{"edit attendees", http.MethodPatch, base, editBody(t, n, func(r *updateNightRequest) { r.Attendees = []string{ada, blake} })},
 			{"edit date", http.MethodPatch, base, editBody(t, n, func(r *updateNightRequest) { r.ScheduledFor, r.Attendees = "2026-07-04", []string{ada, blake} })},
-			{"record pick", http.MethodPost, base + "/pick", `{"pickerId":"` + blake + `"}`},
+			{"edit picker", http.MethodPatch, base, editBody(t, n, func(r *updateNightRequest) { r.Attendees, r.PickerID = []string{ada, blake}, str(blake) })},
 		} {
 			code, got := doJSON[nightResponse](t, mux, step.method, step.path, step.body)
 			if code != http.StatusOK {

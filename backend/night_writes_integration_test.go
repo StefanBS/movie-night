@@ -27,7 +27,6 @@ func TestNightWritesWaitForEachOther(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/pick", recordNightPickHandler(pool))
 
 	// mkNight is a Night Ada picks, with Blake attending.
 	mkNight := func(t *testing.T) (nightResponse, string) {
@@ -40,22 +39,9 @@ func TestNightWritesWaitForEachOther(t *testing.T) {
 		return n, "/groups/" + seededGroup + "/nights/" + n.ID
 	}
 
-	t.Run("a pick waits for an edit that removes the picker", func(t *testing.T) {
+	t.Run("an edit waits for an edit that moves the pick to the attendee it removes", func(t *testing.T) {
 		n, path := mkNight(t)
-		// The edit, mid-transaction: Night locked, Blake removed.
-		code := whileHolding(t, pool, n.ID, `DELETE FROM attendances WHERE night_id = $1 AND user_id = $2`, []any{n.ID, blake},
-			mux, http.MethodPost, path+"/pick", `{"pickerId":"`+blake+`"}`)
-		if code != http.StatusUnprocessableEntity {
-			t.Errorf("record pick status = %d, want 422 (Blake left the Night)", code)
-		}
-		if _, got := doJSON[nightResponse](t, mux, http.MethodGet, path, ""); got.PickerID != ada {
-			t.Errorf("picker = %s, want Ada (unchanged)", got.PickerID)
-		}
-	})
-
-	t.Run("an edit waits for a pick that moves to the attendee it removes", func(t *testing.T) {
-		n, path := mkNight(t)
-		// The pick, mid-transaction: Night locked, Blake made the picker.
+		// The other edit, mid-transaction: Night locked, Blake made the picker.
 		code := whileHolding(t, pool, n.ID, `UPDATE nights SET picker_id = $2 WHERE id = $1`, []any{n.ID, blake},
 			mux, http.MethodPatch, path, editBody(t, n, func(r *updateNightRequest) { r.Attendees = []string{ada} }))
 		if code != http.StatusUnprocessableEntity {
