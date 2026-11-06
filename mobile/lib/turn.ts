@@ -4,7 +4,6 @@ import { formatShortDate } from "./date";
 export type TurnMember = {
   id: string;
   name: string;
-  role: "core" | "guest";
   servedCount: number;
   lastPickedOn: string | null;
 };
@@ -13,7 +12,7 @@ function parseTurnMember(raw: unknown, index: number): TurnMember {
   if (typeof raw !== "object" || raw === null) {
     throw new Error(`member ${index}: expected an object`);
   }
-  const { id, name, role, servedCount, lastPickedOn } = raw as Record<
+  const { id, name, servedCount, lastPickedOn } = raw as Record<
     string,
     unknown
   >;
@@ -23,16 +22,13 @@ function parseTurnMember(raw: unknown, index: number): TurnMember {
   if (typeof name !== "string") {
     throw new Error(`member ${index}: name must be a string`);
   }
-  if (role !== "core" && role !== "guest") {
-    throw new Error(`member ${index}: role must be "core" or "guest"`);
-  }
   if (typeof servedCount !== "number") {
     throw new Error(`member ${index}: servedCount must be a number`);
   }
   if (lastPickedOn !== null && typeof lastPickedOn !== "string") {
     throw new Error(`member ${index}: lastPickedOn must be a string or null`);
   }
-  return { id, name, role, servedCount, lastPickedOn };
+  return { id, name, servedCount, lastPickedOn };
 }
 
 // parseTurn validates an untrusted JSON payload and returns typed TurnMembers,

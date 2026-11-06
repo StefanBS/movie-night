@@ -13,8 +13,8 @@ const members: Member[] = [
   { id: "z", name: "Zed", role: "core", status: "inactive", joinedOn: "2023-01-01" },
 ];
 const turn: TurnMember[] = [
-  { id: "a", name: "Ada", role: "core", servedCount: 0, lastPickedOn: null },
-  { id: "b", name: "Bo", role: "core", servedCount: 2, lastPickedOn: "2026-05-30" },
+  { id: "a", name: "Ada", servedCount: 0, lastPickedOn: null },
+  { id: "b", name: "Bo", servedCount: 2, lastPickedOn: "2026-05-30" },
 ];
 
 test("buildClubSections splits into rotation, guests, inactive", () => {

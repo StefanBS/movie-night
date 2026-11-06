@@ -25,7 +25,7 @@ function night(id: string, scheduledFor: string, opts: Partial<Night> = {}): Nig
 
 // A ranking by name; ids are the names so cases read as the screen does.
 const rank = (...names: string[]): TurnMember[] =>
-  names.map((name) => ({ id: name, name, role: "core", servedCount: 0, lastPickedOn: null }));
+  names.map((name) => ({ id: name, name, servedCount: 0, lastPickedOn: null }));
 
 const CLUB = rank("Blake", "Ada", "Dev", "Esme", "Cleo");
 

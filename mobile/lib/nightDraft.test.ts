@@ -7,7 +7,6 @@ import type { TurnMember } from "./turn";
 const member = (id: string): TurnMember => ({
   id,
   name: id,
-  role: "core",
   servedCount: 0,
   lastPickedOn: null,
 });

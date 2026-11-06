@@ -15,7 +15,6 @@ import (
 type turnResponse struct {
 	ID           string  `json:"id"`
 	Name         string  `json:"name"`
-	Role         string  `json:"role"`
 	ServedCount  int32   `json:"servedCount"`
 	LastPickedOn *string `json:"lastPickedOn"`
 }
@@ -48,7 +47,6 @@ func toTurnResponses(rows []db.RankGroupTurnRow) []turnResponse {
 		resp := turnResponse{
 			ID:          r.ID.String(),
 			Name:        r.Name,
-			Role:        string(r.Role),
 			ServedCount: r.ServedCount,
 		}
 		if r.LastPickedOn.Valid {
