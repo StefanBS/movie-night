@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { fetchTurn, fetchTurnAmong, type TurnMember } from "./turn";
+import { fetchTurn, type TurnMember } from "./turn";
 import { startServer } from "./testServer";
 
 // Integration tests: fetchTurn against a real local HTTP server over a real
@@ -64,37 +64,6 @@ test("aborts the request when the signal fires", async () => {
     const pending = fetchTurn(server.url, GROUP, controller.signal);
     controller.abort();
     await assert.rejects(pending, (err: Error) => err.name === "AbortError");
-  } finally {
-    await server.close();
-  }
-});
-
-test("fetchTurnAmong ranks only the given people via ?present=", async () => {
-  let requestedPath = "";
-  const server = await startServer((req, res) => {
-    requestedPath = req.url ?? "";
-    res.setHeader("content-type", "application/json");
-    res.end("[]");
-  });
-  try {
-    await fetchTurnAmong(server.url, GROUP, ["a", "b"]);
-    assert.equal(requestedPath, `/groups/${GROUP}/turn?present=a%2Cb`);
-  } finally {
-    await server.close();
-  }
-});
-
-test("fetchTurnAmong with nobody present returns [] without a request", async () => {
-  let requests = 0;
-  const server = await startServer((_req, res) => {
-    requests++;
-    res.setHeader("content-type", "application/json");
-    res.end("[]");
-  });
-  try {
-    // A blank present would mean "rank everyone" to the backend.
-    assert.deepEqual(await fetchTurnAmong(server.url, GROUP, []), []);
-    assert.equal(requests, 0);
   } finally {
     await server.close();
   }

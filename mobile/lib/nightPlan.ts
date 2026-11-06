@@ -5,7 +5,7 @@ import { createPicking } from "./nightDraft";
 import { nightDates } from "./nightLifecycle";
 import { createNight, listNights, type Night } from "./nights";
 import { createSessionCore, type Session } from "./session";
-import { fetchTurnAmong, type TurnMember } from "./turn";
+import { fetchTurn, type TurnMember } from "./turn";
 
 // The Plan module behind the New night screen (GLOSSARY: Plan). A Plan is a
 // Night being arranged — date and start time, then who's coming — that exists only here until
@@ -32,15 +32,14 @@ export type NightPlanState = {
 };
 
 export type NightPlan = Session<NightPlanState> & {
-  // load fetches the roster, the club's name and the dates that already hold
-  // a Night.
+  // load fetches the roster, the club's turn ranking, its name and the dates
+  // that already hold a Night.
   load(): Promise<void>;
   // chooseDate sets the date and HH:MM start time (or none) and moves on to Who.
   chooseDate(iso: string, startTime: string | null): void;
   back(): void;
-  // toggle adds or removes an attendee, then reranks. A rank that returns after
-  // a newer one is dropped.
-  toggle(memberId: string): Promise<void>;
+  // toggle adds or removes an attendee and reranks them.
+  toggle(memberId: string): void;
   // choosePicker overrides the order until that person stops attending.
   choosePicker(memberId: string): void;
   // create saves the Plan as a Night, or returns null (no picker, already
@@ -72,7 +71,7 @@ export function createNightPlan({
     busy: null,
     actionError: null,
   });
-  const picking = createPicking(core, (present, signal) => fetchTurnAmong(baseUrl, groupId, present, signal));
+  const picking = createPicking(core);
 
   return {
     get state() {
@@ -84,15 +83,17 @@ export function createNightPlan({
     async load() {
       core.set({ loading: true, error: null });
       try {
-        const [members, groupName, nights] = await core.track((signal) =>
+        const [members, ranking, groupName, nights] = await core.track((signal) =>
           Promise.all([
             fetchMembers(baseUrl, groupId, signal),
+            fetchTurn(baseUrl, groupId, signal),
             fetchGroupName(baseUrl, groupId, signal),
             // The dots are a hint; a failure here must not block planning.
             listNights(baseUrl, groupId, signal).catch(() => [] as Night[]),
           ]),
         );
         core.set({ members, groupName, nightDates: nightDates(nights), loading: false });
+        picking.reset(new Set(), ranking, null);
       } catch (e) {
         core.set({ error: errorMessage(e, "failed to load the club"), loading: false });
       }

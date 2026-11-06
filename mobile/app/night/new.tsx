@@ -96,7 +96,7 @@ export default function NightScreen() {
           attendeeIds={state.attendeeIds}
           pickerId={state.pickerId}
           busy={state.busy}
-          onToggle={(m: Member) => void plan.toggle(m.id)}
+          onToggle={(m: Member) => plan.toggle(m.id)}
           onChoosePicker={plan.choosePicker}
           onNext={() => void onCreate()}
         />

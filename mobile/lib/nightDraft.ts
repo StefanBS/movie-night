@@ -1,4 +1,3 @@
-import { errorMessage } from "./errors";
 import type { TurnMember } from "./turn";
 
 // draftPicker is who picks for a plan that is not yet a Night (ADR-0008): the
@@ -17,13 +16,20 @@ export function draftPicker(
   return order[0]?.id ?? null;
 }
 
+// rankAmong is the turn order over the attendees: the club's full ranking
+// (core only), filtered. The backend's ranking sorts by served count, last
+// pick and rotation position, none of which depend on who is present, so the
+// ranking over any subset is the full ranking with the absent left out. Pure.
+export function rankAmong(ranking: readonly TurnMember[], attendeeIds: ReadonlySet<string>): TurnMember[] {
+  return ranking.filter((m) => attendeeIds.has(m.id));
+}
+
 // PickingState is the part of a draft's state that createPicking owns.
 export type PickingState = {
   attendeeIds: ReadonlySet<string>;
-  // order is the live turn ranking over attendeeIds.
+  // order is the turn ranking over attendeeIds (rankAmong).
   order: TurnMember[];
   pickerId: string | null;
-  actionError: string | null;
 };
 
 // PickingCore is the slice of a session core (lib/session) createPicking
@@ -31,73 +37,44 @@ export type PickingState = {
 type PickingCore = {
   readonly state: PickingState;
   set(patch: Partial<PickingState>): void;
-  track<T>(run: (signal: AbortSignal) => Promise<T>, controller?: AbortController): Promise<T>;
 };
 
 // createPicking is the "who's coming, who picks" draft shared by the New night
-// and We watched it flows: toggling attendees reranks them with `rank` (a rank
-// that returns after a newer one is dropped), and an explicitly chosen picker
-// holds until they stop attending (draftPicker).
-export function createPicking(
-  core: PickingCore,
-  rank: (present: string[], signal: AbortSignal) => Promise<TurnMember[]>,
-) {
+// and We watched it flows. It ranks attendees from the full ranking it was
+// reset with, so a toggle reranks on the spot, without a request; an
+// explicitly chosen picker holds until they stop attending (draftPicker).
+export function createPicking(core: PickingCore) {
   let chosen: string | null = null;
-  let latest: AbortController | null = null;
-  let ranked: Promise<void> = Promise.resolve();
+  let ranking: readonly TurnMember[] = [];
 
-  const set = (patch: Partial<Pick<PickingState, "attendeeIds" | "order">>) => {
-    const attendeeIds = patch.attendeeIds ?? core.state.attendeeIds;
-    const order = patch.order ?? core.state.order;
+  const set = (attendeeIds: ReadonlySet<string>) => {
     if (chosen !== null && !attendeeIds.has(chosen)) {
       chosen = null; // they left, so the pick goes back to the order
     }
-    core.set({ ...patch, pickerId: draftPicker(order, attendeeIds, chosen) });
+    const order = rankAmong(ranking, attendeeIds);
+    core.set({ attendeeIds, order, pickerId: draftPicker(order, attendeeIds, chosen) });
   };
 
   return {
-    // reset starts the draft over from loaded attendees, their order and an
-    // already-chosen picker (null: follow the order).
-    reset(attendeeIds: ReadonlySet<string>, order: TurnMember[], picker: string | null) {
+    // reset starts the draft over from loaded attendees, the club's full
+    // ranking and an already-chosen picker (null: follow the order).
+    reset(attendeeIds: ReadonlySet<string>, fullRanking: readonly TurnMember[], picker: string | null) {
       chosen = picker;
-      set({ attendeeIds, order });
+      ranking = fullRanking;
+      set(attendeeIds);
     },
 
-    toggle(memberId: string): Promise<void> {
+    toggle(memberId: string) {
       const next = new Set(core.state.attendeeIds);
       if (!next.delete(memberId)) {
         next.add(memberId);
       }
-      set({ attendeeIds: next });
-
-      latest?.abort();
-      const controller = new AbortController();
-      latest = controller;
-      ranked = (async () => {
-        try {
-          const order = await core.track((signal) => rank([...next], signal), controller);
-          if (latest === controller) {
-            core.set({ actionError: null });
-            set({ order });
-          }
-        } catch (e) {
-          if (!controller.signal.aborted) {
-            core.set({ actionError: errorMessage(e, "failed to load pick order") });
-          }
-        }
-      })();
-      return ranked;
+      set(next);
     },
 
     choosePicker(memberId: string) {
       chosen = memberId;
-      set({});
-    },
-
-    // settled resolves when the latest rerank does, so a save uses the picker
-    // of the order it asked for, not the one on hand when it was tapped.
-    settled(): Promise<void> {
-      return ranked;
+      set(core.state.attendeeIds);
     },
   };
 }

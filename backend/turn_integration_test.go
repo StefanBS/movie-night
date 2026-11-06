@@ -57,16 +57,12 @@ func TestTurnHandlerIntegration(t *testing.T) {
 
 	mux := newRoutes(pool, nil)
 
-	get := func(groupID, present string) (int, []turnResponse) {
-		path := "/groups/" + groupID + "/turn"
-		if present != "" {
-			path += "?present=" + present
-		}
-		return doJSON[[]turnResponse](t, mux, http.MethodGet, path, "")
+	get := func(groupID string) (int, []turnResponse) {
+		return doJSON[[]turnResponse](t, mux, http.MethodGet, "/groups/"+groupID+"/turn", "")
 	}
 
 	t.Run("default ranks least-served first; non-credited pick ignored", func(t *testing.T) {
-		code, got := get(seededGroup, "")
+		code, got := get(seededGroup)
 		if code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", code)
 		}
@@ -96,42 +92,9 @@ func TestTurnHandlerIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("present subset filters the ranking", func(t *testing.T) {
-		code, got := get(seededGroup, blake+","+cleo)
-		if code != http.StatusOK {
-			t.Fatalf("status = %d, want 200", code)
-		}
-		wantNames := []string{"Cleo", "Blake"}
-		if len(got) != len(wantNames) {
-			t.Fatalf("got %d members, want %d (%+v)", len(got), len(wantNames), got)
-		}
-		for i, name := range wantNames {
-			if got[i].Name != name {
-				t.Errorf("[%d] name = %q, want %q", i, got[i].Name, name)
-			}
-		}
-	})
-
-	t.Run("present set containing only inactive members returns empty", func(t *testing.T) {
-		code, got := get(seededGroup, zed)
-		if code != http.StatusOK {
-			t.Fatalf("status = %d, want 200", code)
-		}
-		if len(got) != 0 {
-			t.Fatalf("got %d members, want 0 (%+v)", len(got), got)
-		}
-	})
-
-	t.Run("malformed present value returns 400", func(t *testing.T) {
-		code, _ := get(seededGroup, "not-a-uuid")
-		if code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want 400", code)
-		}
-	})
-
 	t.Run("baseline_picks counts toward the served order", func(t *testing.T) {
 		group := seedBaselineGroup(t, pool)
-		code, got := get(group, "")
+		code, got := get(group)
 		if code != http.StatusOK {
 			t.Fatalf("status = %d, want 200", code)
 		}
