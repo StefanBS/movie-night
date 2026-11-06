@@ -2,10 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { createNightWatched } from "./nightWatched";
-import type { Member } from "./members";
 import type { Night } from "./nights";
-import type { TurnMember } from "./turn";
 import { type Handler, json, startServer } from "./testServer";
+import { aMember, aMovie, aNight, aTurnMember } from "./fixtures";
 
 // Integration tests: the "We watched it" module against a real local HTTP
 // server over real fetch. No mocks — a throwaway server stands in for the
@@ -14,31 +13,18 @@ import { type Handler, json, startServer } from "./testServer";
 
 const GROUP = "g1";
 
-const member = (id: string, role: "core" | "guest" = "core"): Member => ({
-  id,
-  name: id,
-  role,
-  status: "active",
-  joinedOn: "2026-01-01",
-});
-const ranked = (id: string): TurnMember => ({ id, name: id, servedCount: 0, lastPickedOn: null });
-
-const ROSTER = [member("ada"), member("blake"), member("cleo"), member("frankie", "guest")];
+const ROSTER = [aMember("ada"), aMember("blake"), aMember("cleo"), aMember("frankie", { role: "guest" })];
 // PLANNED is a due Night with a film: Blake picked, Blake and Cleo were coming.
-const PLANNED: Night = {
-  id: "n1",
+const PLANNED = aNight({
   scheduledFor: "2026-06-19",
   startTime: "20:00",
   pickerId: "blake",
-  movie: { tmdbId: 7, title: "Past Lives", releaseYear: 2023, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: 106 },
+  movie: aMovie({ tmdbId: 7, title: "Past Lives", releaseYear: 2023, runtimeMinutes: 106 }),
   attendees: [
     { id: "blake", name: "blake" },
     { id: "cleo", name: "cleo" },
   ],
-  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-  watchedAt: null,
-  repeat: null,
-};
+});
 
 type Patch = { scheduledFor: string; startTime: string | null; attendees: string[]; pickerId: string; watched: boolean };
 
@@ -56,7 +42,7 @@ function backend(over: Partial<Record<string, Handler>> = {}, patches: Patch[] =
     if (key === `GET /groups/${GROUP}/members`) return json(res, 200, ROSTER);
     if (key === `GET /groups/${GROUP}/nights/n1`) return json(res, 200, PLANNED);
     if (key === `GET /groups/${GROUP}/nights/n1/turn`) {
-      return json(res, 200, ROSTER.filter((m) => m.role === "core").map((m) => ranked(m.id)));
+      return json(res, 200, ROSTER.filter((m) => m.role === "core").map((m) => aTurnMember(m.id)));
     }
     if (key === `PATCH /groups/${GROUP}/nights/n1`) {
       const patch = JSON.parse(body) as Patch;

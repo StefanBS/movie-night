@@ -6,6 +6,7 @@ import { createNightLoad, nightLoadView } from "./nightLoad";
 import type { Member } from "./members";
 import type { Night } from "./nights";
 import { type Handler, json, startServer } from "./testServer";
+import { aMember, aNight } from "./fixtures";
 
 // Integration tests: the Night routes' loading Session against a real local
 // HTTP server over real fetch. No mocks — the test drives the Session only
@@ -13,21 +14,8 @@ import { type Handler, json, startServer } from "./testServer";
 
 const GROUP = "g1";
 const NIGHT = "n1";
-const MEMBERS: Member[] = [
-  { id: "ada", name: "Ada", role: "core", status: "active", joinedOn: "2026-01-01" },
-  { id: "blake", name: "Blake", role: "core", status: "active", joinedOn: "2026-01-01" },
-];
-const SAVED: Night = {
-  id: NIGHT,
-  scheduledFor: "2026-06-26",
-  startTime: null,
-  pickerId: "ada",
-  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-  watchedAt: null,
-  repeat: null,
-  movie: null,
-  attendees: [{ id: "ada", name: "Ada" }],
-};
+const MEMBERS: Member[] = [aMember("ada", { name: "Ada" }), aMember("blake", { name: "Blake" })];
+const SAVED = aNight({ id: NIGHT });
 const OTHER: Night = { ...SAVED, id: "n0", scheduledFor: "2026-06-19" };
 
 // backend fakes the three reads the Session makes, counting each one.

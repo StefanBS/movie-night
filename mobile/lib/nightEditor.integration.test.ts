@@ -2,9 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { createNightEditor } from "./nightEditor";
-import type { Movie, SearchResult } from "./movies";
-import type { Night } from "./nights";
+import type { SearchResult } from "./movies";
 import { type Handler, json, startServer } from "./testServer";
+import { aMovie, aNight } from "./fixtures";
 
 // Integration tests: the editor module for a saved Night against a real local
 // HTTP server over real fetch. No mocks — the test drives the editor only
@@ -12,21 +12,14 @@ import { type Handler, json, startServer } from "./testServer";
 
 const GROUP = "g1";
 const NIGHT = "n1";
-const DUNE: Movie = { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null };
-const SAVED: Night = {
+const DUNE = aMovie();
+const SAVED = aNight({
   id: NIGHT,
-  scheduledFor: "2026-06-26",
-  startTime: null,
-  pickerId: "ada",
-  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-  watchedAt: null,
-  repeat: null,
-  movie: null,
   attendees: [
     { id: "ada", name: "Ada" },
     { id: "blake", name: "Blake" },
   ],
-};
+});
 
 // DUNE_RESULT is Dune as the search returns it: the group watched it May 2.
 const DUNE_RESULT: SearchResult = { ...DUNE, watchedOn: "2026-05-02" };

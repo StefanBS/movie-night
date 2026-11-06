@@ -3,23 +3,12 @@ import assert from "node:assert/strict";
 
 import { watchedNights, isDue, nightDates, nightLine, nightActions, nightLineParts, nightTiming, nightWording, plannedNights, upNextAction, type NightAction, type NightLineParts, type NightTiming, type NightWhen, type UpNextAction } from "./nightLifecycle";
 import type { Night } from "./nights";
+import { aMovie, aNight } from "./fixtures";
 
 const TODAY = "2026-06-22";
-const aMovie = { tmdbId: 1, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg", posterThumbUrl: "https://img/x-thumb.jpg", genres: [], runtimeMinutes: null };
 
 function night(id: string, scheduledFor: string, opts: Partial<Night> = {}): Night {
-  return {
-    id,
-    scheduledFor,
-    startTime: null,
-    pickerId: "u1",
-    movie: null,
-    attendees: [],
-    reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-    watchedAt: null,
-    repeat: null,
-    ...opts,
-  };
+  return aNight({ id, scheduledFor, ...opts });
 }
 
 const ids = (ns: Night[]) => ns.map((n) => n.id);
@@ -57,9 +46,9 @@ for (const [name, n, want] of dueCases) {
 
 const actionCases: [string, Night, UpNextAction][] = [
   ["no film, yesterday", night("p", "2026-06-21"), "chooseFilm"],
-  ["film, tomorrow", night("u", "2026-06-23", { movie: aMovie }), null],
-  ["film, today", night("t", TODAY, { movie: aMovie }), "watched"],
-  ["film, yesterday, already recorded", night("p", "2026-06-21", { movie: aMovie, ...WATCHED }), null],
+  ["film, tomorrow", night("u", "2026-06-23", { movie: aMovie() }), null],
+  ["film, today", night("t", TODAY, { movie: aMovie() }), "watched"],
+  ["film, yesterday, already recorded", night("p", "2026-06-21", { movie: aMovie(), ...WATCHED }), null],
 ];
 for (const [name, n, want] of actionCases) {
   test(`upNextAction: ${name} → ${want}`, () => {
@@ -71,7 +60,7 @@ for (const [name, n, want] of actionCases) {
 
 const TOMORROW = "2026-06-23";
 const YESTERDAY = "2026-06-21";
-const FILM = { movie: aMovie };
+const FILM = { movie: aMovie() };
 
 const sheetCases: [string, Night, boolean, NightAction[]][] = [
   ["no film, ahead", night("u", TOMORROW), false, ["edit", "addToCalendar"]],

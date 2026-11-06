@@ -4,14 +4,11 @@ import assert from "node:assert/strict";
 import { editRows, isDirty, type Draft } from "./nightEdit";
 import type { Member } from "./members";
 import type { Night } from "./nights";
+import { aMember, aNight } from "./fixtures";
 
-const member = (id: string, role: Member["role"], status: Member["status"] = "active"): Member => ({
-  id,
-  name: id[0].toUpperCase() + id.slice(1),
-  role,
-  status,
-  joinedOn: "2026-01-01",
-});
+const name = (id: string) => id[0].toUpperCase() + id.slice(1);
+const member = (id: string, role: Member["role"], status: Member["status"] = "active"): Member =>
+  aMember(id, { name: name(id), role, status });
 
 const ROSTER: Member[] = [
   member("ada", "core"),
@@ -20,17 +17,8 @@ const ROSTER: Member[] = [
   member("zed", "core", "inactive"),
 ];
 
-const night = (...ids: string[]): Night => ({
-  id: "n1",
-  scheduledFor: "2026-06-26",
-  startTime: null,
-  pickerId: ids[0],
-  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-  watchedAt: null,
-  repeat: null,
-  movie: null,
-  attendees: ids.map((id) => ({ id, name: id[0].toUpperCase() + id.slice(1) })),
-});
+const night = (...ids: string[]): Night =>
+  aNight({ pickerId: ids[0], attendees: ids.map((id) => ({ id, name: name(id) })) });
 
 test("editRows lists active core members, then every other attendee", () => {
   const cases: { name: string; night: Night; want: string[] }[] = [
