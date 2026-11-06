@@ -2,7 +2,7 @@ import { errorMessage } from "./errors";
 import { fetchMembers, type Member } from "./members";
 import { nightDates } from "./nightLifecycle";
 import { getNightOrNull, listNights, type Night } from "./nights";
-import { createSessionCore, type Session } from "./session";
+import { createSessionCore, withSession, type Session } from "./session";
 
 // The loading module behind the routes for a saved Night (the Night view and
 // the Edit screen): the Night, the roster, and — for Edit's calendar — the
@@ -58,34 +58,23 @@ export function createNightLoad({
     error: null,
     loadStartedAt: 0,
   });
-  let current: AbortController | null = null;
-
-  return {
-    get state() {
-      return core.state;
-    },
-    subscribe: core.subscribe,
-    dispose: core.dispose,
-
+  return withSession<NightLoad>(core, {
     async load() {
-      current?.abort();
-      const controller = new AbortController();
-      current = controller;
       const loadStartedAt = performance.now();
       try {
-        const [night, members, planned] = await core.track(
-          (signal) =>
-            Promise.all([
-              getNightOrNull(baseUrl, groupId, nightId, signal),
-              fetchMembers(baseUrl, groupId, signal),
-              // The dots are a hint (see listNights): a failure never fails the screen.
-              withNightDates ? listNights(baseUrl, groupId, signal).catch(() => [] as Night[]) : null,
-            ]),
-          controller,
+        const loaded = await core.latest("load", (signal) =>
+          Promise.all([
+            getNightOrNull(baseUrl, groupId, nightId, signal),
+            fetchMembers(baseUrl, groupId, signal),
+            // The dots are a hint (see listNights): a failure never fails the screen.
+            withNightDates ? listNights(baseUrl, groupId, signal).catch(() => [] as Night[]) : null,
+          ]),
         );
-        if (current !== controller) {
+        // null: a newer load replaced this one, or the screen closed.
+        if (loaded === null) {
           return;
         }
+        const [night, members, planned] = loaded;
         core.set({
           loaded: true,
           night,
@@ -95,10 +84,8 @@ export function createNightLoad({
           loadStartedAt,
         });
       } catch (e) {
-        if (!controller.signal.aborted) {
-          core.set({ error: errorMessage(e, "failed to load night") });
-        }
+        core.set({ error: errorMessage(e, "failed to load night") });
       }
     },
-  };
+  });
 }
