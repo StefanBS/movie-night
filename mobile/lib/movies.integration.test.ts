@@ -18,8 +18,8 @@ test("searchMovies fetches from the search path and parses the result array", as
     res.setHeader("content-type", "application/json");
     res.end(
       JSON.stringify([
-        { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: null, genres: [], runtimeMinutes: null, watchedOn: "2026-05-02" },
-        { tmdbId: 693134, title: "Dune: Part Two", releaseYear: 2024, posterUrl: null, genres: [], runtimeMinutes: null, watchedOn: null },
+        { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null, watchedOn: "2026-05-02" },
+        { tmdbId: 693134, title: "Dune: Part Two", releaseYear: 2024, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null, watchedOn: null },
       ]),
     );
   });
@@ -42,7 +42,7 @@ test("searchMovies handles a movie with null releaseYear", async () => {
   const server = await startServer((_req, res) => {
     res.statusCode = 200;
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify([{ tmdbId: 1, title: "Unknown", releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null, watchedOn: null }]));
+    res.end(JSON.stringify([{ tmdbId: 1, title: "Unknown", releaseYear: null, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null, watchedOn: null }]));
   });
   try {
     const got = await searchMovies(server.url, GROUP, NIGHT, "unknown");
@@ -66,6 +66,7 @@ test("attachMovie posts the tmdbId and returns the night with its movie", async 
       title: "Dune",
       releaseYear: 2021,
       posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg",
+      posterThumbUrl: "https://image.tmdb.org/t/p/w154/dune.jpg",
       genres: ["Science Fiction", "Adventure"],
       runtimeMinutes: 155,
     },
@@ -92,6 +93,7 @@ test("attachMovie posts the tmdbId and returns the night with its movie", async 
       title: "Dune",
       releaseYear: 2021,
       posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg",
+      posterThumbUrl: "https://image.tmdb.org/t/p/w154/dune.jpg",
       genres: ["Science Fiction", "Adventure"],
       runtimeMinutes: 155,
     });

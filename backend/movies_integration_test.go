@@ -249,6 +249,9 @@ func TestMovieAttachIntegration(t *testing.T) {
 		if n.Movie.PosterURL == nil || *n.Movie.PosterURL != "https://image.tmdb.org/t/p/w342/dune.jpg" {
 			t.Fatalf("night poster = %v, want built w342 url", n.Movie.PosterURL)
 		}
+		if n.Movie.PosterThumbURL == nil || *n.Movie.PosterThumbURL != "https://image.tmdb.org/t/p/w154/dune.jpg" {
+			t.Fatalf("night thumb = %v, want built w154 url", n.Movie.PosterThumbURL)
+		}
 		var poster *string
 		if err := pool.QueryRow(context.Background(),
 			"SELECT poster_path FROM movies WHERE tmdb_id=438631").Scan(&poster); err != nil {

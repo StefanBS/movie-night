@@ -83,6 +83,7 @@ test("parseNight reads an attached movie", () => {
       title: "Dune",
       releaseYear: 2021,
       posterUrl: "https://img/x.jpg",
+      posterThumbUrl: "https://img/x-thumb.jpg",
       genres: ["Drama"],
       runtimeMinutes: 98,
     },
@@ -92,6 +93,7 @@ test("parseNight reads an attached movie", () => {
     title: "Dune",
     releaseYear: 2021,
     posterUrl: "https://img/x.jpg",
+    posterThumbUrl: "https://img/x-thumb.jpg",
     genres: ["Drama"],
     runtimeMinutes: 98,
   });

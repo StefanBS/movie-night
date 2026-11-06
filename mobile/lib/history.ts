@@ -2,8 +2,9 @@ import { formatShortDateYear, todayLocalISO } from "./date";
 import type { Night } from "./nights";
 
 // A HistorySection is a run of Watched rows under one year label, or under
-// none (label null) for the current year.
-export type HistorySection = { label: string | null; nights: Night[] };
+// none (label null) for the current year. `data` is SectionList's field name,
+// so the sections render as they are.
+export type HistorySection = { label: string | null; data: Night[] };
 
 // watchedSub is the Watched tab bar's sub: how many nights the group has
 // recorded and since when ("11 nights since Sep 12 2025."). `since` is the
@@ -33,9 +34,9 @@ export function buildHistory(
     const label = year < thisYear ? year : null;
     const last = sections[sections.length - 1];
     if (last !== undefined && last.label === label) {
-      last.nights.push(n);
+      last.data.push(n);
     } else {
-      sections.push({ label, nights: [n] });
+      sections.push({ label, data: [n] });
     }
   }
   return sections;

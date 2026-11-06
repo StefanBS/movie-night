@@ -144,7 +144,7 @@ export function PickStep({
                   disabled={busy !== null}
                   style={({ pressed }) => [styles.row, i < results.length - 1 && styles.divider, pressed && styles.rowPressed]}
                 >
-                  <Poster uri={mv.posterUrl} title={mv.title} w={44} h={66} />
+                  <Poster uri={mv.posterThumbUrl} title={mv.title} w={44} h={66} />
                   <View style={styles.rowText}>
                     <Text style={styles.resultTitle} numberOfLines={2}>
                       {mv.title}

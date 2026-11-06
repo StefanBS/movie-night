@@ -10,6 +10,7 @@ test("parseMovie accepts a valid movie", () => {
     title: "Dune",
     releaseYear: 2021,
     posterUrl: "https://img/x.jpg",
+    posterThumbUrl: "https://img/x-thumb.jpg",
     genres: ["Science Fiction", "Adventure"],
     runtimeMinutes: 155,
   });
@@ -18,12 +19,13 @@ test("parseMovie accepts a valid movie", () => {
     title: "Dune",
     releaseYear: 2021,
     posterUrl: "https://img/x.jpg",
+    posterThumbUrl: "https://img/x-thumb.jpg",
     genres: ["Science Fiction", "Adventure"],
     runtimeMinutes: 155,
   });
 });
 
-const bare = { tmdbId: 1, title: "X", releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null };
+const bare = { tmdbId: 1, title: "X", releaseYear: null, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null };
 
 test("parseMovie reads null fields as unknown", () => {
   assert.deepEqual(parseMovie(bare), bare);
@@ -41,6 +43,8 @@ test("parseMovie rejects missing or wrong-typed fields", () => {
     ["releaseYear a string", { releaseYear: "2021" }, /releaseYear/],
     ["posterUrl missing", { posterUrl: undefined }, /posterUrl/],
     ["posterUrl a number", { posterUrl: 5 }, /posterUrl/],
+    ["posterThumbUrl missing", { posterThumbUrl: undefined }, /posterThumbUrl/],
+    ["posterThumbUrl a number", { posterThumbUrl: 5 }, /posterThumbUrl/],
   ];
   for (const [name, extra, err] of cases) {
     assert.throws(() => parseMovie({ ...bare, ...extra }), err, name);
@@ -103,7 +107,7 @@ test("formatRuntime", () => {
 });
 
 test("movieDetails tags each line with its kind", () => {
-  const movie: Movie = { tmdbId: 1, title: "In the Mood for Love", releaseYear: 2000, posterUrl: null, genres: ["Drama"], runtimeMinutes: 98 };
+  const movie: Movie = { tmdbId: 1, title: "In the Mood for Love", releaseYear: 2000, posterUrl: null, posterThumbUrl: null, genres: ["Drama"], runtimeMinutes: 98 };
   assert.deepEqual(
     movieDetails(movie).map((d) => d.kind),
     ["year", "genres", "runtime"],
@@ -111,7 +115,7 @@ test("movieDetails tags each line with its kind", () => {
 });
 
 test("movieDetails", () => {
-  const base: Movie = { tmdbId: 1, title: "In the Mood for Love", releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null };
+  const base: Movie = { tmdbId: 1, title: "In the Mood for Love", releaseYear: null, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null };
   const cases: { name: string; movie: Partial<Movie>; want: string[] }[] = [
     {
       name: "all three",
@@ -135,7 +139,7 @@ test("movieDetails", () => {
 });
 
 test("formatYearRuntime", () => {
-  const base: Movie = { tmdbId: 1, title: "Past Lives", releaseYear: null, posterUrl: null, genres: ["Drama"], runtimeMinutes: null };
+  const base: Movie = { tmdbId: 1, title: "Past Lives", releaseYear: null, posterUrl: null, posterThumbUrl: null, genres: ["Drama"], runtimeMinutes: null };
   const cases: { name: string; movie: Partial<Movie>; want: string }[] = [
     { name: "both", movie: { releaseYear: 2023, runtimeMinutes: 106 }, want: "2023 · 1h 46m" },
     { name: "year only", movie: { releaseYear: 2023 }, want: "2023" },

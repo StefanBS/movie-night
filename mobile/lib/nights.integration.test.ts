@@ -161,6 +161,7 @@ test("attachMovie posts the tmdbId and parses the night with its movie", async (
       title: "Dune",
       releaseYear: 2021,
       posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg",
+      posterThumbUrl: "https://image.tmdb.org/t/p/w154/dune.jpg",
       genres: ["Science Fiction", "Adventure"],
       runtimeMinutes: 155,
     },
@@ -186,6 +187,7 @@ test("attachMovie posts the tmdbId and parses the night with its movie", async (
       title: "Dune",
       releaseYear: 2021,
       posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg",
+      posterThumbUrl: "https://image.tmdb.org/t/p/w154/dune.jpg",
       genres: ["Science Fiction", "Adventure"],
       runtimeMinutes: 155,
     });

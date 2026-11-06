@@ -176,18 +176,26 @@ func parseTMDBMovie(body []byte) (movieResult, error) {
 	return m.toResult(), nil
 }
 
-// tmdbImageBase is the TMDB image CDN base + the fixed thumbnail size. The base
-// and size buckets are an effectively-static constant (see ADR-0007); we do not
-// fetch /configuration. Changing the size later is a one-line edit here.
-const tmdbImageBase = "https://image.tmdb.org/t/p/w342"
+// tmdbImageBase is the TMDB image CDN base; a size bucket and the raw
+// poster_path follow it. The base and size buckets are an effectively-static
+// constant (see ADR-0007); we do not fetch /configuration.
+const tmdbImageBase = "https://image.tmdb.org/t/p/"
 
-// posterURL builds a full TMDB poster URL from a raw poster_path, or nil when the
-// movie has no poster (empty path). Pure.
-func posterURL(path string) *string {
+// The two poster sizes the app draws. posterSize is for the large posters
+// (88–150pt wide: Tonight's card, the Night view, Done); thumbSize is for the
+// list thumbnails (40–46pt wide), at about a quarter of the bytes.
+const (
+	posterSize = "w342"
+	thumbSize  = "w154"
+)
+
+// posterURL builds a full TMDB poster URL at the given size bucket from a raw
+// poster_path, or nil when the movie has no poster (empty path). Pure.
+func posterURL(size, path string) *string {
 	if path == "" {
 		return nil
 	}
-	u := tmdbImageBase + path
+	u := tmdbImageBase + size + path
 	return &u
 }
 
