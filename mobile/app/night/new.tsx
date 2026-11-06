@@ -32,7 +32,7 @@ export default function NightScreen() {
   const { from = "Tonight", without } = useLocalSearchParams<{ from?: string; without?: string }>();
   const [today] = useState(todayLocalISO);
   const [plan, state] = useSession(() =>
-    createNightPlan({ baseUrl: API_URL, groupId: GROUP_ID, today, without: without ?? null }),
+    createNightPlan({ baseUrl: API_URL, groupId: GROUP_ID, today, without }),
   );
   const [created, setCreated] = useState<Night | null>(null);
   // Who returns to When, on Android's back button too. Once the Night is

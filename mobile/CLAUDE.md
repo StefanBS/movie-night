@@ -45,7 +45,9 @@ semantic groups (`colors.text.*`, `colors.surface.*`, `colors.accent.*`,
   the active tab is `text.primary`, never accent. Settings is a stack
   screen opened from the gear in Tonight's top bar. Back links name the
   previous screen (`TopBar`'s `back.label`). Flow footers (`WizardFooter`)
-  are solid with a hairline top edge and carry one summary line.
+  are solid with a hairline top edge and hold only the step's action(s), no
+  summary line: what's chosen shows in the step itself. This departs from the
+  design system's README, which still asks for one.
 - **Logo.** The mark is a calendar page with a play button, centred on the
   calendar body so the binder tabs rise above centre. Its SVGs in
   `mobile/assets/brand/` are copied byte for byte from the design system.
