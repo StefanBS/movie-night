@@ -229,7 +229,8 @@ func movieDTOFromCols(row db.FullNight) *movieDTO {
 		TMDBID:         row.MovieTmdbID.Int32,
 		Title:          row.MovieTitle.String,
 		ReleaseYear:    nullableInt32(row.MovieReleaseYear),
-		PosterURL:      posterURLPtr(row.MoviePosterPath),
+		PosterURL:      posterURLPtr(posterSize, row.MoviePosterPath),
+		PosterThumbURL: posterURLPtr(thumbSize, row.MoviePosterPath),
 		Genres:         genresOrEmpty(row.MovieGenres),
 		RuntimeMinutes: nullableInt32(row.MovieRuntimeMinutes),
 	}

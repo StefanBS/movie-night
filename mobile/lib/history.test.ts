@@ -12,7 +12,7 @@ function night(id: string, scheduledFor: string): Night {
     startTime: null,
     pickerId: "u1",
     reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-    movie: { tmdbId: 1, title: "Film", releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null },
+    movie: { tmdbId: 1, title: "Film", releaseYear: null, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null },
     attendees: [],
     watchedAt: `${scheduledFor}T22:00:00Z`,
     repeat: null,
@@ -46,7 +46,7 @@ for (const [name, dates, want] of historyCases) {
   test(`buildHistory: ${name}`, () => {
     const sections = buildHistory(dates.map((d) => night(d, d)), "2026-11-03");
     assert.deepEqual(
-      sections.map((s) => [s.label, s.nights.map((n) => n.id)]),
+      sections.map((s) => [s.label, s.data.map((n) => n.id)]),
       want,
     );
   });

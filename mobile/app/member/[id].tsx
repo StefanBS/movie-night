@@ -69,7 +69,7 @@ function PickRow({ night, last, onPress }: { night: Night; last: boolean; onPres
       accessibilityRole="button"
       style={({ pressed }) => [styles.pick, !last && styles.divider, pressed && styles.pressed]}
     >
-      <Poster uri={night.movie?.posterUrl} title={night.movie?.title} w={40} h={60} />
+      <Poster uri={night.movie?.posterThumbUrl} title={night.movie?.title} w={40} h={60} />
       <View style={styles.pickText}>
         <Text style={styles.pickTitle} numberOfLines={1}>
           {night.movie ? night.movie.title : "Untitled night"}

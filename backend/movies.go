@@ -29,6 +29,7 @@ type movieDTO struct {
 	Title          string   `json:"title"`
 	ReleaseYear    *int32   `json:"releaseYear"`
 	PosterURL      *string  `json:"posterUrl"`
+	PosterThumbURL *string  `json:"posterThumbUrl"`
 	Genres         []string `json:"genres"`
 	RuntimeMinutes *int32   `json:"runtimeMinutes"`
 }
@@ -51,12 +52,13 @@ func nullableInt32(v pgtype.Int4) *int32 {
 	return &y
 }
 
-// posterURLPtr builds the poster URL for a cached movie row, nil when NULL.
-func posterURLPtr(p pgtype.Text) *string {
+// posterURLPtr builds the poster URL at a size for a cached movie row, nil when
+// NULL.
+func posterURLPtr(size string, p pgtype.Text) *string {
 	if !p.Valid {
 		return nil
 	}
-	return posterURL(p.String)
+	return posterURL(size, p.String)
 }
 
 // movieRequest is the JSON body of POST .../nights/{nightId}/movie. Only the
@@ -97,7 +99,8 @@ func toSearchResults(results []movieResult, watchedOn map[int32]string) []search
 			TMDBID:         m.TMDBID,
 			Title:          m.Title,
 			ReleaseYear:    m.ReleaseYear,
-			PosterURL:      posterURL(m.PosterPath),
+			PosterURL:      posterURL(posterSize, m.PosterPath),
+			PosterThumbURL: posterURL(thumbSize, m.PosterPath),
 			Genres:         genresOrEmpty(m.Genres),
 			RuntimeMinutes: m.RuntimeMinutes,
 		}}

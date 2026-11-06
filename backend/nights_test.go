@@ -294,6 +294,9 @@ func TestNewNightResponse(t *testing.T) {
 		if got.Movie.PosterURL == nil || *got.Movie.PosterURL != "https://image.tmdb.org/t/p/w342/dune.jpg" {
 			t.Errorf("Movie poster = %v, want built w342 url", got.Movie.PosterURL)
 		}
+		if got.Movie.PosterThumbURL == nil || *got.Movie.PosterThumbURL != "https://image.tmdb.org/t/p/w154/dune.jpg" {
+			t.Errorf("Movie thumb = %v, want built w154 url", got.Movie.PosterThumbURL)
+		}
 		noYear := mkNight() // release year and poster zero values → Valid false
 		noYear.MovieTmdbID = pgtype.Int4{Int32: 841, Valid: true}
 		noYear.MovieTitle = pgtype.Text{String: "Dune", Valid: true}
@@ -301,8 +304,8 @@ func TestNewNightResponse(t *testing.T) {
 		if got2.Movie == nil || got2.Movie.ReleaseYear != nil {
 			t.Errorf("Movie release year = %+v, want nil", got2.Movie)
 		}
-		if got2.Movie.PosterURL != nil {
-			t.Errorf("Movie poster = %v, want nil (no poster_path)", got2.Movie.PosterURL)
+		if got2.Movie.PosterURL != nil || got2.Movie.PosterThumbURL != nil {
+			t.Errorf("Movie poster = %v, thumb = %v, want nil (no poster_path)", got2.Movie.PosterURL, got2.Movie.PosterThumbURL)
 		}
 	})
 }
@@ -322,8 +325,11 @@ func TestToSearchResults(t *testing.T) {
 	if got[0].PosterURL == nil || *got[0].PosterURL != "https://image.tmdb.org/t/p/w342/dune.jpg" {
 		t.Errorf("[0] poster = %v, want built url", got[0].PosterURL)
 	}
-	if got[1].PosterURL != nil {
-		t.Errorf("[1] poster = %v, want nil", got[1].PosterURL)
+	if got[0].PosterThumbURL == nil || *got[0].PosterThumbURL != "https://image.tmdb.org/t/p/w154/dune.jpg" {
+		t.Errorf("[0] thumb = %v, want built url", got[0].PosterThumbURL)
+	}
+	if got[1].PosterURL != nil || got[1].PosterThumbURL != nil {
+		t.Errorf("[1] poster = %v, thumb = %v, want nil", got[1].PosterURL, got[1].PosterThumbURL)
 	}
 	// Search hits carry only genre ids and no runtime, so the DTO always has
 	// genres [] (never null) and runtimeMinutes null.

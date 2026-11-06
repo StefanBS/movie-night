@@ -8,23 +8,25 @@ import (
 func intp(n int32) *int32 { return &n }
 
 func TestPosterURL(t *testing.T) {
-	full := "https://image.tmdb.org/t/p/w342/abc.jpg"
+	str := func(s string) *string { return &s }
 	tests := []struct {
 		name string
+		size string
 		in   string
 		want *string
 	}{
-		{name: "path builds a full w342 url", in: "/abc.jpg", want: &full},
-		{name: "empty string returns nil", in: "", want: nil},
+		{name: "poster size", size: posterSize, in: "/abc.jpg", want: str("https://image.tmdb.org/t/p/w342/abc.jpg")},
+		{name: "thumb size", size: thumbSize, in: "/abc.jpg", want: str("https://image.tmdb.org/t/p/w154/abc.jpg")},
+		{name: "empty path returns nil", size: posterSize, in: "", want: nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := posterURL(tt.in)
+			got := posterURL(tt.size, tt.in)
 			if (got == nil) != (tt.want == nil) {
-				t.Fatalf("posterURL(%q) = %v, want %v", tt.in, got, tt.want)
+				t.Fatalf("posterURL(%q, %q) = %v, want %v", tt.size, tt.in, got, tt.want)
 			}
 			if got != nil && *got != *tt.want {
-				t.Errorf("posterURL(%q) = %q, want %q", tt.in, *got, *tt.want)
+				t.Errorf("posterURL(%q, %q) = %q, want %q", tt.size, tt.in, *got, *tt.want)
 			}
 		})
 	}

@@ -30,7 +30,7 @@ function night(opts: Partial<Night> = {}): Night {
 const WEEKLY: Repeat = { freq: "weekly", intervalWeeks: 1 };
 const SERIES_NOTES = (cadence: string) => `${cadence}. Open Movie Night for who's picking, who's coming and the film.`;
 
-const movie = (releaseYear: number | null): Movie => ({ tmdbId: 949, title: "Heat", releaseYear, posterUrl: null, genres: [], runtimeMinutes: null });
+const movie = (releaseYear: number | null): Movie => ({ tmdbId: 949, title: "Heat", releaseYear, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null });
 
 test("calendarEntry titles the entry after the club, never the picker", () => {
   const cases: { name: string; groupName: string | null; want: string }[] = [

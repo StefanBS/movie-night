@@ -4,7 +4,10 @@ export type Movie = {
   tmdbId: number;
   title: string;
   releaseYear: number | null;
+  // The poster at two sizes, both null when TMDB has none: posterUrl for the
+  // large posters (88pt wide and up), posterThumbUrl for list thumbnails.
   posterUrl: string | null;
+  posterThumbUrl: string | null;
   // TMDB genre names in TMDB order; [] when unknown (e.g. search results).
   genres: string[];
   // Running time in minutes; null when unknown. Formatting is the client's.
@@ -21,7 +24,7 @@ export function parseMovie(raw: unknown): Movie {
   if (typeof raw !== "object" || raw === null) {
     throw new Error("expected a movie object");
   }
-  const { tmdbId, title, releaseYear, posterUrl, genres, runtimeMinutes } = raw as Record<
+  const { tmdbId, title, releaseYear, posterUrl, posterThumbUrl, genres, runtimeMinutes } = raw as Record<
     string,
     unknown
   >;
@@ -37,13 +40,16 @@ export function parseMovie(raw: unknown): Movie {
   if (posterUrl !== null && typeof posterUrl !== "string") {
     throw new Error("movie: posterUrl must be a string or null");
   }
+  if (posterThumbUrl !== null && typeof posterThumbUrl !== "string") {
+    throw new Error("movie: posterThumbUrl must be a string or null");
+  }
   if (!isStringArray(genres)) {
     throw new Error("movie: genres must be an array of strings");
   }
   if (runtimeMinutes !== null && typeof runtimeMinutes !== "number") {
     throw new Error("movie: runtimeMinutes must be a number or null");
   }
-  return { tmdbId, title, releaseYear, posterUrl, genres, runtimeMinutes };
+  return { tmdbId, title, releaseYear, posterUrl, posterThumbUrl, genres, runtimeMinutes };
 }
 
 // A SearchResult is a film search hit: the film, plus watchedOn, the date

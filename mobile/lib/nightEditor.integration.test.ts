@@ -12,7 +12,7 @@ import { type Handler, json, startServer } from "./testServer";
 
 const GROUP = "g1";
 const NIGHT = "n1";
-const DUNE: Movie = { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: null, genres: [], runtimeMinutes: null };
+const DUNE: Movie = { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null };
 const SAVED: Night = {
   id: NIGHT,
   scheduledFor: "2026-06-26",

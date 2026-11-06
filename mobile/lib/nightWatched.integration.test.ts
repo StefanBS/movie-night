@@ -30,7 +30,7 @@ const PLANNED: Night = {
   scheduledFor: "2026-06-19",
   startTime: "20:00",
   pickerId: "blake",
-  movie: { tmdbId: 7, title: "Past Lives", releaseYear: 2023, posterUrl: null, genres: [], runtimeMinutes: 106 },
+  movie: { tmdbId: 7, title: "Past Lives", releaseYear: 2023, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: 106 },
   attendees: [
     { id: "blake", name: "blake" },
     { id: "cleo", name: "cleo" },

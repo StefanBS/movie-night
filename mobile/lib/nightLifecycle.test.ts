@@ -5,7 +5,7 @@ import { watchedNights, isDue, nightDates, nightMeta, nightTiming, nightWording,
 import type { Night } from "./nights";
 
 const TODAY = "2026-06-22";
-const aMovie = { tmdbId: 1, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg", genres: [], runtimeMinutes: null };
+const aMovie = { tmdbId: 1, title: "Dune", releaseYear: 2021, posterUrl: "https://img/x.jpg", posterThumbUrl: "https://img/x-thumb.jpg", genres: [], runtimeMinutes: null };
 
 function night(id: string, scheduledFor: string, opts: Partial<Night> = {}): Night {
   return {

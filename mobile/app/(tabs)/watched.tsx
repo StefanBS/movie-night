@@ -1,6 +1,7 @@
 import {
   ActivityIndicator,
   Pressable,
+  SectionList,
   Text,
   View,
 } from "react-native";
@@ -9,8 +10,8 @@ import { useRouter } from "expo-router";
 import {
   Poster,
   SectionLabel,
-  TabScrollView,
   TopBar,
+  useTabBarPadding,
 } from "../../components";
 import { useGroup } from "../../components/GroupProvider";
 import { useLoad } from "../../components/useLoad";
@@ -28,6 +29,7 @@ export default function WatchedScreen() {
   const styles = useStyles();
   const router = useRouter();
   const { group } = useGroup();
+  const tabBarPadding = useTabBarPadding();
   // Refetch on focus (useLoad's default): a night recorded on another tab must
   // show up when the user returns here, and the tab screen stays mounted. The
   // group (GroupProvider) only feeds the "N nights since …" sub; until it
@@ -85,45 +87,48 @@ export default function WatchedScreen() {
   return (
     <View style={styles.screen}>
       <TopBar kind="tab" title="Watched" sub={sub} subTabular />
-      <TabScrollView contentContainerStyle={styles.content}>
-        {sections.map((section) => (
-          <View key={section.label ?? "this-year"}>
-            {section.label !== null && (
-              <SectionLabel>{section.label}</SectionLabel>
-            )}
-            {section.nights.map((n, i) => {
-              const picker = nightPicker(n);
-              return (
-                <Pressable
-                  key={n.id}
-                  onPress={() => open(n.id)}
-                  style={({ pressed }) => [
-                    styles.row,
-                    i < section.nights.length - 1 && styles.divider,
-                    pressed && styles.rowPressed,
-                  ]}
-                >
-                  <Poster
-                    uri={n.movie?.posterUrl}
-                    title={n.movie?.title}
-                    w={46}
-                    h={69}
-                  />
-                  <View style={styles.rowText}>
-                    <Text style={styles.rowTitle} numberOfLines={2}>
-                      {n.movie ? n.movie.title : "Untitled night"}
-                    </Text>
-                    <Text style={styles.rowMeta} numberOfLines={1}>
-                      {`${firstName(picker.name)} · `}
-                      {formatShortDate(n.scheduledFor)}
-                    </Text>
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        ))}
-      </TabScrollView>
+      {/* A SectionList, not a ScrollView: the history grows by a row every
+          night, and only the rows near the screen mount and load posters. */}
+      <SectionList
+        sections={sections}
+        keyExtractor={(n) => n.id}
+        stickySectionHeadersEnabled={false}
+        contentContainerStyle={[styles.content, tabBarPadding]}
+        renderSectionHeader={({ section }) =>
+          section.label !== null ? (
+            <SectionLabel>{section.label}</SectionLabel>
+          ) : null
+        }
+        renderItem={({ item: n, index: i, section }) => {
+          const picker = nightPicker(n);
+          return (
+            <Pressable
+              onPress={() => open(n.id)}
+              style={({ pressed }) => [
+                styles.row,
+                i < section.data.length - 1 && styles.divider,
+                pressed && styles.rowPressed,
+              ]}
+            >
+              <Poster
+                uri={n.movie?.posterThumbUrl}
+                title={n.movie?.title}
+                w={46}
+                h={69}
+              />
+              <View style={styles.rowText}>
+                <Text style={styles.rowTitle} numberOfLines={2}>
+                  {n.movie ? n.movie.title : "Untitled night"}
+                </Text>
+                <Text style={styles.rowMeta} numberOfLines={1}>
+                  {`${firstName(picker.name)} · `}
+                  {formatShortDate(n.scheduledFor)}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        }}
+      />
     </View>
   );
 }
