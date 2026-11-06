@@ -10,7 +10,7 @@ import { addToCalendar } from "../../calendarExport";
 import { firstName } from "../../lib/avatar";
 import { calendarRecurrence, seriesNote, type CalendarRecurrence } from "../../lib/calendarEntry";
 import { formatShortDate, formatWeekdayDate } from "../../lib/date";
-import { isWatched, nightMeta, nightWording } from "../../lib/nightLifecycle";
+import { isWatched, nightLine, nightWording } from "../../lib/nightLifecycle";
 import { nightPicker, type Night } from "../../lib/nights";
 import { formatRepeatLabel } from "../../lib/repeat";
 import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, radius, space, tabular, textPresets, useColors } from "../../theme";
@@ -103,7 +103,7 @@ export function NightView({
             </View>
           )}
           <View style={styles.headText}>
-            <Text style={styles.meta}>{nightMeta(night.scheduledFor, night.startTime, today)}</Text>
+            <Text style={styles.meta}>{nightLine(night, { countdown: "relative", date: "short" }, today)}</Text>
             {movie !== null ? (
               <Text style={styles.filmTitle} numberOfLines={4}>
                 {movie.title}

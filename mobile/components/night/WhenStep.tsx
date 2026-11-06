@@ -6,13 +6,13 @@ import { StartTimeRow } from "./StartTimeRow";
 import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
 import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
-import { nightSummary } from "../../lib/date";
+import { nightLineParts } from "../../lib/nightLifecycle";
 import { createThemedStyles, fontFamily, radius, space, textPresets } from "../../theme";
 
 // WhenStep is the wizard's first step: the Calendar (opening on the chosen
 // date's month, with today ringed, so tonight is one tap away) and an optional
 // start time, with a sticky footer that sums up the choice in one line
-// ("Friday, Jun 19 · 8:00 PM · in 4 days", lib/date nightSummary). It owns its
+// ("Friday, Jun 19 · 8:00 PM · in 4 days", lib/nightLifecycle nightLineParts). It owns its
 // own selection/month — it reports the chosen date and start time on "Next".
 // `initial` and `initialStartTime` restore them when the user comes back.
 export function WhenStep({
@@ -34,7 +34,11 @@ export function WhenStep({
   const [selected, setSelected] = useState(initial);
   const [startTime, setStartTime] = useState(initialStartTime);
   const [month, setMonth] = useState<YearMonth>(() => yearMonthOf(initial));
-  const [summaryDate, ...summaryRest] = nightSummary(selected, startTime, today);
+  const [summaryDate, ...summaryRest] = nightLineParts(
+    { scheduledFor: selected, startTime },
+    { date: "long", countdown: "trail" },
+    today,
+  );
 
   return (
     <View style={styles.flex}>

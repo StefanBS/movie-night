@@ -4,10 +4,13 @@ import {
   formatShortDate,
   formatStartTime,
   formatWeekdayDate,
+  formatWeekdayDayMonth,
   relativeLabel,
   todayLocalISO,
 } from "./date";
 import type { Night } from "./nights";
+import { formatRepeatShort, type Repeat } from "./repeat";
+import { capitalize } from "./text";
 
 // The Night lifecycle: the one owner of a Night's state and the selectors
 // built on it (see GLOSSARY.md). Every Night has a picker (ADR-0008) and
@@ -140,22 +143,83 @@ export function nightWording(scheduledFor: string, today: string = todayLocalISO
   }
 }
 
-// nightMeta is the line above the film on the Night screen: the full date for
-// a past Night ("Saturday, Jun 20"), and for one still ahead how far off it is,
-// the date and the start time when set ("Tonight · Jun 23 · 8:00 PM").
+// NightLineParts picks what a Night's "when" line says. Every part is opt-in
+// but the start time, which shows whenever it is set.
+export type NightLineParts = {
+  // countdown says how far off the Night is: "label" leads with "tonight" /
+  // "in 3 days" while it is still ahead; "relative" leads with "Tonight" /
+  // "This Thursday", or for a past Night is the whole line, its full date (a
+  // record, never the time); "trail" ends the date and time with "in 4 days",
+  // only for a Night after today.
+  countdown?: "label" | "relative" | "trail";
+  // date is "long" ("Friday, Jun 19"), "short" ("Jun 19") or "compact"
+  // ("Fri 19 Jun"). Left out when the relative countdown already is the date.
+  date?: "long" | "short" | "compact";
+  // repeat adds a repeating Night's cadence ("Weekly").
+  repeat?: boolean;
+  // picker is the picker's first name, worded for the Night's timing
+  // ("Tomas picks"; just "Tomas" once past).
+  picker?: string;
+};
+
+export type NightWhen = { scheduledFor: string; startTime: string | null; repeat?: Repeat | null };
+
+// nightLineParts is a Night's "when" line as parts, in a fixed order: the
+// leading countdown, the date, the start time, the trailing countdown, the
+// repeat, the picker. For a caller that styles one part on its own.
 // `locale` reaches formatStartTime, for deterministic tests.
-export function nightMeta(
-  scheduledFor: string,
-  startTime: string | null,
+export function nightLineParts(
+  night: NightWhen,
+  parts: NightLineParts,
+  today: string = todayLocalISO(),
+  locale?: string,
+): string[] {
+  const { scheduledFor, startTime } = night;
+  const timing = nightTiming(scheduledFor, today);
+  if (parts.countdown === "relative" && timing === "past") {
+    return [formatWeekdayDate(scheduledFor)];
+  }
+  const out: string[] = [];
+  let dateShown = false;
+  if (parts.countdown === "label" && timing !== "past") {
+    out.push(countdownLabel(scheduledFor, today));
+  } else if (parts.countdown === "relative") {
+    const relative = relativeLabel(scheduledFor, today);
+    dateShown = relative === formatWeekdayDate(scheduledFor);
+    out.push(relative);
+  }
+  if (parts.date !== undefined && !dateShown) {
+    out.push(DATE_FORMATS[parts.date](scheduledFor));
+  }
+  if (startTime !== null) {
+    out.push(formatStartTime(startTime, locale));
+  }
+  if (parts.countdown === "trail" && timing === "upcoming") {
+    out.push(countdownLabel(scheduledFor, today));
+  }
+  if (parts.repeat === true && night.repeat != null) {
+    out.push(formatRepeatShort(night.repeat));
+  }
+  if (parts.picker !== undefined) {
+    out.push(nightWording(scheduledFor, today).pickerTitle(parts.picker));
+  }
+  return out;
+}
+
+const DATE_FORMATS = {
+  long: formatWeekdayDate,
+  short: formatShortDate,
+  compact: formatWeekdayDayMonth,
+} satisfies Record<NonNullable<NightLineParts["date"]>, (iso: string) => string>;
+
+// nightLine is the one formatter for a Night's "when" line: nightLineParts
+// joined with " · ", capitalized so a lowercase countdown can start it
+// ("In 3 days · Thursday, Jun 25 · 8:00 PM · Weekly").
+export function nightLine(
+  night: NightWhen,
+  parts: NightLineParts,
   today: string = todayLocalISO(),
   locale?: string,
 ): string {
-  if (nightTiming(scheduledFor, today) === "past") {
-    return formatWeekdayDate(scheduledFor);
-  }
-  const parts = [relativeLabel(scheduledFor, today), formatShortDate(scheduledFor)];
-  if (startTime !== null) {
-    parts.push(formatStartTime(startTime, locale));
-  }
-  return parts.join(" · ");
+  return capitalize(nightLineParts(night, parts, today, locale).join(" · "));
 }

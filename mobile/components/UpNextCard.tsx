@@ -4,12 +4,9 @@ import { AppButton } from "./AppButton";
 import { Avatar } from "./Avatar";
 import { Poster } from "./Poster";
 import { firstName } from "../lib/avatar";
-import { formatStartTime, formatWeekdayDate } from "../lib/date";
 import { movieDetails } from "../lib/movies";
-import { nightWording, upNextAction } from "../lib/nightLifecycle";
+import { nightLine, upNextAction } from "../lib/nightLifecycle";
 import { nightPicker, type Night } from "../lib/nights";
-import { formatRepeatShort } from "../lib/repeat";
-import { capitalize } from "../lib/text";
 import {
   borderWidth,
   createThemedStyles,
@@ -68,15 +65,7 @@ export function UpNextCard({
   const movie = night.movie;
   const details = movie !== null ? movieDetails(movie) : [];
   const picker = nightPicker(night);
-  const wording = nightWording(night.scheduledFor, today);
-  const when = [
-    wording.countdown,
-    formatWeekdayDate(night.scheduledFor),
-    night.startTime !== null ? formatStartTime(night.startTime) : null,
-    night.repeat !== null ? formatRepeatShort(night.repeat) : null,
-  ]
-    .filter((part) => part !== null)
-    .join(" · ");
+  const when = nightLine(night, { countdown: "label", date: "long", repeat: true }, today);
   const action = upNextAction(night, today);
   const primary =
     action === "chooseFilm"
@@ -95,7 +84,7 @@ export function UpNextCard({
         <View style={styles.whenRow}>
           <View style={styles.dot} />
           <Text style={styles.when} numberOfLines={2}>
-            {capitalize(when)}
+            {when}
           </Text>
         </View>
 
