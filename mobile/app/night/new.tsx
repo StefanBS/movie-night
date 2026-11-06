@@ -27,12 +27,11 @@ export default function NightScreen() {
   const styles = useStyles();
   const router = useRouter();
   // `from` names the screen that opened the flow; the When step's and the
-  // saved Night's back links return there. `without` is a member who can't
-  // make it (Tonight's "<name> can't make it"): the Plan starts without them.
-  const { from = "Tonight", without } = useLocalSearchParams<{ from?: string; without?: string }>();
+  // saved Night's back links return there.
+  const { from = "Tonight" } = useLocalSearchParams<{ from?: string }>();
   const [today] = useState(todayLocalISO);
   const [plan, state] = useSession(() =>
-    createNightPlan({ baseUrl: API_URL, groupId: GROUP_ID, today, without }),
+    createNightPlan({ baseUrl: API_URL, groupId: GROUP_ID, today }),
   );
   const [created, setCreated] = useState<Night | null>(null);
   // Who returns to When, on Android's back button too. Once the Night is

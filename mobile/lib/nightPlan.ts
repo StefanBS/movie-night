@@ -48,15 +48,10 @@ export function createNightPlan({
   baseUrl,
   groupId,
   today,
-  without = null,
 }: {
   baseUrl: string;
   groupId: string;
   today: string;
-  // without is the member who can't make it (Tonight's "<name> can't make
-  // it"): the Plan starts with the rest of the rotation coming, so the pick
-  // falls to whoever is next after them. They keep their place in the order.
-  without?: string | null;
 }): NightPlan {
   const core = createSessionCore<NightPlanState>({
     loading: true,
@@ -87,8 +82,7 @@ export function createNightPlan({
           ]),
         );
         core.set({ members, nightDates: nightDates(nights), loading: false });
-        const coming = without === null ? [] : ranking.map((m) => m.id).filter((id) => id !== without);
-        picking.reset(new Set(coming), ranking, null);
+        picking.reset(new Set(), ranking, null);
       } catch (e) {
         core.set({ error: errorMessage(e, "failed to load the club"), loading: false });
       }
