@@ -11,22 +11,13 @@ import {
   type Night,
 } from "./nights";
 import { startServer } from "./testServer";
+import { aMovie, aNight } from "./fixtures";
 
 const GROUP = "11111111-1111-1111-1111-111111111111";
 const NIGHT = "n1";
 const ADA = "a0000000-0000-0000-0000-000000000001";
 
-const night: Night = {
-  id: NIGHT,
-  scheduledFor: "2026-06-12",
-  startTime: null,
-  pickerId: ADA,
-  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-  watchedAt: null,
-  repeat: null,
-  movie: null,
-  attendees: [{ id: ADA, name: "Ada" }],
-};
+const night = aNight({ id: NIGHT, scheduledFor: "2026-06-12", pickerId: ADA, attendees: [{ id: ADA, name: "Ada" }] });
 
 const NEW_NIGHT = { scheduledFor: "2026-06-12", startTime: null, attendees: [ADA], pickerId: ADA };
 
@@ -154,17 +145,15 @@ test("changeNightPicker PATCHes the night as it is with the new picker", async (
 });
 
 test("attachMovie posts the tmdbId and parses the night with its movie", async () => {
+  const dune = aMovie({
+    posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg",
+    posterThumbUrl: "https://image.tmdb.org/t/p/w154/dune.jpg",
+    genres: ["Science Fiction", "Adventure"],
+    runtimeMinutes: 155,
+  });
   const withMovie: Night = {
     ...night,
-    movie: {
-      tmdbId: 438631,
-      title: "Dune",
-      releaseYear: 2021,
-      posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg",
-      posterThumbUrl: "https://image.tmdb.org/t/p/w154/dune.jpg",
-      genres: ["Science Fiction", "Adventure"],
-      runtimeMinutes: 155,
-    },
+    movie: dune,
   };
   let path = "";
   let method = "";
@@ -182,15 +171,7 @@ test("attachMovie posts the tmdbId and parses the night with its movie", async (
     assert.equal(method, "POST");
     assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/movie`);
     assert.deepEqual(JSON.parse(body), { tmdbId: 438631 });
-    assert.deepEqual(got.movie, {
-      tmdbId: 438631,
-      title: "Dune",
-      releaseYear: 2021,
-      posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg",
-      posterThumbUrl: "https://image.tmdb.org/t/p/w154/dune.jpg",
-      genres: ["Science Fiction", "Adventure"],
-      runtimeMinutes: 155,
-    });
+    assert.deepEqual(got.movie, dune);
   } finally {
     await server.close();
   }

@@ -3,19 +3,13 @@ import assert from "node:assert/strict";
 
 import { draftPicker, rankAmong } from "./nightDraft";
 import type { TurnMember } from "./turn";
-
-const member = (id: string): TurnMember => ({
-  id,
-  name: id,
-  servedCount: 0,
-  lastPickedOn: null,
-});
+import { aTurnMember } from "./fixtures";
 
 const cases: [string, TurnMember[], string[], string | null, string | null][] = [
-  ["follows the head of the order", [member("ada"), member("blake")], ["ada", "blake"], null, "ada"],
-  ["an explicit choice wins over the order", [member("ada"), member("blake")], ["ada", "blake"], "blake", "blake"],
-  ["a guest can be chosen", [member("ada")], ["ada", "frankie"], "frankie", "frankie"],
-  ["a chosen picker who left falls back to the order", [member("ada")], ["ada"], "blake", "ada"],
+  ["follows the head of the order", [aTurnMember("ada"), aTurnMember("blake")], ["ada", "blake"], null, "ada"],
+  ["an explicit choice wins over the order", [aTurnMember("ada"), aTurnMember("blake")], ["ada", "blake"], "blake", "blake"],
+  ["a guest can be chosen", [aTurnMember("ada")], ["ada", "frankie"], "frankie", "frankie"],
+  ["a chosen picker who left falls back to the order", [aTurnMember("ada")], ["ada"], "blake", "ada"],
   ["guest-only plan with no choice has no picker", [], ["frankie"], null, null],
 ];
 for (const [name, order, attending, chosen, want] of cases) {
@@ -29,12 +23,8 @@ for (const [name, order, attending, chosen, want] of cases) {
 // count, then last pick (never-picked first), then rotation position — never
 // looks at who is present. FULL is the backend's order for every core member;
 // each case's want is the order the backend gives the subset directly.
-const ranks = (id: string, servedCount: number, lastPickedOn: string | null): TurnMember => ({
-  id,
-  name: id,
-  servedCount,
-  lastPickedOn,
-});
+const ranks = (id: string, servedCount: number, lastPickedOn: string | null): TurnMember =>
+  aTurnMember(id, { servedCount, lastPickedOn });
 const FULL = [
   ranks("ada", 0, null),
   ranks("blake", 1, "2026-04-10"),

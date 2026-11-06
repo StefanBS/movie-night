@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { formatRuntime, formatYearRuntime, movieDetails, parseMovie, parseSearchResults, searchMovies, type Movie } from "./movies";
+import { aMovie } from "./fixtures";
 import { startServer } from "./testServer";
 
 test("parseMovie accepts a valid movie", () => {
@@ -107,7 +108,7 @@ test("formatRuntime", () => {
 });
 
 test("movieDetails tags each line with its kind", () => {
-  const movie: Movie = { tmdbId: 1, title: "In the Mood for Love", releaseYear: 2000, posterUrl: null, posterThumbUrl: null, genres: ["Drama"], runtimeMinutes: 98 };
+  const movie = aMovie({ title: "In the Mood for Love", releaseYear: 2000, genres: ["Drama"], runtimeMinutes: 98 });
   assert.deepEqual(
     movieDetails(movie).map((d) => d.kind),
     ["year", "genres", "runtime"],
@@ -115,7 +116,7 @@ test("movieDetails tags each line with its kind", () => {
 });
 
 test("movieDetails", () => {
-  const base: Movie = { tmdbId: 1, title: "In the Mood for Love", releaseYear: null, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null };
+  const base = aMovie({ title: "In the Mood for Love", releaseYear: null });
   const cases: { name: string; movie: Partial<Movie>; want: string[] }[] = [
     {
       name: "all three",
@@ -139,7 +140,7 @@ test("movieDetails", () => {
 });
 
 test("formatYearRuntime", () => {
-  const base: Movie = { tmdbId: 1, title: "Past Lives", releaseYear: null, posterUrl: null, posterThumbUrl: null, genres: ["Drama"], runtimeMinutes: null };
+  const base = aMovie({ title: "Past Lives", releaseYear: null, genres: ["Drama"] });
   const cases: { name: string; movie: Partial<Movie>; want: string }[] = [
     { name: "both", movie: { releaseYear: 2023, runtimeMinutes: 106 }, want: "2023 · 1h 46m" },
     { name: "year only", movie: { releaseYear: 2023 }, want: "2023" },

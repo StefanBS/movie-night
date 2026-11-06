@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { searchMovies } from "./movies";
-import { attachMovie, type Night } from "./nights";
+import { attachMovie } from "./nights";
+import { aMovie, aNight } from "./fixtures";
 import { startServer } from "./testServer";
 
 const GROUP = "11111111-1111-1111-1111-111111111111";
@@ -18,8 +19,8 @@ test("searchMovies fetches from the search path and parses the result array", as
     res.setHeader("content-type", "application/json");
     res.end(
       JSON.stringify([
-        { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null, watchedOn: "2026-05-02" },
-        { tmdbId: 693134, title: "Dune: Part Two", releaseYear: 2024, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null, watchedOn: null },
+        { ...aMovie(), watchedOn: "2026-05-02" },
+        { ...aMovie({ tmdbId: 693134, title: "Dune: Part Two", releaseYear: 2024 }), watchedOn: null },
       ]),
     );
   });
@@ -42,7 +43,7 @@ test("searchMovies handles a movie with null releaseYear", async () => {
   const server = await startServer((_req, res) => {
     res.statusCode = 200;
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify([{ tmdbId: 1, title: "Unknown", releaseYear: null, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null, watchedOn: null }]));
+    res.end(JSON.stringify([{ ...aMovie({ title: "Unknown", releaseYear: null }), watchedOn: null }]));
   });
   try {
     const got = await searchMovies(server.url, GROUP, NIGHT, "unknown");
@@ -53,25 +54,16 @@ test("searchMovies handles a movie with null releaseYear", async () => {
 });
 
 test("attachMovie posts the tmdbId and returns the night with its movie", async () => {
-  const nightWithMovie: Night = {
+  const dune = aMovie({
+    posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg",
+    posterThumbUrl: "https://image.tmdb.org/t/p/w154/dune.jpg",
+    genres: ["Science Fiction", "Adventure"],
+    runtimeMinutes: 155,
+  });
+  const nightWithMovie = aNight({
     id: NIGHT,
-    scheduledFor: "2026-06-12",
-    startTime: null,
-    pickerId: "u1",
-    reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-    watchedAt: null,
-    repeat: null,
-    movie: {
-      tmdbId: 438631,
-      title: "Dune",
-      releaseYear: 2021,
-      posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg",
-      posterThumbUrl: "https://image.tmdb.org/t/p/w154/dune.jpg",
-      genres: ["Science Fiction", "Adventure"],
-      runtimeMinutes: 155,
-    },
-    attendees: [{ id: "u1", name: "Ada" }],
-  };
+    movie: dune,
+  });
   let path = "";
   let method = "";
   let body = "";
@@ -88,15 +80,7 @@ test("attachMovie posts the tmdbId and returns the night with its movie", async 
     assert.equal(method, "POST");
     assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/movie`);
     assert.deepEqual(JSON.parse(body), { tmdbId: 438631 });
-    assert.deepEqual(got.movie, {
-      tmdbId: 438631,
-      title: "Dune",
-      releaseYear: 2021,
-      posterUrl: "https://image.tmdb.org/t/p/w342/dune.jpg",
-      posterThumbUrl: "https://image.tmdb.org/t/p/w154/dune.jpg",
-      genres: ["Science Fiction", "Adventure"],
-      runtimeMinutes: 155,
-    });
+    assert.deepEqual(got.movie, dune);
   } finally {
     await server.close();
   }

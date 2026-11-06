@@ -5,6 +5,7 @@ import http from "node:http";
 import { createIdentitySession, type NotificationAccess, type PushDevice, type TokenStorage } from "./identity";
 import type { Member } from "./members";
 import { type Handler, json, startServer } from "./testServer";
+import { aMember } from "./fixtures";
 
 // Integration tests: the Identity module against a real local HTTP server over
 // real fetch. A throwaway server stands in for the backend's identity routes,
@@ -12,13 +13,8 @@ import { type Handler, json, startServer } from "./testServer";
 
 const GROUP = "g1";
 
-const member = (id: string, status: "active" | "inactive" = "active", role: "core" | "guest" = "core"): Member => ({
-  id,
-  name: id,
-  role,
-  status,
-  joinedOn: "2026-01-01",
-});
+const member = (id: string, status: Member["status"] = "active", role: Member["role"] = "core"): Member =>
+  aMember(id, { status, role });
 
 // backend is a small fake of the identity routes plus the roster and join: it
 // issues sequential tokens and forgets them on release, and records push

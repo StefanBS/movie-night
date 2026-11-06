@@ -5,16 +5,17 @@ import { buildClubSections, clubSummary, memberPicks, memberProfile, memberSince
 import type { Member } from "./members";
 import type { Night } from "./nights";
 import type { TurnMember } from "./turn";
+import { aMember, aNight, aTurnMember } from "./fixtures";
 
 const members: Member[] = [
-  { id: "a", name: "Ada", role: "core", status: "active", joinedOn: "2024-01-01" },
-  { id: "b", name: "Bo", role: "core", status: "active", joinedOn: "2024-02-01" },
-  { id: "g", name: "Gus", role: "guest", status: "active", joinedOn: "2024-03-01" },
-  { id: "z", name: "Zed", role: "core", status: "inactive", joinedOn: "2023-01-01" },
+  aMember("a", { name: "Ada", joinedOn: "2024-01-01" }),
+  aMember("b", { name: "Bo", joinedOn: "2024-02-01" }),
+  aMember("g", { name: "Gus", role: "guest", joinedOn: "2024-03-01" }),
+  aMember("z", { name: "Zed", status: "inactive", joinedOn: "2023-01-01" }),
 ];
 const turn: TurnMember[] = [
-  { id: "a", name: "Ada", servedCount: 0, lastPickedOn: null },
-  { id: "b", name: "Bo", servedCount: 2, lastPickedOn: "2026-05-30" },
+  aTurnMember("a", { name: "Ada" }),
+  aTurnMember("b", { name: "Bo", servedCount: 2, lastPickedOn: "2026-05-30" }),
 ];
 
 test("buildClubSections splits into rotation, guests, inactive", () => {
@@ -82,17 +83,13 @@ for (const [name, member, want] of sinceCases) {
 const TODAY = "2026-06-22";
 // night is a Night recorded as watched unless `watched` is false.
 function night(id: string, scheduledFor: string, pickerId: string, watched = true): Night {
-  return {
+  return aNight({
     id,
     scheduledFor,
-    startTime: null,
     pickerId,
-    movie: null,
-    attendees: [],
-    reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
+    attendees: [{ id: pickerId, name: pickerId }],
     watchedAt: watched ? `${scheduledFor}T22:00:00Z` : null,
-    repeat: null,
-  };
+  });
 }
 const nights: Night[] = [
   night("old", "2026-05-01", "a"),

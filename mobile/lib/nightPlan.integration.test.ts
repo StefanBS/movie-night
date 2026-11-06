@@ -2,10 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { createNightPlan } from "./nightPlan";
-import type { Member } from "./members";
-import type { Night } from "./nights";
-import type { TurnMember } from "./turn";
 import { type Handler, json, startServer } from "./testServer";
+import { aMember, aNight, aTurnMember } from "./fixtures";
 
 // Integration tests: the Plan module against a real local HTTP server over real
 // fetch. No mocks — a throwaway server stands in for the backend, and the test
@@ -14,27 +12,8 @@ import { type Handler, json, startServer } from "./testServer";
 const GROUP = "g1";
 const TODAY = "2026-06-22";
 
-const member = (id: string, role: "core" | "guest" = "core"): Member => ({
-  id,
-  name: id,
-  role,
-  status: "active",
-  joinedOn: "2026-01-01",
-});
-const ranked = (id: string): TurnMember => ({ id, name: id, servedCount: 0, lastPickedOn: null });
-
-const ROSTER = [member("ada"), member("blake"), member("frankie", "guest")];
-const EXISTING: Night = {
-  id: "n0",
-  scheduledFor: "2026-06-19",
-  startTime: null,
-  pickerId: "ada",
-  movie: null,
-  attendees: [{ id: "ada", name: "Ada" }],
-  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-  watchedAt: null,
-  repeat: null,
-};
+const ROSTER = [aMember("ada"), aMember("blake"), aMember("frankie", { role: "guest" })];
+const EXISTING = aNight({ id: "n0", scheduledFor: "2026-06-19" });
 
 // backend is a small fake of the routes a Plan touches. The turn ranking is
 // every core member in roster order.
@@ -50,21 +29,16 @@ function backend(over: Partial<Record<string, Handler>> = {}): Handler {
     if (key === `GET /groups/${GROUP}/members`) return json(res, 200, ROSTER);
     if (key === `GET /groups/${GROUP}/nights`) return json(res, 200, [EXISTING]);
     if (key === `GET /groups/${GROUP}/turn`) {
-      return json(res, 200, ROSTER.filter((m) => m.role === "core").map((m) => ranked(m.id)));
+      return json(res, 200, ROSTER.filter((m) => m.role === "core").map((m) => aTurnMember(m.id)));
     }
     if (key === `POST /groups/${GROUP}/nights`) {
       const req = JSON.parse(body) as { scheduledFor: string; startTime: string | null; attendees: string[]; pickerId: string };
-      const night: Night = {
-        id: "n1",
+      const night = aNight({
         scheduledFor: req.scheduledFor,
         startTime: req.startTime,
         pickerId: req.pickerId,
-        reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-        watchedAt: null,
-        repeat: null,
-        movie: null,
         attendees: req.attendees.map((id) => ({ id, name: id })),
-      };
+      });
       return json(res, 201, night);
     }
     json(res, 404, { error: `no route ${key}` });

@@ -3,23 +3,17 @@ import assert from "node:assert/strict";
 
 import type { Night } from "./nights";
 import { alsoPlannedPicks } from "./alsoPlanned";
+import { aNight } from "./fixtures";
 
 function night(opts: Partial<Night> = {}): Night {
-  return {
-    id: "n",
-    scheduledFor: "2026-06-27",
-    startTime: null,
+  return aNight({
     pickerId: "p",
-    movie: null,
     attendees: [
       { id: "a", name: "Ada Lovelace" },
       { id: "p", name: "Priya Raman" },
     ],
-    reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-    watchedAt: null,
-    repeat: null,
     ...opts,
-  };
+  });
 }
 
 const picksCases: [string, Night, string][] = [

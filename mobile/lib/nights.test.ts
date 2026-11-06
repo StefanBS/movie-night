@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { nightPicker, parseNight, parseNights, type Night } from "./nights";
+import { nightPicker, parseNight, parseNights } from "./nights";
+import { aNight } from "./fixtures";
 
 const reminders = { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" };
 
@@ -125,20 +126,13 @@ test("parseNights rejects a malformed element", () => {
 
 // nightPicker
 
-const pickerNight: Night = {
-  id: "n",
-  scheduledFor: "2026-06-27",
-  startTime: null,
+const pickerNight = aNight({
   pickerId: "p",
-  movie: null,
   attendees: [
     { id: "a", name: "Ada Lovelace" },
     { id: "p", name: "Priya Raman" },
   ],
-  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-  watchedAt: null,
-  repeat: null,
-};
+});
 
 test("nightPicker: found among the attendees", () => {
   assert.equal(nightPicker(pickerNight).name, "Priya Raman");

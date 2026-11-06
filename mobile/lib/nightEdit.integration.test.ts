@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 
 import { createNightEdit } from "./nightEdit";
 import type { Member } from "./members";
-import type { Night } from "./nights";
 import type { Reminders } from "./reminders";
 import type { Repeat } from "./repeat";
 import { type Handler, json, startServer } from "./testServer";
+import { aMember, aNight } from "./fixtures";
 
 // Integration tests: the Edit screen's session against a real local HTTP
 // server over real fetch. No mocks — the test drives the session only through
@@ -16,24 +16,17 @@ const GROUP = "g1";
 const NIGHT = "n1";
 const PATH = `/groups/${GROUP}/nights/${NIGHT}`;
 const MEMBERS: Member[] = [
-  { id: "ada", name: "Ada", role: "core", status: "active", joinedOn: "2026-01-01" },
-  { id: "blake", name: "Blake", role: "core", status: "active", joinedOn: "2026-01-01" },
-  { id: "frankie", name: "Frankie", role: "guest", status: "active", joinedOn: "2026-01-01" },
+  aMember("ada", { name: "Ada" }),
+  aMember("blake", { name: "Blake" }),
+  aMember("frankie", { name: "Frankie", role: "guest" }),
 ];
-const SAVED: Night = {
+const SAVED = aNight({
   id: NIGHT,
-  scheduledFor: "2026-06-26",
-  startTime: null,
-  pickerId: "ada",
-  reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-  watchedAt: null,
-  repeat: null,
-  movie: null,
   attendees: [
     { id: "ada", name: "Ada" },
     { id: "frankie", name: "Frankie" },
   ],
-};
+});
 
 type Edit = { scheduledFor: string; startTime: string | null; attendees: string[]; reminders: Reminders; repeat: Repeat | null };
 

@@ -4,28 +4,18 @@ import assert from "node:assert/strict";
 import type { Night } from "./nights";
 import { tonightLineup, type TonightLineup } from "./tonight";
 import type { TurnMember } from "./turn";
+import { aNight, aTurnMember } from "./fixtures";
 
 const TODAY = "2026-06-22";
 const WATCHED = { watchedAt: "2026-06-20T22:00:00Z" };
 
+// night is a Night Cleo picks.
 function night(id: string, scheduledFor: string, opts: Partial<Night> = {}): Night {
-  return {
-    id,
-    scheduledFor,
-    startTime: null,
-    pickerId: "Cleo",
-    movie: null,
-    attendees: [],
-    reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-    watchedAt: null,
-    repeat: null,
-    ...opts,
-  };
+  return aNight({ id, scheduledFor, pickerId: "Cleo", attendees: [{ id: "Cleo", name: "Cleo" }], ...opts });
 }
 
 // A ranking by name; ids are the names so cases read as the screen does.
-const rank = (...names: string[]): TurnMember[] =>
-  names.map((name) => ({ id: name, name, servedCount: 0, lastPickedOn: null }));
+const rank = (...names: string[]): TurnMember[] => names.map((name) => aTurnMember(name));
 
 const CLUB = rank("Blake", "Ada", "Dev", "Esme", "Cleo");
 

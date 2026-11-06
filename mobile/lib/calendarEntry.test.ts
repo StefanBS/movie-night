@@ -5,32 +5,28 @@ import { calendarEntry, calendarRecurrence, seriesNote, type CalendarRecurrence 
 import type { Movie } from "./movies";
 import type { Night } from "./nights";
 import type { Repeat } from "./repeat";
+import { aMovie, aNight } from "./fixtures";
 
 const ID = "11111111-2222-3333-4444-555555555555";
 
 function night(opts: Partial<Night> = {}): Night {
-  return {
+  return aNight({
     id: ID,
     scheduledFor: "2026-11-06",
-    startTime: null,
     pickerId: "b",
-    movie: null,
     attendees: [
       { id: "a", name: "Alex Moreno" },
       { id: "b", name: "Bea Lind" },
       { id: "g", name: "Gus" },
     ],
-    reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-    watchedAt: null,
-    repeat: null,
     ...opts,
-  };
+  });
 }
 
 const WEEKLY: Repeat = { freq: "weekly", intervalWeeks: 1 };
 const SERIES_NOTES = (cadence: string) => `${cadence}. Open Movie Night for who's picking, who's coming and the film.`;
 
-const movie = (releaseYear: number | null): Movie => ({ tmdbId: 949, title: "Heat", releaseYear, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null });
+const movie = (releaseYear: number | null): Movie => aMovie({ tmdbId: 949, title: "Heat", releaseYear });
 
 test("calendarEntry titles the entry after the club, never the picker", () => {
   const cases: { name: string; groupName: string | null; want: string }[] = [

@@ -3,20 +3,16 @@ import assert from "node:assert/strict";
 
 import { buildHistory, watchedSub } from "./history";
 import type { Night } from "./nights";
+import { aMovie, aNight } from "./fixtures";
 
 // night is a Night recorded as watched.
 function night(id: string, scheduledFor: string): Night {
-  return {
+  return aNight({
     id,
     scheduledFor,
-    startTime: null,
-    pickerId: "u1",
-    reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-    movie: { tmdbId: 1, title: "Film", releaseYear: null, posterUrl: null, posterThumbUrl: null, genres: [], runtimeMinutes: null },
-    attendees: [],
+    movie: aMovie(),
     watchedAt: `${scheduledFor}T22:00:00Z`,
-    repeat: null,
-  };
+  });
 }
 
 const historyCases: [string, string[], [string | null, string[]][]][] = [
