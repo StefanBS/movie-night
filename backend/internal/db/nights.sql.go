@@ -13,24 +13,24 @@ import (
 )
 
 const addAttendees = `-- name: AddAttendees :exec
-INSERT INTO attendances (pick_id, user_id)
+INSERT INTO attendances (night_id, user_id)
 SELECT $1, unnest($2::uuid[])
-ON CONFLICT (pick_id, user_id) DO NOTHING
+ON CONFLICT (night_id, user_id) DO NOTHING
 `
 
 type AddAttendeesParams struct {
-	PickID  uuid.UUID   `json:"pick_id"`
+	NightID uuid.UUID   `json:"night_id"`
 	UserIds []uuid.UUID `json:"user_ids"`
 }
 
 // Adds each user who isn't attending yet; existing attendances are left as-is.
 func (q *Queries) AddAttendees(ctx context.Context, arg AddAttendeesParams) error {
-	_, err := q.db.Exec(ctx, addAttendees, arg.PickID, arg.UserIds)
+	_, err := q.db.Exec(ctx, addAttendees, arg.NightID, arg.UserIds)
 	return err
 }
 
 const clearNightRepeat = `-- name: ClearNightRepeat :exec
-UPDATE picks
+UPDATE nights
 SET repeat_freq = NULL, repeat_interval_weeks = NULL, repeat_week_of_month = NULL
 WHERE id = $1 AND group_id = $2
 `
@@ -47,18 +47,18 @@ func (q *Queries) ClearNightRepeat(ctx context.Context, arg ClearNightRepeatPara
 
 const createNextInSeries = `-- name: CreateNextInSeries :one
 WITH night AS (
-  INSERT INTO picks (group_id, scheduled_for, start_time, picker_id, is_credited,
+  INSERT INTO nights (group_id, scheduled_for, start_time, picker_id, is_credited,
                      remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience,
                      repeat_freq, repeat_interval_weeks, repeat_week_of_month)
   SELECT src.group_id, $1, src.start_time, $2, $3,
          src.remind_night_before, src.remind_morning_of, src.remind_two_hours_before, src.remind_audience,
          src.repeat_freq, src.repeat_interval_weeks, src.repeat_week_of_month
-  FROM picks AS src
+  FROM nights AS src
   WHERE src.id = $4 AND src.group_id = $5
   RETURNING id
 ), attended AS (
-  INSERT INTO attendances (pick_id, user_id)
-  SELECT night.id, a.user_id FROM night, attendances a WHERE a.pick_id = $4
+  INSERT INTO attendances (night_id, user_id)
+  SELECT night.id, a.user_id FROM night, attendances a WHERE a.night_id = $4
 )
 SELECT id FROM night
 `
@@ -90,13 +90,13 @@ func (q *Queries) CreateNextInSeries(ctx context.Context, arg CreateNextInSeries
 const createNight = `-- name: CreateNight :one
 
 WITH night AS (
-  INSERT INTO picks (group_id, scheduled_for, start_time, picker_id, is_credited,
+  INSERT INTO nights (group_id, scheduled_for, start_time, picker_id, is_credited,
                      repeat_freq, repeat_interval_weeks, repeat_week_of_month)
   VALUES ($1, $2, $3, $4, $5,
           $6, $7, $8)
   RETURNING id
 ), attended AS (
-  INSERT INTO attendances (pick_id, user_id)
+  INSERT INTO attendances (night_id, user_id)
   SELECT night.id, unnest($9::uuid[]) FROM night
 )
 SELECT id FROM night
@@ -114,8 +114,8 @@ type CreateNightParams struct {
 	Attendees           []uuid.UUID    `json:"attendees"`
 }
 
-// Night writes change picks/attendances and return at most the Night's id; the
-// response is read back through the nights view (GetNight), the one definition
+// Night writes change nights/attendances and return at most the Night's id; the
+// response is read back through the full_nights view (GetNight), the one definition
 // of a full Night.
 // Inserts the night and its attendees in one statement, so a night never exists
 // without the attendees its picker is drawn from. Attendees must be deduped.
@@ -137,7 +137,7 @@ func (q *Queries) CreateNight(ctx context.Context, arg CreateNightParams) (uuid.
 }
 
 const deleteNight = `-- name: DeleteNight :exec
-DELETE FROM picks
+DELETE FROM nights
 WHERE id = $1 AND group_id = $2
 `
 
@@ -152,7 +152,7 @@ func (q *Queries) DeleteNight(ctx context.Context, arg DeleteNightParams) error 
 }
 
 const getNight = `-- name: GetNight :one
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes, watched_at, repeat_freq, repeat_interval_weeks, repeat_week_of_month FROM nights
+SELECT id, group_id, scheduled_for, start_time, picker_id, is_credited, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, watched_at, repeat_freq, repeat_interval_weeks, repeat_week_of_month, created_at, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes FROM full_nights
 WHERE id = $1 AND group_id = $2
 `
 
@@ -161,41 +161,41 @@ type GetNightParams struct {
 	GroupID uuid.UUID `json:"group_id"`
 }
 
-func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (Night, error) {
+func (q *Queries) GetNight(ctx context.Context, arg GetNightParams) (FullNight, error) {
 	row := q.db.QueryRow(ctx, getNight, arg.NightID, arg.GroupID)
-	var i Night
+	var i FullNight
 	err := row.Scan(
 		&i.ID,
 		&i.GroupID,
+		&i.ScheduledFor,
+		&i.StartTime,
 		&i.PickerID,
 		&i.IsCredited,
-		&i.ScheduledFor,
-		&i.CreatedAt,
-		&i.StartTime,
 		&i.RemindNightBefore,
 		&i.RemindMorningOf,
 		&i.RemindTwoHoursBefore,
 		&i.RemindAudience,
+		&i.WatchedAt,
+		&i.RepeatFreq,
+		&i.RepeatIntervalWeeks,
+		&i.RepeatWeekOfMonth,
+		&i.CreatedAt,
 		&i.MovieTmdbID,
 		&i.MovieTitle,
 		&i.MovieReleaseYear,
 		&i.MoviePosterPath,
 		&i.MovieGenres,
 		&i.MovieRuntimeMinutes,
-		&i.WatchedAt,
-		&i.RepeatFreq,
-		&i.RepeatIntervalWeeks,
-		&i.RepeatWeekOfMonth,
 	)
 	return i, err
 }
 
 const joinSeries = `-- name: JoinSeries :exec
-UPDATE picks AS t
+UPDATE nights AS t
 SET repeat_freq           = s.repeat_freq,
     repeat_interval_weeks = s.repeat_interval_weeks,
     repeat_week_of_month  = s.repeat_week_of_month
-FROM picks AS s
+FROM nights AS s
 WHERE t.id = $1 AND t.group_id = $2
   AND s.id = $3 AND s.group_id = $2
   AND t.repeat_freq IS NULL
@@ -219,7 +219,7 @@ SELECT u.id, u.name, m.role
 FROM attendances a
 JOIN users u ON u.id = a.user_id
 JOIN memberships m ON m.user_id = a.user_id AND m.group_id = $1
-WHERE a.pick_id = $2
+WHERE a.night_id = $2
 ORDER BY
   CASE WHEN m.role = 'core' THEN 0 ELSE 1 END,
   u.name
@@ -257,42 +257,42 @@ func (q *Queries) ListNightAttendees(ctx context.Context, arg ListNightAttendees
 }
 
 const listNights = `-- name: ListNights :many
-SELECT id, group_id, picker_id, is_credited, scheduled_for, created_at, start_time, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes, watched_at, repeat_freq, repeat_interval_weeks, repeat_week_of_month FROM nights
+SELECT id, group_id, scheduled_for, start_time, picker_id, is_credited, remind_night_before, remind_morning_of, remind_two_hours_before, remind_audience, watched_at, repeat_freq, repeat_interval_weeks, repeat_week_of_month, created_at, movie_tmdb_id, movie_title, movie_release_year, movie_poster_path, movie_genres, movie_runtime_minutes FROM full_nights
 WHERE group_id = $1
 ORDER BY scheduled_for DESC
 `
 
-func (q *Queries) ListNights(ctx context.Context, groupID uuid.UUID) ([]Night, error) {
+func (q *Queries) ListNights(ctx context.Context, groupID uuid.UUID) ([]FullNight, error) {
 	rows, err := q.db.Query(ctx, listNights, groupID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Night
+	var items []FullNight
 	for rows.Next() {
-		var i Night
+		var i FullNight
 		if err := rows.Scan(
 			&i.ID,
 			&i.GroupID,
+			&i.ScheduledFor,
+			&i.StartTime,
 			&i.PickerID,
 			&i.IsCredited,
-			&i.ScheduledFor,
-			&i.CreatedAt,
-			&i.StartTime,
 			&i.RemindNightBefore,
 			&i.RemindMorningOf,
 			&i.RemindTwoHoursBefore,
 			&i.RemindAudience,
+			&i.WatchedAt,
+			&i.RepeatFreq,
+			&i.RepeatIntervalWeeks,
+			&i.RepeatWeekOfMonth,
+			&i.CreatedAt,
 			&i.MovieTmdbID,
 			&i.MovieTitle,
 			&i.MovieReleaseYear,
 			&i.MoviePosterPath,
 			&i.MovieGenres,
 			&i.MovieRuntimeMinutes,
-			&i.WatchedAt,
-			&i.RepeatFreq,
-			&i.RepeatIntervalWeeks,
-			&i.RepeatWeekOfMonth,
 		); err != nil {
 			return nil, err
 		}
@@ -305,11 +305,11 @@ func (q *Queries) ListNights(ctx context.Context, groupID uuid.UUID) ([]Night, e
 }
 
 const listNightsAttendees = `-- name: ListNightsAttendees :many
-SELECT a.pick_id, u.id, u.name, m.role
+SELECT a.night_id, u.id, u.name, m.role
 FROM attendances a
 JOIN users u ON u.id = a.user_id
 JOIN memberships m ON m.user_id = a.user_id AND m.group_id = $1
-WHERE a.pick_id = ANY($2::uuid[])
+WHERE a.night_id = ANY($2::uuid[])
 ORDER BY
   CASE WHEN m.role = 'core' THEN 0 ELSE 1 END,
   u.name
@@ -321,10 +321,10 @@ type ListNightsAttendeesParams struct {
 }
 
 type ListNightsAttendeesRow struct {
-	PickID uuid.UUID      `json:"pick_id"`
-	ID     uuid.UUID      `json:"id"`
-	Name   string         `json:"name"`
-	Role   MembershipRole `json:"role"`
+	NightID uuid.UUID      `json:"night_id"`
+	ID      uuid.UUID      `json:"id"`
+	Name    string         `json:"name"`
+	Role    MembershipRole `json:"role"`
 }
 
 func (q *Queries) ListNightsAttendees(ctx context.Context, arg ListNightsAttendeesParams) ([]ListNightsAttendeesRow, error) {
@@ -337,7 +337,7 @@ func (q *Queries) ListNightsAttendees(ctx context.Context, arg ListNightsAttende
 	for rows.Next() {
 		var i ListNightsAttendeesRow
 		if err := rows.Scan(
-			&i.PickID,
+			&i.NightID,
 			&i.ID,
 			&i.Name,
 			&i.Role,
@@ -357,7 +357,7 @@ SELECT picker_id,
        (movie_id IS NOT NULL)::boolean AS has_movie,
        (watched_at IS NOT NULL)::boolean AS is_watched,
        scheduled_for, repeat_freq, repeat_interval_weeks, repeat_week_of_month
-FROM picks
+FROM nights
 WHERE id = $1 AND group_id = $2
 FOR UPDATE
 `
@@ -397,7 +397,7 @@ func (q *Queries) LockNight(ctx context.Context, arg LockNightParams) (LockNight
 }
 
 const lockNightOnDate = `-- name: LockNightOnDate :one
-SELECT id, (watched_at IS NOT NULL)::boolean AS is_watched FROM picks
+SELECT id, (watched_at IS NOT NULL)::boolean AS is_watched FROM nights
 WHERE group_id = $1 AND scheduled_for = $2
 FOR UPDATE
 `
@@ -422,7 +422,7 @@ func (q *Queries) LockNightOnDate(ctx context.Context, arg LockNightOnDateParams
 }
 
 const recordNightWatched = `-- name: RecordNightWatched :exec
-UPDATE picks
+UPDATE nights
 SET watched_at = COALESCE(watched_at, now())
 WHERE id = $1 AND group_id = $2
 `
@@ -441,21 +441,21 @@ func (q *Queries) RecordNightWatched(ctx context.Context, arg RecordNightWatched
 
 const removeAttendeesNotIn = `-- name: RemoveAttendeesNotIn :exec
 DELETE FROM attendances
-WHERE pick_id = $1 AND NOT (user_id = ANY($2::uuid[]))
+WHERE night_id = $1 AND NOT (user_id = ANY($2::uuid[]))
 `
 
 type RemoveAttendeesNotInParams struct {
-	PickID uuid.UUID   `json:"pick_id"`
-	Keep   []uuid.UUID `json:"keep"`
+	NightID uuid.UUID   `json:"night_id"`
+	Keep    []uuid.UUID `json:"keep"`
 }
 
 func (q *Queries) RemoveAttendeesNotIn(ctx context.Context, arg RemoveAttendeesNotInParams) error {
-	_, err := q.db.Exec(ctx, removeAttendeesNotIn, arg.PickID, arg.Keep)
+	_, err := q.db.Exec(ctx, removeAttendeesNotIn, arg.NightID, arg.Keep)
 	return err
 }
 
 const setNightPicker = `-- name: SetNightPicker :exec
-UPDATE picks
+UPDATE nights
 SET picker_id = $1, is_credited = $2
 WHERE id = $3 AND group_id = $4
 `
@@ -478,7 +478,7 @@ func (q *Queries) SetNightPicker(ctx context.Context, arg SetNightPickerParams) 
 }
 
 const updateNight = `-- name: UpdateNight :exec
-UPDATE picks
+UPDATE nights
 SET scheduled_for           = $1,
     start_time              = $2,
     remind_night_before     = $3,

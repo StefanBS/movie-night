@@ -453,9 +453,9 @@ func TestGroupAttendees(t *testing.T) {
 	ada := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
 	blake := uuid.MustParse("a0000000-0000-0000-0000-000000000002")
 	rows := []db.ListNightsAttendeesRow{
-		{PickID: n1, ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
-		{PickID: n1, ID: blake, Name: "Blake", Role: db.MembershipRoleCore},
-		{PickID: n2, ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
+		{NightID: n1, ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
+		{NightID: n1, ID: blake, Name: "Blake", Role: db.MembershipRoleCore},
+		{NightID: n2, ID: ada, Name: "Ada", Role: db.MembershipRoleCore},
 	}
 	got := groupAttendees(rows)
 	if len(got[n1]) != 2 || len(got[n2]) != 1 {

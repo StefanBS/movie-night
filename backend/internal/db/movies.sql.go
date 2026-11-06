@@ -13,7 +13,7 @@ import (
 )
 
 const clearNightMovie = `-- name: ClearNightMovie :one
-UPDATE picks
+UPDATE nights
 SET movie_id = NULL
 WHERE id = $1 AND group_id = $2
 RETURNING id
@@ -33,7 +33,7 @@ func (q *Queries) ClearNightMovie(ctx context.Context, arg ClearNightMovieParams
 }
 
 const setNightMovie = `-- name: SetNightMovie :exec
-UPDATE picks
+UPDATE nights
 SET movie_id = $1
 WHERE id = $2 AND group_id = $3
 `
@@ -56,7 +56,7 @@ VALUES ($1, $2, $3, $4,
 ON CONFLICT (tmdb_id) DO UPDATE
     SET title = excluded.title, release_year = excluded.release_year,
         poster_path = excluded.poster_path, genres = excluded.genres,
-        runtime_minutes = excluded.runtime_minutes, cached_at = now()
+        runtime_minutes = excluded.runtime_minutes
 RETURNING id
 `
 

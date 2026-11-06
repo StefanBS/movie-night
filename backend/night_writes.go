@@ -97,10 +97,10 @@ func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit 
 	if locked.IsWatched && edit.Repeat != nil {
 		return errWatchedRepeats
 	}
-	if err := q.RemoveAttendeesNotIn(ctx, db.RemoveAttendeesNotInParams{PickID: nightID, Keep: edit.Attendees}); err != nil {
+	if err := q.RemoveAttendeesNotIn(ctx, db.RemoveAttendeesNotInParams{NightID: nightID, Keep: edit.Attendees}); err != nil {
 		return err
 	}
-	if err := q.AddAttendees(ctx, db.AddAttendeesParams{PickID: nightID, UserIds: edit.Attendees}); err != nil {
+	if err := q.AddAttendees(ctx, db.AddAttendeesParams{NightID: nightID, UserIds: edit.Attendees}); err != nil {
 		return err
 	}
 	if edit.Picker.Valid {

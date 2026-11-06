@@ -53,9 +53,8 @@ Enum repeat_freq {
 // ---------------------------------------------------------------------------
 
 Table users {
-  id              uuid         [pk, default: `gen_random_uuid()`]
+  id              uuid         [pk, default: `uuidv7()`]
   name            varchar      [not null]
-  letterboxd_user varchar      [null, note: 'Optional handle; watchlists seeded via CSV import (ADR-0003)']
   created_at      timestamptz  [not null, default: `now()`]
   reminders_muted boolean      [not null, default: false, note: 'Mutes every reminder and nudge to this person (ADR-0010)']
 
@@ -63,11 +62,10 @@ Table users {
 }
 
 Table devices {
-  id           uuid         [pk, default: `gen_random_uuid()`]
+  id           uuid         [pk, default: `uuidv7()`]
   user_id      uuid         [not null]
   token_hash   bytea        [not null, unique, note: 'SHA-256 of the bearer token; the raw token lives only on the device']
   created_at   timestamptz  [not null, default: `now()`]
-  last_seen_at timestamptz  [not null, default: `now()`]
   push_token   text         [null, note: 'Expo push token; at most one device holds a given token (ADR-0010)']
   time_zone    text         [null, note: 'IANA zone the device reported; reminder slots are wall-clock times there']
 
@@ -75,7 +73,7 @@ Table devices {
 }
 
 Table groups {
-  id         uuid         [pk, default: `gen_random_uuid()`]
+  id         uuid         [pk, default: `uuidv7()`]
   name       varchar      [not null]
   created_at timestamptz  [not null, default: `now()`]
 
@@ -83,7 +81,7 @@ Table groups {
 }
 
 Table memberships {
-  id                uuid               [pk, default: `gen_random_uuid()`]
+  id                uuid               [pk, default: `uuidv7()`]
   group_id          uuid               [not null]
   user_id           uuid               [not null]
   role              membership_role    [not null, default: 'core']
@@ -106,20 +104,19 @@ Table memberships {
 // ---------------------------------------------------------------------------
 
 Table movies {
-  id           uuid         [pk, default: `gen_random_uuid()`]
+  id           uuid         [pk, default: `uuidv7()`]
   tmdb_id      integer      [not null, unique, note: 'Canonical id from TMDB (ADR-0002)']
   title        varchar      [not null]
   release_year integer      [null]
   poster_path  varchar      [null, note: 'Raw TMDB poster path; full image URL built at render time']
-  genres       "text[]"     [not null, default: `'{}'`, note: 'TMDB genre names in TMDB order; {} when none or cached before 0014']
+  genres       "text[]"     [not null, default: `'{}'`, note: 'TMDB genre names in TMDB order; {} when TMDB has none']
   runtime_minutes integer   [null, note: 'Running time in minutes; NULL when unknown (TMDB 0 or missing)']
-  cached_at    timestamptz  [not null, default: `now()`, note: 'Metadata cached from TMDB; refresh as needed']
 
   Note: 'Movie metadata cached from TMDB.'
 }
 
-Table picks {
-  id            uuid         [pk, default: `gen_random_uuid()`]
+Table nights {
+  id            uuid         [pk, default: `uuidv7()`]
   group_id      uuid         [not null]
   picker_id     uuid         [not null, note: 'The attendee who chose. Every night has one (ADR-0008); a free/guest pick is just uncredited']
   movie_id      uuid         [null, note: 'Attached after planning; NULL on a planned night with no movie yet (set via POST .../nights/{id}/movie)']
@@ -138,19 +135,19 @@ Table picks {
 
   Indexes {
     (group_id, scheduled_for) [unique, name: 'uq_night_per_group_date', note: 'At most one night per group per date']
-    (picker_id, is_credited)  [name: 'ix_pick_picker_credited', note: 'Drives the least-served count']
+    (picker_id, is_credited)  [name: 'ix_night_picker_credited', note: 'Drives the least-served count']
   }
 
-  Note: 'One movie night, created with its picker. Whose turn is NEXT is derived from credited picks + attendance, not stored. Reads go through the `nights` view (picks + its movie); writes go to picks.'
+  Note: 'One movie night, created with its picker. Whose turn is NEXT is derived from credited picks + attendance, not stored. Reads go through the `full_nights` view (nights + its movie); writes go to nights.'
 }
 
 Table attendances {
-  id      uuid [pk, default: `gen_random_uuid()`]
-  pick_id uuid [not null]
-  user_id uuid [not null]
+  id      uuid [pk, default: `uuidv7()`]
+  night_id uuid [not null]
+  user_id  uuid [not null]
 
   Indexes {
-    (pick_id, user_id) [unique, name: 'uq_attendance_pick_user']
+    (night_id, user_id) [unique, name: 'uq_attendance_night_user']
   }
 
   Note: 'Who was present on a given night. Feeds the "present tonight" set for the rotation (ADR-0004/0005).'
@@ -174,22 +171,22 @@ Table reminders_sent {
 // ---------------------------------------------------------------------------
 
 Table reviews {
-  id         uuid         [pk, default: `gen_random_uuid()`]
-  pick_id    uuid         [not null]
+  id         uuid         [pk, default: `uuidv7()`]
+  night_id   uuid         [not null]
   user_id    uuid         [not null]
   rating     decimal(2,1) [null, note: 'e.g. 0.5–5.0 in Letterboxd style; NULL = noted but unrated']
   body       text         [null]
   created_at timestamptz  [not null, default: `now()`]
 
   Indexes {
-    (pick_id, user_id) [unique, name: 'uq_review_pick_user', note: 'One review per person per night; reviews hang off the night, not just the movie (ADR-0004 data-model)']
+    (night_id, user_id) [unique, name: 'uq_review_night_user', note: 'One review per person per night; reviews hang off the night, not just the movie (ADR-0004 data-model)']
   }
 
   Note: 'A person rating/notes for a given night, enabling per-picker analytics later.'
 }
 
 Table watchlist_items {
-  id       uuid        [pk, default: `gen_random_uuid()`]
+  id       uuid        [pk, default: `uuidv7()`]
   user_id  uuid        [not null]
   movie_id uuid        [not null]
   added_at timestamptz [not null, default: `now()`]
@@ -205,7 +202,7 @@ Table watchlist_items {
 // References
 // ---------------------------------------------------------------------------
 // delete rules: memberships/attendances/reviews/watchlist cascade with their
-// parent; picks restrict on movie (keep history) and on picker (people are
+// parent; nights restrict on movie (keep history) and on picker (people are
 // deactivated, never deleted — ADR-0006).
 
 Ref: devices.user_id > users.id [delete: cascade]
@@ -213,17 +210,17 @@ Ref: devices.user_id > users.id [delete: cascade]
 Ref: memberships.group_id > groups.id [delete: cascade]
 Ref: memberships.user_id  > users.id  [delete: cascade]
 
-Ref: picks.group_id > groups.id [delete: cascade]
-Ref: picks.picker_id > users.id [delete: restrict]
+Ref: nights.group_id > groups.id [delete: cascade]
+Ref: nights.picker_id > users.id [delete: restrict]
 
-Ref: reminders_sent.night_id > picks.id [delete: cascade]
+Ref: reminders_sent.night_id > nights.id [delete: cascade]
 Ref: reminders_sent.user_id  > users.id [delete: cascade]
-Ref: picks.movie_id  > movies.id [delete: restrict]
+Ref: nights.movie_id  > movies.id [delete: restrict]
 
-Ref: attendances.pick_id > picks.id [delete: cascade]
+Ref: attendances.night_id > nights.id [delete: cascade]
 Ref: attendances.user_id > users.id [delete: cascade]
 
-Ref: reviews.pick_id > picks.id [delete: cascade]
+Ref: reviews.night_id > nights.id [delete: cascade]
 Ref: reviews.user_id > users.id [delete: cascade]
 
 Ref: watchlist_items.user_id  > users.id  [delete: cascade]

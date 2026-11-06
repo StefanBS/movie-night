@@ -59,7 +59,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, client))
 	mux.Handle("GET /movies/search", searchMoviesHandler(client))
 
-	// mkNight clears the group's picks and inserts a fresh night, returning its
+	// mkNight clears the group's nights and inserts a fresh night, returning its
 	// id. Attaching a movie needs only a night to exist, so it is seeded directly
 	// rather than through create — emptyGroup has no members to pick.
 	mkNight := func(t *testing.T, group string) string {
@@ -67,7 +67,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 		clearAllPicks(t, pool, group)
 		var id string
 		if err := pool.QueryRow(context.Background(),
-			`INSERT INTO picks (group_id, picker_id, scheduled_for) VALUES ($1, $2, '2026-06-12') RETURNING id`,
+			`INSERT INTO nights (group_id, picker_id, scheduled_for) VALUES ($1, $2, '2026-06-12') RETURNING id`,
 			group, ada).Scan(&id); err != nil {
 			t.Fatalf("seed night: %v", err)
 		}
@@ -123,7 +123,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 		if !slices.Equal(genres, want) || runtime == nil || *runtime != 155 {
 			t.Fatalf("stored genres/runtime = %v/%v", genres, runtime)
 		}
-		// The detail read goes through the nights view too.
+		// The detail read goes through the full_nights view too.
 		code, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+night, "")
 		if code != http.StatusOK || got.Movie == nil || !slices.Equal(got.Movie.Genres, want) ||
 			got.Movie.RuntimeMinutes == nil || *got.Movie.RuntimeMinutes != 155 {
@@ -157,16 +157,16 @@ func TestMovieAttachIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("a movie cached before genres/runtime returns [] and null", func(t *testing.T) {
+	t.Run("a movie with no genres or runtime returns [] and null", func(t *testing.T) {
 		night := mkNight(t, seededGroup)
-		// Inserted without the new columns, as a row from before migration 0014.
+		// TMDB can know a film without its genres or runtime.
 		if _, err := pool.Exec(context.Background(), `
-			WITH m AS (INSERT INTO movies (tmdb_id, title) VALUES (777, 'Old Cache') RETURNING id)
-			UPDATE picks SET movie_id = (SELECT id FROM m) WHERE id = $1`, night); err != nil {
-			t.Fatalf("seed cached movie: %v", err)
+			WITH m AS (INSERT INTO movies (tmdb_id, title) VALUES (777, 'Sparse Film') RETURNING id)
+			UPDATE nights SET movie_id = (SELECT id FROM m) WHERE id = $1`, night); err != nil {
+			t.Fatalf("seed sparse movie: %v", err)
 		}
 		code, got := doJSON[nightResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+night, "")
-		if code != http.StatusOK || got.Movie == nil || got.Movie.Title != "Old Cache" ||
+		if code != http.StatusOK || got.Movie == nil || got.Movie.Title != "Sparse Film" ||
 			got.Movie.Genres == nil || len(got.Movie.Genres) != 0 || got.Movie.RuntimeMinutes != nil {
 			t.Fatalf("detail status %d movie = %+v, want genres [] and runtime nil", code, got.Movie)
 		}

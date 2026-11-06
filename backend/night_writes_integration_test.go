@@ -43,7 +43,7 @@ func TestNightWritesWaitForEachOther(t *testing.T) {
 	t.Run("a pick waits for an edit that removes the picker", func(t *testing.T) {
 		n, path := mkNight(t)
 		// The edit, mid-transaction: Night locked, Blake removed.
-		code := whileHolding(t, pool, n.ID, `DELETE FROM attendances WHERE pick_id = $1 AND user_id = $2`, []any{n.ID, blake},
+		code := whileHolding(t, pool, n.ID, `DELETE FROM attendances WHERE night_id = $1 AND user_id = $2`, []any{n.ID, blake},
 			mux, http.MethodPost, path+"/pick", `{"pickerId":"`+blake+`"}`)
 		if code != http.StatusUnprocessableEntity {
 			t.Errorf("record pick status = %d, want 422 (Blake left the Night)", code)
@@ -56,7 +56,7 @@ func TestNightWritesWaitForEachOther(t *testing.T) {
 	t.Run("an edit waits for a pick that moves to the attendee it removes", func(t *testing.T) {
 		n, path := mkNight(t)
 		// The pick, mid-transaction: Night locked, Blake made the picker.
-		code := whileHolding(t, pool, n.ID, `UPDATE picks SET picker_id = $2 WHERE id = $1`, []any{n.ID, blake},
+		code := whileHolding(t, pool, n.ID, `UPDATE nights SET picker_id = $2 WHERE id = $1`, []any{n.ID, blake},
 			mux, http.MethodPatch, path, editBody(t, n, func(r *updateNightRequest) { r.Attendees = []string{ada} }))
 		if code != http.StatusUnprocessableEntity {
 			t.Errorf("edit status = %d, want 422 (it would drop the new picker)", code)
@@ -78,7 +78,7 @@ func whileHolding(t *testing.T, pool *pgxpool.Pool, nightID, sql string, args []
 		t.Fatalf("begin: %v", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := tx.Exec(ctx, `SELECT 1 FROM picks WHERE id = $1 FOR UPDATE`, nightID); err != nil {
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM nights WHERE id = $1 FOR UPDATE`, nightID); err != nil {
 		t.Fatalf("lock night: %v", err)
 	}
 	if _, err := tx.Exec(ctx, sql, args...); err != nil {

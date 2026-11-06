@@ -14,25 +14,18 @@ import (
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (name) VALUES ($1)
-RETURNING id, name, letterboxd_user, created_at
+RETURNING id, name
 `
 
 type CreateUserRow struct {
-	ID             uuid.UUID          `json:"id"`
-	Name           string             `json:"name"`
-	LetterboxdUser pgtype.Text        `json:"letterboxd_user"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, name string) (CreateUserRow, error) {
 	row := q.db.QueryRow(ctx, createUser, name)
 	var i CreateUserRow
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.LetterboxdUser,
-		&i.CreatedAt,
-	)
+	err := row.Scan(&i.ID, &i.Name)
 	return i, err
 }
 
@@ -255,13 +248,13 @@ SELECT
      FROM memberships m
      LEFT JOIN (
        SELECT picker_id, COUNT(*) FILTER (WHERE is_credited) AS cnt
-       FROM picks pk
+       FROM nights pk
        WHERE pk.group_id = $1
        GROUP BY picker_id
      ) p ON p.picker_id = m.user_id
     WHERE m.group_id = $1 AND m.status = 'active' AND m.role = 'core')::float8 AS avg_served,
   (SELECT COUNT(*) FILTER (WHERE c.is_credited)
-     FROM picks c
+     FROM nights c
     WHERE c.group_id = $1 AND c.picker_id = $2)::int AS credited_count,
   (SELECT COALESCE(MAX(r.rotation_position), 0)
      FROM memberships r
@@ -280,8 +273,8 @@ type RotationSeedInputsRow struct {
 }
 
 // Everything a member entering the rotation is seeded from, read at one point
-// in time: the active-core average served-count, the credited picks user_id
-// already has (0 for a user with no picks), and the highest rotation slot.
+// in time: the active-core average served-count, the credited nights user_id
+// already has (0 for a user with no nights), and the highest rotation slot.
 func (q *Queries) RotationSeedInputs(ctx context.Context, arg RotationSeedInputsParams) (RotationSeedInputsRow, error) {
 	row := q.db.QueryRow(ctx, rotationSeedInputs, arg.GroupID, arg.UserID)
 	var i RotationSeedInputsRow

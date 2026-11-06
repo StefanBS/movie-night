@@ -306,13 +306,13 @@ func TestNightsListIntegration(t *testing.T) {
 	execSeed(t, pool, []seedStmt{
 		{sql: `INSERT INTO movies (id, tmdb_id, title, release_year, poster_path)
 		        VALUES ($1, 27205, 'Inception', 2010, '/inc.jpg')`, args: []any{movieID}},
-		{sql: `INSERT INTO picks (id, group_id, picker_id, is_credited, scheduled_for, movie_id)
+		{sql: `INSERT INTO nights (id, group_id, picker_id, is_credited, scheduled_for, movie_id)
 		        VALUES ($1, $2, $3, true, '2026-05-01', $4)`, args: []any{night1, seededGroup, ada, movieID}},
-		{sql: `INSERT INTO picks (id, group_id, picker_id, is_credited, scheduled_for)
+		{sql: `INSERT INTO nights (id, group_id, picker_id, is_credited, scheduled_for)
 		        VALUES ($1, $2, $3, true, '2026-06-01')`, args: []any{night2, seededGroup, blake}},
-		{sql: `INSERT INTO picks (id, group_id, picker_id, is_credited, scheduled_for)
+		{sql: `INSERT INTO nights (id, group_id, picker_id, is_credited, scheduled_for)
 		        VALUES ($1, $2, $3, true, '2099-07-01')`, args: []any{upcoming, seededGroup, cleo}},
-		{sql: `INSERT INTO attendances (pick_id, user_id) VALUES ($1, $2), ($1, $3)`, args: []any{night1, ada, blake}},
+		{sql: `INSERT INTO attendances (night_id, user_id) VALUES ($1, $2), ($1, $3)`, args: []any{night1, ada, blake}},
 	})
 
 	do := func(t *testing.T, path string) (int, []nightResponse) {
