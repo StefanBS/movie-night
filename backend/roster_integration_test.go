@@ -6,16 +6,13 @@ import (
 	"net/http"
 	"testing"
 	"time"
-
-	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
 func TestMembersHandlerIntegration(t *testing.T) {
 	pool := freshDB(t)
 	seedFixtures(t, pool)
 
-	mux := http.NewServeMux()
-	mux.Handle("GET /groups/{groupId}/members", membersHandler(db.New(pool)))
+	mux := newRoutes(pool, nil)
 
 	get := func(groupID string) (int, []memberResponse) {
 		return doJSON[[]memberResponse](t, mux, http.MethodGet, "/groups/"+groupID+"/members", "")

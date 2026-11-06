@@ -100,7 +100,7 @@ func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit 
 		RemindNightBefore:    edit.Reminders.NightBefore,
 		RemindMorningOf:      edit.Reminders.MorningOf,
 		RemindTwoHoursBefore: edit.Reminders.TwoHoursBefore,
-		RemindAudience:       edit.Reminders.Audience,
+		RemindAudience:       db.ReminderAudience(edit.Reminders.Audience),
 		RepeatFreq:           freq,
 		RepeatIntervalWeeks:  intervalWeeks,
 		RepeatWeekOfMonth:    weekOfMonth,
@@ -110,13 +110,9 @@ func editNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, edit 
 	if !edit.Watched {
 		return nil
 	}
-	// The series moves on and the repeat is cleared before watched_at is set:
-	// ck_night_watched_no_repeat refuses a Watched Night that still repeats.
+	// The series moves on from this Night's repeat before recording ends it.
 	if edit.Repeat != nil {
 		if err := moveSeriesOn(ctx, q, gid, nightID, picker, *edit.Repeat, edit.ScheduledFor.Time, false, now); err != nil {
-			return err
-		}
-		if err := q.ClearNightRepeat(ctx, db.ClearNightRepeatParams{NightID: nightID, GroupID: gid}); err != nil {
 			return err
 		}
 	}
@@ -206,7 +202,7 @@ func moveSeriesOn(ctx context.Context, q *db.Queries, gid, from, picker uuid.UUI
 		}
 		next = nextOccurrence(rule, next)
 	}
-	attendees, err := q.ListNightAttendees(ctx, db.ListNightAttendeesParams{GroupID: gid, NightID: from})
+	attendees, err := q.ListAttendees(ctx, db.ListAttendeesParams{GroupID: gid, NightID: pgtype.UUID{Bytes: from, Valid: true}})
 	if err != nil {
 		return err
 	}
@@ -247,17 +243,18 @@ func memberRoles(ctx context.Context, q *db.Queries, gid uuid.UUID, attendees []
 
 // attendeeRole finds the picker among a Night's attendees and returns their
 // role, or errPickerNotAttendee. Pure.
-func attendeeRole(attendees []db.ListNightAttendeesRow, picker uuid.UUID) (db.MembershipRole, error) {
-	i := slices.IndexFunc(attendees, func(a db.ListNightAttendeesRow) bool { return a.ID == picker })
+func attendeeRole(attendees []db.ListAttendeesRow, picker uuid.UUID) (db.MembershipRole, error) {
+	i := slices.IndexFunc(attendees, func(a db.ListAttendeesRow) bool { return a.ID == picker })
 	if i < 0 {
 		return "", errPickerNotAttendee
 	}
 	return attendees[i].Role, nil
 }
 
-// writeNightError maps a failed Night write to its response: a missing Night is
-// a 404; a broken ADR-0008 rule, recording a Night with no film or before its
-// date, or clearing a Watched Night's film, a 422; a date another Night holds a 409; and anything else a 500.
+// writeNightError maps a failed Night write to its response: a missing Night
+// is a 404; a broken ADR-0008 rule or Watched Night rule (no film, dated
+// ahead, repeating, film cleared) a 422; a date another Night holds a 409; and
+// anything else a 500.
 func writeNightError(w http.ResponseWriter, gid uuid.UUID, op string, err error) {
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):

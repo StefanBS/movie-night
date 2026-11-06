@@ -70,8 +70,8 @@ func slotTime(s reminderSlot, date time.Time, start pgtype.Time, loc *time.Locat
 	if !start.Valid {
 		return time.Time{}, false
 	}
-	minute := int(start.Microseconds / int64(time.Minute/time.Microsecond))
-	return time.Date(y, m, d, 0, minute, 0, 0, loc).Add(-s.beforeStart), true
+	c := startClock(start)
+	return time.Date(y, m, d, c.Hour(), c.Minute(), 0, 0, loc).Add(-s.beforeStart), true
 }
 
 // wantsSlot reports whether a person gets a reminder for a Night in a slot.
@@ -119,7 +119,7 @@ func reminderMessage(row db.ListReminderCandidatesRow, slot db.ReminderSlot) (ti
 // formatStartTime is a start time as reminder copy shows it, e.g. "7:30 PM".
 // Pure.
 func formatStartTime(t pgtype.Time) string {
-	return time.Time{}.Add(time.Duration(t.Microseconds) * time.Microsecond).Format("3:04 PM")
+	return startClock(t).Format("3:04 PM")
 }
 
 // firstName is the first word of a person's name. Pure.
@@ -135,6 +135,16 @@ func firstName(name string) string {
 // any of their devices reaches the slot's time in its own zone, and then goes
 // to all of their devices. A device with an unknown zone is skipped. Pure.
 func dueReminders(rows []db.ListReminderCandidatesRow, now time.Time) []dueReminder {
+	// Each zone is loaded once per call, not once per device and slot.
+	zones := map[string]*time.Location{}
+	zone := func(name string) *time.Location {
+		loc, ok := zones[name]
+		if !ok {
+			loc, _ = time.LoadLocation(name) // nil when unknown
+			zones[name] = loc
+		}
+		return loc
+	}
 	var out []dueReminder
 	for start := 0; start < len(rows); {
 		end := start + 1
@@ -150,8 +160,8 @@ func dueReminders(rows []db.ListReminderCandidatesRow, now time.Time) []dueRemin
 			}
 			due := false
 			for _, d := range person {
-				loc, err := time.LoadLocation(d.TimeZone)
-				if err != nil {
+				loc := zone(d.TimeZone)
+				if loc == nil {
 					continue
 				}
 				at, ok := slotTime(s, d.ScheduledFor.Time, d.StartTime, loc)
@@ -185,11 +195,7 @@ func dueReminders(rows []db.ListReminderCandidatesRow, now time.Time) []dueRemin
 // a device's local date is within a day of UTC, and the night-before slot
 // belongs to the next day's Night. Pure.
 func candidateDates(now time.Time) (from, to pgtype.Date) {
-	y, m, d := now.UTC().Date()
-	day := func(offset int) pgtype.Date {
-		return pgtype.Date{Time: time.Date(y, m, d+offset, 0, 0, 0, 0, time.UTC), Valid: true}
-	}
-	return day(-1), day(2)
+	return pgtype.Date{Time: utcDay(now, -1), Valid: true}, pgtype.Date{Time: utcDay(now, 2), Valid: true}
 }
 
 // sendDueReminders sends every reminder due at now. A reminder is logged
@@ -233,7 +239,7 @@ func sendDueReminders(ctx context.Context, store *db.Queries, push *expoPusher, 
 			continue
 		}
 		if t.Details.Error == "DeviceNotRegistered" {
-			if err := store.ClearPushToken(ctx, pgtype.Text{String: msgs[i].To, Valid: true}); err != nil {
+			if err := store.ClearPushToken(ctx, pgText(msgs[i].To)); err != nil {
 				log.Printf("reminders: clear push token: %v", err)
 			}
 			continue

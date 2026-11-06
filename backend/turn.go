@@ -52,7 +52,7 @@ func toTurnResponses(rows []db.RankGroupTurnRow) []turnResponse {
 			ServedCount: r.ServedCount,
 		}
 		if r.LastPickedOn.Valid {
-			s := formatDate(r.LastPickedOn)
+			s := formatDay(r.LastPickedOn.Time)
 			resp.LastPickedOn = &s
 		}
 		out = append(out, resp)
@@ -82,6 +82,6 @@ func turnHandler(store *db.Queries) http.HandlerFunc {
 			return
 		}
 
-		respondJSON(w, http.StatusOK, toTurnResponses(rows), gid, "encode turn response")
+		respondJSON(w, http.StatusOK, toTurnResponses(rows))
 	}
 }

@@ -49,16 +49,6 @@ INSERT INTO attendances (night_id, user_id)
 SELECT sqlc.arg(night_id), unnest(sqlc.arg(user_ids)::uuid[])
 ON CONFLICT (night_id, user_id) DO NOTHING;
 
--- name: ListNightAttendees :many
-SELECT u.id, u.name, m.role
-FROM attendances a
-JOIN users u ON u.id = a.user_id
-JOIN memberships m ON m.user_id = a.user_id AND m.group_id = sqlc.arg(group_id)
-WHERE a.night_id = sqlc.arg(night_id)
-ORDER BY
-  CASE WHEN m.role = 'core' THEN 0 ELSE 1 END,
-  u.name;
-
 -- name: SetNightPicker :exec
 UPDATE nights
 SET picker_id = sqlc.arg(picker_id), is_credited = sqlc.arg(is_credited)
@@ -80,10 +70,12 @@ SET scheduled_for           = sqlc.arg(scheduled_for),
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
 
 -- name: RecordNightWatched :exec
--- Records the night as watched (ADR-0012). Recording again keeps the first
--- watched_at.
+-- Records the night as watched (ADR-0012), which ends its repeat: the series
+-- has moved on, and ck_night_watched_no_repeat refuses a Watched Night that
+-- repeats. Recording again keeps the first watched_at.
 UPDATE nights
-SET watched_at = COALESCE(watched_at, now())
+SET watched_at = COALESCE(watched_at, now()),
+    repeat_freq = NULL, repeat_interval_weeks = NULL, repeat_week_of_month = NULL
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
 
 -- name: LockNightOnDate :one
@@ -125,21 +117,19 @@ WHERE t.id = sqlc.arg(night_id) AND t.group_id = sqlc.arg(group_id)
   AND s.id = sqlc.arg(from_night) AND s.group_id = sqlc.arg(group_id)
   AND t.repeat_freq IS NULL;
 
--- name: ClearNightRepeat :exec
-UPDATE nights
-SET repeat_freq = NULL, repeat_interval_weeks = NULL, repeat_week_of_month = NULL
-WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
-
 -- name: DeleteNight :exec
 DELETE FROM nights
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
 
--- name: ListNightsAttendees :many
+-- name: ListAttendees :many
+-- The attendees of the group's Nights, or of just night_id when it is given,
+-- core members first, then by name.
 SELECT a.night_id, u.id, u.name, m.role
 FROM attendances a
+JOIN nights n ON n.id = a.night_id AND n.group_id = sqlc.arg(group_id)
 JOIN users u ON u.id = a.user_id
 JOIN memberships m ON m.user_id = a.user_id AND m.group_id = sqlc.arg(group_id)
-WHERE a.night_id = ANY(sqlc.arg(night_ids)::uuid[])
+WHERE sqlc.narg(night_id)::uuid IS NULL OR a.night_id = sqlc.narg(night_id)::uuid
 ORDER BY
   CASE WHEN m.role = 'core' THEN 0 ELSE 1 END,
   u.name;

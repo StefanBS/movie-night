@@ -15,15 +15,8 @@ import (
 func TestMembershipChurnIntegration(t *testing.T) {
 	pool := freshDB(t)
 	seedFixtures(t, pool)
-	q := db.New(pool)
 
-	mux := http.NewServeMux()
-	mux.Handle("POST /groups/{groupId}/members", joinMemberHandler(pool))
-	mux.Handle("POST /groups/{groupId}/members/{userId}/deactivate", moveMemberHandler(pool, actionDeactivate))
-	mux.Handle("POST /groups/{groupId}/members/{userId}/reactivate", moveMemberHandler(pool, actionReactivate))
-	mux.Handle("POST /groups/{groupId}/members/{userId}/promote", moveMemberHandler(pool, actionPromote))
-	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
-	mux.Handle("GET /groups/{groupId}/turn", turnHandler(q))
+	mux := newRoutes(pool, nil)
 
 	do := func(t *testing.T, method, path, body string) (int, memberResponse) {
 		t.Helper()

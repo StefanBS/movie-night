@@ -38,8 +38,8 @@ func pathUUID(w http.ResponseWriter, r *http.Request, segment, errMsg string) (u
 }
 
 // pathGroupNight parses the {groupId}/{nightId} pair that every night-scoped
-// route carries, so the two-segment preamble is written once instead of in each
-// of the nine handlers. ok=false means a 400 was already written.
+// route carries, so the two-segment preamble is written once instead of in
+// each handler. ok=false means a 400 was already written.
 func pathGroupNight(w http.ResponseWriter, r *http.Request) (gid, nightID uuid.UUID, ok bool) {
 	if gid, ok = pathUUID(w, r, "groupId", "invalid group id"); !ok {
 		return uuid.UUID{}, uuid.UUID{}, false
@@ -70,15 +70,13 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 }
 
 // respondJSON writes v as a JSON success body with the matching Content-Type and
-// status — the success-path twin of writeJSONError, so the header/encode/log
-// dance lives in one place rather than in every handler. An encode failure is
-// only logged: the status line is already on the wire, so there's nothing to
-// recover. gid scopes the log line; see logScope for the group-less routes.
-func respondJSON(w http.ResponseWriter, status int, v any, gid uuid.UUID, what string) {
+// status — the success-path twin of writeJSONError. An encode failure is only
+// logged: the status line is already on the wire, so there's nothing to recover.
+func respondJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Printf("%s (%s): %v", what, logScope(gid), err) //#nosec G706 -- gid is a parsed uuid.UUID
+		log.Printf("encode response: %v", err)
 	}
 }
 
@@ -96,9 +94,8 @@ func decodeJSON[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 	return v, true
 }
 
-// logScope renders the group id that scopes a log line. uuid.Nil means the route
-// has no group (/healthz, /movies/search) and renders as "-", so those handlers
-// use the shared response helpers rather than hand-rolling the JSON contract.
+// logScope renders the group id that scopes a log line; uuid.Nil (a route with
+// no group, such as /identity) renders as "-".
 func logScope(gid uuid.UUID) string {
 	if gid == uuid.Nil {
 		return "-"
@@ -130,30 +127,22 @@ func storeError(w http.ResponseWriter, gid uuid.UUID, what string, err error, st
 // the helpers below can never drift apart.
 const dateLayout = "2006-01-02"
 
-// formatDate renders a DATE column as a YYYY-MM-DD string; "" when unset.
-func formatDate(d pgtype.Date) string {
-	if !d.Valid {
-		return ""
-	}
-	return d.Time.Format(dateLayout)
+// formatDay renders a DATE, or a timestamptz's UTC calendar date, in
+// dateLayout, so joined_at/created_at read on the wire like a true DATE column.
+func formatDay(t time.Time) string {
+	return t.Format(dateLayout)
 }
 
-// formatTimestampDate renders a timestamptz as its UTC calendar date, so
-// joined_at/created_at read on the wire exactly like a true DATE column. An
-// unset timestamp yields "", though both columns are NOT NULL in practice.
-func formatTimestampDate(ts pgtype.Timestamptz) string {
-	if !ts.Valid {
-		return ""
-	}
-	return ts.Time.Format(dateLayout)
+// utcDay is the UTC midnight offset days from now's UTC date. Pure.
+func utcDay(now time.Time, offset int) time.Time {
+	y, m, d := now.UTC().Date()
+	return time.Date(y, m, d+offset, 0, 0, 0, 0, time.UTC)
 }
 
-// parseDate parses a YYYY-MM-DD wire date into a DATE param. Callers name the
-// offending field in their own error message. Pure.
-func parseDate(s string) (pgtype.Date, error) {
-	t, err := time.Parse(dateLayout, s)
-	if err != nil {
-		return pgtype.Date{}, err
+// pgText maps a string to a text param; "" stores as NULL.
+func pgText(s string) pgtype.Text {
+	if s == "" {
+		return pgtype.Text{}
 	}
-	return pgtype.Date{Time: t, Valid: true}, nil
+	return pgtype.Text{String: s, Valid: true}
 }

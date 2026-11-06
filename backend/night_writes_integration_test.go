@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
 // A write that arrives while another write holds the Night must decide against
@@ -22,11 +20,7 @@ func TestNightWritesWaitForEachOther(t *testing.T) {
 	pool := freshDB(t)
 	seedFixtures(t, pool)
 
-	mux := http.NewServeMux()
-	q := db.New(pool)
-	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
-	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
-	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
+	mux := newRoutes(pool, nil)
 
 	// mkNight is a Night Ada picks, with Blake attending.
 	mkNight := func(t *testing.T) (nightResponse, string) {

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -82,14 +81,6 @@ func int4Ptr(v *int32) pgtype.Int4 {
 	return pgtype.Int4{Int32: *v, Valid: true}
 }
 
-// pgText maps a raw string to pgtype.Text for UpsertMovie; "" stores as NULL.
-func pgText(s string) pgtype.Text {
-	if s == "" {
-		return pgtype.Text{}
-	}
-	return pgtype.Text{String: s, Valid: true}
-}
-
 // toMovieResults maps TMDB search hits to the JSON DTO (always non-nil → []).
 func toMovieResults(results []movieResult) []movieDTO {
 	out := make([]movieDTO, 0, len(results))
@@ -126,8 +117,7 @@ func searchMoviesHandler(client *tmdbClient) http.HandlerFunc {
 			writeJSONError(w, http.StatusBadGateway, "movie search failed")
 			return
 		}
-		// uuid.Nil: this route is not group-scoped (see logScope).
-		respondJSON(w, http.StatusOK, toMovieResults(results), uuid.Nil, "encode movie results")
+		respondJSON(w, http.StatusOK, toMovieResults(results))
 	}
 }
 

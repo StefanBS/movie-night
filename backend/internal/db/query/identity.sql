@@ -1,7 +1,6 @@
--- name: CreateDevice :one
+-- name: CreateDevice :exec
 INSERT INTO devices (user_id, token_hash)
-VALUES (sqlc.arg(user_id), sqlc.arg(token_hash))
-RETURNING id, user_id;
+VALUES (sqlc.arg(user_id), sqlc.arg(token_hash));
 
 -- name: GetDeviceIdentity :one
 -- Resolves a token hash to its identity; no row means the token is unknown or

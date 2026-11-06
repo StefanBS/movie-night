@@ -41,7 +41,7 @@ func joinMember(ctx context.Context, q *db.Queries, gid uuid.UUID, name string, 
 	if err != nil {
 		return memberResponse{}, err
 	}
-	membership, err := q.InsertMembership(ctx, db.InsertMembershipParams{
+	joinedAt, err := q.InsertMembership(ctx, db.InsertMembershipParams{
 		GroupID:          gid,
 		UserID:           user.ID,
 		Role:             role,
@@ -52,7 +52,7 @@ func joinMember(ctx context.Context, q *db.Queries, gid uuid.UUID, name string, 
 	if err != nil {
 		return memberResponse{}, err
 	}
-	return memberFromMembership(membership, user.Name), nil
+	return newMemberResponse(user.ID, user.Name, role, db.MembershipStatusActive, joinedAt), nil
 }
 
 // moveMember applies a churn action to a member and returns them as they now
@@ -71,7 +71,7 @@ func moveMember(ctx context.Context, q *db.Queries, gid, uid uuid.UUID, action m
 		return memberResponse{}, err
 	}
 	if move.noOp {
-		return currentMember(m), nil
+		return newMemberResponse(m.UserID, m.Name, m.Role, m.Status, m.JoinedAt), nil
 	}
 	baseline, position := m.BaselinePicks, m.RotationPosition
 	if move.seed {
@@ -83,18 +83,17 @@ func moveMember(ctx context.Context, q *db.Queries, gid, uid uuid.UUID, action m
 			position = slot
 		}
 	}
-	updated, err := q.UpdateMembership(ctx, db.UpdateMembershipParams{
+	if err := q.UpdateMembership(ctx, db.UpdateMembershipParams{
 		GroupID:          gid,
 		UserID:           uid,
 		Role:             move.role,
 		Status:           move.status,
 		BaselinePicks:    baseline,
 		RotationPosition: position,
-	})
-	if err != nil {
+	}); err != nil {
 		return memberResponse{}, err
 	}
-	return memberFromMembership(updated, m.Name), nil
+	return newMemberResponse(uid, m.Name, move.role, move.status, m.JoinedAt), nil
 }
 
 // rotationSeed computes where a member entering the rotation lands: the

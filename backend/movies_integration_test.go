@@ -8,8 +8,6 @@ import (
 	"net/http/httptest"
 	"slices"
 	"testing"
-
-	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
 // fakeTMDB mimics the two TMDB endpoints this app calls, so the real tmdbClient
@@ -53,11 +51,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 	upstream := fakeTMDB(t)
 	client := &tmdbClient{baseURL: upstream.URL, token: "test", client: upstream.Client()}
 
-	q := db.New(pool)
-	mux := http.NewServeMux()
-	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(pool, client))
-	mux.Handle("GET /movies/search", searchMoviesHandler(client))
+	mux := newRoutes(pool, client)
 
 	// mkNight clears the group's nights and inserts a fresh night, returning its
 	// id. Attaching a movie needs only a night to exist, so it is seeded directly
@@ -274,8 +268,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 		// Drive attach through a router so {groupId}/{nightId} path values populate;
 		// with a nil client the handler must 503 after loadNight passes.
 		night := mkNight(t, seededGroup)
-		m2 := http.NewServeMux()
-		m2.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(pool, nilClient))
+		m2 := newRoutes(pool, nil)
 		if code, _ := doReq(t, m2, http.MethodPost,
 			"/groups/"+seededGroup+"/nights/"+night+"/movie", `{"tmdbId":438631}`); code != http.StatusServiceUnavailable {
 			t.Errorf("attach unconfigured = %d, want 503", code)

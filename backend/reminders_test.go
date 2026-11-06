@@ -239,10 +239,10 @@ func TestDueReminders(t *testing.T) {
 
 func TestCandidateDates(t *testing.T) {
 	from, to := candidateDates(at(t, "2026-06-18T23:30:00-04:00")) // 03:30 UTC on the 19th
-	if got := formatDate(from); got != "2026-06-18" {
+	if got := formatDay(from.Time); got != "2026-06-18" {
 		t.Errorf("from = %s, want 2026-06-18", got)
 	}
-	if got := formatDate(to); got != "2026-06-21" {
+	if got := formatDay(to.Time); got != "2026-06-21" {
 		t.Errorf("to = %s, want 2026-06-21", got)
 	}
 }
@@ -263,7 +263,7 @@ func TestCandidateDatesCoverAfterMidnightStart(t *testing.T) {
 			slot, _ := slotTime(reminderSlot{slot: db.ReminderSlotTwoHoursBefore, beforeStart: 2 * time.Hour}, mustDate(t, tc.night), pgtype.Time{Valid: true}, loc)
 			from, to := candidateDates(slot)
 			if night := mustDate(t, tc.night); night.Before(from.Time) || night.After(to.Time) {
-				t.Errorf("night %s outside [%s, %s] at %s", tc.night, formatDate(from), formatDate(to), slot.UTC())
+				t.Errorf("night %s outside [%s, %s] at %s", tc.night, formatDay(from.Time), formatDay(to.Time), slot.UTC())
 			}
 		})
 	}

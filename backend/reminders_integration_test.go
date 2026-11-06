@@ -56,9 +56,7 @@ func TestRemindersIntegration(t *testing.T) {
 	seedFixtures(t, pool)
 	q := db.New(pool)
 
-	mux := http.NewServeMux()
-	mux.Handle("POST /groups/{groupId}/nights", createNightHandler(pool))
-	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
+	mux := newRoutes(pool, nil)
 
 	// device registers a push-ready device for a person, in Madrid.
 	device := func(t *testing.T, user, pushToken string) {

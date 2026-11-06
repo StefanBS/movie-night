@@ -7,8 +7,6 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
 // seedTurnPicks adds pick history for the seeded group on top of seedFixtures.
@@ -55,8 +53,7 @@ func TestTurnHandlerIntegration(t *testing.T) {
 	seedFixtures(t, pool)
 	seedTurnPicks(t, pool)
 
-	mux := http.NewServeMux()
-	mux.Handle("GET /groups/{groupId}/turn", turnHandler(db.New(pool)))
+	mux := newRoutes(pool, nil)
 
 	get := func(groupID, present string) (int, []turnResponse) {
 		path := "/groups/" + groupID + "/turn"

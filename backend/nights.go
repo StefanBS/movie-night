@@ -34,8 +34,8 @@ type parsedCreateNight struct {
 	Repeat       *repeatRule
 }
 
-// errPickerNotAttendee is the 422 shared by create, record-pick and edit: a
-// Night's picker is always one of its attendees.
+// errPickerNotAttendee is the 422 shared by create, edit and a series moving
+// on: a Night's picker is always one of its attendees.
 var errPickerNotAttendee = errors.New("picker is not an attendee of this night")
 
 // errWatchedWithoutFilm is the 422 for recording a Night that has no film yet:
@@ -57,9 +57,7 @@ var errWatchedDateAhead = errors.New("night is dated too far ahead to be recorde
 // at the cost of letting a Night be recorded up to a day early (ADR-0013).
 // Pure.
 func recordableAsWatched(scheduledFor pgtype.Date, now time.Time) bool {
-	y, m, d := now.UTC().Date()
-	latest := time.Date(y, m, d+1, 0, 0, 0, 0, time.UTC)
-	return !scheduledFor.Time.After(latest)
+	return !scheduledFor.Time.After(utcDay(now, 1))
 }
 
 // errWatchedRepeats is the 422 for setting a repeat on a Watched Night: a
@@ -94,11 +92,11 @@ func parseAttendeeIDs(raw []string) ([]uuid.UUID, error) {
 // field in the error. Shared by create and the edit PATCH so the two paths
 // can't disagree on the accepted format. Pure.
 func parseScheduledFor(raw string) (pgtype.Date, error) {
-	d, err := parseDate(raw)
+	t, err := time.Parse(dateLayout, raw)
 	if err != nil {
 		return pgtype.Date{}, fmt.Errorf("invalid scheduledFor")
 	}
-	return d, nil
+	return pgtype.Date{Time: t, Valid: true}, nil
 }
 
 // startTimeLayout is a Night's start time on the wire: a zone-less HH:MM, read
@@ -113,6 +111,12 @@ func parseStartTime(raw string) (pgtype.Time, error) {
 		return pgtype.Time{}, fmt.Errorf("invalid startTime: want HH:MM")
 	}
 	return pgtype.Time{Microseconds: int64(t.Hour()*60+t.Minute()) * int64(time.Minute/time.Microsecond), Valid: true}, nil
+}
+
+// startClock is a start time as a clock reading on the zero day, for
+// formatting or for its hour and minute. Pure.
+func startClock(t pgtype.Time) time.Time {
+	return time.Time{}.Add(time.Duration(t.Microseconds) * time.Microsecond)
 }
 
 // parseOptionalStartTime is parseStartTime for the wire's nullable field: nil
@@ -130,7 +134,7 @@ func formatStartTimeWire(t pgtype.Time) *string {
 	if !t.Valid {
 		return nil
 	}
-	s := time.Time{}.Add(time.Duration(t.Microseconds) * time.Microsecond).Format(startTimeLayout)
+	s := startClock(t).Format(startTimeLayout)
 	return &s
 }
 
@@ -205,24 +209,16 @@ type nightResponse struct {
 	Repeat       *repeatDTO   `json:"repeat"`
 }
 
-// toAttendee builds the attendee DTO. The single-night query and the grouped
-// history query return different row types carrying the same three fields, so
-// both funnel through here and their JSON cannot drift apart.
-func toAttendee(id uuid.UUID, name string, role db.MembershipRole) attendee {
-	return attendee{ID: id.String(), Name: name, Role: string(role)}
-}
-
 // newNightResponse assembles the night DTO from a night row and its attendees.
-// The detail path and the history-list path read attendees in different row
-// shapes but both build through here, so a new field is added once. Attendees
-// is normalized to non-nil so an empty list encodes as [] rather than null.
+// The detail and list paths both build through here, so a new field is added
+// once. Attendees is normalized to non-nil so an empty list encodes as [] rather than null.
 func newNightResponse(night db.FullNight, atts []attendee) nightResponse {
 	if atts == nil {
 		atts = []attendee{}
 	}
 	return nightResponse{
 		ID:           night.ID.String(),
-		ScheduledFor: formatDate(night.ScheduledFor),
+		ScheduledFor: formatDay(night.ScheduledFor.Time),
 		StartTime:    formatStartTimeWire(night.StartTime),
 		PickerID:     night.PickerID.String(),
 		Movie:        movieDTOFromCols(night),
@@ -248,15 +244,6 @@ func formatTimestampWire(t pgtype.Timestamptz) *string {
 	return &s
 }
 
-// toNightResponse maps a night row + attendee rows to the night DTO.
-func toNightResponse(night db.FullNight, rows []db.ListNightAttendeesRow) nightResponse {
-	attendees := make([]attendee, 0, len(rows))
-	for _, r := range rows {
-		attendees = append(attendees, toAttendee(r.ID, r.Name, r.Role))
-	}
-	return newNightResponse(night, attendees)
-}
-
 // movieDTOFromCols builds the movie DTO from a night row's nullable LEFT JOIN
 // columns; nil when the night has no movie attached. It is the only movie-row
 // mapper, so a new movie field is added here and to the full_nights view.
@@ -276,18 +263,17 @@ func movieDTOFromCols(row db.FullNight) *movieDTO {
 
 // groupAttendees buckets attendee rows by their night (night_id), preserving the
 // query's role-then-name order within each night.
-func groupAttendees(rows []db.ListNightsAttendeesRow) map[uuid.UUID][]attendee {
-	byNight := make(map[uuid.UUID][]attendee, len(rows))
+func groupAttendees(rows []db.ListAttendeesRow) map[uuid.UUID][]attendee {
+	byNight := make(map[uuid.UUID][]attendee)
 	for _, r := range rows {
-		byNight[r.NightID] = append(byNight[r.NightID], toAttendee(r.ID, r.Name, r.Role))
+		byNight[r.NightID] = append(byNight[r.NightID], attendee{ID: r.ID.String(), Name: r.Name, Role: string(r.Role)})
 	}
 	return byNight
 }
 
-// toNightResponses assembles the ordered nights list from night rows
-// and the attendees grouped by night. A nil byNight (no night had attendees) is
-// fine: reads from a nil map yield the zero value, which newNightResponse
-// normalizes to [].
+// toNightResponses assembles the ordered nights list from night rows and the
+// attendees grouped by night. A Night missing from byNight has none, which
+// newNightResponse normalizes to [].
 func toNightResponses(rows []db.FullNight, byNight map[uuid.UUID][]attendee) []nightResponse {
 	out := make([]nightResponse, 0, len(rows))
 	for _, row := range rows {
@@ -311,27 +297,19 @@ func listNightsHandler(store *db.Queries) http.HandlerFunc {
 			internalError(w, gid, "list nights", err)
 			return
 		}
-		var byNight map[uuid.UUID][]attendee
-		if len(rows) > 0 {
-			ids := make([]uuid.UUID, 0, len(rows))
-			for _, row := range rows {
-				ids = append(ids, row.ID)
-			}
-			attRows, err := store.ListNightsAttendees(ctx, db.ListNightsAttendeesParams{GroupID: gid, NightIds: ids})
-			if err != nil {
-				internalError(w, gid, "list nights attendees", err)
-				return
-			}
-			byNight = groupAttendees(attRows)
+		attRows, err := store.ListAttendees(ctx, db.ListAttendeesParams{GroupID: gid})
+		if err != nil {
+			internalError(w, gid, "list attendees", err)
+			return
 		}
-		respondJSON(w, http.StatusOK, toNightResponses(rows, byNight), gid, "encode nights list response")
+		respondJSON(w, http.StatusOK, toNightResponses(rows, groupAttendees(attRows)))
 	}
 }
 
 // presentIDs extracts attendee user IDs as a NON-NIL (possibly empty) slice to
 // pass as RankGroupTurn's present set. Empty (not nil) makes the ranking exclude
 // everyone — distinct from nil, which RankGroupTurn treats as "rank all core".
-func presentIDs(rows []db.ListNightAttendeesRow) []uuid.UUID {
+func presentIDs(rows []db.ListAttendeesRow) []uuid.UUID {
 	ids := make([]uuid.UUID, 0, len(rows))
 	for _, r := range rows {
 		ids = append(ids, r.ID)
@@ -356,14 +334,6 @@ type updateNightRequest struct {
 	Watched      bool         `json:"watched"`
 }
 
-// nightReminders is a validated remindersDTO.
-type nightReminders struct {
-	NightBefore    bool
-	MorningOf      bool
-	TwoHoursBefore bool
-	Audience       db.ReminderAudience
-}
-
 // nightEdit is a validated updateNightRequest. Attendees is deduped; StartTime
 // is not Valid when the Night has none, and Picker not Valid when the edit
 // keeps the stored picker. Repeat is nil when the Night doesn't repeat.
@@ -371,24 +341,19 @@ type nightEdit struct {
 	ScheduledFor pgtype.Date
 	StartTime    pgtype.Time
 	Attendees    []uuid.UUID
-	Reminders    nightReminders
+	Reminders    remindersDTO
 	Repeat       *repeatRule
 	Picker       pgtype.UUID
 	Watched      bool
 }
 
-// parseReminders requires a known audience. Pure.
-func parseReminders(req remindersDTO) (nightReminders, error) {
+// validateReminders requires a known audience. Pure.
+func validateReminders(req remindersDTO) error {
 	audience := db.ReminderAudience(req.Audience)
 	if audience != db.ReminderAudienceEveryone && audience != db.ReminderAudiencePicker {
-		return nightReminders{}, fmt.Errorf("invalid reminders audience")
+		return fmt.Errorf("invalid reminders audience")
 	}
-	return nightReminders{
-		NightBefore:    req.NightBefore,
-		MorningOf:      req.MorningOf,
-		TwoHoursBefore: req.TwoHoursBefore,
-		Audience:       audience,
-	}, nil
+	return nil
 }
 
 // validateUpdateNightRequest parses the whole edited Night. The picker rule
@@ -406,8 +371,7 @@ func validateUpdateNightRequest(req updateNightRequest) (nightEdit, error) {
 	if err != nil {
 		return nightEdit{}, err
 	}
-	reminders, err := parseReminders(req.Reminders)
-	if err != nil {
+	if err := validateReminders(req.Reminders); err != nil {
 		return nightEdit{}, err
 	}
 	repeat, err := parseRepeat(req.Repeat, scheduledFor.Time)
@@ -426,7 +390,7 @@ func validateUpdateNightRequest(req updateNightRequest) (nightEdit, error) {
 		ScheduledFor: scheduledFor,
 		StartTime:    startTime,
 		Attendees:    attendees,
-		Reminders:    reminders,
+		Reminders:    req.Reminders,
 		Repeat:       repeat,
 		Picker:       picker,
 		Watched:      req.Watched,
@@ -479,12 +443,12 @@ func writeNight(w http.ResponseWriter, r *http.Request, store *db.Queries, gid, 
 	if !ok {
 		return
 	}
-	rows, err := store.ListNightAttendees(r.Context(), db.ListNightAttendeesParams{GroupID: gid, NightID: night.ID})
+	rows, err := store.ListAttendees(r.Context(), db.ListAttendeesParams{GroupID: gid, NightID: pgtype.UUID{Bytes: night.ID, Valid: true}})
 	if err != nil {
 		internalError(w, gid, "list night attendees", err)
 		return
 	}
-	respondJSON(w, code, toNightResponse(night, rows), gid, "encode night response")
+	respondJSON(w, code, newNightResponse(night, groupAttendees(rows)[night.ID]))
 }
 
 // isUniqueViolation reports whether err is a Postgres unique-constraint
@@ -522,11 +486,8 @@ func createNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		var nightID uuid.UUID
-		err = withTx(r.Context(), pool, func(q *db.Queries) error {
-			var err error
-			nightID, err = createNight(r.Context(), q, gid, parsed)
-			return err
+		nightID, err := withTxResult(r.Context(), pool, func(q *db.Queries) (uuid.UUID, error) {
+			return createNight(r.Context(), q, gid, parsed)
 		})
 		if err != nil {
 			writeNightError(w, gid, "create night", err)
@@ -570,7 +531,7 @@ func nightTurnHandler(store *db.Queries) http.HandlerFunc {
 			return
 		}
 		if present == nil {
-			rows, err := store.ListNightAttendees(ctx, db.ListNightAttendeesParams{GroupID: gid, NightID: nightID})
+			rows, err := store.ListAttendees(ctx, db.ListAttendeesParams{GroupID: gid, NightID: pgtype.UUID{Bytes: nightID, Valid: true}})
 			if err != nil {
 				internalError(w, gid, "list night attendees", err)
 				return
@@ -586,7 +547,7 @@ func nightTurnHandler(store *db.Queries) http.HandlerFunc {
 			internalError(w, gid, "rank group turn", err)
 			return
 		}
-		respondJSON(w, http.StatusOK, toTurnResponses(ranked), gid, "encode turn response")
+		respondJSON(w, http.StatusOK, toTurnResponses(ranked))
 	}
 }
 

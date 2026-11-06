@@ -7,21 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
-
-	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
 func TestIdentityIntegration(t *testing.T) {
 	pool := freshDB(t)
 	seedFixtures(t, pool)
-	q := db.New(pool)
 
-	mux := http.NewServeMux()
-	mux.Handle("POST /identity", claimIdentityHandler(q))
-	mux.Handle("GET /identity", getIdentityHandler(q))
-	mux.Handle("DELETE /identity", releaseIdentityHandler(q))
-	mux.Handle("PUT /identity/push", registerPushHandler(q))
-	mux.Handle("PUT /identity/preferences", setPreferencesHandler(q))
+	mux := newRoutes(pool, nil)
 
 	claimBody := func(group, user string) string {
 		return fmt.Sprintf(`{"groupId":%q,"userId":%q}`, group, user)
