@@ -29,7 +29,7 @@ const night = (...ids: string[]): Night => ({
   watchedAt: null,
   repeat: null,
   movie: null,
-  attendees: ids.map((id) => ({ id, name: id[0].toUpperCase() + id.slice(1), role: id === "frankie" ? "guest" : "core" })),
+  attendees: ids.map((id) => ({ id, name: id[0].toUpperCase() + id.slice(1) })),
 });
 
 test("editRows lists active core members, then every other attendee", () => {

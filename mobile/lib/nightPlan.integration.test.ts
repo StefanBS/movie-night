@@ -63,7 +63,7 @@ function backend(over: Partial<Record<string, Handler>> = {}): Handler {
         watchedAt: null,
         repeat: null,
         movie: null,
-        attendees: req.attendees.map((id) => ({ id, name: id, role: id === "frankie" ? "guest" : "core" })),
+        attendees: req.attendees.map((id) => ({ id, name: id })),
       };
       return json(res, 201, night);
     }

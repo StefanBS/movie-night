@@ -130,7 +130,7 @@ WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
 -- name: ListAttendees :many
 -- The attendees of the group's Nights, or of just night_id when it is given,
 -- core members first, then by name.
-SELECT a.night_id, u.id, u.name, m.role
+SELECT a.night_id, u.id, u.name
 FROM attendances a
 JOIN users u ON u.id = a.user_id
 JOIN memberships m ON m.group_id = a.group_id AND m.user_id = a.user_id

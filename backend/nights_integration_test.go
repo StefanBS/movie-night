@@ -90,12 +90,12 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		n := mustCreateNight(t, mux, seededGroup, nightBody("2026-06-12", ada, frankie))
 		var sawGuest bool
 		for _, a := range n.Attendees {
-			if a.Name == "Frankie" && a.Role == "guest" {
+			if a.Name == "Frankie" {
 				sawGuest = true
 			}
 		}
 		if !sawGuest {
-			t.Fatalf("attendees = %+v, want Frankie as guest", n.Attendees)
+			t.Fatalf("attendees = %+v, want Frankie", n.Attendees)
 		}
 		if got := names(turn(t, n.ID)); slices.Contains(got, "Frankie") {
 			t.Fatalf("order = %v, want no Frankie", got)

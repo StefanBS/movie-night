@@ -200,7 +200,7 @@ func (q *Queries) JoinSeries(ctx context.Context, arg JoinSeriesParams) error {
 }
 
 const listAttendees = `-- name: ListAttendees :many
-SELECT a.night_id, u.id, u.name, m.role
+SELECT a.night_id, u.id, u.name
 FROM attendances a
 JOIN users u ON u.id = a.user_id
 JOIN memberships m ON m.group_id = a.group_id AND m.user_id = a.user_id
@@ -217,10 +217,9 @@ type ListAttendeesParams struct {
 }
 
 type ListAttendeesRow struct {
-	NightID uuid.UUID      `json:"night_id"`
-	ID      uuid.UUID      `json:"id"`
-	Name    string         `json:"name"`
-	Role    MembershipRole `json:"role"`
+	NightID uuid.UUID `json:"night_id"`
+	ID      uuid.UUID `json:"id"`
+	Name    string    `json:"name"`
 }
 
 // The attendees of the group's Nights, or of just night_id when it is given,
@@ -234,12 +233,7 @@ func (q *Queries) ListAttendees(ctx context.Context, arg ListAttendeesParams) ([
 	var items []ListAttendeesRow
 	for rows.Next() {
 		var i ListAttendeesRow
-		if err := rows.Scan(
-			&i.NightID,
-			&i.ID,
-			&i.Name,
-			&i.Role,
-		); err != nil {
+		if err := rows.Scan(&i.NightID, &i.ID, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -64,7 +64,7 @@ function backend(over: Partial<Record<string, Handler>> = {}, patches: Patch[] =
       const night: Night = {
         ...PLANNED,
         pickerId: patch.pickerId,
-        attendees: patch.attendees.map((id) => ({ id, name: id, role: id === "frankie" ? "guest" : "core" })),
+        attendees: patch.attendees.map((id) => ({ id, name: id })),
         watchedAt: "2026-06-19T22:00:00Z",
         repeat: null,
       };
