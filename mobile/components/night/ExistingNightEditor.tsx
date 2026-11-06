@@ -82,7 +82,6 @@ export function ExistingNightEditor({
           resultsFor={state.resultsFor}
           searching={state.searching}
           searchError={state.searchError}
-          groupNights={state.groupNights}
           onSearch={editor.search}
           onAttach={editor.attach}
           onChangePicker={editor.changePicker}

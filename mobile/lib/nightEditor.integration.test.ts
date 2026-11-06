@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { createNightEditor } from "./nightEditor";
-import type { Movie } from "./movies";
+import type { Movie, SearchResult } from "./movies";
 import type { Night } from "./nights";
 import { type Handler, json, startServer } from "./testServer";
 
@@ -28,8 +28,10 @@ const SAVED: Night = {
   ],
 };
 
-// PAST_DUNE is an earlier Night of the group that watched Dune.
-const PAST_DUNE: Night = { ...SAVED, id: "n0", scheduledFor: "2026-05-02", movie: DUNE };
+// DUNE_RESULT is Dune as the search returns it: the group watched it May 2.
+const DUNE_RESULT: SearchResult = { ...DUNE, watchedOn: "2026-05-02" };
+// SEARCH is the search route for this group.
+const SEARCH = `GET /groups/${GROUP}/movies/search`;
 
 // backend fakes the routes the editor touches, keeping one Night in memory.
 function backend(over: Partial<Record<string, Handler>> = {}): Handler {
@@ -43,8 +45,10 @@ function backend(over: Partial<Record<string, Handler>> = {}): Handler {
       return;
     }
     const base = `/groups/${GROUP}/nights/${NIGHT}`;
-    if (key === `GET /groups/${GROUP}/nights`) return json(res, 200, [PAST_DUNE, night]);
-    if (key === "GET /movies/search") return json(res, 200, url.searchParams.get("q") === "dune" ? [DUNE] : []);
+    if (key === SEARCH) {
+      if (url.searchParams.get("exceptNight") !== NIGHT) return json(res, 400, { error: "want exceptNight" });
+      return json(res, 200, url.searchParams.get("q") === "dune" ? [DUNE_RESULT] : []);
+    }
     if (key === `POST ${base}/movie`) return json(res, 200, (night = { ...night, movie: DUNE }));
     if (key === `DELETE ${base}/movie`) return json(res, 200, (night = { ...night, movie: null }));
     if (key === `PATCH ${base}`) {
@@ -53,14 +57,6 @@ function backend(over: Partial<Record<string, Handler>> = {}): Handler {
     }
     json(res, 404, { error: `no route ${key}` });
   };
-}
-
-// until waits for a background load to land.
-async function until(done: () => boolean) {
-  for (let i = 0; i < 100 && !done(); i++) {
-    await new Promise((r) => setTimeout(r, 5));
-  }
-  assert.ok(done(), "timed out waiting");
 }
 
 async function withEditor(
@@ -99,11 +95,11 @@ test("search fills the results; a blank query clears them without a request", as
   let searches = 0;
   const base = backend();
   await withEditor(
-    backend({ "GET /movies/search": (req, res, body) => (searches++, base(req, res, body)) }),
+    backend({ [SEARCH]: (req, res, body) => (searches++, base(req, res, body)) }),
     async (editor) => {
       await editor.search(" dune ");
       assert.equal(searches, 1);
-      assert.deepEqual(editor.state.results, [DUNE]);
+      assert.deepEqual(editor.state.results, [DUNE_RESULT]);
       assert.equal(editor.state.resultsFor, "dune");
       assert.equal(editor.state.searching, false);
       assert.equal(editor.state.searchError, null);
@@ -119,14 +115,14 @@ test("the same query again (submit after the debounce) sends one request", async
   let searches = 0;
   const base = backend();
   await withEditor(
-    backend({ "GET /movies/search": (req, res, body) => (searches++, base(req, res, body)) }),
+    backend({ [SEARCH]: (req, res, body) => (searches++, base(req, res, body)) }),
     async (editor) => {
       const running = editor.search("dune");
       await editor.search("dune "); // while the first is in flight
       await running;
       await editor.search("dune"); // once it has answered
       assert.equal(searches, 1);
-      assert.deepEqual(editor.state.results, [DUNE]);
+      assert.deepEqual(editor.state.results, [DUNE_RESULT]);
     },
   );
 });
@@ -136,7 +132,7 @@ test("a newer search replaces one still running", async () => {
   await withEditor(
     backend({
       // The first query answers last; its results must not land.
-      "GET /movies/search": (req, res, body) => {
+      [SEARCH]: (req, res, body) => {
         const slow = new URL(req.url ?? "", "http://x").searchParams.get("q") === "du";
         setTimeout(() => base(req, res, body), slow ? 100 : 0);
       },
@@ -145,7 +141,7 @@ test("a newer search replaces one still running", async () => {
       const first = editor.search("du");
       await editor.search("dune");
       await first;
-      assert.deepEqual(editor.state.results, [DUNE]);
+      assert.deepEqual(editor.state.results, [DUNE_RESULT]);
       assert.equal(editor.state.resultsFor, "dune");
       assert.equal(editor.state.searching, false);
       assert.equal(editor.state.searchError, null);
@@ -153,47 +149,9 @@ test("a newer search replaces one still running", async () => {
   );
 });
 
-test("opening the Pick step loads the group's Nights once", async () => {
-  let loads = 0;
-  const base = backend();
-  const handler = backend({
-    [`GET /groups/${GROUP}/nights`]: (req, res, body) => (loads++, base(req, res, body)),
-  });
-  await withEditor(handler, async (editor) => {
-    assert.equal(loads, 0);
-    editor.pickFilm();
-    await until(() => editor.state.groupNights.length > 0);
-    assert.deepEqual(editor.state.groupNights.map((n) => n.id), ["n0", NIGHT]);
-    editor.toNight();
-    editor.pickFilm();
-    assert.equal(loads, 1);
-  });
-  await withEditor(
-    handler,
-    async (editor) => {
-      await until(() => editor.state.groupNights.length > 0);
-      assert.equal(loads, 2);
-    },
-    "pick",
-  );
-});
-
-test("a failed load of the group's Nights leaves no hints and no error", async () => {
-  await withEditor(
-    backend({ [`GET /groups/${GROUP}/nights`]: (_q, res) => json(res, 500, { error: "boom" }) }),
-    async (editor) => {
-      editor.pickFilm();
-      await new Promise((r) => setTimeout(r, 50));
-      assert.deepEqual(editor.state.groupNights, []);
-      assert.equal(editor.state.actionError, null);
-      assert.equal(editor.state.searchError, null);
-    },
-  );
-});
-
 test("a failed search reports its error", async () => {
   await withEditor(
-    backend({ "GET /movies/search": (_q, res) => json(res, 503, { error: "movie search is not configured" }) }),
+    backend({ [SEARCH]: (_q, res) => json(res, 503, { error: "movie search is not configured" }) }),
     async (editor) => {
       await editor.search("dune");
       assert.equal(editor.state.searchError, "movie search is not configured");
@@ -302,7 +260,7 @@ test("refresh swaps in a fresher Night but keeps the step and search", async () 
       editor.refresh(moved, performance.now());
       assert.equal(editor.state.night.scheduledFor, "2026-07-03");
       assert.equal(editor.state.step, "pick");
-      assert.deepEqual(editor.state.results, [DUNE]);
+      assert.deepEqual(editor.state.results, [DUNE_RESULT]);
     },
     "pick",
   );

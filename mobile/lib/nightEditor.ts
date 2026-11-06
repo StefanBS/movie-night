@@ -1,6 +1,6 @@
 import { errorMessage } from "./errors";
-import { searchMovies, type Movie } from "./movies";
-import { attachMovie, changeNightPicker, detachMovie, listNights, type Night } from "./nights";
+import { searchMovies, type SearchResult } from "./movies";
+import { attachMovie, changeNightPicker, detachMovie, type Night } from "./nights";
 import { createSessionCore, type Session } from "./session";
 
 // The editor module for a saved Night: choosing or clearing its film and
@@ -16,16 +16,12 @@ export type NightEditorState = {
   step: EditorStep;
   busy: string | null;
   actionError: string | null;
-  results: Movie[];
+  results: SearchResult[];
   // resultsFor is the trimmed query the results answer ("" before any search),
   // so the screen can tell "no films match" from "still typing".
   resultsFor: string;
   searching: boolean;
   searchError: string | null;
-  // groupNights is every Night of the group, loaded once the Pick step opens,
-  // for the "watched May 2" hints (lib/history watchedOn). It's a hint: a
-  // failed load leaves it empty.
-  groupNights: Night[];
 };
 
 export type NightEditor = Session<NightEditorState> & {
@@ -65,32 +61,12 @@ export function createNightEditor({
     resultsFor: "",
     searching: false,
     searchError: null,
-    groupNights: [],
   });
 
   let lastWriteAt = -Infinity;
   let searchController: AbortController | null = null;
   // searchingFor is the query searchController is answering ("" when idle).
   let searchingFor = "";
-  let groupNightsRequested = false;
-
-  // loadGroupNights fetches the group's Nights the first time the Pick step
-  // opens. It never sets an error: the hints just don't show.
-  const loadGroupNights = async () => {
-    if (groupNightsRequested) {
-      return;
-    }
-    groupNightsRequested = true;
-    try {
-      const groupNights = await core.track((signal) => listNights(baseUrl, groupId, signal));
-      core.set({ groupNights });
-    } catch {
-      groupNightsRequested = false;
-    }
-  };
-  if (initialStep === "pick") {
-    void loadGroupNights();
-  }
 
   // write runs one Night write under the busy guard, keeping the returned
   // Night; on failure the Night is unchanged and the error is shown.
@@ -125,7 +101,6 @@ export function createNightEditor({
 
     pickFilm() {
       core.set({ step: "pick" });
-      void loadGroupNights();
     },
 
     toNight() {
@@ -152,7 +127,7 @@ export function createNightEditor({
       searchingFor = q;
       core.set({ searching: true, searchError: null });
       try {
-        const results = await core.track((signal) => searchMovies(baseUrl, q, signal), controller);
+        const results = await core.track((signal) => searchMovies(baseUrl, groupId, nightId, q, signal), controller);
         if (searchController === controller) {
           core.set({ results, resultsFor: q, searching: false });
         }
