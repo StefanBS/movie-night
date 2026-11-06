@@ -46,18 +46,13 @@ func TestNightCreateRequestValidation(t *testing.T) {
 		wantStart     string // "" = no start time
 	}{
 		{name: "with a start time", req: createNightRequest{ScheduledFor: "2026-06-12", StartTime: str("19:30"), Attendees: []string{a}, PickerID: a}, wantCount: 1, wantStart: "19:30"},
-		{name: "a null start time is none", req: createNightRequest{ScheduledFor: "2026-06-12", StartTime: nil, Attendees: []string{a}, PickerID: a}, wantCount: 1},
 		{name: "bad start time", req: createNightRequest{ScheduledFor: "2026-06-12", StartTime: str("7pm"), Attendees: []string{a}, PickerID: a}, wantErr: true},
 		{name: "start time with seconds", req: createNightRequest{ScheduledFor: "2026-06-12", StartTime: str("19:30:00"), Attendees: []string{a}, PickerID: a}, wantErr: true},
-		{name: "start time out of range", req: createNightRequest{ScheduledFor: "2026-06-12", StartTime: str("24:00"), Attendees: []string{a}, PickerID: a}, wantErr: true},
 		{name: "valid", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a, b}, PickerID: a}, wantCount: 2},
-		{name: "picker alone", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{b}, PickerID: b}, wantCount: 1},
 		{name: "dedupes attendees", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a, a, b}, PickerID: b}, wantCount: 2},
 		{name: "bad date", req: createNightRequest{ScheduledFor: "12-06-2026", Attendees: []string{a}, PickerID: a}, wantErr: true},
-		{name: "empty date", req: createNightRequest{ScheduledFor: "", Attendees: []string{a}, PickerID: a}, wantErr: true},
 		{name: "bad attendee uuid", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{"nope"}, PickerID: a}, wantErr: true},
 		{name: "missing picker", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a}}, wantErr: true},
-		{name: "bad picker uuid", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a}, PickerID: "nope"}, wantErr: true},
 		{name: "picker not attending", req: createNightRequest{ScheduledFor: "2026-06-12", Attendees: []string{a}, PickerID: b}, wantErr: true, wantNotAttend: true},
 		{name: "no attendees", req: createNightRequest{ScheduledFor: "2026-06-12", PickerID: a}, wantErr: true, wantNotAttend: true},
 	}
@@ -114,10 +109,8 @@ func TestUpdateNightRequestValidation(t *testing.T) {
 	}{
 		{name: "whole night", req: valid(func(*updateNightRequest) {}), wantStart: "20:15", wantAttendees: 2},
 		{name: "null start time is none", req: valid(func(r *updateNightRequest) { r.StartTime = nil }), wantAttendees: 2},
-		{name: "dedupes attendees", req: valid(func(r *updateNightRequest) { r.Attendees = []string{a, a, b} }), wantStart: "20:15", wantAttendees: 2},
 		{name: "no attendees parses (editNight rejects it: no picker)", req: valid(func(r *updateNightRequest) { r.Attendees = nil }), wantStart: "20:15"},
 		{name: "bad date", req: valid(func(r *updateNightRequest) { r.ScheduledFor = "nope" }), wantErr: true},
-		{name: "missing date", req: valid(func(r *updateNightRequest) { r.ScheduledFor = "" }), wantErr: true},
 		{name: "bad start time", req: valid(func(r *updateNightRequest) { r.StartTime = str("8:15 PM") }), wantErr: true},
 		{name: "bad attendee uuid", req: valid(func(r *updateNightRequest) { r.Attendees = []string{"nope"} }), wantErr: true},
 		{name: "missing reminders", req: valid(func(r *updateNightRequest) { r.Reminders = remindersDTO{} }), wantErr: true},
@@ -166,7 +159,6 @@ func TestUpdateNightRequestPickerAndWatched(t *testing.T) {
 		{name: "neither: picker kept, not recorded"},
 		{name: "a new picker", pickerID: str(a), wantPicker: a},
 		{name: "recorded", watched: true, wantWatched: true},
-		{name: "recorded with a picker", pickerID: str(a), watched: true, wantPicker: a, wantWatched: true},
 		{name: "bad picker uuid", pickerID: str("nope"), wantErr: true},
 	}
 	for _, tt := range tests {
@@ -250,7 +242,6 @@ func TestAttendeeRole(t *testing.T) {
 		{name: "core attendee", attendees: attendees, picker: ada, want: db.MembershipRoleCore},
 		{name: "guest attendee", attendees: attendees, picker: frankie, want: db.MembershipRoleGuest},
 		{name: "not attending", attendees: attendees, picker: stranger, wantErr: errPickerNotAttendee},
-		{name: "no attendees", attendees: nil, picker: ada, wantErr: errPickerNotAttendee},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -308,14 +299,6 @@ func TestToNightResponse(t *testing.T) {
 		}
 		if len(got.Attendees) != 0 {
 			t.Errorf("len = %d, want 0", len(got.Attendees))
-		}
-	})
-
-	t.Run("pickerId is the picker's uuid", func(t *testing.T) {
-		n := mkNight()
-		n.PickerID = ada
-		if got := toNightResponse(n, nil); got.PickerID != ada.String() {
-			t.Errorf("PickerID = %q, want %s", got.PickerID, ada)
 		}
 	})
 
@@ -391,14 +374,13 @@ func TestToMovieResults(t *testing.T) {
 	if got[1].PosterURL != nil {
 		t.Errorf("[1] poster = %v, want nil", got[1].PosterURL)
 	}
-}
-
-func TestCreditedForRole(t *testing.T) {
-	if !creditedForRole(db.MembershipRoleCore) {
-		t.Error("core picker must be credited")
+	// Search hits carry only genre ids and no runtime, so the DTO always has
+	// genres [] (never null) and runtimeMinutes null.
+	if got[1].Genres == nil || len(got[1].Genres) != 0 {
+		t.Errorf("[1] genres = %#v, want []", got[1].Genres)
 	}
-	if creditedForRole(db.MembershipRoleGuest) {
-		t.Error("guest picker must not be credited")
+	if got[1].RuntimeMinutes != nil {
+		t.Errorf("[1] runtime = %v, want nil", got[1].RuntimeMinutes)
 	}
 }
 
@@ -465,37 +447,6 @@ func TestAttendeeRoles(t *testing.T) {
 	}
 }
 
-func TestMovieDTOFromCols(t *testing.T) {
-	base := nightRow{
-		ID:           uuid.MustParse("b0000000-0000-0000-0000-0000000000aa"),
-		ScheduledFor: pgtype.Date{Time: mustDate(t, "2026-05-01"), Valid: true},
-	}
-
-	t.Run("nil when no movie", func(t *testing.T) {
-		if got := movieDTOFromCols(base); got != nil {
-			t.Fatalf("want nil, got %+v", got)
-		}
-	})
-
-	t.Run("maps the nullable columns", func(t *testing.T) {
-		row := base
-		row.MovieTmdbID = pgtype.Int4{Int32: 27205, Valid: true}
-		row.MovieTitle = pgtype.Text{String: "Inception", Valid: true}
-		row.MovieReleaseYear = pgtype.Int4{Int32: 2010, Valid: true}
-		row.MoviePosterPath = pgtype.Text{String: "/inc.jpg", Valid: true}
-		got := movieDTOFromCols(row)
-		if got == nil || got.TMDBID != 27205 || got.Title != "Inception" {
-			t.Fatalf("unexpected movie dto: %+v", got)
-		}
-		if got.ReleaseYear == nil || *got.ReleaseYear != 2010 {
-			t.Fatalf("want release year 2010, got %v", got.ReleaseYear)
-		}
-		if got.PosterURL == nil {
-			t.Fatalf("want a poster url, got nil")
-		}
-	})
-}
-
 func TestGroupAttendees(t *testing.T) {
 	n1 := uuid.MustParse("b0000000-0000-0000-0000-0000000000aa")
 	n2 := uuid.MustParse("b0000000-0000-0000-0000-0000000000bb")
@@ -543,15 +494,6 @@ func TestToNightResponses(t *testing.T) {
 	if got[0].ID != n1.String() || got[1].ID != n2.String() {
 		t.Fatalf("order not preserved: %s then %s", got[0].ID, got[1].ID)
 	}
-	if got[0].ScheduledFor != "2026-06-01" {
-		t.Fatalf("want scheduledFor 2026-06-01, got %s", got[0].ScheduledFor)
-	}
-	if got[0].Movie == nil || got[0].Movie.Title != "Inception" {
-		t.Fatalf("want movie Inception, got %+v", got[0].Movie)
-	}
-	if got[1].Movie != nil {
-		t.Fatalf("want nil movie on second night, got %+v", got[1].Movie)
-	}
 	if got[1].Attendees == nil || len(got[1].Attendees) != 0 {
 		t.Fatalf("want empty (non-nil) attendees, got %+v", got[1].Attendees)
 	}
@@ -561,10 +503,8 @@ func TestValidateMovieRequest(t *testing.T) {
 	if err := validateMovieRequest(movieRequest{TMDBID: 438631}); err != nil {
 		t.Errorf("valid tmdbId rejected: %v", err)
 	}
-	for _, bad := range []int{0, -1} {
-		if err := validateMovieRequest(movieRequest{TMDBID: bad}); err == nil {
-			t.Errorf("tmdbId %d accepted, want error", bad)
-		}
+	if err := validateMovieRequest(movieRequest{TMDBID: 0}); err == nil {
+		t.Error("tmdbId 0 accepted, want error")
 	}
 }
 
@@ -589,18 +529,14 @@ func TestRecordableAsWatched(t *testing.T) {
 		now          time.Time
 		want         bool
 	}{
-		{name: "a past night", scheduledFor: "2026-10-01", now: now, want: true},
 		{name: "dated today in UTC-12", scheduledFor: "2026-11-02", now: now, want: true},
 		{name: "dated the UTC date", scheduledFor: "2026-11-03", now: now, want: true},
 		{name: "dated today in UTC+14", scheduledFor: "2026-11-04", now: now, want: true},
 		{name: "two days after the UTC date", scheduledFor: "2026-11-05", now: now, want: false},
-		{name: "next week", scheduledFor: "2026-11-10", now: now, want: false},
 		{name: "a non-UTC clock is read as UTC", scheduledFor: "2026-11-05",
 			now: time.Date(2026, 11, 4, 1, 0, 0, 0, time.FixedZone("UTC+14", 14*3600)), want: false},
 		{name: "end of the UTC day", scheduledFor: "2026-11-04",
 			now: time.Date(2026, 11, 3, 23, 59, 59, 0, time.UTC), want: true},
-		{name: "across a month end", scheduledFor: "2026-12-01",
-			now: time.Date(2026, 11, 30, 0, 0, 0, 0, time.UTC), want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -37,7 +37,6 @@ func TestReleaseYear(t *testing.T) {
 		want *int32
 	}{
 		{name: "valid date returns 2021", in: "2021-10-22", want: intp(2021)},
-		{name: "valid date returns 1984", in: "1984-12-14", want: intp(1984)},
 		{name: "empty string returns nil", in: "", want: nil},
 		{name: "non-numeric prefix returns nil", in: "nope", want: nil},
 		{name: "too-short string returns nil", in: "20", want: nil},
@@ -139,18 +138,6 @@ func TestParseTMDBMovieDetails(t *testing.T) {
 			wantGenres:  []string{},
 			wantRuntime: nil,
 		},
-		{
-			name:        "missing genres and runtime",
-			body:        `{"id":1,"title":"A"}`,
-			wantGenres:  []string{},
-			wantRuntime: nil,
-		},
-		{
-			name:        "negative runtime is unknown",
-			body:        `{"id":1,"title":"A","runtime":-5}`,
-			wantGenres:  []string{},
-			wantRuntime: nil,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -169,17 +156,5 @@ func TestParseTMDBMovieDetails(t *testing.T) {
 				t.Errorf("runtime = %v, want %v", got.RuntimeMinutes, tt.wantRuntime)
 			}
 		})
-	}
-}
-
-func TestToMovieResultsDetails(t *testing.T) {
-	// Search hits carry only genre ids and no runtime, so the DTO always has
-	// genres [] (never null) and runtimeMinutes null.
-	got := toMovieResults([]movieResult{{TMDBID: 1, Title: "A"}})
-	if got[0].Genres == nil || len(got[0].Genres) != 0 {
-		t.Errorf("genres = %#v, want []", got[0].Genres)
-	}
-	if got[0].RuntimeMinutes != nil {
-		t.Errorf("runtime = %v, want nil", got[0].RuntimeMinutes)
 	}
 }

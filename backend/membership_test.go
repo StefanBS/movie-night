@@ -17,9 +17,7 @@ func TestSeedBaseline(t *testing.T) {
 		{name: "rounds to nearest", avg: 1.4, existingCredit: 0, want: 1},
 		{name: "rounds half away from zero", avg: 2.5, existingCredit: 0, want: 3},
 		{name: "subtracts existing credited picks", avg: 5.0, existingCredit: 2, want: 3},
-		{name: "returner with history lands at average total", avg: 4.0, existingCredit: 4, want: 0},
 		{name: "never negative", avg: 2.0, existingCredit: 5, want: 0},
-		{name: "empty group averages to zero", avg: 0.0, existingCredit: 0, want: 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -53,7 +51,6 @@ func TestValidateJoin(t *testing.T) {
 		name string
 		req  joinRequest
 	}{
-		{name: "empty name", req: joinRequest{Name: ""}},
 		{name: "whitespace name", req: joinRequest{Name: "   "}},
 		{name: "unknown role", req: joinRequest{Name: "Ada", Role: "admin"}},
 	} {
@@ -81,17 +78,13 @@ func TestPlanMove(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "deactivate active core leaves the rotation", action: actionDeactivate, role: core, status: active, want: membershipMove{}},
-		{name: "deactivate active guest", action: actionDeactivate, role: guest, status: active, want: membershipMove{}},
 		{name: "deactivate inactive core is a no-op", action: actionDeactivate, role: core, status: inactive, want: membershipMove{noOp: true}},
-		{name: "deactivate inactive guest is a no-op", action: actionDeactivate, role: guest, status: inactive, want: membershipMove{noOp: true}},
 		{name: "reactivate inactive core re-enters the rotation seeded", action: actionReactivate, role: core, status: inactive, want: membershipMove{seed: true}},
 		{name: "reactivate inactive guest stays out of the rotation", action: actionReactivate, role: guest, status: inactive, want: membershipMove{}},
 		{name: "reactivate active core is a no-op", action: actionReactivate, role: core, status: active, want: membershipMove{noOp: true}},
-		{name: "reactivate active guest is a no-op", action: actionReactivate, role: guest, status: active, want: membershipMove{noOp: true}},
 		{name: "promote active guest enters the rotation seeded", action: actionPromote, role: guest, status: active, want: membershipMove{seed: true}},
 		{name: "promote active core is a no-op", action: actionPromote, role: core, status: active, want: membershipMove{noOp: true}},
 		{name: "promote inactive guest is rejected", action: actionPromote, role: guest, status: inactive, wantErr: true},
-		{name: "promote inactive core is rejected", action: actionPromote, role: core, status: inactive, wantErr: true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

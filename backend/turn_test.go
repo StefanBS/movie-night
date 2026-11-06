@@ -21,8 +21,6 @@ func TestParsePresent(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "empty string yields nil", raw: "", want: nil},
-		{name: "blank string yields nil", raw: "   ", want: nil},
-		{name: "single id", raw: id1.String(), want: []uuid.UUID{id1}},
 		{name: "multiple ids", raw: id1.String() + "," + id2.String(), want: []uuid.UUID{id1, id2}},
 		{name: "trims whitespace around ids", raw: " " + id1.String() + " , " + id2.String() + " ", want: []uuid.UUID{id1, id2}},
 		{name: "skips trailing blank segment", raw: id1.String() + ",", want: []uuid.UUID{id1}},

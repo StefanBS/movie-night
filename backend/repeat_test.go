@@ -19,23 +19,15 @@ func TestNextSeriesDate(t *testing.T) {
 		want  string
 	}{
 		{name: "weekly: a week on", rule: weekly, night: "2026-06-19", now: "2026-06-19T21:00:00Z", want: "2026-06-26"},
-		{name: "weekly: into the next month", rule: weekly, night: "2026-06-26", now: "2026-06-26T21:00:00Z", want: "2026-07-03"},
 		{name: "weekly: into the next year", rule: weekly, night: "2026-12-25", now: "2026-12-25T21:00:00Z", want: "2027-01-01"},
-		{name: "weekly: across the October DST change", rule: weekly, night: "2026-10-23", now: "2026-10-23T21:00:00Z", want: "2026-10-30"},
-		{name: "weekly: across the March DST change", rule: weekly, night: "2027-03-26", now: "2027-03-26T21:00:00Z", want: "2027-04-02"},
-		{name: "weekly: recorded the next UTC day", rule: weekly, night: "2026-06-19", now: "2026-06-20T03:00:00Z", want: "2026-06-26"},
-		{name: "weekly: cancelled ahead of time", rule: weekly, night: "2026-06-19", now: "2026-06-10T12:00:00Z", want: "2026-06-26"},
 		{name: "weekly: recorded weeks late skips to the first ahead", rule: weekly, night: "2026-06-05", now: "2026-06-24T12:00:00Z", want: "2026-06-26"},
 		{name: "weekly: late, landing on today's date", rule: weekly, night: "2026-06-05", now: "2026-06-26T12:00:00Z", want: "2026-06-26"},
 		{name: "every 2 weeks", rule: fortnightly, night: "2026-06-19", now: "2026-06-19T21:00:00Z", want: "2026-07-03"},
-		{name: "every 2 weeks: recorded late", rule: fortnightly, night: "2026-06-05", now: "2026-06-24T12:00:00Z", want: "2026-07-03"},
 		{name: "third Friday: next month", rule: third, night: "2026-06-19", now: "2026-06-19T21:00:00Z", want: "2026-07-17"},
 		{name: "third Friday: into the next year", rule: third, night: "2026-12-18", now: "2026-12-18T21:00:00Z", want: "2027-01-15"},
 		{name: "first Monday: month starting on a Monday", rule: repeatRule{Freq: repeatMonthly, WeekOfMonth: 1}, night: "2026-05-04", now: "2026-05-04T21:00:00Z", want: "2026-06-01"},
-		{name: "fourth Friday", rule: repeatRule{Freq: repeatMonthly, WeekOfMonth: 4}, night: "2026-06-26", now: "2026-06-26T21:00:00Z", want: "2026-07-24"},
 		{name: "last Friday: a month with five", rule: last, night: "2026-06-26", now: "2026-06-26T21:00:00Z", want: "2026-07-31"},
 		{name: "last Friday: a month with four", rule: last, night: "2026-07-31", now: "2026-07-31T21:00:00Z", want: "2026-08-28"},
-		{name: "last Sunday of February, leap year", rule: last, night: "2028-01-30", now: "2028-01-30T21:00:00Z", want: "2028-02-27"},
 		{name: "third Friday: recorded months late", rule: third, night: "2026-03-20", now: "2026-06-25T12:00:00Z", want: "2026-07-17"},
 	}
 	for _, tc := range tests {

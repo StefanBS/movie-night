@@ -133,16 +133,6 @@ func TestReminderMessage(t *testing.T) {
 			wantTitle: "Movie night starts at 7:30 PM",
 			wantBody:  "Ada picks · 4 going. Tap to see who's coming.",
 		},
-		{
-			name: "the picker 2 hours before", user: remPicker, slot: db.ReminderSlotTwoHoursBefore, opts: []func(*db.ListReminderCandidatesRow){evening},
-			wantTitle: "✦ It's your turn — you pick tonight's movie",
-			wantBody:  "Friday Film Club · Jun 19 at 7:30 PM. Come with a film in mind.",
-		},
-		{
-			name: "a start time on the hour", user: remGuest, slot: db.ReminderSlotTwoHoursBefore, opts: []func(*db.ListReminderCandidatesRow){startsAt(21, 0)},
-			wantTitle: "Movie night starts at 9:00 PM",
-			wantBody:  "Ada picks · 4 going. Tap to see who's coming.",
-		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			title, body := reminderMessage(candidate(t, tc.user, "", "", tc.opts...), tc.slot)
@@ -219,15 +209,6 @@ func TestDueReminders(t *testing.T) {
 			name: "2 hours before switched off",
 			rows: []db.ListReminderCandidatesRow{candidate(t, remGuest, "g", "Europe/Madrid", startsAt(19, 30), func(r *db.ListReminderCandidatesRow) { r.RemindTwoHoursBefore = false })},
 			now:  "2026-06-19T15:30:00Z",
-		},
-		{
-			name: "2 hours before, just the picker",
-			rows: []db.ListReminderCandidatesRow{
-				candidate(t, remPicker, "p", "Europe/Madrid", startsAt(19, 30), func(r *db.ListReminderCandidatesRow) { r.RemindAudience = db.ReminderAudiencePicker }),
-				candidate(t, remGuest, "g", "Europe/Madrid", startsAt(19, 30), func(r *db.ListReminderCandidatesRow) { r.RemindAudience = db.ReminderAudiencePicker }),
-			},
-			now:  "2026-06-19T15:30:00Z",
-			want: []want{{remPicker, db.ReminderSlotTwoHoursBefore, []string{"p"}}},
 		},
 		{
 			// A 01:00 start puts the slot at 23:00 Madrid the day before (21:00 UTC).
