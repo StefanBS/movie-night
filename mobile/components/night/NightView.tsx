@@ -26,7 +26,9 @@ type SheetAction = Omit<ComponentProps<typeof SheetRow>, "last">;
 // show is nightActions' call (lib/nightLifecycle.ts). On a weekly
 // night, Add to calendar first asks: the whole series, or just this night;
 // the club's name (GroupProvider) titles the entry. `today` is passed in (mirrors lib/date.ts)
-// for deterministic date framing.
+// for deterministic date framing. With `onDone` (the New night flow), the
+// footer also ends the flow: "Done" is the main action once the film is in,
+// and a ghost button under "Choose the film" while it isn't.
 export function NightView({
   night,
   today,
@@ -35,6 +37,7 @@ export function NightView({
   onPickFilm,
   onClearFilm,
   onEdit,
+  onDone,
 }: {
   night: Night;
   today: string;
@@ -43,6 +46,7 @@ export function NightView({
   onPickFilm: () => void;
   onClearFilm: () => void;
   onEdit: () => void;
+  onDone?: () => void;
 }) {
   const colors = useColors();
   const styles = useStyles();
@@ -141,6 +145,11 @@ export function NightView({
       {movie === null ? (
         <WizardFooter>
           <AppButton title="Choose the film" fullWidth onPress={onPickFilm} />
+          {onDone ? <AppButton title="Done" variant="ghost" fullWidth onPress={onDone} /> : null}
+        </WizardFooter>
+      ) : onDone ? (
+        <WizardFooter>
+          <AppButton title="Done" fullWidth onPress={onDone} />
         </WizardFooter>
       ) : null}
 

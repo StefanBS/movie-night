@@ -205,7 +205,9 @@ export default function TonightScreen() {
                 <AppButton
                   title={`${firstName(lineup.picker.name)} can't make it`}
                   variant="ghost"
-                  onPress={() => {}}
+                  onPress={() =>
+                    router.navigate({ pathname: "/night/new", params: { without: lineup.picker.id } })
+                  }
                 />
               </View>
               {lineup.onDeck.length > 0 ? (

@@ -48,9 +48,10 @@ function backend(over: Partial<Record<string, Handler>> = {}): Handler {
 async function withPlan(
   handler: Handler,
   run: (plan: ReturnType<typeof createNightPlan>) => Promise<void>,
+  without: string | null = null,
 ) {
   const server = await startServer(handler);
-  const plan = createNightPlan({ baseUrl: server.url, groupId: GROUP, today: TODAY });
+  const plan = createNightPlan({ baseUrl: server.url, groupId: GROUP, today: TODAY, without });
   try {
     await run(plan);
   } finally {
@@ -116,6 +117,21 @@ test("load ranks the club once; toggling reranks the attendees without a request
       assert.equal(plan.state.pickerId, "blake");
       assert.equal(turnRequests, 1);
     },
+  );
+});
+
+test("a plan without someone starts with the rest of the rotation, and the next one up picks", async () => {
+  await withPlan(
+    backend(),
+    async (plan) => {
+      await plan.load();
+      // frankie is a guest, so not in the rotation; ada can't make it.
+      assert.deepEqual([...plan.state.attendeeIds], ["blake"]);
+      assert.equal(plan.state.pickerId, "blake");
+      plan.toggle("ada");
+      assert.equal(plan.state.pickerId, "ada");
+    },
+    "ada",
   );
 });
 

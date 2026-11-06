@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { watchedNights, isDue, nightDates, nightLine, nightActions, nightLineParts, nightTiming, nightWording, plannedNights, upNextAction, type NightAction, type NightLineParts, type NightTiming, type NightWhen, type UpNextAction } from "./nightLifecycle";
+import { watchedNights, isDue, nightDates, nightLine, nightActions, nightTiming, nightWording, plannedNights, upNextAction, type NightAction, type NightLineParts, type NightTiming, type NightWhen, type UpNextAction } from "./nightLifecycle";
 import type { Night } from "./nights";
 import { aMovie, aNight } from "./fixtures";
 
@@ -200,7 +200,6 @@ for (const [date, want] of calendarCases) {
 const NIGHT_SCREEN: NightLineParts = { countdown: "relative", date: "short" };
 const UP_NEXT: NightLineParts = { countdown: "label", date: "long", repeat: true };
 const EDIT_HERO = (picker: string): NightLineParts => ({ countdown: "label", picker });
-const WHEN_STEP: NightLineParts = { date: "long", countdown: "trail" };
 const ALSO_PLANNED: NightLineParts = { date: "compact" };
 const weekly = { freq: "weekly", intervalWeeks: 1 } as const;
 
@@ -220,11 +219,6 @@ const lineCases: [string, NightWhen, NightLineParts, string][] = [
   ["edit hero: upcoming", { scheduledFor: UPCOMING, startTime: "20:00" }, EDIT_HERO("Tomas"), "In 3 days · 8:00 PM · Tomas picks"],
   ["edit hero: tonight without a time", { scheduledFor: TODAY, startTime: null }, EDIT_HERO("Tomas"), "Tonight · Tomas picks"],
   ["edit hero: past is just the picker", { scheduledFor: PAST, startTime: "20:00" }, EDIT_HERO("Tomas"), "8:00 PM · Tomas"],
-  // New night When step
-  ["when step: ahead with a time", { scheduledFor: UPCOMING, startTime: "20:00" }, WHEN_STEP, "Thursday, Jun 25 · 8:00 PM · in 3 days"],
-  ["when step: ahead without a time", { scheduledFor: UPCOMING, startTime: null }, WHEN_STEP, "Thursday, Jun 25 · in 3 days"],
-  ["when step: tonight has no countdown", { scheduledFor: TODAY, startTime: "20:00" }, WHEN_STEP, "Monday, Jun 22 · 8:00 PM"],
-  ["when step: past has no countdown", { scheduledFor: PAST, startTime: null }, WHEN_STEP, "Saturday, Jun 20"],
   // Tonight's also planned rows
   ["also planned: date only", { scheduledFor: "2026-06-27", startTime: null }, ALSO_PLANNED, "Sat 27 Jun"],
   ["also planned: date and start time", { scheduledFor: "2026-06-27", startTime: "20:00" }, ALSO_PLANNED, "Sat 27 Jun · 8:00 PM"],
@@ -239,13 +233,6 @@ for (const [name, night, parts, want] of lineCases) {
 
 test("nightLine: a 24-hour locale keeps HH:MM", () => {
   assert.equal(nightLine({ scheduledFor: "2026-06-27", startTime: "20:00" }, ALSO_PLANNED, TODAY, "en-GB"), "Sat 27 Jun · 20:00");
-});
-
-test("nightLineParts: the When step styles its date part on its own", () => {
-  assert.deepEqual(
-    nightLineParts({ scheduledFor: UPCOMING, startTime: "20:00" }, WHEN_STEP, TODAY, "en-US"),
-    ["Thursday, Jun 25", "8:00 PM", "in 3 days"],
-  );
 });
 
 // plannedNights

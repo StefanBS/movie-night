@@ -30,36 +30,43 @@ export function Input({
   const [focused, setFocused] = useState(false);
   return (
     <View style={styles.wrap}>
-      <TextInput
-        style={[styles.input, focused ? styles.focused : styles.idle]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.text.tertiary}
-        autoFocus={autoFocus}
-        onSubmitEditing={onSubmitEditing}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        returnKeyType={addonLabel ? "search" : "done"}
-      />
+      <View style={[styles.field, focused ? styles.focused : styles.idle]}>
+        <TextInput
+          style={styles.input}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.text.tertiary}
+          autoFocus={autoFocus}
+          onSubmitEditing={onSubmitEditing}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          returnKeyType={addonLabel ? "search" : "done"}
+        />
+      </View>
       {addonLabel && onAddonPress ? <AppButton title={addonLabel} onPress={onAddonPress} /> : null}
     </View>
   );
 }
 
 // The rings are inset box shadows (as in the DS), so focusing doesn't shift
-// the layout the way a thicker border would.
+// the layout the way a thicker border would. The fill and ring sit on a View
+// around the TextInput: on Android a box shadow on the TextInput itself
+// replaces its native background, which drops its padding, and the text
+// would run into the ring.
 const useStyles = createThemedStyles((colors, shadow) => ({
   wrap: { flexDirection: "row", alignItems: "center", gap: space[2] },
-  input: {
+  field: {
     flex: 1,
     minWidth: 0,
+    backgroundColor: colors.surface.card,
+    borderRadius: radius.md,
+  },
+  input: {
     height: 48,
     ...textPresets.body,
     color: colors.text.primary,
-    backgroundColor: colors.surface.card,
     paddingHorizontal: space[4],
-    borderRadius: radius.md,
   },
   idle: { boxShadow: `inset 0 0 0 1px ${colors.border.hairline}` },
   focused: { boxShadow: `inset 0 0 0 1.5px ${colors.border.focus}, ${String(shadow.focus.boxShadow)}` },
