@@ -1,12 +1,9 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
-
-	"github.com/google/uuid"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -44,17 +41,9 @@ func toGroupResponse(g db.Group) groupResponse {
 	}
 }
 
-// groupStore is the subset of *db.Queries the group handlers need; the real
-// *db.Queries satisfies it, so no mock is ever written (same pattern as
-// nightStore/turnStore).
-type groupStore interface {
-	GetGroup(ctx context.Context, id uuid.UUID) (db.Group, error)
-	RenameGroup(ctx context.Context, arg db.RenameGroupParams) (db.Group, error)
-}
-
 // getGroupHandler serves GET /groups/{groupId} — the group's name and since
 // date; 404 when the group does not exist.
-func getGroupHandler(store groupStore) http.HandlerFunc {
+func getGroupHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
 		if !ok {
@@ -71,7 +60,7 @@ func getGroupHandler(store groupStore) http.HandlerFunc {
 
 // renameGroupHandler serves PATCH /groups/{groupId} — renames the group. The
 // update's empty result set (unknown group) surfaces as pgx.ErrNoRows → 404.
-func renameGroupHandler(store groupStore) http.HandlerFunc {
+func renameGroupHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
 		if !ok {

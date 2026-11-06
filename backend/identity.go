@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -41,17 +40,6 @@ type identityResponse struct {
 type claimResponse struct {
 	Token    string           `json:"token"`
 	Identity identityResponse `json:"identity"`
-}
-
-// identityStore is the subset of *db.Queries the identity handlers need; the
-// real *db.Queries satisfies it.
-type identityStore interface {
-	GetGroupMember(ctx context.Context, arg db.GetGroupMemberParams) (db.GetGroupMemberRow, error)
-	CreateDevice(ctx context.Context, arg db.CreateDeviceParams) (db.CreateDeviceRow, error)
-	GetDeviceIdentity(ctx context.Context, tokenHash []byte) (db.GetDeviceIdentityRow, error)
-	DeleteDevice(ctx context.Context, tokenHash []byte) (int64, error)
-	RegisterPush(ctx context.Context, arg db.RegisterPushParams) (int64, error)
-	SetRemindersMuted(ctx context.Context, arg db.SetRemindersMutedParams) (db.SetRemindersMutedRow, error)
 }
 
 // pushRequest is the JSON body of PUT /identity/push.
@@ -121,7 +109,7 @@ func requireBearer(w http.ResponseWriter, r *http.Request) (string, bool) {
 
 // claimIdentityHandler serves POST /identity: the install claims a person with
 // an active membership in the group and receives a bearer token for it.
-func claimIdentityHandler(store identityStore) http.HandlerFunc {
+func claimIdentityHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		req, ok := decodeJSON[claimRequest](w, r)
 		if !ok {
@@ -162,7 +150,7 @@ func claimIdentityHandler(store identityStore) http.HandlerFunc {
 
 // getIdentityHandler serves GET /identity: who the bearer's install acts as. An
 // unknown or released token is a 401, which tells the app to claim again.
-func getIdentityHandler(store identityStore) http.HandlerFunc {
+func getIdentityHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := requireBearer(w, r)
 		if !ok {
@@ -180,7 +168,7 @@ func getIdentityHandler(store identityStore) http.HandlerFunc {
 // releaseIdentityHandler serves DELETE /identity: the install gives up its
 // identity, revoking the token. Idempotent — an unknown token is already
 // released.
-func releaseIdentityHandler(store identityStore) http.HandlerFunc {
+func releaseIdentityHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := requireBearer(w, r)
 		if !ok {
@@ -197,7 +185,7 @@ func releaseIdentityHandler(store identityStore) http.HandlerFunc {
 // registerPushHandler serves PUT /identity/push: the install's Expo push token
 // and time zone, re-sent on every launch so both stay current. 204 on success;
 // an unknown or released token is a 401.
-func registerPushHandler(store identityStore) http.HandlerFunc {
+func registerPushHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := requireBearer(w, r)
 		if !ok {
@@ -231,7 +219,7 @@ func registerPushHandler(store identityStore) http.HandlerFunc {
 // setPreferencesHandler serves PUT /identity/preferences: body
 // {"remindersMuted"} mutes or unmutes every reminder and nudge to the
 // install's identity, on all of their devices. Returns the identity.
-func setPreferencesHandler(store identityStore) http.HandlerFunc {
+func setPreferencesHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := requireBearer(w, r)
 		if !ok {

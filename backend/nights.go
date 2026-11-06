@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -304,7 +303,7 @@ func toNightResponses(rows []nightRow, byNight map[uuid.UUID][]attendee) []night
 // listNightsHandler serves GET /groups/{groupId}/nights — every night of the
 // group, past and upcoming, newest first. Two set-based queries (the nights, then all
 // of their attendees in one shot) keep it constant in the number of nights.
-func listNightsHandler(store nightStore) http.HandlerFunc {
+func listNightsHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
 		if !ok {
@@ -342,18 +341,6 @@ func presentIDs(rows []db.ListNightAttendeesRow) []uuid.UUID {
 		ids = append(ids, r.ID)
 	}
 	return ids
-}
-
-// nightStore is the subset of *db.Queries the night read handlers need; the
-// real *db.Queries satisfies it, so no mock is ever written (same pattern as
-// turnStore/groupStore). Night writes take the pool instead and run
-// in night_writes.go.
-type nightStore interface {
-	GetNight(ctx context.Context, arg db.GetNightParams) (db.FullNight, error)
-	ListNightAttendees(ctx context.Context, arg db.ListNightAttendeesParams) ([]db.ListNightAttendeesRow, error)
-	RankGroupTurn(ctx context.Context, arg db.RankGroupTurnParams) ([]db.RankGroupTurnRow, error)
-	ListNights(ctx context.Context, groupID uuid.UUID) ([]db.FullNight, error)
-	ListNightsAttendees(ctx context.Context, arg db.ListNightsAttendeesParams) ([]db.ListNightsAttendeesRow, error)
 }
 
 // updateNightRequest is the JSON body of PATCH .../nights/{nightId}: the whole
@@ -479,7 +466,7 @@ func attendeeRoles(attendees []uuid.UUID, members []db.FilterGroupMembersRow) (m
 // other error to 500. It hands back the row so a caller that needs the night
 // itself — not just proof it exists — does not read it a second time. ok=false
 // means a response was already written.
-func loadNight(w http.ResponseWriter, r *http.Request, store nightStore, gid, nightID uuid.UUID) (nightRow, bool) {
+func loadNight(w http.ResponseWriter, r *http.Request, store *db.Queries, gid, nightID uuid.UUID) (nightRow, bool) {
 	night, err := store.GetNight(r.Context(), db.GetNightParams{NightID: nightID, GroupID: gid})
 	if err != nil {
 		storeError(w, gid, "get night", err, http.StatusNotFound, "night not found")
@@ -491,7 +478,7 @@ func loadNight(w http.ResponseWriter, r *http.Request, store nightStore, gid, ni
 // writeNight reads a Night (GetNight, the one full-Night read) and its
 // attendees and encodes them with the given status, so every handler, read or
 // write, answers with the current Night.
-func writeNight(w http.ResponseWriter, r *http.Request, store nightStore, gid, nightID uuid.UUID, code int) {
+func writeNight(w http.ResponseWriter, r *http.Request, store *db.Queries, gid, nightID uuid.UUID, code int) {
 	night, ok := loadNight(w, r, store, gid, nightID)
 	if !ok {
 		return
@@ -554,7 +541,7 @@ func createNightHandler(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 // nightDetailHandler serves GET /groups/{groupId}/nights/{nightId}.
-func nightDetailHandler(store nightStore) http.HandlerFunc {
+func nightDetailHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
@@ -571,7 +558,7 @@ func nightDetailHandler(store nightStore) http.HandlerFunc {
 // the order the picker was chosen from. An optional `present=<uuid>,…` ranks
 // that draft attendee set instead of the stored one (the "We watched it" flow
 // confirms who came before saving); blank means the stored attendees.
-func nightTurnHandler(store nightStore) http.HandlerFunc {
+func nightTurnHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {

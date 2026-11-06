@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
@@ -61,14 +60,8 @@ func toTurnResponses(rows []db.RankGroupTurnRow) []turnResponse {
 	return out
 }
 
-// turnStore is the subset of *db.Queries the handler needs. The integration
-// test passes the real *db.Queries, so no mock implementation is ever written.
-type turnStore interface {
-	RankGroupTurn(ctx context.Context, arg db.RankGroupTurnParams) ([]db.RankGroupTurnRow, error)
-}
-
 // turnHandler serves GET /groups/{groupId}/turn.
-func turnHandler(store turnStore) http.HandlerFunc {
+func turnHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
 		if !ok {

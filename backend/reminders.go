@@ -181,13 +181,6 @@ func dueReminders(rows []db.ListReminderCandidatesRow, now time.Time) []dueRemin
 	return out
 }
 
-// reminderStore is the subset of *db.Queries the scheduler needs.
-type reminderStore interface {
-	ListReminderCandidates(ctx context.Context, arg db.ListReminderCandidatesParams) ([]db.ListReminderCandidatesRow, error)
-	LogReminderSent(ctx context.Context, arg db.LogReminderSentParams) (int64, error)
-	ClearPushToken(ctx context.Context, pushToken pgtype.Text) error
-}
-
 // candidateDates is the range of Night dates that can have a slot due at now:
 // a device's local date is within a day of UTC, and the night-before slot
 // belongs to the next day's Night. Pure.
@@ -201,7 +194,7 @@ func candidateDates(now time.Time) (from, to pgtype.Date) {
 
 // sendDueReminders sends every reminder due at now. A reminder is logged
 // before it is sent, so a failed send loses it rather than repeating it.
-func sendDueReminders(ctx context.Context, store reminderStore, push *expoPusher, now time.Time) error {
+func sendDueReminders(ctx context.Context, store *db.Queries, push *expoPusher, now time.Time) error {
 	from, to := candidateDates(now)
 	rows, err := store.ListReminderCandidates(ctx, db.ListReminderCandidatesParams{FromDate: from, ToDate: to})
 	if err != nil {
@@ -251,7 +244,7 @@ func sendDueReminders(ctx context.Context, store reminderStore, push *expoPusher
 }
 
 // runReminders runs the scheduler every interval until ctx is done.
-func runReminders(ctx context.Context, store reminderStore, push *expoPusher, interval time.Duration) {
+func runReminders(ctx context.Context, store *db.Queries, push *expoPusher, interval time.Duration) {
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
 	for {
