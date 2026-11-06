@@ -18,19 +18,21 @@ test("searchMovies fetches from the search path and parses the result array", as
     res.setHeader("content-type", "application/json");
     res.end(
       JSON.stringify([
-        { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: null, genres: [], runtimeMinutes: null },
-        { tmdbId: 693134, title: "Dune: Part Two", releaseYear: 2024, posterUrl: null, genres: [], runtimeMinutes: null },
+        { tmdbId: 438631, title: "Dune", releaseYear: 2021, posterUrl: null, genres: [], runtimeMinutes: null, watchedOn: "2026-05-02" },
+        { tmdbId: 693134, title: "Dune: Part Two", releaseYear: 2024, posterUrl: null, genres: [], runtimeMinutes: null, watchedOn: null },
       ]),
     );
   });
   try {
-    const got = await searchMovies(server.url, "dune");
+    const got = await searchMovies(server.url, GROUP, NIGHT, "dune");
     assert.equal(method, "GET");
-    assert.equal(path, "/movies/search?q=dune");
+    assert.equal(path, `/groups/${GROUP}/movies/search?q=dune&exceptNight=${NIGHT}`);
     assert.equal(got.length, 2);
     assert.equal(got[0].tmdbId, 438631);
     assert.equal(got[1].title, "Dune: Part Two");
     assert.equal(got[1].releaseYear, 2024);
+    assert.equal(got[0].watchedOn, "2026-05-02");
+    assert.equal(got[1].watchedOn, null);
   } finally {
     await server.close();
   }
@@ -40,10 +42,10 @@ test("searchMovies handles a movie with null releaseYear", async () => {
   const server = await startServer((_req, res) => {
     res.statusCode = 200;
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify([{ tmdbId: 1, title: "Unknown", releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null }]));
+    res.end(JSON.stringify([{ tmdbId: 1, title: "Unknown", releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null, watchedOn: null }]));
   });
   try {
-    const got = await searchMovies(server.url, "unknown");
+    const got = await searchMovies(server.url, GROUP, NIGHT, "unknown");
     assert.equal(got[0].releaseYear, null);
   } finally {
     await server.close();

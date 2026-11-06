@@ -14,12 +14,12 @@ import (
 )
 
 // This file holds the movie concern: the movie DTO, the row/param mappers
-// between the movies table and TMDB, and the movie endpoints (TMDB search
-// proxy, and attaching and clearing a night's film, whose writes run in
-// night_writes.go). It sits next to tmdb.go; the night lifecycle in
+// between the movies table and TMDB, and the movie endpoints (the TMDB search
+// proxy, which adds when the group watched each result, and attaching and
+// clearing a night's film, whose writes run in night_writes.go). It sits next to tmdb.go; the night lifecycle in
 // nights.go embeds a movieDTO in its response but otherwise stays separate.
 
-// movieDTO is the JSON shape for an attached movie (and a search result).
+// movieDTO is the JSON shape for an attached movie (and a search result's film).
 // ReleaseYear is null when TMDB has no release date. int32 matches the movies
 // table and TMDB's domain (ids/years fit in 32 bits); JSON renders it as a number.
 // Genres is always an array (never null); RuntimeMinutes is null when unknown.
@@ -81,31 +81,66 @@ func int4Ptr(v *int32) pgtype.Int4 {
 	return pgtype.Int4{Int32: *v, Valid: true}
 }
 
-// toMovieResults maps TMDB search hits to the JSON DTO (always non-nil → []).
-func toMovieResults(results []movieResult) []movieDTO {
-	out := make([]movieDTO, 0, len(results))
+// searchResultDTO is one film search result: the movie, plus when the group
+// last watched it (scheduledFor of its latest Watched Night), or null.
+type searchResultDTO struct {
+	movieDTO
+	WatchedOn *string `json:"watchedOn"`
+}
+
+// toSearchResults maps TMDB search hits to the JSON DTO (always non-nil → []),
+// joining in watchedOn by tmdbId. Pure.
+func toSearchResults(results []movieResult, watchedOn map[int32]string) []searchResultDTO {
+	out := make([]searchResultDTO, 0, len(results))
 	for _, m := range results {
-		out = append(out, movieDTO{
+		res := searchResultDTO{movieDTO: movieDTO{
 			TMDBID:         m.TMDBID,
 			Title:          m.Title,
 			ReleaseYear:    m.ReleaseYear,
 			PosterURL:      posterURL(m.PosterPath),
 			Genres:         genresOrEmpty(m.Genres),
 			RuntimeMinutes: m.RuntimeMinutes,
-		})
+		}}
+		if day, ok := watchedOn[m.TMDBID]; ok {
+			res.WatchedOn = &day
+		}
+		out = append(out, res)
 	}
 	return out
 }
 
-// searchMoviesHandler serves GET /movies/search?q=… — a thin TMDB proxy so the
-// API token stays server-side. 400 empty query, 503 when TMDB is unconfigured,
-// 502 on an upstream failure.
-func searchMoviesHandler(client *tmdbClient) http.HandlerFunc {
+// tmdbIDs lists the results' TMDB ids, for the watchedOn lookup. Pure.
+func tmdbIDs(results []movieResult) []int32 {
+	ids := make([]int32, 0, len(results))
+	for _, m := range results {
+		ids = append(ids, m.TMDBID)
+	}
+	return ids
+}
+
+// searchMoviesHandler serves GET /groups/{groupId}/movies/search?q=…&exceptNight=…
+// — a TMDB proxy (so the API token stays server-side) whose results say when
+// the group last watched each film. exceptNight, optional, is the Night whose
+// film is being chosen: its own film doesn't count. 400 empty query or a bad
+// id, 503 when TMDB is unconfigured, 502 on an upstream failure.
+func searchMoviesHandler(store *db.Queries, client *tmdbClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
+		if !ok {
+			return
+		}
 		q := strings.TrimSpace(r.URL.Query().Get("q"))
 		if q == "" {
 			writeJSONError(w, http.StatusBadRequest, "missing query")
 			return
+		}
+		var except pgtype.UUID
+		if raw := r.URL.Query().Get("exceptNight"); raw != "" {
+			id, ok := parseUUID(w, raw, "invalid night id")
+			if !ok {
+				return
+			}
+			except = pgtype.UUID{Bytes: id, Valid: true}
 		}
 		if client == nil {
 			writeJSONError(w, http.StatusServiceUnavailable, "movie search is not configured")
@@ -117,7 +152,20 @@ func searchMoviesHandler(client *tmdbClient) http.HandlerFunc {
 			writeJSONError(w, http.StatusBadGateway, "movie search failed")
 			return
 		}
-		respondJSON(w, http.StatusOK, toMovieResults(results))
+		rows, err := store.GroupWatchedOn(r.Context(), db.GroupWatchedOnParams{
+			GroupID:     gid,
+			TmdbIds:     tmdbIDs(results),
+			ExceptNight: except,
+		})
+		if err != nil {
+			internalError(w, gid, "group watched on", err)
+			return
+		}
+		watchedOn := make(map[int32]string, len(rows))
+		for _, row := range rows {
+			watchedOn[row.TmdbID] = formatDay(row.WatchedOn.Time)
+		}
+		respondJSON(w, http.StatusOK, toSearchResults(results, watchedOn))
 	}
 }
 

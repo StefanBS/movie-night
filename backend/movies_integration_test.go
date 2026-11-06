@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -79,7 +80,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 	}
 
 	t.Run("search returns mapped results", func(t *testing.T) {
-		code, got := doJSON[[]movieDTO](t, mux, http.MethodGet, "/movies/search?q=dune", "")
+		code, got := doJSON[[]searchResultDTO](t, mux, http.MethodGet, "/groups/"+seededGroup+"/movies/search?q=dune", "")
 		if code != http.StatusOK {
 			t.Fatalf("search status = %d, want 200", code)
 		}
@@ -92,6 +93,62 @@ func TestMovieAttachIntegration(t *testing.T) {
 		}
 		if got[0].Genres == nil || len(got[0].Genres) != 0 || got[0].RuntimeMinutes != nil {
 			t.Fatalf("search genres/runtime = %#v/%v, want []/nil", got[0].Genres, got[0].RuntimeMinutes)
+		}
+	})
+
+	t.Run("search says when the group last watched each result", func(t *testing.T) {
+		// Dune (438631) watched twice, the 1984 Dune (841) attached but not
+		// yet watched.
+		earlier := mkNight(t)
+		attachMovie(t, mux, seededGroup, earlier, `{"tmdbId":438631}`)
+		later := seedNight(t, "2026-07-03")
+		attachMovie(t, mux, seededGroup, later, `{"tmdbId":438631}`)
+		planned := seedNight(t, "2026-08-07")
+		attachMovie(t, mux, seededGroup, planned, `{"tmdbId":841}`)
+		if _, err := pool.Exec(context.Background(),
+			"UPDATE nights SET watched_at = now() WHERE id = ANY($1::uuid[])", []string{earlier, later}); err != nil {
+			t.Fatalf("mark watched: %v", err)
+		}
+
+		// watchedOn returns each result's watchedOn by tmdbId ("" for null).
+		watchedOn := func(t *testing.T, group, query string) map[int32]string {
+			t.Helper()
+			code, got := doJSON[[]searchResultDTO](t, mux, http.MethodGet, "/groups/"+group+"/movies/search?q=dune"+query, "")
+			if code != http.StatusOK {
+				t.Fatalf("search status = %d, want 200", code)
+			}
+			out := map[int32]string{}
+			for _, r := range got {
+				out[r.TMDBID] = ""
+				if r.WatchedOn != nil {
+					out[r.TMDBID] = *r.WatchedOn
+				}
+			}
+			return out
+		}
+		for _, tc := range []struct {
+			name, group, query string
+			want               map[int32]string
+		}{
+			{"the latest watched night's date; a planned film is null", seededGroup, "",
+				map[int32]string{438631: "2026-07-03", 841: ""}},
+			{"the night being edited doesn't count", seededGroup, "&exceptNight=" + later,
+				map[int32]string{438631: "2026-06-12", 841: ""}},
+			{"excepting a planned night changes nothing", seededGroup, "&exceptNight=" + planned,
+				map[int32]string{438631: "2026-07-03", 841: ""}},
+			{"another group's nights don't count", emptyGroup, "",
+				map[int32]string{438631: "", 841: ""}},
+		} {
+			if got := watchedOn(t, tc.group, tc.query); !maps.Equal(got, tc.want) {
+				t.Errorf("%s: watchedOn = %v, want %v", tc.name, got, tc.want)
+			}
+		}
+
+		if code, _ := doReq(t, mux, http.MethodGet, "/groups/"+seededGroup+"/movies/search?q=dune&exceptNight=nope", ""); code != http.StatusBadRequest {
+			t.Errorf("bad exceptNight status = %d, want 400", code)
+		}
+		if code, _ := doReq(t, mux, http.MethodGet, "/groups/nope/movies/search?q=dune", ""); code != http.StatusBadRequest {
+			t.Errorf("bad group id status = %d, want 400", code)
 		}
 	})
 
@@ -266,14 +323,13 @@ func TestMovieAttachIntegration(t *testing.T) {
 	})
 
 	t.Run("unconfigured TMDB yields 503", func(t *testing.T) {
-		var nilClient *tmdbClient
-		if code, _ := doReq(t, searchMoviesHandler(nilClient), http.MethodGet, "/movies/search?q=dune", ""); code != http.StatusServiceUnavailable {
+		// Drive both through a router so the {groupId}/{nightId} path values
+		// populate; with a nil client attach must 503 after loadNight passes.
+		m2 := newRoutes(pool, nil)
+		if code, _ := doReq(t, m2, http.MethodGet, "/groups/"+seededGroup+"/movies/search?q=dune", ""); code != http.StatusServiceUnavailable {
 			t.Errorf("search unconfigured = %d, want 503", code)
 		}
-		// Drive attach through a router so {groupId}/{nightId} path values populate;
-		// with a nil client the handler must 503 after loadNight passes.
 		night := mkNight(t)
-		m2 := newRoutes(pool, nil)
 		if code, _ := doReq(t, m2, http.MethodPost,
 			"/groups/"+seededGroup+"/nights/"+night+"/movie", `{"tmdbId":438631}`); code != http.StatusServiceUnavailable {
 			t.Errorf("attach unconfigured = %d, want 503", code)

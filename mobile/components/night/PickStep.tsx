@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 
 import { AppButton, Avatar, Badge, Input, Poster } from "../";
@@ -7,8 +7,7 @@ import { Stepper } from "./Stepper";
 import { WizardFooter } from "./WizardFooter";
 import { firstName } from "../../lib/avatar";
 import { formatShortDate } from "../../lib/date";
-import { watchedOn } from "../../lib/history";
-import type { Movie } from "../../lib/movies";
+import type { SearchResult } from "../../lib/movies";
 import { nightWording } from "../../lib/nightLifecycle";
 import { nightPicker, type Night } from "../../lib/nights";
 import { borderWidth, createThemedStyles, fontFamily, lh, pressedOpacity, space, tabular, textPresets, useColors } from "../../theme";
@@ -31,7 +30,6 @@ export function PickStep({
   resultsFor,
   searching,
   searchError,
-  groupNights,
   onSearch,
   onAttach,
   onChangePicker,
@@ -40,11 +38,10 @@ export function PickStep({
   night: Night;
   today: string;
   busy: string | null;
-  results: Movie[];
+  results: SearchResult[];
   resultsFor: string;
   searching: boolean;
   searchError: string | null;
-  groupNights: Night[];
   onSearch: (query: string) => void;
   onAttach: (tmdbId: number) => void;
   onChangePicker: (memberId: string) => Promise<Night | null>;
@@ -60,7 +57,6 @@ export function PickStep({
     return () => clearTimeout(timer);
   }, [movieQuery, onSearch]);
 
-  const watched = useMemo(() => watchedOn(groupNights, night.id), [groupNights, night.id]);
   const choosePicker = async (memberId: string) => {
     if ((await onChangePicker(memberId)) !== null) {
       setChangingPicker(false);
@@ -138,8 +134,7 @@ export function PickStep({
 
         {query !== ""
           ? results.map((mv, i) => {
-              const seen = watched.get(mv.tmdbId);
-              const meta = [mv.releaseYear, seen !== undefined ? `watched ${formatShortDate(seen)}` : null]
+              const meta = [mv.releaseYear, mv.watchedOn !== null ? `watched ${formatShortDate(mv.watchedOn)}` : null]
                 .filter((part) => part !== null)
                 .join(" · ");
               return (

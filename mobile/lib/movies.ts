@@ -46,26 +46,38 @@ export function parseMovie(raw: unknown): Movie {
   return { tmdbId, title, releaseYear, posterUrl, genres, runtimeMinutes };
 }
 
-// parseMovies validates an untrusted search-results payload (an array) and
-// returns typed Movies, throwing on a bad shape.
-export function parseMovies(raw: unknown): Movie[] {
+// A SearchResult is a film search hit: the film, plus watchedOn, the date
+// (YYYY-MM-DD) the group last watched it, or null.
+export type SearchResult = Movie & { watchedOn: string | null };
+
+// parseSearchResults validates an untrusted search-results payload (an array)
+// and returns typed results, throwing on a bad shape.
+export function parseSearchResults(raw: unknown): SearchResult[] {
   if (!Array.isArray(raw)) {
     throw new Error("movies: expected an array");
   }
-  return raw.map(parseMovie);
+  return raw.map((r: unknown) => {
+    const movie = parseMovie(r);
+    const { watchedOn } = r as Record<string, unknown>;
+    if (watchedOn !== null && typeof watchedOn !== "string") {
+      throw new Error("movie: watchedOn must be a string or null");
+    }
+    return { ...movie, watchedOn };
+  });
 }
 
-// searchMovies proxies TMDB search through the backend and returns typed results.
+// searchMovies proxies TMDB search through the backend for a group's Night,
+// so each result says when the group last watched it; the Night's own film
+// doesn't count.
 export function searchMovies(
   baseUrl: string,
+  groupId: string,
+  nightId: string,
   query: string,
   signal?: AbortSignal,
-): Promise<Movie[]> {
-  return requestJson(
-    `${baseUrl}/movies/search?q=${encodeURIComponent(query)}`,
-    parseMovies,
-    { signal },
-  );
+): Promise<SearchResult[]> {
+  const params = new URLSearchParams({ q: query, exceptNight: nightId });
+  return requestJson(`${baseUrl}/groups/${groupId}/movies/search?${params}`, parseSearchResults, { signal });
 }
 
 // formatRuntime renders a running time in minutes as "1h 38m", "45m" or "2h".

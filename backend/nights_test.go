@@ -307,12 +307,12 @@ func TestNewNightResponse(t *testing.T) {
 	})
 }
 
-func TestToMovieResults(t *testing.T) {
+func TestToSearchResults(t *testing.T) {
 	in := []movieResult{
 		{TMDBID: 438631, Title: "Dune", ReleaseYear: intp(2021), PosterPath: "/dune.jpg"},
 		{TMDBID: 99, Title: "No Poster", ReleaseYear: nil, PosterPath: ""},
 	}
-	got := toMovieResults(in)
+	got := toSearchResults(in, map[int32]string{438631: "2026-05-02", 7: "2026-01-01"})
 	if len(got) != 2 {
 		t.Fatalf("len = %d, want 2", len(got))
 	}
@@ -332,6 +332,13 @@ func TestToMovieResults(t *testing.T) {
 	}
 	if got[1].RuntimeMinutes != nil {
 		t.Errorf("[1] runtime = %v, want nil", got[1].RuntimeMinutes)
+	}
+	// watchedOn joins by tmdbId; a film the group hasn't watched is null.
+	if got[0].WatchedOn == nil || *got[0].WatchedOn != "2026-05-02" {
+		t.Errorf("[0] watchedOn = %v, want 2026-05-02", got[0].WatchedOn)
+	}
+	if got[1].WatchedOn != nil {
+		t.Errorf("[1] watchedOn = %v, want nil", *got[1].WatchedOn)
 	}
 }
 

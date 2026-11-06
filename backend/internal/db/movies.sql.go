@@ -28,6 +28,51 @@ func (q *Queries) ClearNightMovie(ctx context.Context, arg ClearNightMovieParams
 	return err
 }
 
+const groupWatchedOn = `-- name: GroupWatchedOn :many
+SELECT m.tmdb_id, max(n.scheduled_for)::date AS watched_on
+FROM nights n
+JOIN movies m ON m.id = n.movie_id
+WHERE n.group_id = $1
+  AND n.watched_at IS NOT NULL
+  AND m.tmdb_id = ANY($2::int[])
+  AND ($3::uuid IS NULL OR n.id <> $3::uuid)
+GROUP BY m.tmdb_id
+`
+
+type GroupWatchedOnParams struct {
+	GroupID     uuid.UUID   `json:"group_id"`
+	TmdbIds     []int32     `json:"tmdb_ids"`
+	ExceptNight pgtype.UUID `json:"except_night"`
+}
+
+type GroupWatchedOnRow struct {
+	TmdbID    int32       `json:"tmdb_id"`
+	WatchedOn pgtype.Date `json:"watched_on"`
+}
+
+// For each of the given films the group has recorded as watched, the date of
+// the latest Night that watched it. except_night (nullable) leaves out the
+// Night whose film is being chosen, so its own film doesn't count.
+func (q *Queries) GroupWatchedOn(ctx context.Context, arg GroupWatchedOnParams) ([]GroupWatchedOnRow, error) {
+	rows, err := q.db.Query(ctx, groupWatchedOn, arg.GroupID, arg.TmdbIds, arg.ExceptNight)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GroupWatchedOnRow
+	for rows.Next() {
+		var i GroupWatchedOnRow
+		if err := rows.Scan(&i.TmdbID, &i.WatchedOn); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setNightMovie = `-- name: SetNightMovie :exec
 UPDATE nights
 SET movie_id = $1

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { formatRuntime, formatYearRuntime, movieDetails, parseMovie, searchMovies, type Movie } from "./movies";
+import { formatRuntime, formatYearRuntime, movieDetails, parseMovie, parseSearchResults, searchMovies, type Movie } from "./movies";
 import { startServer } from "./testServer";
 
 test("parseMovie accepts a valid movie", () => {
@@ -53,19 +53,39 @@ test("parseMovie rejects bad shapes", () => {
   assert.throws(() => parseMovie({ tmdbId: 1, title: 2 }), /title/);
 });
 
-test("searchMovies hits the search path with the query and parses results", async () => {
+test("parseSearchResults reads watchedOn, a date or null", () => {
+  assert.deepEqual(parseSearchResults([{ ...bare, watchedOn: "2026-05-02" }, { ...bare, watchedOn: null }]), [
+    { ...bare, watchedOn: "2026-05-02" },
+    { ...bare, watchedOn: null },
+  ]);
+});
+
+test("parseSearchResults rejects a bad payload", () => {
+  const cases: [string, unknown, RegExp][] = [
+    ["not an array", { results: [] }, /expected an array/],
+    ["watchedOn missing", [bare], /watchedOn/],
+    ["watchedOn a number", [{ ...bare, watchedOn: 20260502 }], /watchedOn/],
+    ["a bad movie", [{ ...bare, title: 2, watchedOn: null }], /title/],
+  ];
+  for (const [name, raw, err] of cases) {
+    assert.throws(() => parseSearchResults(raw), err, name);
+  }
+});
+
+test("searchMovies hits the group's search path with the query and the Night to leave out", async () => {
   let path = "";
   const server = await startServer((req, res) => {
     path = req.url ?? "";
     res.statusCode = 200;
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify([{ ...bare, tmdbId: 438631, title: "Dune", releaseYear: 2021 }]));
+    res.end(JSON.stringify([{ ...bare, tmdbId: 438631, title: "Dune", releaseYear: 2021, watchedOn: "2026-05-02" }]));
   });
   try {
-    const got = await searchMovies(server.url, "dune two");
-    assert.equal(path, "/movies/search?q=dune%20two");
+    const got = await searchMovies(server.url, "g1", "n1", "dune two");
+    assert.equal(path, "/groups/g1/movies/search?q=dune+two&exceptNight=n1");
     assert.equal(got.length, 1);
     assert.equal(got[0].title, "Dune");
+    assert.equal(got[0].watchedOn, "2026-05-02");
   } finally {
     await server.close();
   }

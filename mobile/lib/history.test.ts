@@ -1,23 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildHistory, watchedOn, watchedSub } from "./history";
+import { buildHistory, watchedSub } from "./history";
 import type { Night } from "./nights";
 
-// night is a Night recorded as watched unless `watched` is false.
-function night(id: string, scheduledFor: string, tmdbId: number | null, watched = true): Night {
+// night is a Night recorded as watched.
+function night(id: string, scheduledFor: string): Night {
   return {
     id,
     scheduledFor,
     startTime: null,
     pickerId: "u1",
     reminders: { nightBefore: true, morningOf: true, twoHoursBefore: true, audience: "everyone" },
-    movie:
-      tmdbId === null
-        ? null
-        : { tmdbId, title: `Film ${tmdbId}`, releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null },
+    movie: { tmdbId: 1, title: "Film", releaseYear: null, posterUrl: null, genres: [], runtimeMinutes: null },
     attendees: [],
-    watchedAt: watched ? `${scheduledFor}T22:00:00Z` : null,
+    watchedAt: `${scheduledFor}T22:00:00Z`,
     repeat: null,
   };
 }
@@ -47,28 +44,11 @@ const historyCases: [string, string[], [string | null, string[]][]][] = [
 ];
 for (const [name, dates, want] of historyCases) {
   test(`buildHistory: ${name}`, () => {
-    const sections = buildHistory(dates.map((d) => night(d, d, 1)), "2026-11-03");
+    const sections = buildHistory(dates.map((d) => night(d, d)), "2026-11-03");
     assert.deepEqual(
       sections.map((s) => [s.label, s.nights.map((n) => n.id)]),
       want,
     );
-  });
-}
-
-const watchedCases: [string, Night[], [number, string][]][] = [
-  ["a watched night's film, with its date", [night("a", "2026-05-02", 10)], [[10, "2026-05-02"]]],
-  ["a night not yet recorded doesn't count, whatever its date", [night("a", "2026-05-02", 10, false)], []],
-  ["a night without a film adds nothing", [night("a", "2026-05-02", null)], []],
-  ["the night being edited is left out", [night("self", "2026-05-02", 10)], []],
-  [
-    "a film watched twice keeps the later date, in any order",
-    [night("a", "2026-03-06", 10), night("b", "2026-05-02", 10), night("c", "2026-04-10", 10)],
-    [[10, "2026-05-02"]],
-  ],
-];
-for (const [name, nights, want] of watchedCases) {
-  test(`watchedOn: ${name}`, () => {
-    assert.deepEqual([...watchedOn(nights, "self")], want);
   });
 }
 

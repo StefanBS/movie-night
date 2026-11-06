@@ -40,7 +40,7 @@ DATABASE_URL=postgres://movie:movie@localhost:5432/movienight?sslmode=disable
 # Comma-separated browser origins allowed by CORS (the deployed web origin in prod).
 CORS_ALLOWED_ORIGINS=http://localhost:8081
 
-# TMDB v4 read token for the movie proxy. Optional — when unset, /movies/search
+# TMDB v4 read token for the movie proxy. Optional — when unset, movie search
 # and movie attach return 503. https://www.themoviedb.org/settings/api
 TMDB_READ_TOKEN=
 
@@ -124,7 +124,7 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/movies/search?q=…` | TMDB search proxy; `400` empty query, `502` upstream failure. |
+| `GET` | `/groups/{groupId}/movies/search?q=…&exceptNight=…` | TMDB search proxy; each result adds `watchedOn`, the date of the group's latest Watched Night with that film, or `null`. `exceptNight` (optional) leaves out the Night whose film is being chosen. `400` empty query or bad id, `502` upstream failure. |
 | `POST` | `/groups/{groupId}/nights/{nightId}/movie` | Attach a movie by `{"tmdbId"}`; re-fetches canonical title/year from TMDB and returns the night. Repeatable, including on a Watched Night (changes its film). |
 | `DELETE` | `/groups/{groupId}/nights/{nightId}/movie` | Detach the film; returns the night with `movie` null. Idempotent. `422` on a Watched Night, which keeps its film. |
 

@@ -41,7 +41,7 @@ func main() {
 
 	tmdb := newTMDBClient(os.Getenv("TMDB_READ_TOKEN"))
 	if tmdb == nil {
-		log.Print("TMDB not configured (TMDB_READ_TOKEN unset); /movies/search and attach return 503")
+		log.Print("TMDB not configured (TMDB_READ_TOKEN unset); movie search and attach return 503")
 	} else {
 		log.Print("TMDB configured")
 	}
@@ -116,7 +116,7 @@ func newRoutes(pool *pgxpool.Pool, tmdb *tmdbClient) *http.ServeMux {
 	mux.Handle("PATCH /groups/{groupId}/nights/{nightId}", updateNightHandler(pool))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}", deleteNightHandler(pool))
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}/turn", nightTurnHandler(queries))
-	mux.Handle("GET /movies/search", searchMoviesHandler(tmdb))
+	mux.Handle("GET /groups/{groupId}/movies/search", searchMoviesHandler(queries, tmdb))
 	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(pool, tmdb))
 	mux.Handle("DELETE /groups/{groupId}/nights/{nightId}/movie", clearNightMovieHandler(pool))
 	return mux
