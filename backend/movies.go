@@ -9,13 +9,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
 // This file holds the movie concern: the movie DTO, the row/param mappers
-// between the movies table and TMDB, and the two movie endpoints (TMDB search
-// proxy and attach-to-night). It sits next to tmdb.go; the night lifecycle in
+// between the movies table and TMDB, and the movie endpoints (TMDB search
+// proxy, and attaching and clearing a night's film, whose writes run in
+// night_writes.go). It sits next to tmdb.go; the night lifecycle in
 // nights.go embeds a movieDTO in its response but otherwise stays separate.
 
 // movieDTO is the JSON shape for an attached movie (and a search result).
@@ -131,10 +133,10 @@ func searchMoviesHandler(client *tmdbClient) http.HandlerFunc {
 
 // recordNightMovieHandler serves POST /groups/{groupId}/nights/{nightId}/movie.
 // The body carries only {tmdbId}; the backend re-fetches canonical title/year from
-// TMDB (source of truth), caches the movie, and sets it on the night. Repeatable:
-// attaching a different movie is the correction path. It reuses the night plumbing
-// (loadNight/writeNight over nightStore) from nights.go.
-func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerFunc {
+// TMDB (source of truth), then caches the movie and sets it on the night in one
+// transaction (setFilm). Repeatable: attaching a different movie is the
+// correction path, on a Watched Night too.
+func recordNightMovieHandler(pool *pgxpool.Pool, client *tmdbClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
@@ -148,8 +150,9 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			writeJSONError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		// Existence check only — an unknown night must 404 before we call TMDB;
-		// writeNight reads the result back.
+		store := db.New(pool)
+		// Existence check only, so an unknown night 404s before we call TMDB;
+		// setFilm locks the night for the write itself.
 		if _, ok := loadNight(w, r, store, gid, nightID); !ok {
 			return
 		}
@@ -157,6 +160,7 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			writeJSONError(w, http.StatusServiceUnavailable, "movie attach is not configured")
 			return
 		}
+		// Outside the transaction: no row lock is held across the TMDB call.
 		movie, err := client.FetchMovie(r.Context(), req.TMDBID)
 		if err != nil {
 			if errors.Is(err, errMovieNotFound) {
@@ -167,26 +171,11 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 			writeJSONError(w, http.StatusBadGateway, "movie lookup failed")
 			return
 		}
-		movieID, err := store.UpsertMovie(r.Context(), db.UpsertMovieParams{
-			TmdbID:      movie.TMDBID,
-			Title:       movie.Title,
-			ReleaseYear: int4Ptr(movie.ReleaseYear),
-			PosterPath:  pgText(movie.PosterPath),
-			// Never nil, so the NOT NULL text[] column never gets a NULL.
-			Genres:         genresOrEmpty(movie.Genres),
-			RuntimeMinutes: int4Ptr(movie.RuntimeMinutes),
+		err = withTx(r.Context(), pool, func(q *db.Queries) error {
+			return setFilm(r.Context(), q, gid, nightID, movie)
 		})
 		if err != nil {
-			internalError(w, gid, "upsert movie", err)
-			return
-		}
-		err = store.SetNightMovie(r.Context(), db.SetNightMovieParams{
-			MovieID: pgtype.UUID{Bytes: movieID, Valid: true},
-			NightID: nightID,
-			GroupID: gid,
-		})
-		if err != nil {
-			internalError(w, gid, "set night movie", err)
+			writeNightError(w, gid, "set night movie", err)
 			return
 		}
 		writeNight(w, r, store, gid, nightID, http.StatusOK)
@@ -195,23 +184,20 @@ func recordNightMovieHandler(store nightStore, client *tmdbClient) http.HandlerF
 
 // clearNightMovieHandler serves DELETE /groups/{groupId}/nights/{nightId}/movie.
 // Idempotent: clearing when no movie is attached still returns the night DTO
-// with movie null.
-func clearNightMovieHandler(store nightStore) http.HandlerFunc {
+// with movie null. A Watched Night keeps its film (422).
+func clearNightMovieHandler(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
-		// No existence pre-check: an unknown night matches no row, so the
-		// RETURNING miss is the 404.
-		_, err := store.ClearNightMovie(r.Context(), db.ClearNightMovieParams{
-			NightID: nightID,
-			GroupID: gid,
+		err := withTx(r.Context(), pool, func(q *db.Queries) error {
+			return clearFilm(r.Context(), q, gid, nightID)
 		})
 		if err != nil {
-			storeError(w, gid, "clear night movie", err, http.StatusNotFound, "night not found")
+			writeNightError(w, gid, "clear night movie", err)
 			return
 		}
-		writeNight(w, r, store, gid, nightID, http.StatusOK)
+		writeNight(w, r, db.New(pool), gid, nightID, http.StatusOK)
 	}
 }

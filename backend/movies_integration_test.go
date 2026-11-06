@@ -56,7 +56,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 	q := db.New(pool)
 	mux := http.NewServeMux()
 	mux.Handle("GET /groups/{groupId}/nights/{nightId}", nightDetailHandler(q))
-	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, client))
+	mux.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(pool, client))
 	mux.Handle("GET /movies/search", searchMoviesHandler(client))
 
 	// mkNight clears the group's nights and inserts a fresh night, returning its
@@ -275,7 +275,7 @@ func TestMovieAttachIntegration(t *testing.T) {
 		// with a nil client the handler must 503 after loadNight passes.
 		night := mkNight(t, seededGroup)
 		m2 := http.NewServeMux()
-		m2.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(q, nilClient))
+		m2.Handle("POST /groups/{groupId}/nights/{nightId}/movie", recordNightMovieHandler(pool, nilClient))
 		if code, _ := doReq(t, m2, http.MethodPost,
 			"/groups/"+seededGroup+"/nights/"+night+"/movie", `{"tmdbId":438631}`); code != http.StatusServiceUnavailable {
 			t.Errorf("attach unconfigured = %d, want 503", code)

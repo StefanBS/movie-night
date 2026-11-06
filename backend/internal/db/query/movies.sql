@@ -13,9 +13,7 @@ UPDATE nights
 SET movie_id = sqlc.arg(movie_id)
 WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);
 
--- name: ClearNightMovie :one
--- RETURNING the id lets a missing night surface as no rows (404).
+-- name: ClearNightMovie :exec
 UPDATE nights
 SET movie_id = NULL
-WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id)
-RETURNING id;
+WHERE id = sqlc.arg(night_id) AND group_id = sqlc.arg(group_id);

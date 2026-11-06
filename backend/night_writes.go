@@ -14,7 +14,7 @@ import (
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
-// The writes that decide a Night's picker or attendees live here, and each runs
+// The writes that decide a Night's picker, attendees or film live here, and each runs
 // inside the caller's withTx. A write to an existing Night locks it first
 // (LockNight), so the ADR-0008 rules are checked against a Night no other write
 // can change before this one commits: the picker is an attendee, attendees are
@@ -163,6 +163,46 @@ func cancelNight(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, now
 	return q.DeleteNight(ctx, db.DeleteNightParams{NightID: nightID, GroupID: gid})
 }
 
+// setFilm caches a film fetched from TMDB and attaches it to a Night, replacing
+// any film it had: changing a Watched Night's film is the correction path, so
+// it stays allowed. The TMDB fetch happens before the caller's transaction.
+func setFilm(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID, movie movieResult) error {
+	if _, err := q.LockNight(ctx, db.LockNightParams{NightID: nightID, GroupID: gid}); err != nil {
+		return err
+	}
+	movieID, err := q.UpsertMovie(ctx, db.UpsertMovieParams{
+		TmdbID:      movie.TMDBID,
+		Title:       movie.Title,
+		ReleaseYear: int4Ptr(movie.ReleaseYear),
+		PosterPath:  pgText(movie.PosterPath),
+		// Never nil, so the NOT NULL text[] column never gets a NULL.
+		Genres:         genresOrEmpty(movie.Genres),
+		RuntimeMinutes: int4Ptr(movie.RuntimeMinutes),
+	})
+	if err != nil {
+		return err
+	}
+	return q.SetNightMovie(ctx, db.SetNightMovieParams{
+		MovieID: pgtype.UUID{Bytes: movieID, Valid: true},
+		NightID: nightID,
+		GroupID: gid,
+	})
+}
+
+// clearFilm detaches a Night's film. A Watched Night keeps its film, since a
+// Night needs one to be recorded and recording is not undone. Clearing a Night
+// that has no film is not an error.
+func clearFilm(ctx context.Context, q *db.Queries, gid, nightID uuid.UUID) error {
+	locked, err := q.LockNight(ctx, db.LockNightParams{NightID: nightID, GroupID: gid})
+	if err != nil {
+		return err
+	}
+	if locked.IsWatched {
+		return errWatchedFilmCleared
+	}
+	return q.ClearNightMovie(ctx, db.ClearNightMovieParams{NightID: nightID, GroupID: gid})
+}
+
 // moveSeriesOn opens the next Night of the series on Night from (dated date,
 // picked by picker) on nextSeriesDate (ADR-0014). If a Night not yet watched
 // already holds that date, it joins the series instead (keeping its own
@@ -237,15 +277,15 @@ func attendeeRole(attendees []db.ListNightAttendeesRow, picker uuid.UUID) (db.Me
 }
 
 // writeNightError maps a failed Night write to its response: a missing Night is
-// a 404; a broken ADR-0008 rule, or recording a Night with no film or before
-// its date, a 422; a date another Night holds a 409; and anything else a 500.
+// a 404; a broken ADR-0008 rule, recording a Night with no film or before its
+// date, or clearing a Watched Night's film, a 422; a date another Night holds a 409; and anything else a 500.
 func writeNightError(w http.ResponseWriter, gid uuid.UUID, op string, err error) {
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		writeJSONError(w, http.StatusNotFound, "night not found")
 	case errors.Is(err, errPickerNotAttendee), errors.Is(err, errNotMember),
 		errors.Is(err, errWatchedWithoutFilm), errors.Is(err, errWatchedDateAhead),
-		errors.Is(err, errWatchedRepeats):
+		errors.Is(err, errWatchedRepeats), errors.Is(err, errWatchedFilmCleared):
 		writeJSONError(w, http.StatusUnprocessableEntity, err.Error())
 	case isUniqueViolation(err):
 		writeJSONError(w, http.StatusConflict, errNightDateTaken)

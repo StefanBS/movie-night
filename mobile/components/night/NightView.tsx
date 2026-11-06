@@ -10,7 +10,7 @@ import { firstName } from "../../lib/avatar";
 import { calendarRecurrence, seriesNote, type CalendarRecurrence } from "../../lib/calendarEntry";
 import { formatShortDate, formatWeekdayDate } from "../../lib/date";
 import type { Member } from "../../lib/members";
-import { nightMeta, nightWording } from "../../lib/nightLifecycle";
+import { isWatched, nightMeta, nightWording } from "../../lib/nightLifecycle";
 import { nightPickerName, type Night } from "../../lib/nights";
 import { formatRepeatLabel } from "../../lib/repeat";
 import { borderWidth, createThemedStyles, fontFamily, fontSize, lh, radius, space, tabular, textPresets, useColors } from "../../theme";
@@ -22,7 +22,8 @@ type SheetAction = Omit<ComponentProps<typeof SheetRow>, "last">;
 // credit line under it. A night without a film has one primary action, "Choose
 // the film"; a night with one has none. The secondary actions (Change film,
 // Edit night, Add to calendar, Clear film) sit in the sheet behind the ⋯
-// button, which the editor's top bar opens through moreOpen. On a weekly
+// button, which the editor's top bar opens through moreOpen; a Watched Night
+// keeps its film, so it can change film but not clear it. On a weekly
 // night, Add to calendar first asks: the whole series, or just this night;
 // `groupName` titles the entry. `today` is passed in (mirrors lib/date.ts)
 // for deterministic date framing.
@@ -85,7 +86,7 @@ export function NightView({
       onPress: act(() => (recurrence !== null ? setCalendarOpen(true) : void onAddToCalendar(null))),
     });
   }
-  if (movie !== null && onClearFilm !== undefined) {
+  if (movie !== null && !isWatched(night) && onClearFilm !== undefined) {
     actions.push({
       icon: X,
       label: "Clear film",
