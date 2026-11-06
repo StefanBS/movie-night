@@ -42,9 +42,8 @@ const PLANNED: Night = {
 
 type Patch = { scheduledFor: string; startTime: string | null; attendees: string[]; pickerId: string; watched: boolean };
 
-// backend fakes the routes the flow touches. The night's turn ranks the
-// present core members in roster order (enough to see reranks); without
-// `present` it ranks the stored attendees. `patches` collects every PATCH.
+// backend fakes the routes the flow touches. The night's turn ranks every
+// core member in roster order, attending or not. `patches` collects every PATCH.
 function backend(over: Partial<Record<string, Handler>> = {}, patches: Patch[] = []): Handler {
   return (req, res, body) => {
     const url = new URL(req.url ?? "", "http://x");
@@ -57,9 +56,7 @@ function backend(over: Partial<Record<string, Handler>> = {}, patches: Patch[] =
     if (key === `GET /groups/${GROUP}/members`) return json(res, 200, ROSTER);
     if (key === `GET /groups/${GROUP}/nights/n1`) return json(res, 200, PLANNED);
     if (key === `GET /groups/${GROUP}/nights/n1/turn`) {
-      const raw = url.searchParams.get("present");
-      const present = raw === null ? PLANNED.attendees.map((a) => a.id) : raw.split(",");
-      return json(res, 200, ROSTER.filter((m) => m.role === "core" && present.includes(m.id)).map((m) => ranked(m.id)));
+      return json(res, 200, ROSTER.filter((m) => m.role === "core").map((m) => ranked(m.id)));
     }
     if (key === `PATCH /groups/${GROUP}/nights/n1`) {
       const patch = JSON.parse(body) as Patch;
@@ -130,21 +127,43 @@ test("load reports a roster failure", async () => {
 test("removing the planned picker gives the pick to whoever's next up and here", async () => {
   await withFlow(backend(), async (flow) => {
     await flow.load();
-    await flow.toggle("ada"); // Ada came too; Blake still has the pick
+    flow.toggle("ada"); // Ada came too; Blake still has the pick
     assert.equal(flow.state.pickerId, "blake");
-    await flow.toggle("blake"); // Blake didn't make it
+    flow.toggle("blake"); // Blake didn't make it
     assert.deepEqual([...flow.state.attendeeIds].sort(), ["ada", "cleo"]);
     assert.equal(flow.state.pickerId, "ada");
-    await flow.toggle("blake"); // back again: the order decides now
+    flow.toggle("blake"); // back again: the order decides now
     assert.equal(flow.state.pickerId, "ada");
   });
+});
+
+test("toggling reranks from the loaded ranking without a request", async () => {
+  let turnRequests = 0;
+  const base = backend();
+  await withFlow(
+    backend({
+      [`GET /groups/${GROUP}/nights/n1/turn`]: (req, res, body) => {
+        turnRequests++;
+        base(req, res, body);
+      },
+    }),
+    async (flow) => {
+      await flow.load();
+      assert.deepEqual(flow.state.order.map((m) => m.id), ["blake", "cleo"]);
+      flow.toggle("ada"); // not a stored attendee, but in the full ranking
+      assert.deepEqual(flow.state.order.map((m) => m.id), ["ada", "blake", "cleo"]);
+      flow.toggle("blake");
+      assert.deepEqual(flow.state.order.map((m) => m.id), ["ada", "cleo"]);
+      assert.equal(turnRequests, 1);
+    },
+  );
 });
 
 test("removing everyone leaves no picker", async () => {
   await withFlow(backend(), async (flow) => {
     await flow.load();
-    await flow.toggle("blake");
-    await flow.toggle("cleo");
+    flow.toggle("blake");
+    flow.toggle("cleo");
     assert.equal(flow.state.attendeeIds.size, 0);
     assert.equal(flow.state.pickerId, null);
   });
@@ -153,10 +172,10 @@ test("removing everyone leaves no picker", async () => {
 test("choosePicker overrides the order until they leave", async () => {
   await withFlow(backend(), async (flow) => {
     await flow.load();
-    await flow.toggle("frankie");
+    flow.toggle("frankie");
     flow.choosePicker("frankie");
     assert.equal(flow.state.pickerId, "frankie");
-    await flow.toggle("frankie");
+    flow.toggle("frankie");
     assert.equal(flow.state.pickerId, "blake"); // the order's head
   });
 });
@@ -165,7 +184,7 @@ test("record saves who came and who picked as watched, then shows Done; back ret
   const patches: Patch[] = [];
   await withFlow(backend({}, patches), async (flow) => {
     await flow.load();
-    await flow.toggle("blake"); // the planned picker didn't make it
+    flow.toggle("blake"); // the planned picker didn't make it
     const night = await flow.record();
     assert.equal(patches.length, 1);
     assert.deepEqual(patches[0].attendees, ["cleo"]);
@@ -188,7 +207,7 @@ test("a failed record shows the error and stays on People with the selection int
   const refuse: Handler = (_q, res) => json(res, 422, { error: "a watched night must have a film" });
   await withFlow(backend({ [`PATCH /groups/${GROUP}/nights/n1`]: refuse }), async (flow) => {
     await flow.load();
-    await flow.toggle("ada");
+    flow.toggle("ada");
     assert.equal(await flow.record(), null);
     assert.equal(flow.state.step, "who");
     assert.equal(flow.state.busy, null);
@@ -203,49 +222,10 @@ test("record without a picker sends nothing", async () => {
   const patches: Patch[] = [];
   await withFlow(backend({}, patches), async (flow) => {
     await flow.load();
-    await flow.toggle("blake");
-    await flow.toggle("cleo");
+    flow.toggle("blake");
+    flow.toggle("cleo");
     assert.equal(await flow.record(), null);
     assert.equal(patches.length, 0);
     assert.equal(flow.state.step, "who");
   });
-});
-
-test("record during a rerank waits for it, so it saves the reranked picker", async () => {
-  const patches: Patch[] = [];
-  await withFlow(backend({}, patches), async (flow) => {
-    await flow.load();
-    // Not awaited: the planned picker leaves and the rerank is in flight, so
-    // the order on hand still has Blake at its head.
-    const toggling = flow.toggle("blake");
-    await flow.record();
-    await toggling;
-    assert.equal(patches.length, 1);
-    assert.equal(patches[0].pickerId, "cleo");
-    assert.deepEqual(patches[0].attendees, ["cleo"]);
-  });
-});
-
-test("a rerank that succeeds clears an earlier rerank failure", async () => {
-  let fail = true;
-  const turn: Handler = (req, res) => {
-    if (fail) {
-      fail = false;
-      return json(res, 500, { error: "rank down" });
-    }
-    const present = new URL(req.url ?? "", "http://x").searchParams.get("present")?.split(",") ?? [];
-    json(res, 200, ROSTER.filter((m) => m.role === "core" && present.includes(m.id)).map((m) => ranked(m.id)));
-  };
-  // The load's own rank (no `present`) goes through the default route.
-  const handler = backend();
-  await withFlow(
-    (req, res, body) => (req.url?.includes("present=") ? turn(req, res, body) : handler(req, res, body)),
-    async (flow) => {
-      await flow.load();
-      await flow.toggle("ada");
-      assert.equal(flow.state.actionError, "rank down");
-      await flow.toggle("ada");
-      assert.equal(flow.state.actionError, null);
-    },
-  );
 });

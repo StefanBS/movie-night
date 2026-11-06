@@ -21,8 +21,8 @@ export type NightWatchedState = {
   members: Member[];
   step: WatchedStep;
   attendeeIds: ReadonlySet<string>;
-  // order is the live turn ranking over attendeeIds, ignoring the Night's own
-  // pick, so it is the order the picker was chosen from.
+  // order is the turn ranking over attendeeIds, ignoring the Night's own pick,
+  // so it is the order the picker was chosen from.
   order: TurnMember[];
   pickerId: string | null;
   busy: "record" | null;
@@ -30,11 +30,11 @@ export type NightWatchedState = {
 };
 
 export type NightWatched = Session<NightWatchedState> & {
-  // load fetches the Night, the roster and its pick order, and opens People.
+  // load fetches the Night, the roster and the club's ranking as of before
+  // the Night's own pick, and opens People.
   load(): Promise<void>;
-  // toggle adds or removes an attendee, then reranks. A rank that returns
-  // after a newer one is dropped.
-  toggle(memberId: string): Promise<void>;
+  // toggle adds or removes an attendee and reranks them.
+  toggle(memberId: string): void;
   // choosePicker overrides the order until that person stops attending.
   choosePicker(memberId: string): void;
   // record saves the Night as watched and moves on to Done, or returns null
@@ -66,9 +66,7 @@ export function createNightWatched({
     busy: null,
     actionError: null,
   });
-  const picking = createPicking(core, (present, signal) =>
-    getNightTurn(baseUrl, groupId, nightId, signal, present),
-  );
+  const picking = createPicking(core);
 
   return {
     get state() {
@@ -80,18 +78,18 @@ export function createNightWatched({
     async load() {
       core.set({ loading: true, error: null });
       try {
-        const [night, members, order] = await core.track(async (signal) => {
+        const [night, members, ranking] = await core.track(async (signal) => {
           const [night, members] = await Promise.all([
             getNightOrNull(baseUrl, groupId, nightId, signal),
             fetchMembers(baseUrl, groupId, signal),
           ]);
-          // A missing Night has no order (its turn is a 404 too).
-          const order = night === null ? [] : await getNightTurn(baseUrl, groupId, nightId, signal);
-          return [night, members, order] as const;
+          // A missing Night has no ranking (its turn is a 404 too).
+          const ranking = night === null ? [] : await getNightTurn(baseUrl, groupId, nightId, signal);
+          return [night, members, ranking] as const;
         });
         core.set({ night, members, loading: false });
         // The planned picker stays theirs while they're attending.
-        picking.reset(new Set(night?.attendees.map((a) => a.id)), order, night?.pickerId ?? null);
+        picking.reset(new Set(night?.attendees.map((a) => a.id)), ranking, night?.pickerId ?? null);
       } catch (e) {
         core.set({ error: errorMessage(e, "failed to load the night"), loading: false });
       }
@@ -104,14 +102,11 @@ export function createNightWatched({
       if (core.state.busy !== null) {
         return null;
       }
-      core.set({ busy: "record" });
-      await picking.settled();
       const { pickerId, attendeeIds, night } = core.state;
       if (pickerId === null || night === null) {
-        core.set({ busy: null });
         return null;
       }
-      core.set({ actionError: null });
+      core.set({ busy: "record", actionError: null });
       try {
         const recorded = await core.track((signal) =>
           recordWatched(baseUrl, groupId, night, { attendees: [...attendeeIds], pickerId }, signal),

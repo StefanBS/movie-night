@@ -10,48 +10,6 @@ import (
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
 
-func TestParsePresent(t *testing.T) {
-	id1 := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
-	id2 := uuid.MustParse("a0000000-0000-0000-0000-000000000002")
-
-	tests := []struct {
-		name    string
-		raw     string
-		want    []uuid.UUID
-		wantErr bool
-	}{
-		{name: "empty string yields nil", raw: "", want: nil},
-		{name: "multiple ids", raw: id1.String() + "," + id2.String(), want: []uuid.UUID{id1, id2}},
-		{name: "trims whitespace around ids", raw: " " + id1.String() + " , " + id2.String() + " ", want: []uuid.UUID{id1, id2}},
-		{name: "skips trailing blank segment", raw: id1.String() + ",", want: []uuid.UUID{id1}},
-		{name: "preserves duplicates", raw: id1.String() + "," + id1.String(), want: []uuid.UUID{id1, id1}},
-		{name: "all-blank segments yields nil", raw: ",,,", want: nil},
-		{name: "malformed value errors", raw: id1.String() + ",not-a-uuid", wantErr: true},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := parsePresent(tc.raw)
-			if tc.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if len(got) != len(tc.want) {
-				t.Fatalf("len = %d, want %d (%v)", len(got), len(tc.want), got)
-			}
-			for i := range tc.want {
-				if got[i] != tc.want[i] {
-					t.Errorf("[%d] = %v, want %v", i, got[i], tc.want[i])
-				}
-			}
-		})
-	}
-}
-
 func TestToTurnResponses(t *testing.T) {
 	id1 := uuid.MustParse("a0000000-0000-0000-0000-000000000001")
 	id2 := uuid.MustParse("a0000000-0000-0000-0000-000000000002")

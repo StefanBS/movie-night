@@ -88,7 +88,7 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `GET` | `/groups/{groupId}` | The group `{"name","createdOn"}` (`createdOn`: `YYYY-MM-DD`). |
 | `PATCH` | `/groups/{groupId}` | Rename the group. Body `{"name"}`; `400` if blank. Returns the group. |
 | `GET` | `/groups/{groupId}/members` | Active members in rotation order. |
-| `GET` | `/groups/{groupId}/turn` | Active core ranked least-served ([ADR-0005](../docs/adr/0005-least-served-turn-ranking.md)); element 0 is the picker. Optional `present=<uuid>,…` filters to tonight's attendees. Returns `[{"id","name","role","servedCount","lastPickedOn"}]` (`lastPickedOn`: `YYYY-MM-DD` or `null`). |
+| `GET` | `/groups/{groupId}/turn` | Active core ranked least-served ([ADR-0005](../docs/adr/0005-least-served-turn-ranking.md)); element 0 is the picker. Returns `[{"id","name","role","servedCount","lastPickedOn"}]` (`lastPickedOn`: `YYYY-MM-DD` or `null`). |
 
 **Membership churn** ([ADR-0006](../docs/adr/0006-membership-churn-handling.md)) — each returns the updated member `{"id","name","role","status"}`; idempotent.
 
@@ -118,7 +118,7 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `GET` | `/groups/{groupId}/nights/{nightId}` | A night and its attendees. |
 | `PATCH` | `/groups/{groupId}/nights/{nightId}` | Replace the whole editable Night (date, start time, attendee set, reminder settings) in one transaction — a rejected edit changes nothing. Body `{"scheduledFor","startTime","attendees","reminders","repeat"}` (`startTime` `null` for none, `repeat` `null` to end the series), plus optional `"pickerId"` (change the picker in the same edit; a guest's pick doesn't move standings) and `"watched": true` (record the Night as watched; the first `watchedAt` is kept, ADR-0012; on a repeating Night it also opens the next one, ADR-0014); `422` if the attendees leave out the picker or include a non-member, or `watched` is sent for a Night with no film, or the Night is (or would become) a Watched Night dated more than a day past the server's UTC date ([ADR-0013](../docs/adr/0013-watched-night-date-bound.md)), or a Watched Night is given a repeat, `409` if the date is taken. |
 | `DELETE` | `/groups/{groupId}/nights/{nightId}` | Cancel/delete the night; `204`. Idempotent. Cancelling a repeating night opens the next one in its series ([ADR-0014](../docs/adr/0014-repeating-nights.md)). |
-| `GET` | `/groups/{groupId}/nights/{nightId}/turn` | Least-served ranking over the night's attendees, ignoring the night's own pick. Optional `present=<uuid>,…` ranks that set instead (a draft of who came). |
+| `GET` | `/groups/{groupId}/nights/{nightId}/turn` | Least-served ranking of active core, ignoring the night's own pick — the order its picker is chosen from. Not limited to the stored attendees: the app filters it to who came. |
 
 **Movies** ([ADR-0007](../docs/adr/0007-tmdb-proxy-source-of-truth.md)) — `503` when `TMDB_READ_TOKEN` is unset.
 

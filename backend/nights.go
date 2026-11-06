@@ -441,40 +441,24 @@ func nightDetailHandler(store *db.Queries) http.HandlerFunc {
 	}
 }
 
-// nightTurnHandler serves GET /groups/{groupId}/nights/{nightId}/turn — the core
-// pick order over the night's attendees. Reuses RankGroupTurn with the attendee
-// IDs as a non-nil present set (empty present = rank nobody), excluding this
-// night's own pick so recording (or re-recording) its picker never reshuffles
-// the order the picker was chosen from. An optional `present=<uuid>,…` ranks
-// that draft attendee set instead of the stored one (the "We watched it" flow
-// confirms who came before saving); blank means the stored attendees.
+// nightTurnHandler serves GET /groups/{groupId}/nights/{nightId}/turn — every
+// active core member ranked as if this night were still undecided: it ignores
+// the night's own pick, so recording (or re-recording) its picker never
+// reshuffles the order the picker was chosen from. It isn't limited to the
+// stored attendees: the "We watched it" flow confirms who came before saving
+// and filters this ranking to that draft itself.
 func nightTurnHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, nightID, ok := pathGroupNight(w, r)
 		if !ok {
 			return
 		}
-		present, err := parsePresent(r.URL.Query().Get("present"))
-		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, "invalid present id")
-			return
-		}
-		ctx := r.Context()
 		if _, ok := loadNight(w, r, store, gid, nightID); !ok {
 			return
 		}
-		if present == nil {
-			rows, err := store.ListAttendees(ctx, db.ListAttendeesParams{GroupID: gid, NightID: pgtype.UUID{Bytes: nightID, Valid: true}})
-			if err != nil {
-				internalError(w, gid, "list night attendees", err)
-				return
-			}
-			present = presentIDs(rows)
-		}
-		ranked, err := store.RankGroupTurn(ctx, db.RankGroupTurnParams{
+		ranked, err := store.RankGroupTurn(r.Context(), db.RankGroupTurnParams{
 			GroupID:      gid,
 			ExcludeNight: pgtype.UUID{Bytes: nightID, Valid: true},
-			Present:      present,
 		})
 		if err != nil {
 			internalError(w, gid, "rank group turn", err)

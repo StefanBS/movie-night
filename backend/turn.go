@@ -2,9 +2,6 @@ package main
 
 import (
 	"net/http"
-	"strings"
-
-	"github.com/google/uuid"
 
 	"github.com/stefanbs/movie-night-app/backend/internal/db"
 )
@@ -17,26 +14,6 @@ type turnResponse struct {
 	Name         string  `json:"name"`
 	ServedCount  int32   `json:"servedCount"`
 	LastPickedOn *string `json:"lastPickedOn"`
-}
-
-// parsePresent parses the optional `present` query param — a comma-separated
-// list of member UUIDs present tonight. Blank input (or blank segments) yields
-// nil, which the handler passes as a NULL present-set (rank all active core).
-func parsePresent(raw string) ([]uuid.UUID, error) {
-	var ids []uuid.UUID
-	for p := range strings.SplitSeq(raw, ",") {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			continue
-		}
-		id, err := uuid.Parse(p)
-		if err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	// A blank param leaves ids nil, which is the "rank all active core" signal.
-	return ids, nil
 }
 
 // toTurnResponses maps sqlc rows to JSON responses, preserving the ranking
@@ -58,23 +35,16 @@ func toTurnResponses(rows []db.RankGroupTurnRow) []turnResponse {
 	return out
 }
 
-// turnHandler serves GET /groups/{groupId}/turn.
+// turnHandler serves GET /groups/{groupId}/turn: every active core member,
+// ranked. The app filters it to a draft's attendees itself, since who is
+// present never changes the order (RankGroupTurn's ORDER BY ignores it).
 func turnHandler(store *db.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		gid, ok := pathUUID(w, r, "groupId", "invalid group id")
 		if !ok {
 			return
 		}
-		present, err := parsePresent(r.URL.Query().Get("present"))
-		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, "invalid present id")
-			return
-		}
-
-		rows, err := store.RankGroupTurn(r.Context(), db.RankGroupTurnParams{
-			GroupID: gid,
-			Present: present,
-		})
+		rows, err := store.RankGroupTurn(r.Context(), db.RankGroupTurnParams{GroupID: gid})
 		if err != nil {
 			internalError(w, gid, "rank group turn", err)
 			return

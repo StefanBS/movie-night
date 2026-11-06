@@ -156,25 +156,16 @@ export function listNights(
   return requestJson(`${baseUrl}/groups/${groupId}/nights`, parseNights, { signal });
 }
 
-// getNightTurn loads the core pick order over a night's attendees, ignoring the
-// night's own pick — the order its picker is chosen from. `present` ranks a
-// draft of who came instead of the stored attendees; an empty draft is []
-// without a request (a blank `present` would mean the stored ones).
-export async function getNightTurn(
+// getNightTurn loads the club's full core pick order, ignoring the night's
+// own pick — the ranking its picker is chosen from. Filter it to who came
+// with rankAmong (lib/nightDraft).
+export function getNightTurn(
   baseUrl: string,
   groupId: string,
   nightId: string,
   signal?: AbortSignal,
-  present?: string[],
 ): Promise<TurnMember[]> {
-  let url = `${baseUrl}/groups/${groupId}/nights/${nightId}/turn`;
-  if (present !== undefined) {
-    if (present.length === 0) {
-      return [];
-    }
-    url += `?present=${encodeURIComponent(present.join(","))}`;
-  }
-  return requestJson(url, parseTurn, { signal });
+  return requestJson(`${baseUrl}/groups/${groupId}/nights/${nightId}/turn`, parseTurn, { signal });
 }
 
 // attachMovie sets (or changes) the night's movie. The client sends only the

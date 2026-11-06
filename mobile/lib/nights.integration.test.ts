@@ -212,26 +212,6 @@ test("listNights GETs the group's nights and parses the array", async () => {
   }
 });
 
-test("getNightTurn with a present set ranks that draft, and an empty one is [] without a request", async () => {
-  let path = "";
-  let requests = 0;
-  const server = await startServer((req, res) => {
-    requests++;
-    path = req.url ?? "";
-    res.statusCode = 200;
-    res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify([{ id: ADA, name: "Ada", role: "core", servedCount: 0, lastPickedOn: null }]));
-  });
-  try {
-    await getNightTurn(server.url, GROUP, NIGHT, undefined, [ADA, "b"]);
-    assert.equal(path, `/groups/${GROUP}/nights/${NIGHT}/turn?present=${encodeURIComponent(`${ADA},b`)}`);
-    assert.deepEqual(await getNightTurn(server.url, GROUP, NIGHT, undefined, []), []);
-    assert.equal(requests, 1);
-  } finally {
-    await server.close();
-  }
-});
-
 test("recordWatched PATCHes the night as it is, repeat included, with the confirmed attendees, picker and watched", async () => {
   let path = "";
   let method = "";

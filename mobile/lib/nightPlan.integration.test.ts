@@ -37,7 +37,7 @@ const EXISTING: Night = {
 };
 
 // backend is a small fake of the routes a Plan touches. The turn ranking is
-// "present core members in roster order", which is enough to see reranks.
+// every core member in roster order.
 function backend(over: Partial<Record<string, Handler>> = {}): Handler {
   return (req, res, body) => {
     const url = new URL(req.url ?? "", "http://x");
@@ -51,8 +51,7 @@ function backend(over: Partial<Record<string, Handler>> = {}): Handler {
     if (key === `GET /groups/${GROUP}/members`) return json(res, 200, ROSTER);
     if (key === `GET /groups/${GROUP}/nights`) return json(res, 200, [EXISTING]);
     if (key === `GET /groups/${GROUP}/turn`) {
-      const present = (url.searchParams.get("present") ?? "").split(",");
-      return json(res, 200, ROSTER.filter((m) => m.role === "core" && present.includes(m.id)).map((m) => ranked(m.id)));
+      return json(res, 200, ROSTER.filter((m) => m.role === "core").map((m) => ranked(m.id)));
     }
     if (key === `POST /groups/${GROUP}/nights`) {
       const req = JSON.parse(body) as { scheduledFor: string; startTime: string | null; attendees: string[]; pickerId: string };
@@ -135,60 +134,45 @@ test("starts on When for today; choosing a date moves to Who; back returns", asy
   });
 });
 
-test("toggling reranks the attendees and the picker follows the order", async () => {
-  const presents: string[] = [];
+test("load ranks the club once; toggling reranks the attendees without a request", async () => {
+  let turnRequests = 0;
   const base = backend();
   await withPlan(
     backend({
       [`GET /groups/${GROUP}/turn`]: (req, res, body) => {
-        presents.push(new URL(req.url ?? "", "http://x").searchParams.get("present") ?? "");
+        turnRequests++;
         base(req, res, body);
       },
     }),
     async (plan) => {
-      await plan.toggle("blake");
+      await plan.load();
+      assert.equal(plan.state.order.length, 0);
+      assert.equal(plan.state.pickerId, null);
+      plan.toggle("blake");
       assert.deepEqual(plan.state.order.map((m) => m.id), ["blake"]);
       assert.equal(plan.state.pickerId, "blake");
-      await plan.toggle("ada");
+      plan.toggle("ada");
       assert.deepEqual(plan.state.order.map((m) => m.id), ["ada", "blake"]);
       assert.equal(plan.state.pickerId, "ada");
-      await plan.toggle("ada");
+      plan.toggle("ada");
       assert.deepEqual([...plan.state.attendeeIds], ["blake"]);
       assert.equal(plan.state.pickerId, "blake");
-      assert.deepEqual(presents, ["blake", "blake,ada", "blake"]);
+      assert.equal(turnRequests, 1);
     },
   );
 });
 
-test("a stale order response never overwrites a newer one", async () => {
-  const base = backend();
-  let releaseSlow: () => void = () => {};
-  const slowGate = new Promise<void>((resolve) => (releaseSlow = resolve));
-  await withPlan(
-    backend({
-      [`GET /groups/${GROUP}/turn`]: (req, res, body) => {
-        const present = new URL(req.url ?? "", "http://x").searchParams.get("present");
-        if (present === "ada") {
-          // Answer the first rank only after the second has landed.
-          void slowGate.then(() => base(req, res, body));
-          return;
-        }
-        base(req, res, body);
-      },
-    }),
-    async (plan) => {
-      const first = plan.toggle("ada");
-      await plan.toggle("blake");
-      releaseSlow();
-      await first;
-      assert.deepEqual(plan.state.order.map((m) => m.id), ["ada", "blake"]);
-    },
-  );
+test("load reports a ranking failure", async () => {
+  await withPlan(backend({ [`GET /groups/${GROUP}/turn`]: (_q, res) => json(res, 500, { error: "boom" }) }), async (plan) => {
+    await plan.load();
+    assert.equal(plan.state.error, "boom");
+  });
 });
 
 test("a guest-only plan has no picker until one is chosen", async () => {
   await withPlan(backend(), async (plan) => {
-    await plan.toggle("frankie");
+    await plan.load();
+    plan.toggle("frankie");
     assert.deepEqual(plan.state.order, []);
     assert.equal(plan.state.pickerId, null);
     plan.choosePicker("frankie");
@@ -198,14 +182,15 @@ test("a guest-only plan has no picker until one is chosen", async () => {
 
 test("removing the chosen picker hands the pick back to the order", async () => {
   await withPlan(backend(), async (plan) => {
-    await plan.toggle("ada");
-    await plan.toggle("blake");
+    await plan.load();
+    plan.toggle("ada");
+    plan.toggle("blake");
     plan.choosePicker("blake");
     assert.equal(plan.state.pickerId, "blake");
-    await plan.toggle("blake");
+    plan.toggle("blake");
     assert.equal(plan.state.pickerId, "ada");
     // Re-adding them does not restore the old choice.
-    await plan.toggle("blake");
+    plan.toggle("blake");
     assert.equal(plan.state.pickerId, "ada");
   });
 });
@@ -221,9 +206,10 @@ test("create posts the date, attendees and picker and returns the Night", async 
       },
     }),
     async (plan) => {
+      await plan.load();
       plan.chooseDate("2026-06-26", null);
-      await plan.toggle("ada");
-      await plan.toggle("frankie");
+      plan.toggle("ada");
+      plan.toggle("frankie");
       const night = await plan.create();
       assert.deepEqual(posted, { scheduledFor: "2026-06-26", startTime: null, attendees: ["ada", "frankie"], pickerId: "ada" });
       assert.equal(night?.id, "n1");
@@ -243,9 +229,10 @@ test("create posts the start time chosen with the date", async () => {
       },
     }),
     async (plan) => {
+      await plan.load();
       plan.chooseDate("2026-06-26", "20:15");
       assert.equal(plan.state.startTime, "20:15");
-      await plan.toggle("ada");
+      plan.toggle("ada");
       const night = await plan.create();
       assert.equal(posted?.startTime, "20:15");
       assert.equal(night?.startTime, "20:15");
@@ -270,8 +257,9 @@ test("a taken date surfaces the backend's message and keeps the plan", async () 
       [`POST /groups/${GROUP}/nights`]: (_q, res) => json(res, 409, { error: "there is already a night on that date" }),
     }),
     async (plan) => {
+      await plan.load();
       plan.chooseDate("2026-06-19", null);
-      await plan.toggle("ada");
+      plan.toggle("ada");
       assert.equal(await plan.create(), null);
       assert.equal(plan.state.actionError, "there is already a night on that date");
       assert.equal(plan.state.busy, null);
@@ -285,7 +273,8 @@ test("choosing a new date clears the last create error", async () => {
   await withPlan(
     backend({ [`POST /groups/${GROUP}/nights`]: (_q, res) => json(res, 409, { error: "taken" }) }),
     async (plan) => {
-      await plan.toggle("ada");
+      await plan.load();
+      plan.toggle("ada");
       await plan.create();
       plan.chooseDate("2026-06-27", null);
       assert.equal(plan.state.actionError, null);
@@ -304,7 +293,8 @@ test("a double create sends one request", async () => {
       },
     }),
     async (plan) => {
-      await plan.toggle("ada");
+      await plan.load();
+      plan.toggle("ada");
       const [a, b] = await Promise.all([plan.create(), plan.create()]);
       assert.equal(posts, 1);
       assert.equal(a?.id, "n1");

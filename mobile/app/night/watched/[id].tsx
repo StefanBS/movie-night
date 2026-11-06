@@ -78,7 +78,7 @@ function NightWatchedFlow({ id, from }: { id: string; from: string }) {
         busy={state.busy}
         stepper={false}
         nextLabel={(first) => `Record: ${first} picked →`}
-        onToggle={(m: Member) => void flow.toggle(m.id)}
+        onToggle={(m: Member) => flow.toggle(m.id)}
         onChoosePicker={flow.choosePicker}
         onNext={() => void flow.record()}
       />

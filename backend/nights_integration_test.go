@@ -4,6 +4,7 @@ package main
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -75,27 +76,13 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		}
 	})
 
-	run("pick order ranks attendees and excludes absent core", func(t *testing.T) {
+	run("pick order ranks every active core member, ignoring the night's own pick", func(t *testing.T) {
+		// Ada is credited for this night, but its own pick is ignored, so the
+		// order is the baseline one. Cleo isn't attending and still ranks: the
+		// app filters this order to who came.
 		n := mustCreateNight(t, mux, seededGroup, nightBody("2026-06-12", ada, blake))
-		// The night's own pick (Ada) is ignored, so the order is the baseline one.
-		if got := names(turn(t, n.ID)); len(got) != 2 || got[0] != "Ada" || got[1] != "Blake" {
-			t.Fatalf("order = %v, want [Ada Blake]", got)
-		}
-	})
-
-	run("present ranks a draft attendee set, still ignoring the night's own pick", func(t *testing.T) {
-		// Ada is credited for this night. Ranked over a draft of Ada + Cleo
-		// (Blake left, Cleo came), Ada still comes first: her own pick doesn't count.
-		n := mustCreateNight(t, mux, seededGroup, nightBody("2026-06-12", ada, blake))
-		code, got := doJSON[[]turnResponse](t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID+"/turn?present="+ada+","+cleo, "")
-		if code != http.StatusOK {
-			t.Fatalf("turn status = %d, want 200", code)
-		}
-		if order := names(got); len(order) != 2 || order[0] != "Ada" || order[1] != "Cleo" {
-			t.Fatalf("order = %v, want [Ada Cleo]", order)
-		}
-		if code, _ := doReq(t, mux, http.MethodGet, "/groups/"+seededGroup+"/nights/"+n.ID+"/turn?present=nope", ""); code != http.StatusBadRequest {
-			t.Fatalf("bad present status = %d, want 400", code)
+		if got := names(turn(t, n.ID)); strings.Join(got, ",") != "Ada,Blake,Cleo" {
+			t.Fatalf("order = %v, want [Ada Blake Cleo]", got)
 		}
 	})
 
@@ -110,8 +97,8 @@ func TestNightAttendanceIntegration(t *testing.T) {
 		if !sawGuest {
 			t.Fatalf("attendees = %+v, want Frankie as guest", n.Attendees)
 		}
-		if got := names(turn(t, n.ID)); len(got) != 1 || got[0] != "Ada" {
-			t.Fatalf("order = %v, want [Ada]", got)
+		if got := names(turn(t, n.ID)); slices.Contains(got, "Frankie") {
+			t.Fatalf("order = %v, want no Frankie", got)
 		}
 	})
 
@@ -121,25 +108,9 @@ func TestNightAttendanceIntegration(t *testing.T) {
 			t.Fatalf("attendees = %+v, want 2 (Ada + Zed)", n.Attendees)
 		}
 		// Zed is inactive core: recorded as present, but RankGroupTurn filters to
-		// active core, so the order is Ada only.
-		if got := names(turn(t, n.ID)); len(got) != 1 || got[0] != "Ada" {
-			t.Fatalf("order = %v, want [Ada]", got)
-		}
-	})
-
-	run("editing the attendees changes the order", func(t *testing.T) {
-		n := mustCreateNight(t, mux, seededGroup, nightBody("2026-06-12", ada))
-		if code, b := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.Attendees = []string{ada, blake} })); code != http.StatusOK {
-			t.Fatalf("add status = %d, want 200 (body %s)", code, b)
-		}
-		if got := names(turn(t, n.ID)); len(got) != 2 {
-			t.Fatalf("after add: order = %v, want 2", got)
-		}
-		if code, _ := doReq(t, mux, http.MethodPatch, "/groups/"+seededGroup+"/nights/"+n.ID, editBody(t, n, func(r *updateNightRequest) { r.Attendees = []string{ada} })); code != http.StatusOK {
-			t.Fatalf("remove status = %d, want 200", code)
-		}
-		if got := names(turn(t, n.ID)); len(got) != 1 || got[0] != "Ada" {
-			t.Fatalf("after remove: order = %v, want [Ada]", got)
+		// active core.
+		if got := names(turn(t, n.ID)); slices.Contains(got, "Zed") {
+			t.Fatalf("order = %v, want no Zed", got)
 		}
 	})
 
@@ -217,7 +188,7 @@ func TestNightAttendanceIntegration(t *testing.T) {
 	run("a night's order still counts other nights' picks", func(t *testing.T) {
 		mustCreateNight(t, mux, seededGroup, nightBody("2026-06-05", ada, blake))
 		n := mustCreateNight(t, mux, seededGroup, nightBody("2026-06-12", blake, ada))
-		if order := names(turn(t, n.ID)); len(order) != 2 || order[0] != "Blake" {
+		if order := names(turn(t, n.ID)); len(order) != 3 || order[0] != "Blake" {
 			t.Fatalf("order = %v, want Blake first (Ada credited on an earlier night)", order)
 		}
 	})
