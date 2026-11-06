@@ -2,7 +2,7 @@ import { errorMessage } from "./errors";
 import { fetchMembers, type Member } from "./members";
 import { createPicking } from "./nightDraft";
 import { getNightOrNull, getNightTurn, recordWatched, type Night } from "./nights";
-import { createSessionCore, type Session } from "./session";
+import { createSessionCore, withSession, type Session } from "./session";
 import type { TurnMember } from "./turn";
 
 // The module behind the "We watched it" flow for a planned Night (ADR-0012):
@@ -68,13 +68,7 @@ export function createNightWatched({
   });
   const picking = createPicking(core);
 
-  return {
-    get state() {
-      return core.state;
-    },
-    subscribe: core.subscribe,
-    dispose: core.dispose,
-
+  return withSession<NightWatched>(core, {
     async load() {
       core.set({ loading: true, error: null });
       try {
@@ -98,29 +92,20 @@ export function createNightWatched({
     toggle: picking.toggle,
     choosePicker: picking.choosePicker,
 
-    async record() {
-      if (core.state.busy !== null) {
-        return null;
-      }
+    record() {
       const { pickerId, attendeeIds, night } = core.state;
       if (pickerId === null || night === null) {
-        return null;
+        return Promise.resolve(null);
       }
-      core.set({ busy: "record", actionError: null });
-      try {
-        const recorded = await core.track((signal) =>
-          recordWatched(baseUrl, groupId, night, { attendees: [...attendeeIds], pickerId }, signal),
-        );
-        core.set({ night: recorded, busy: null, step: "done" });
+      return core.act("record", "failed to record the night", async (signal) => {
+        const recorded = await recordWatched(baseUrl, groupId, night, { attendees: [...attendeeIds], pickerId }, signal);
+        core.set({ night: recorded, step: "done" });
         return recorded;
-      } catch (e) {
-        core.set({ busy: null, actionError: errorMessage(e, "failed to record the night") });
-        return null;
-      }
+      });
     },
 
     back() {
       core.set({ step: "who" });
     },
-  };
+  });
 }

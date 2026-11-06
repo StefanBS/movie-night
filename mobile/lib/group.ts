@@ -1,6 +1,6 @@
 import { errorMessage } from "./errors";
 import { requestJson } from "./http";
-import { createSessionCore, type Session } from "./session";
+import { createSessionCore, withSession, type Session } from "./session";
 
 export type Group = {
   name: string;
@@ -98,13 +98,7 @@ export function createGroupSession({ baseUrl, groupId }: { baseUrl: string; grou
     return inFlight;
   };
 
-  return {
-    get state() {
-      return core.state;
-    },
-    subscribe: core.subscribe,
-    dispose: core.dispose,
-
+  return withSession<GroupSession>(core, {
     load() {
       return core.state.group !== null ? Promise.resolve() : fetchOnce();
     },
@@ -115,5 +109,5 @@ export function createGroupSession({ baseUrl, groupId }: { baseUrl: string; grou
       writes++;
       core.set({ group, error: null });
     },
-  };
+  });
 }

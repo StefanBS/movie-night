@@ -3,7 +3,7 @@ import { fetchMembers, type Member } from "./members";
 import { createPicking } from "./nightDraft";
 import { nightDates } from "./nightLifecycle";
 import { createNight, listNights, type Night } from "./nights";
-import { createSessionCore, type Session } from "./session";
+import { createSessionCore, withSession, type Session } from "./session";
 import { fetchTurn, type TurnMember } from "./turn";
 
 // The Plan module behind the New night screen (GLOSSARY: Plan). A Plan is a
@@ -69,13 +69,7 @@ export function createNightPlan({
   });
   const picking = createPicking(core);
 
-  return {
-    get state() {
-      return core.state;
-    },
-    subscribe: core.subscribe,
-    dispose: core.dispose,
-
+  return withSession<NightPlan>(core, {
     async load() {
       core.set({ loading: true, error: null });
       try {
@@ -105,22 +99,14 @@ export function createNightPlan({
     toggle: picking.toggle,
     choosePicker: picking.choosePicker,
 
-    async create() {
-      const { busy, pickerId, date, startTime, attendeeIds } = core.state;
-      if (busy !== null || pickerId === null) {
-        return null;
+    create() {
+      const { pickerId, date, startTime, attendeeIds } = core.state;
+      if (pickerId === null) {
+        return Promise.resolve(null);
       }
-      core.set({ busy: "create", actionError: null });
-      try {
-        const night = await core.track((signal) =>
-          createNight(baseUrl, groupId, { scheduledFor: date, startTime, attendees: [...attendeeIds], pickerId }, signal),
-        );
-        core.set({ busy: null });
-        return night;
-      } catch (e) {
-        core.set({ busy: null, actionError: errorMessage(e, "failed to create night") });
-        return null;
-      }
+      return core.act("create", "failed to create night", (signal) =>
+        createNight(baseUrl, groupId, { scheduledFor: date, startTime, attendees: [...attendeeIds], pickerId }, signal),
+      );
     },
-  };
+  });
 }

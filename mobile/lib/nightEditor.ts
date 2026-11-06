@@ -1,7 +1,7 @@
 import { errorMessage } from "./errors";
 import { searchMovies, type SearchResult } from "./movies";
 import { attachMovie, changeNightPicker, detachMovie, type Night } from "./nights";
-import { createSessionCore, type Session } from "./session";
+import { createSessionCore, withSession, type Session } from "./session";
 
 // The editor module for a saved Night: choosing or clearing its film and
 // changing its picker. It keeps the stored picker — only changePicker moves it
@@ -64,41 +64,22 @@ export function createNightEditor({
   });
 
   let lastWriteAt = -Infinity;
-  let searchController: AbortController | null = null;
-  // searchingFor is the query searchController is answering ("" when idle).
-  let searchingFor = "";
+  // searchingFor is the query of the search in flight (null when idle).
+  let searchingFor: { q: string } | null = null;
 
-  // write runs one Night write under the busy guard, keeping the returned
-  // Night; on failure the Night is unchanged and the error is shown.
-  const write = async (
-    busyKey: string,
-    run: (signal: AbortSignal) => Promise<Night>,
-    fallback: string,
-  ): Promise<Night | null> => {
-    if (core.state.busy !== null) {
-      return null;
-    }
-    core.set({ busy: busyKey, actionError: null });
-    try {
-      const updated = await core.track(run);
+  // write runs one Night write under core.act, keeping the returned Night; on
+  // failure the Night is unchanged and the error is shown.
+  const write = (busyKey: string, run: (signal: AbortSignal) => Promise<Night>, fallback: string) =>
+    core.act(busyKey, fallback, async (signal) => {
+      const updated = await run(signal);
       lastWriteAt = performance.now();
-      core.set({ night: updated, busy: null });
+      core.set({ night: updated });
       return updated;
-    } catch (e) {
-      core.set({ busy: null, actionError: errorMessage(e, fallback) });
-      return null;
-    }
-  };
+    });
 
   const nightId = night.id;
 
-  return {
-    get state() {
-      return core.state;
-    },
-    subscribe: core.subscribe,
-    dispose: core.dispose,
-
+  return withSession<NightEditor>(core, {
     pickFilm() {
       core.set({ step: "pick" });
     },
@@ -112,34 +93,30 @@ export function createNightEditor({
       // Submitting the field and the typing debounce both ask for the same
       // query; one request answers both.
       const { resultsFor, searchError } = core.state;
-      if (q !== "" && (q === searchingFor || (searchController === null && q === resultsFor && searchError === null))) {
+      if (q !== "" && (q === searchingFor?.q || (searchingFor === null && q === resultsFor && searchError === null))) {
         return;
       }
-      searchController?.abort();
-      searchController = null;
-      searchingFor = "";
       if (q === "") {
+        searchingFor = null;
         core.set({ results: [], resultsFor: "", searching: false, searchError: null });
+        // Cancels a search still in flight; a blank query sends no request.
+        await core.latest("search", async () => []);
         return;
       }
-      const controller = new AbortController();
-      searchController = controller;
-      searchingFor = q;
+      const mine = { q };
+      searchingFor = mine;
       core.set({ searching: true, searchError: null });
       try {
-        const results = await core.track((signal) => searchMovies(baseUrl, groupId, nightId, q, signal), controller);
-        if (searchController === controller) {
+        // null: a newer search replaced this one, or the screen closed.
+        const results = await core.latest("search", (signal) => searchMovies(baseUrl, groupId, nightId, q, signal));
+        if (results !== null) {
           core.set({ results, resultsFor: q, searching: false });
         }
       } catch (e) {
-        // An aborted search was replaced by a newer one, or the screen closed.
-        if (!controller.signal.aborted) {
-          core.set({ searching: false, searchError: errorMessage(e, "search failed") });
-        }
+        core.set({ searching: false, searchError: errorMessage(e, "search failed") });
       } finally {
-        if (searchController === controller) {
-          searchController = null;
-          searchingFor = "";
+        if (searchingFor === mine) {
+          searchingFor = null;
         }
       }
     },
@@ -185,5 +162,5 @@ export function createNightEditor({
       }
       core.set({ night });
     },
-  };
+  });
 }

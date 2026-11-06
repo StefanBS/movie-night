@@ -1,7 +1,7 @@
 import { errorMessage } from "./errors";
 import { requestJson, requestJsonOrNull, requestNoContent } from "./http";
 import { fetchMembers, joinMember, type Member } from "./members";
-import { createSessionCore, type Session } from "./session";
+import { createSessionCore, withSession, type Session } from "./session";
 
 // The Identity module (GLOSSARY: Identity; ADR-0009). An install claims the
 // person it acts as from the group's roster and keeps the bearer token the
@@ -248,21 +248,6 @@ export function createIdentitySession({
     }
   };
 
-  // act runs one user action with the busy flag and its error, so a double tap
-  // can't claim twice.
-  const act = async (fallback: string, run: () => Promise<void>) => {
-    if (core.state.busy) {
-      return;
-    }
-    core.set({ busy: true, actionError: null });
-    try {
-      await run();
-      core.set({ busy: false });
-    } catch (e) {
-      core.set({ busy: false, actionError: errorMessage(e, fallback) });
-    }
-  };
-
   const claimMember = async (userId: string) => {
     const claim = await core.track((signal) => claimIdentity(baseUrl, groupId, userId, signal));
     await storage.set(claim.token);
@@ -270,36 +255,37 @@ export function createIdentitySession({
     await syncPush(claim.token);
   };
 
-  return {
-    get state() {
-      return core.state;
-    },
-    subscribe: core.subscribe,
-    dispose: core.dispose,
+  // Each action runs under core.act, so a double tap can't claim twice.
+  return withSession<IdentitySession>(core, {
     load,
-    claim: (userId) => act("couldn't claim that person", () => claimMember(userId)),
-    joinAndClaim: (name) =>
-      act("couldn't add you", async () => {
-        const member = await core.track((signal) => joinMember(baseUrl, groupId, name, "guest", signal));
+    async claim(userId) {
+      await core.act(true, "couldn't claim that person", () => claimMember(userId));
+    },
+    async joinAndClaim(name) {
+      await core.act(true, "couldn't add you", async (signal) => {
+        const member = await joinMember(baseUrl, groupId, name, "guest", signal);
         await claimMember(member.id);
-      }),
-    release: () =>
-      act("couldn't switch", async () => {
+      });
+    },
+    async release() {
+      await core.act(true, "couldn't switch", async (signal) => {
         const token = await storage.get();
         if (token !== null) {
-          await core.track((signal) => releaseIdentity(baseUrl, token, signal));
+          await releaseIdentity(baseUrl, token, signal);
           await storage.remove();
         }
         await showRoster();
-      }),
-    setRemindersMuted: (muted) =>
-      act("couldn't change reminders", async () => {
+      });
+    },
+    async setRemindersMuted(muted) {
+      await core.act(true, "couldn't change reminders", async (signal) => {
         const token = await storage.get();
         if (token === null) {
           return;
         }
-        const identity = await core.track((signal) => setRemindersMuted(baseUrl, token, muted, signal));
+        const identity = await setRemindersMuted(baseUrl, token, muted, signal);
         core.set({ identity });
-      }),
-  };
+      });
+    },
+  });
 }

@@ -1,9 +1,8 @@
-import { errorMessage } from "./errors";
 import type { Member } from "./members";
 import { deleteNight, updateNight, type Night } from "./nights";
 import { sameReminders, type Reminders } from "./reminders";
 import { reconcileRepeat, sameRepeat, type Repeat } from "./repeat";
-import { createSessionCore, type Session } from "./session";
+import { createSessionCore, withSession, type Session } from "./session";
 
 // The Edit screen's module for a saved Night: a draft of its date, start time,
 // attendees, reminder settings and repeat, saved in one request that either fully applies or changes nothing,
@@ -114,13 +113,7 @@ export function createNightEdit({
 
   const nightId = night.id;
 
-  return {
-    get state() {
-      return core.state;
-    },
-    subscribe: core.subscribe,
-    dispose: core.dispose,
-
+  return withSession<NightEdit>(core, {
     // A monthly repeat moves to the new date's week of the month when the
     // date leaves its own (lib/repeat reconcileRepeat).
     setDate(date) {
@@ -150,43 +143,30 @@ export function createNightEdit({
       setDraft({ repeat });
     },
 
-    async save() {
-      const { busy, dirty, date, startTime, attendees, reminders, repeat } = core.state;
-      if (busy !== null || !dirty) {
-        return null;
+    save() {
+      const { dirty, date, startTime, attendees, reminders, repeat } = core.state;
+      if (!dirty) {
+        return Promise.resolve(null);
       }
-      core.set({ busy: "save", actionError: null });
-      try {
-        const saved = await core.track((signal) =>
-          updateNight(
-            baseUrl,
-            groupId,
-            nightId,
-            { scheduledFor: date, startTime, attendees: [...attendees], reminders, repeat },
-            signal,
-          ),
+      return core.act("save", "failed to save changes", async (signal) => {
+        const saved = await updateNight(
+          baseUrl,
+          groupId,
+          nightId,
+          { scheduledFor: date, startTime, attendees: [...attendees], reminders, repeat },
+          signal,
         );
-        core.set({ ...fromNight(saved, core.state.members), busy: null });
+        core.set(fromNight(saved, core.state.members));
         return saved;
-      } catch (e) {
-        core.set({ busy: null, actionError: errorMessage(e, "failed to save changes") });
-        return null;
-      }
+      });
     },
 
     async cancelNight() {
-      if (core.state.busy !== null) {
-        return false;
-      }
-      core.set({ busy: "cancel", actionError: null });
-      try {
-        await core.track((signal) => deleteNight(baseUrl, groupId, nightId, signal));
-        core.set({ busy: null });
+      const gone = await core.act("cancel", "failed to cancel night", async (signal) => {
+        await deleteNight(baseUrl, groupId, nightId, signal);
         return true;
-      } catch (e) {
-        core.set({ busy: null, actionError: errorMessage(e, "failed to cancel night") });
-        return false;
-      }
+      });
+      return gone ?? false;
     },
-  };
+  });
 }
