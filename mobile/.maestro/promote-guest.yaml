@@ -1,0 +1,37 @@
+# Promote Frankie, the seeded guest, to core. Promoting seeds Frankie's
+# baseline at the active-core average (round(0.6) = 1 pick) with no pick date,
+# which ranks first among the 1-pick members (last_picked_on NULLS FIRST): so
+# the rotation becomes Ada, Dev, Frankie, Cleo, Blake, Esme.
+appId: ${APP_ID}
+name: Promote a guest to core
+---
+- runFlow: common/setup.yaml
+- tapOn: Club
+- assertVisible: 6 members · 5 in rotation
+- assertVisible:
+    text: Frankie
+    below: Guests · not in rotation
+- tapOn: Frankie
+- assertVisible: Guest since .*
+- tapOn: Promote to core
+# Back on Club: Frankie is in the rotation, and there are no guests left.
+- assertVisible: 6 members · 6 in rotation
+- assertNotVisible: Guests · not in rotation
+- assertVisible:
+    text: Frankie
+    below: Dev
+- assertVisible:
+    text: Cleo
+    below: Frankie
+- tapOn: Frankie
+- assertVisible: Core since .*
+- assertVisible: 3rd
+- back
+- tapOn: Tonight
+- tapOn: See full rotation →
+- assertVisible:
+    text: Frankie
+    below: Dev
+- assertVisible:
+    text: Cleo
+    below: Frankie

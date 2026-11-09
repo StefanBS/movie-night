@@ -1,0 +1,46 @@
+# Deactivate Blake, then reactivate him. From the seed (backend/seed.sql) the
+# rotation is Ada, Dev, Cleo, Blake, Esme (see rotation-moves-on.yaml).
+# Deactivating takes Blake out of the rotation, but his seeded pick (Dune: Part
+# Two, May 1) stays on Watched. Reactivating keeps his rotation slot and
+# re-seeds his baseline to the active-core average (round(0.5) = 1, less his
+# one credited pick = 0), so he's back between Cleo and Esme.
+appId: ${APP_ID}
+name: Deactivate, then reactivate, a member
+---
+- runFlow: common/setup.yaml
+- tapOn: Club
+- assertVisible: 6 members · 5 in rotation
+- tapOn: Blake
+- assertVisible: Leaves the rotation. Their picks stay in Watched.
+- tapOn: Deactivate Blake
+# Back on Club: Blake is listed as inactive, not in rotation.
+- assertVisible: 5 members · 4 in rotation
+- assertVisible:
+    text: Blake
+    below: Inactive
+- tapOn: Tonight
+- tapOn: See full rotation →
+- assertVisible: The order
+- assertVisible: Esme
+- assertNotVisible: Blake
+- back
+# His pick is still on Watched, credited to him.
+- tapOn: Watched
+- assertVisible:
+    text: Blake · .*
+    below: 'Dune: Part Two'
+- tapOn: Club
+- tapOn: Blake
+- assertVisible: "Blake's picks"
+- assertVisible: 'Dune: Part Two'
+- tapOn: Reactivate Blake
+- assertVisible: 6 members · 5 in rotation
+- assertNotVisible: Inactive
+- tapOn: Tonight
+- tapOn: See full rotation →
+- assertVisible:
+    text: Blake
+    below: Cleo
+- assertVisible:
+    text: Esme
+    below: Blake
