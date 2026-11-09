@@ -91,9 +91,9 @@ audit:
 audit-sarif:
     osv-scanner scan source --lockfile=package-lock.json --config=osv-scanner.toml --format sarif > osv-scanner.sarif
 
-# Drive the dev client on the adb-attached phone: launch [port] | tap "<text>" |
-# dump | shot <file> | has <text> (is my change in the phone's bundle?) |
-# devlink [port]
+# Open the dev client on the adb-attached phone: launch [port] | has <text>
+# (is my change in the phone's bundle?) | devlink [port]. To drive the app,
+# use Maestro (`maestro hierarchy`, or a flow).
 [positional-arguments]
 phone *args:
     bash scripts/phone.sh "$@"

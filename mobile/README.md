@@ -80,17 +80,17 @@ just start          # or: npm start
 Open the installed **Movie Night / mobile** app on the phone (not Expo Go) and
 connect to the Metro bundler. Use `just ios` (macOS) or `just web` for those targets.
 
-**Driving the phone from the terminal** (adb-attached, including wireless adb):
+**Opening the app from the terminal** (adb-attached, including wireless adb):
 
 ```bash
 just phone launch [port]    # force-stop, open the dev client on http://<lan-ip>:<port> (8081), wait for load
-just phone dump             # visible text and accessibility labels of our app, with bounds
-just phone tap "Watched"    # tap the first element whose text matches exactly,
-                            # else whose accessibility label does (e.g. "Settings", the gear)
-just phone shot screen.png  # screenshot
 just phone has "someText"   # exit 0 if the text is in the phone's JS bundle, 1 if not
 just phone devlink          # print the deep link that opens the dev client on Metro
 ```
+
+To drive the app (tap, read the screen, screenshot), use Maestro: `maestro
+hierarchy` prints what's on screen, and a flow does the rest (see
+[End-to-end tests](#end-to-end-tests-maestro)).
 
 Before trusting any on-device result, run `just phone has <something from your
 change>`. A long-running Metro can serve the phone a stale bundle even when a
@@ -270,7 +270,7 @@ mobile/
 ├── *.ts               # thin native adapters (secure storage, push, calendar, API URL)
 ├── theme/             # "Spotlight, refined" design tokens (colors, spacing, typography)
 ├── assets/            # brand SVGs, the icon/splash PNGs rendered from them, fonts
-├── scripts/           # `just phone` driver, Android push setup wizard
+├── scripts/           # `just phone` launch/bundle check, Android push setup wizard
 ├── app.json           # Expo app config
 ├── eslint.config.js   # ESLint flat config
 ├── justfile           # task recipes (just) — parity with the backend
