@@ -115,7 +115,9 @@ e2e marker *flows:
     [[ ${#flows[@]} -gt 0 ]] || flows=(.maestro/*.yaml)
     bash scripts/phone.sh launch
     bash scripts/phone.sh has "$marker"
-    link=$(bash scripts/phone.sh devlink)
+    # Hide the dev client's floating tools button for the run: it sits over
+    # Tonight's Settings gear and catches taps meant for it.
+    link="$(bash scripts/phone.sh devlink)&__expo_disable_fab=1"
     app_id=$(node -p 'require("./app.json").expo.android.package')
     failed=()
     report() { [[ ${#failed[@]} -eq 0 ]] || printf 'e2e: FAILED %s\n' "${failed[@]}" >&2; }
