@@ -1,0 +1,30 @@
+# Open a seeded watched night from Watched, change its film and who watched.
+# In the seed (backend/seed.sql), Esme's Past Lives night was watched by Esme,
+# Ada and Dev. Movie search hits the real TMDB: match the exact title under
+# the result count, not a list position.
+appId: ${APP_ID}
+name: Edit a watched night
+---
+- runFlow: common/setup.yaml
+- tapOn: Watched
+- tapOn: Past Lives
+- assertVisible: Who watched · 3
+- tapOn: More
+- tapOn: Change film
+- assertVisible: 'What are we watching\?'
+- tapOn: Search a film title…
+- inputText: Paddington 2
+- pressKey: Enter
+- tapOn:
+    text: Paddington 2
+    below: '\d+ films? · tap one.*'
+- assertVisible: Paddington 2
+- tapOn: More
+- tapOn: Edit night
+- tapOn: Cleo
+- tapOn: Save changes
+- assertVisible: Who watched · 4
+- assertVisible: Cleo
+- tapOn: Back to Watched
+- assertVisible: Paddington 2
+- assertNotVisible: Past Lives
