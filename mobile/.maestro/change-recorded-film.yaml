@@ -1,0 +1,25 @@
+# Record tonight's night, then change its film from the receipt's "Change
+# film": Watched shows the new film and not the old one.
+# Movie search hits the real TMDB: match the exact title under the result
+# count, not a list position.
+appId: ${APP_ID}
+name: Change a recorded night's film
+---
+- runFlow: plan-night.yaml
+- tapOn: We watched it
+- tapOn: "Record: Ada picked.*"
+- assertVisible: Recorded ✓
+- tapOn: Change film
+- assertVisible: 'What are we watching\?'
+- tapOn: Search a film title…
+- inputText: The Holdovers
+- pressKey: Enter
+- tapOn:
+    text: The Holdovers
+    below: '\d+ films? · tap one.*'
+- assertVisible: The Holdovers
+- tapOn: Back to Tonight
+- tapOn: Watched
+- assertVisible: The Holdovers
+# Exact match: the seeded "Dune: Part Two" stays.
+- assertNotVisible: Dune
