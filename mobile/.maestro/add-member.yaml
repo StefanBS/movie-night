@@ -1,0 +1,14 @@
+# Add a core member from the Club tab.
+appId: ${APP_ID}
+name: Add a member
+---
+- runFlow: common/setup.yaml
+- tapOn: Club
+- tapOn: Add member
+- tapOn: e.g. Alex Rivera
+- inputText: Gus
+- hideKeyboard
+- tapOn: Core
+- tapOn: Add to the club
+- assertVisible: Club
+- assertVisible: Gus

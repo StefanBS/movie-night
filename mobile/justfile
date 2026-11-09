@@ -92,7 +92,40 @@ audit-sarif:
     osv-scanner scan source --lockfile=package-lock.json --config=osv-scanner.toml --format sarif > osv-scanner.sarif
 
 # Drive the dev client on the adb-attached phone: launch [port] | tap "<text>" |
-# dump | shot <file> | has <text> (is my change in the phone's bundle?)
+# dump | shot <file> | has <text> (is my change in the phone's bundle?) |
+# devlink [port]
 [positional-arguments]
 phone *args:
     bash scripts/phone.sh "$@"
+
+# Run the Maestro end-to-end suite (.maestro/) on the adb-attached phone.
+# <marker> is text from your change: the run refuses a phone whose bundle lacks
+# it (`just phone has`). Each flow starts from a reseeded dev DB (needs the
+# backend's Postgres up, and the backend + Metro running). Run a subset by
+# naming flow files: just e2e "<marker>" .maestro/plan-night.yaml
+[positional-arguments]
+e2e marker *flows:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export MAESTRO_CLI_NO_ANALYTICS=1 MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED=true
+    command -v maestro >/dev/null || { echo "e2e: maestro isn't on PATH (see README: End-to-end tests)" >&2; exit 2; }
+    marker=$1
+    shift
+    flows=("$@")
+    [[ ${#flows[@]} -gt 0 ]] || flows=(.maestro/*.yaml)
+    bash scripts/phone.sh launch
+    bash scripts/phone.sh has "$marker"
+    link=$(bash scripts/phone.sh devlink)
+    app_id=$(node -p 'require("./app.json").expo.android.package')
+    failed=()
+    report() { [[ ${#failed[@]} -eq 0 ]] || printf 'e2e: FAILED %s\n' "${failed[@]}" >&2; }
+    for f in "${flows[@]}"; do
+        # A failed reseed stops the run, but still reports the flows before it.
+        (cd ../backend && just reseed) || { report; echo "e2e: reseed failed before $f" >&2; exit 1; }
+        maestro test -e APP_ID="$app_id" -e DEV_LINK="$link" "$f" || failed+=("$f")
+    done
+    if [[ ${#failed[@]} -gt 0 ]]; then
+        report
+        exit 1
+    fi
+    echo "e2e: all ${#flows[@]} flows passed" >&2

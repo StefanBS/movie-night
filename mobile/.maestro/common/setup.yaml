@@ -1,0 +1,24 @@
+# Every flow runs this first: the dev client reopened against Metro, then
+# claimed as Ada (she has never picked in the seed, so she's next up).
+# `just e2e` passes APP_ID (from app.json) and DEV_LINK (`just phone devlink`)
+# and reseeds the DB before each flow. Reseeding empties `devices`, which
+# revokes the phone's identity token, so the app opens on "Who are you?"
+# without clearing its state. Don't use clearState: it also wipes granted
+# permissions and the dev menu's onboarding flag, so every run stops on system
+# and dev-client dialogs.
+# Notifications are granted up front: claiming asks for them (pushDevice.ts),
+# and the OS prompt would block a fresh install.
+appId: ${APP_ID}
+---
+- stopApp
+- setPermissions:
+    permissions:
+      notifications: allow
+- openLink: ${DEV_LINK}
+- extendedWaitUntil:
+    visible: 'Who are you\?'
+    timeout: 90000
+- tapOn: Ada
+- extendedWaitUntil:
+    visible: Plan a night
+    timeout: 15000

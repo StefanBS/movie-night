@@ -28,6 +28,8 @@ usage: just phone <cmd>
   shot <file>     save a screenshot (PNG)
   has <text>      exit 0 if <text> is in the phone's downloaded JS bundle,
                   1 if not: the "is my change on the phone?" check
+  devlink [port]  print the deep link that opens the dev client against Metro
+                  (what launch opens; the e2e flows open it too)
 EOF
   exit 2
 }
@@ -59,13 +61,20 @@ nodes() {
       -e 's/&lt;/</g' -e 's/&gt;/>/g' -e 's/&amp;/\&/g'
 }
 
+# devlink prints the dev client deep link for Metro at <url>.
+devlink() {
+  echo "$SCHEME://expo-development-client/?url=$(sed -e 's/:/%3A/g' -e 's#/#%2F#g' <<<"$1")"
+}
+
+cmd_devlink() {
+  devlink "http://$(lan_ip):${1:-8081}"
+}
+
 cmd_launch() {
   local port=${1:-8081} url prev="" cur deadline
   url="http://$(lan_ip):$port"
   adb shell am force-stop "$PKG"
-  adb shell am start -a android.intent.action.VIEW \
-    -d "$SCHEME://expo-development-client/?url=$(sed -e 's/:/%3A/g' -e 's#/#%2F#g' <<<"$url")" \
-    "$PKG" >/dev/null
+  adb shell am start -a android.intent.action.VIEW -d "$(devlink "$url")" "$PKG" >/dev/null
   echo "phone: opened $url, waiting for the app to load..." >&2
   # Loaded = our app shows text beyond the dev client's floating "Tools"
   # button, and it's unchanged across two polls (no splash or progress text).
@@ -130,6 +139,6 @@ cmd_has() {
 cmd=$1
 shift
 case $cmd in
-  launch | tap | dump | shot | has) "cmd_$cmd" "$@" ;;
+  launch | tap | dump | shot | has | devlink) "cmd_$cmd" "$@" ;;
   *) usage ;;
 esac

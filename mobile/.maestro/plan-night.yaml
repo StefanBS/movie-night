@@ -1,0 +1,23 @@
+# Plan a night for tonight with Ada and Blake, and give it Ada's pick.
+# Movie search hits the real TMDB: match the title "Dune", not a list position.
+appId: ${APP_ID}
+name: Plan a night
+---
+- runFlow: common/setup.yaml
+- tapOn: Plan a night
+- tapOn: "Next: who's coming.*"
+- tapOn: Ada
+- tapOn: Blake
+- tapOn: "Next: Ada picks.*"
+- assertVisible: 'What are we watching\?'
+- tapOn: Search a film title…
+- inputText: Dune
+- pressKey: Enter
+# The first exact "Dune" under the result count, so not the search box itself
+# (or "Dune: Part Two").
+- tapOn:
+    text: Dune
+    below: '\d+ films? · tap one.*'
+- tapOn: Done
+- assertVisible: Dune
+- assertVisible: We watched it

@@ -28,6 +28,12 @@ migrate-down:
 seed:
     docker compose exec -T db psql -U movie -d movienight < seed.sql
 
+# Reset the dev DB to exactly the seed: empty every table (except goose's
+# version table), then load the seed. What `just e2e` (mobile/) starts from.
+reseed:
+    docker compose exec -T db psql -U movie -d movienight -v ON_ERROR_STOP=1 -c "DO \$\$ BEGIN EXECUTE (SELECT 'TRUNCATE ' || string_agg(format('%I', tablename), ', ') || ' CASCADE' FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'goose_db_version'); END \$\$"
+    just seed
+
 # Regenerate the sqlc db package
 sqlc:
     go tool sqlc generate

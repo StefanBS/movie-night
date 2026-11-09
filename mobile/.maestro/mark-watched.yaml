@@ -1,0 +1,10 @@
+# Record tonight's night as watched, then find it on the Watched tab.
+appId: ${APP_ID}
+name: Mark a night watched
+---
+- runFlow: plan-night.yaml
+- tapOn: We watched it
+- tapOn: "Record: Ada picked.*"
+- tapOn: Done
+- tapOn: Watched
+- assertVisible: Dune
