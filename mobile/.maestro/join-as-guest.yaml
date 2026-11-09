@@ -5,6 +5,11 @@ name: Join as a guest
 ---
 - runFlow: common/open.yaml
 - tapOn: "I'm not on the list"
+# The name field autofocuses; the field and its button must sit above the
+# keyboard, not under it.
+- assertVisible: e.g. Alex Rivera
+- assertVisible: Join as a guest
+- tapOn: e.g. Alex Rivera
 - inputText: Gus
 - hideKeyboard
 - tapOn: Join as a guest

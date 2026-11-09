@@ -1,5 +1,12 @@
-import { useState } from "react";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  ScrollView,
+  type ScrollViewInstance,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { IdentitySession, IdentitySessionState } from "../lib/identity";
@@ -26,6 +33,19 @@ export function ClaimIdentityScreen({
   const insets = useSafeAreaInsets();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
+  const scroll = useRef<ScrollViewInstance>(null);
+
+  // The name field sits below the whole roster, and it autofocuses, so the
+  // keyboard would open over it and the "Join as a guest" button. The
+  // KeyboardAvoidingView shrinks the scroll view to above the keyboard; when it
+  // resizes (or the field appears) while adding, scroll to the end so the
+  // field and button show. Scrolling on the keyboard event instead races the
+  // resize and lands short.
+  const showJoin = () => {
+    if (adding) {
+      scroll.current?.scrollToEnd();
+    }
+  };
 
   const join = () => {
     const trimmed = name.trim();
@@ -35,8 +55,11 @@ export function ClaimIdentityScreen({
   };
 
   return (
-    <View style={styles.screen}>
+    <KeyboardAvoidingView style={styles.screen} behavior="padding">
       <ScrollView
+        ref={scroll}
+        onLayout={showJoin}
+        onContentSizeChange={showJoin}
         contentContainerStyle={[
           styles.content,
           { paddingTop: insets.top + space[8], paddingBottom: insets.bottom + space[8] },
@@ -100,7 +123,7 @@ export function ClaimIdentityScreen({
           </>
         )}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
