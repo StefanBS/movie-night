@@ -162,6 +162,7 @@ lefthook install               # from the repo root
 just migrate        # apply pending migrations
 just migrate-down   # roll back the most recent migration
 just seed           # (re)load dev seed data — safe to run repeatedly
+just reseed         # empty every table, then seed: back to exactly the seed state
 just sqlc           # regenerate internal/db after editing SQL
 just db-reset       # destroy the container AND its data volume
 ```

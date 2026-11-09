@@ -1,0 +1,23 @@
+# Plan a night with no film, edit who's coming, then cancel it.
+appId: ${APP_ID}
+name: Edit, then cancel, a night
+---
+- runFlow: common/setup.yaml
+- tapOn: Plan a night
+- tapOn: "Next: who's coming.*"
+- tapOn: Ada
+- tapOn: Blake
+- tapOn: "Next: Ada picks.*"
+- tapOn: "Skip for now.*"
+- tapOn: Done
+- assertVisible: Choose the film
+- assertVisible: 2 coming
+- tapOn: Edit
+- tapOn: Cleo
+- tapOn: Save changes
+- assertVisible: Choose the film
+- assertVisible: 3 coming
+- tapOn: Edit
+- tapOn: Cancel this night
+# No night planned any more: Tonight is back to Ada's empty turn.
+- assertVisible: Plan a night

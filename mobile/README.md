@@ -89,11 +89,45 @@ just phone tap "Watched"    # tap the first element whose text matches exactly,
                             # else whose accessibility label does (e.g. "Settings", the gear)
 just phone shot screen.png  # screenshot
 just phone has "someText"   # exit 0 if the text is in the phone's JS bundle, 1 if not
+just phone devlink          # print the deep link that opens the dev client on Metro
 ```
 
 Before trusting any on-device result, run `just phone has <something from your
 change>`. A long-running Metro can serve the phone a stale bundle even when a
 fresh `curl` of the bundle shows new code.
+
+### End-to-end tests (Maestro)
+
+`.maestro/` holds [Maestro](https://maestro.dev/) flows that drive the dev
+client on the adb-attached phone: plan a night, edit then cancel one, mark one
+watched, and add a member. Run them before merging a UI change:
+
+```bash
+just e2e "<text from your change>"                     # every flow
+just e2e "<text from your change>" .maestro/plan-night.yaml   # just one
+```
+
+`just e2e` launches the app (`just phone launch`), refuses to run if the
+phone's bundle lacks your text (`just phone has`), then runs each flow on a
+fresh dev DB (`just reseed` in `backend/`). Reseeding revokes the phone's identity, so
+each flow reopens the app (the deep link from `just phone devlink`) on "Who are
+you?" and claims Ada. The flows never clear the app's state: that would also
+wipe its granted permissions and bring back system and dev-client dialogs. The
+backend, its Postgres, and Metro must be running, and the phone unlocked.
+Movie search goes to the real TMDB, so flows match a film by title ("Dune"),
+never by its position in the results.
+
+Install Maestro from its release zip (it needs Java 17+), not a `curl | bash`
+installer:
+
+```bash
+v=2.12.0   # https://github.com/mobile-dev-inc/Maestro/releases
+curl -fsSLO https://github.com/mobile-dev-inc/Maestro/releases/download/cli-$v/maestro.zip
+curl -fsSLO https://github.com/mobile-dev-inc/Maestro/releases/download/cli-$v/checksums_sha256.txt
+sha256sum -c --ignore-missing checksums_sha256.txt
+unzip -q maestro.zip -d ~/.local/opt && ln -sf ~/.local/opt/maestro/bin/maestro ~/.local/bin/maestro
+maestro --version
+```
 
 ### Optional: EAS development build
 
