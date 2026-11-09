@@ -1,0 +1,27 @@
+# Join as a guest from "Who are you?" instead of claiming a seeded member.
+# A guest isn't in the rotation, so Club counts 7 members but still 5 in it.
+appId: ${APP_ID}
+name: Join as a guest
+---
+- runFlow: common/open.yaml
+- tapOn: "I'm not on the list"
+# The name field autofocuses; the field and its button must sit above the
+# keyboard, not under it.
+- assertVisible: e.g. Alex Rivera
+- assertVisible: Join as a guest
+- tapOn: e.g. Alex Rivera
+- inputText: Gus
+- hideKeyboard
+- tapOn: Join as a guest
+- extendedWaitUntil:
+    visible: Plan a night
+    timeout: 15000
+- tapOn: Club
+- assertVisible: 7 members · 5 in rotation
+- assertVisible:
+    text: Gus
+    below: Guests · not in rotation
+- tapOn: Tonight
+- tapOn: Settings
+- assertVisible: Gus
+- assertVisible: This phone belongs to you

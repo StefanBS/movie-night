@@ -1,0 +1,21 @@
+# Claimed as Ada, switch to Blake from Settings. Switching revokes this
+# phone's token and returns to "Who are you?"; claiming again remounts the app
+# on Tonight.
+appId: ${APP_ID}
+name: Switch identity
+---
+- runFlow: common/setup.yaml
+- tapOn: Settings
+- assertVisible: Ada
+- tapOn: 'Not you\? Switch'
+- extendedWaitUntil:
+    visible: 'Who are you\?'
+    timeout: 15000
+- tapOn: Blake
+- extendedWaitUntil:
+    visible: Plan a night
+    timeout: 15000
+- tapOn: Settings
+- assertVisible: Blake
+- assertVisible: This phone belongs to you
+- assertNotVisible: Ada
