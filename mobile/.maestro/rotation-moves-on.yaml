@@ -1,0 +1,31 @@
+# Record Ada's pick, then check the rotation moves on to the next picker.
+# From the seed (backend/seed.sql) and the turn query (fewest credited picks,
+# then longest since last pick, then rotation_position): Ada and Dev start on
+# 0 (Dev's seeded pick isn't credited), Cleo, Blake and Esme on 1. Ada's
+# credited pick tonight puts her on 1 with the latest date, so Dev is next,
+# then Cleo (Apr 10), Blake (May 1), Esme (May 15), and Ada last.
+appId: ${APP_ID}
+name: The rotation moves on
+---
+- runFlow: mark-watched.yaml
+- tapOn: Tonight
+- extendedWaitUntil:
+    visible: After Dev
+    timeout: 15000
+- assertVisible: Dev
+- assertNotVisible: After Ada
+- tapOn: See full rotation →
+- assertVisible: The order
+- assertVisible: Skip Dev's turn
+- assertVisible:
+    text: Cleo
+    below: Dev
+- assertVisible:
+    text: Blake
+    below: Cleo
+- assertVisible:
+    text: Esme
+    below: Blake
+- assertVisible:
+    text: Ada
+    below: Esme
