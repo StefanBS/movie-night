@@ -1,0 +1,32 @@
+# Rename the group from Settings, check the new name shows in Settings and on
+# Tonight's header, then relaunch the app and check it again, so the name came
+# back from the backend and not from GroupProvider's state.
+appId: ${APP_ID}
+name: Rename the group
+---
+- runFlow: common/setup.yaml
+- assertVisible: Friday Film Club
+- tapOn: Settings
+- tapOn: Friday Film Club
+# The field opens focused with the current name in it.
+- eraseText
+- inputText: Sunday Screenings
+- tapOn: Save
+- assertVisible: Sunday Screenings
+# The field shows the new name too; "Since …" is only on the saved row, so
+# this checks the save went through and folded the field away.
+- assertVisible: Since.*
+- assertNotVisible: Friday Film Club
+- tapOn: Tonight
+- assertVisible: Sunday Screenings
+- assertNotVisible: Friday Film Club
+# Relaunch without reseeding: the phone stays claimed, so it opens on Tonight.
+- stopApp
+- openLink: ${DEV_LINK}
+- extendedWaitUntil:
+    visible: Plan a night
+    timeout: 90000
+- assertVisible: Sunday Screenings
+- assertNotVisible: Friday Film Club
+- tapOn: Settings
+- assertVisible: Sunday Screenings
