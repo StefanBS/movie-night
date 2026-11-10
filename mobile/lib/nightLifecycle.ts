@@ -63,7 +63,7 @@ export type NightAction = "changeFilm" | "edit" | "addToCalendar" | "clearFilm";
 // nightActions picks the ⋯ sheet's actions, in display order. Edit is always
 // there. Change film needs a film; Clear film also needs the Night unwatched,
 // since a Watched Night keeps its film. Add to calendar is for a Night still
-// ahead (nightWording's canAddToCalendar), and never on web, where there is no
+// ahead and not recorded (nightWording's canAddToCalendar), and never on web, where there is no
 // OS calendar form. Whether it then asks "whole series or just this night" is
 // calendarRecurrence's call (lib/calendarEntry.ts).
 export function nightActions(night: Night, today: string, { web }: { web: boolean }): NightAction[] {
@@ -71,7 +71,7 @@ export function nightActions(night: Night, today: string, { web }: { web: boolea
   const actions: NightAction[] = [];
   if (hasFilm) actions.push("changeFilm");
   actions.push("edit");
-  if (nightWording(night.scheduledFor, today).canAddToCalendar && !web) actions.push("addToCalendar");
+  if (nightWording(night, today).canAddToCalendar && !web) actions.push("addToCalendar");
   if (hasFilm && !isWatched(night)) actions.push("clearFilm");
   return actions;
 }
@@ -101,12 +101,15 @@ export function nightDates(nights: Night[]): Set<string> {
 
 // NightWording is what the screens say about a Night for its timing, so no
 // screen reduces the timing to its own yes/no. Tonight's Night reads forward
-// (the film hasn't been watched yet); a past Night reads as a record.
+// (the film hasn't been watched yet); a past Night, or one recorded as
+// watched whatever its date, reads as a record.
 export type NightWording = {
   // countdown is null once the Night has passed.
   countdown: string | null;
   pickerTitle: (name: string) => string;
   attendeesSection: (count: number) => string;
+  // editAttendeesSection heads the Edit screen's attendee list.
+  editAttendeesSection: (count: number) => string;
   whoSection: string;
   whoHint: string;
   // pickerNote is the line under a Night still waiting on its film, or null
@@ -119,15 +122,23 @@ export type NightWording = {
   canAddToCalendar: boolean;
 };
 
-// nightWording words a Night dated `scheduledFor` (or a plan for that date).
-export function nightWording(scheduledFor: string, today: string = todayLocalISO()): NightWording {
-  const timing = nightTiming(scheduledFor, today);
+// WordedNight is what nightWording reads: a Night, or a plan for a date that
+// has no Night yet (so nothing recorded).
+export type WordedNight = { scheduledFor: string; watchedAt?: string | null };
+
+// nightWording words a Night (or a plan): a Night recorded as watched reads as
+// a record whatever its date; otherwise its timing decides.
+export function nightWording(night: WordedNight, today: string = todayLocalISO()): NightWording {
+  const { scheduledFor } = night;
+  const recorded = night.watchedAt != null;
+  const timing = recorded ? "past" : nightTiming(scheduledFor, today);
   switch (timing) {
     case "upcoming":
       return {
         countdown: countdownLabel(scheduledFor, today),
         pickerTitle: (name) => `${name} picks`,
         attendeesSection: (count) => `Coming · ${count}`,
+        editAttendeesSection: (count) => `Who's coming · ${count}`,
         whoSection: "Who's coming?",
         whoHint: "Who's planning to come? The next-up member who's in gets the pick.",
         pickerNote: (first) => `${first} can choose now or on the night. Whatever it is, you watch it.`,
@@ -140,6 +151,7 @@ export function nightWording(scheduledFor: string, today: string = todayLocalISO
         countdown: countdownLabel(scheduledFor, today),
         pickerTitle: (name) => `${name} picks`,
         attendeesSection: (count) => `Coming · ${count}`,
+        editAttendeesSection: (count) => `Who's coming · ${count}`,
         whoSection: "Who's here?",
         whoHint: "Tap who made it. Tonight's pick goes to whoever's next up and here.",
         pickerNote: (first) => `${first} can choose now or later tonight. Whatever it is, you watch it.`,
@@ -152,6 +164,7 @@ export function nightWording(scheduledFor: string, today: string = todayLocalISO
         countdown: null,
         pickerTitle: (name) => name,
         attendeesSection: (count) => `Who watched · ${count}`,
+        editAttendeesSection: (count) => `Who watched · ${count}`,
         whoSection: "Who was there?",
         whoHint: "Tap who made it. The pick goes to whoever was next up and there.",
         pickerNote: null,
@@ -175,12 +188,12 @@ export type NightLineParts = {
   date?: "long" | "short" | "compact";
   // repeat adds a repeating Night's cadence ("Weekly").
   repeat?: boolean;
-  // picker is the picker's first name, worded for the Night's timing
-  // ("Tomas picks"; just "Tomas" once past).
+  // picker is the picker's first name, worded for the Night ("Tomas picks";
+  // just "Tomas" once past or recorded).
   picker?: string;
 };
 
-export type NightWhen = { scheduledFor: string; startTime: string | null; repeat?: Repeat | null };
+export type NightWhen = WordedNight & { startTime: string | null; repeat?: Repeat | null };
 
 // nightLineParts is a Night's "when" line as parts, in a fixed order: the
 // countdown, the date, the start time, the repeat, the picker. `locale`
@@ -215,7 +228,7 @@ function nightLineParts(
     out.push(formatRepeatShort(night.repeat));
   }
   if (parts.picker !== undefined) {
-    out.push(nightWording(scheduledFor, today).pickerTitle(parts.picker));
+    out.push(nightWording(night, today).pickerTitle(parts.picker));
   }
   return out;
 }

@@ -52,7 +52,7 @@ export function NightView({
   const styles = useStyles();
   const toast = useToast();
   const groupName = useGroup().group?.name ?? null;
-  const wording = nightWording(night.scheduledFor, today);
+  const wording = nightWording(night, today);
   const movie = night.movie;
   const pickerName = nightPicker(night).name;
   const first = firstName(pickerName);

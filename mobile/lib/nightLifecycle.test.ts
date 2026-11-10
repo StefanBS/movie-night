@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { watchedNights, isDue, nightDates, nightLine, nightActions, nightTiming, nightWording, plannedNights, upNextAction, type NightAction, type NightLineParts, type NightTiming, type NightWhen, type UpNextAction } from "./nightLifecycle";
+import { watchedNights, isDue, nightDates, nightLine, nightActions, nightTiming, nightWording, plannedNights, upNextAction, type NightAction, type NightLineParts, type NightTiming, type NightWhen, type UpNextAction, type WordedNight } from "./nightLifecycle";
 import type { Night } from "./nights";
 import { aMovie, aNight } from "./fixtures";
 
@@ -69,7 +69,7 @@ const sheetCases: [string, Night, boolean, NightAction[]][] = [
   ["film, ahead", night("u", TOMORROW, FILM), false, ["changeFilm", "edit", "addToCalendar", "clearFilm"]],
   ["film, today", night("t", TODAY, FILM), false, ["changeFilm", "edit", "addToCalendar", "clearFilm"]],
   ["film, past", night("p", YESTERDAY, FILM), false, ["changeFilm", "edit", "clearFilm"]],
-  ["film, today, watched", night("t", TODAY, { ...FILM, ...WATCHED }), false, ["changeFilm", "edit", "addToCalendar"]],
+  ["film, today, watched", night("t", TODAY, { ...FILM, ...WATCHED }), false, ["changeFilm", "edit"]],
   ["film, past, watched", night("p", YESTERDAY, { ...FILM, ...WATCHED }), false, ["changeFilm", "edit"]],
   ["no film, ahead, web", night("u", TOMORROW), true, ["edit"]],
   ["film, ahead, web", night("u", TOMORROW, FILM), true, ["changeFilm", "edit", "clearFilm"]],
@@ -104,60 +104,83 @@ test("nightDates: one entry per dated night, past and upcoming", () => {
   assert.deepEqual([...set].sort(), ["2026-06-19", "2026-06-26"]);
 });
 
-// nightWording: what each screen says for a Night's timing. One row per timing,
-// with an upcoming date three days out so the countdown has a day count.
+// nightWording: what each screen says for a Night. One row per timing, with
+// an upcoming date three days out so the countdown has a day count, plus a
+// Night recorded tonight, which reads as a record like a past one.
 
 const UPCOMING = "2026-06-25";
 const PAST = "2026-06-20";
 
-const countdownCases: [string, string | null][] = [
-  [UPCOMING, "in 3 days"],
-  [TODAY, "tonight"],
-  [PAST, null],
+const W_UPCOMING: WordedNight = { scheduledFor: UPCOMING };
+const W_TONIGHT: WordedNight = { scheduledFor: TODAY };
+const W_PAST: WordedNight = { scheduledFor: PAST };
+const W_RECORDED_TONIGHT: WordedNight = { scheduledFor: TODAY, ...WATCHED };
+
+const wordedName = (n: WordedNight) => `${n.scheduledFor}${n.watchedAt != null ? ", recorded" : ""}`;
+
+const countdownCases: [WordedNight, string | null][] = [
+  [W_UPCOMING, "in 3 days"],
+  [W_TONIGHT, "tonight"],
+  [W_PAST, null],
+  [W_RECORDED_TONIGHT, null],
 ];
-for (const [date, want] of countdownCases) {
-  test(`nightWording: countdown for ${date} → ${want}`, () => {
-    assert.equal(nightWording(date, TODAY).countdown, want);
+for (const [n, want] of countdownCases) {
+  test(`nightWording: countdown for ${wordedName(n)} → ${want}`, () => {
+    assert.equal(nightWording(n, TODAY).countdown, want);
   });
 }
 
-const pickerTitleCases: [string, string][] = [
-  [UPCOMING, "Ana picks"],
-  [TODAY, "Ana picks"],
-  [PAST, "Ana"],
+const pickerTitleCases: [WordedNight, string][] = [
+  [W_UPCOMING, "Ana picks"],
+  [W_TONIGHT, "Ana picks"],
+  [W_PAST, "Ana"],
+  [W_RECORDED_TONIGHT, "Ana"],
 ];
-for (const [date, want] of pickerTitleCases) {
-  test(`nightWording: picker title for ${date} → ${want}`, () => {
-    assert.equal(nightWording(date, TODAY).pickerTitle("Ana"), want);
+for (const [n, want] of pickerTitleCases) {
+  test(`nightWording: picker title for ${wordedName(n)} → ${want}`, () => {
+    assert.equal(nightWording(n, TODAY).pickerTitle("Ana"), want);
   });
 }
 
-const attendeesCases: [string, string][] = [
-  [UPCOMING, "Coming · 4"],
-  [TODAY, "Coming · 4"],
-  [PAST, "Who watched · 4"],
+const attendeesCases: [WordedNight, string][] = [
+  [W_UPCOMING, "Coming · 4"],
+  [W_TONIGHT, "Coming · 4"],
+  [W_PAST, "Who watched · 4"],
+  [W_RECORDED_TONIGHT, "Who watched · 4"],
 ];
-for (const [date, want] of attendeesCases) {
-  test(`nightWording: attendees heading for ${date} → ${want}`, () => {
-    assert.equal(nightWording(date, TODAY).attendeesSection(4), want);
+for (const [n, want] of attendeesCases) {
+  test(`nightWording: attendees heading for ${wordedName(n)} → ${want}`, () => {
+    assert.equal(nightWording(n, TODAY).attendeesSection(4), want);
   });
 }
 
-const whoCases: [string, { section: string; hint: string }][] = [
-  [UPCOMING, { section: "Who's coming?", hint: "Who's planning to come? The next-up member who's in gets the pick." }],
-  [TODAY, { section: "Who's here?", hint: "Tap who made it. Tonight's pick goes to whoever's next up and here." }],
-  [PAST, { section: "Who was there?", hint: "Tap who made it. The pick goes to whoever was next up and there." }],
+const editAttendeesCases: [WordedNight, string][] = [
+  [W_UPCOMING, "Who's coming · 4"],
+  [W_TONIGHT, "Who's coming · 4"],
+  [W_PAST, "Who watched · 4"],
+  [W_RECORDED_TONIGHT, "Who watched · 4"],
 ];
-for (const [date, want] of whoCases) {
-  test(`nightWording: the Who step for ${date}`, () => {
-    const w = nightWording(date, TODAY);
+for (const [n, want] of editAttendeesCases) {
+  test(`nightWording: Edit screen attendees heading for ${wordedName(n)} → ${want}`, () => {
+    assert.equal(nightWording(n, TODAY).editAttendeesSection(4), want);
+  });
+}
+
+const whoCases: [WordedNight, { section: string; hint: string }][] = [
+  [W_UPCOMING, { section: "Who's coming?", hint: "Who's planning to come? The next-up member who's in gets the pick." }],
+  [W_TONIGHT, { section: "Who's here?", hint: "Tap who made it. Tonight's pick goes to whoever's next up and here." }],
+  [W_PAST, { section: "Who was there?", hint: "Tap who made it. The pick goes to whoever was next up and there." }],
+];
+for (const [n, want] of whoCases) {
+  test(`nightWording: the Who step for ${wordedName(n)}`, () => {
+    const w = nightWording(n, TODAY);
     assert.deepEqual({ section: w.whoSection, hint: w.whoHint }, want);
   });
 }
 
-const nightScreenCases: [string, { note: string | null; edit: string; skip: string }][] = [
+const nightScreenCases: [WordedNight, { note: string | null; edit: string; skip: string }][] = [
   [
-    UPCOMING,
+    W_UPCOMING,
     {
       note: "Ana can choose now or on the night. Whatever it is, you watch it.",
       edit: "Date, time and who's coming",
@@ -165,18 +188,19 @@ const nightScreenCases: [string, { note: string | null; edit: string; skip: stri
     },
   ],
   [
-    TODAY,
+    W_TONIGHT,
     {
       note: "Ana can choose now or later tonight. Whatever it is, you watch it.",
       edit: "Date, time and who's coming",
       skip: "Skip for now · Ana can pick later",
     },
   ],
-  [PAST, { note: null, edit: "Date, time and who watched", skip: "Skip for now" }],
+  [W_PAST, { note: null, edit: "Date, time and who watched", skip: "Skip for now" }],
+  [W_RECORDED_TONIGHT, { note: null, edit: "Date, time and who watched", skip: "Skip for now" }],
 ];
-for (const [date, want] of nightScreenCases) {
-  test(`nightWording: Night screen and pick lines for ${date}`, () => {
-    const w = nightWording(date, TODAY);
+for (const [n, want] of nightScreenCases) {
+  test(`nightWording: Night screen and pick lines for ${wordedName(n)}`, () => {
+    const w = nightWording(n, TODAY);
     assert.deepEqual(
       { note: w.pickerNote === null ? null : w.pickerNote("Ana"), edit: w.editSub, skip: w.skipLabel("Ana") },
       want,
@@ -184,14 +208,15 @@ for (const [date, want] of nightScreenCases) {
   });
 }
 
-const calendarCases: [string, boolean][] = [
-  [UPCOMING, true],
-  [TODAY, true],
-  [PAST, false],
+const calendarCases: [WordedNight, boolean][] = [
+  [W_UPCOMING, true],
+  [W_TONIGHT, true],
+  [W_PAST, false],
+  [W_RECORDED_TONIGHT, false],
 ];
-for (const [date, want] of calendarCases) {
-  test(`nightWording: calendar entry for ${date}`, () => {
-    assert.equal(nightWording(date, TODAY).canAddToCalendar, want);
+for (const [n, want] of calendarCases) {
+  test(`nightWording: calendar entry for ${wordedName(n)}`, () => {
+    assert.equal(nightWording(n, TODAY).canAddToCalendar, want);
   });
 }
 
@@ -219,6 +244,7 @@ const lineCases: [string, NightWhen, NightLineParts, string][] = [
   ["edit hero: upcoming", { scheduledFor: UPCOMING, startTime: "20:00" }, EDIT_HERO("Tomas"), "In 3 days · 8:00 PM · Tomas picks"],
   ["edit hero: tonight without a time", { scheduledFor: TODAY, startTime: null }, EDIT_HERO("Tomas"), "Tonight · Tomas picks"],
   ["edit hero: past is just the picker", { scheduledFor: PAST, startTime: "20:00" }, EDIT_HERO("Tomas"), "8:00 PM · Tomas"],
+  ["edit hero: recorded tonight is just the picker", { scheduledFor: TODAY, startTime: null, ...WATCHED }, EDIT_HERO("Tomas"), "Tonight · Tomas"],
   // Tonight's also planned rows
   ["also planned: date only", { scheduledFor: "2026-06-27", startTime: null }, ALSO_PLANNED, "Sat 27 Jun"],
   ["also planned: date and start time", { scheduledFor: "2026-06-27", startTime: "20:00" }, ALSO_PLANNED, "Sat 27 Jun · 8:00 PM"],

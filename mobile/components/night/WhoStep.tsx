@@ -43,7 +43,7 @@ export function WhoStep({
   nextLabel?: (first: string) => string;
 }) {
   const styles = useStyles();
-  const wording = nightWording(scheduledFor, today);
+  const wording = nightWording({ scheduledFor }, today);
   const picker = members.find((m) => m.id === pickerId) ?? null;
   return (
     <View style={styles.flex}>

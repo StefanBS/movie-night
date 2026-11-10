@@ -25,7 +25,7 @@ import { shiftMonth, yearMonthOf, type YearMonth } from "../../lib/calendar";
 import { formatShortDate, formatWeekdayDate } from "../../lib/date";
 import type { Member } from "../../lib/members";
 import { createNightEdit } from "../../lib/nightEdit";
-import { isWatched, nightLine } from "../../lib/nightLifecycle";
+import { isWatched, nightLine, nightWording } from "../../lib/nightLifecycle";
 import { nightPicker, type Night } from "../../lib/nights";
 import { formatRepeatLabel } from "../../lib/repeat";
 import {
@@ -164,7 +164,7 @@ export function EditNightScreen({
             </Text>
             <Text style={styles.heroMeta}>
               {nightLine(
-                { scheduledFor: date, startTime },
+                { scheduledFor: date, startTime, watchedAt: state.night.watchedAt },
                 { countdown: "label", picker: firstName(picker.name) },
                 today,
               )}
@@ -203,7 +203,9 @@ export function EditNightScreen({
             />
           </View>
 
-          <SectionLabel>{`Who's coming · ${attendees.size}`}</SectionLabel>
+          <SectionLabel>
+            {nightWording({ scheduledFor: date, watchedAt: state.night.watchedAt }, today).editAttendeesSection(attendees.size)}
+          </SectionLabel>
           <View>
             {rows.map((m, i) => {
               const here = attendees.has(m.id);

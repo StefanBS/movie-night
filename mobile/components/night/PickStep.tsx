@@ -64,7 +64,7 @@ export function PickStep({
   };
   const pickerName = nightPicker(night).name;
   const first = firstName(pickerName);
-  const wording = nightWording(night.scheduledFor, today);
+  const wording = nightWording(night, today);
   const query = movieQuery.trim();
   const answered = query !== "" && resultsFor === query && !searching;
 
