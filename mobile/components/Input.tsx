@@ -37,6 +37,10 @@ export function Input({
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor={colors.text.tertiary}
+          // Android's own caret and handles are an off-palette teal; ink them
+          // like the text, as a web caret is (never the accent).
+          cursorColor={colors.text.primary}
+          selectionHandleColor={colors.text.primary}
           autoFocus={autoFocus}
           onSubmitEditing={onSubmitEditing}
           onFocus={() => setFocused(true)}
