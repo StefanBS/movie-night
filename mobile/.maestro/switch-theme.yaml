@@ -1,6 +1,6 @@
-# Pin the theme to Light, then Dark, in Settings › Appearance, relaunch and
-# check the choice came back from storage, then set it back to System so the
-# next flow runs with the phone's own mode.
+# Pin the theme to Light, then Dark, with the Theme row in Settings ›
+# Appearance, relaunch and check the choice came back from storage, then set
+# it back to System so the next flow runs with the phone's own mode.
 appId: ${APP_ID}
 name: Switch the theme
 ---
@@ -9,14 +9,14 @@ name: Switch the theme
 - scrollUntilVisible:
     element: Dark
 - assertVisible:
-    text: "System.*"
+    text: System
     checked: true
 - tapOn: Light
 - assertVisible:
     text: Light
     checked: true
 - assertVisible:
-    text: "System.*"
+    text: System
     checked: false
 - takeScreenshot: theme-light
 - tapOn: Dark
@@ -38,5 +38,5 @@ name: Switch the theme
     checked: true
 - tapOn: System
 - assertVisible:
-    text: "System.*"
+    text: System
     checked: true

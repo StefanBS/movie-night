@@ -8,6 +8,7 @@ import {
   Avatar,
   Input,
   SectionLabel,
+  Segmented,
   SettingsRow,
   Toggle,
   TopBar,
@@ -193,23 +194,20 @@ export default function SettingsScreen() {
         </View>
 
         <SectionLabel>Appearance</SectionLabel>
-        <View style={styles.card} accessibilityRole="radiogroup">
-          {THEME_PREFERENCES.map((option, i) => (
-            <View
-              key={option.value}
-              style={i < THEME_PREFERENCES.length - 1 ? styles.divider : undefined}
-            >
-              <SettingsRow
-                label={option.label}
-                sub={option.value === "system" ? "Match the phone's light or dark mode" : undefined}
-                checked={theme === option.value}
-                onPress={() => {
-                  setTheme(option.value);
-                  saveThemePreference(option.value);
+        <View style={styles.card}>
+          <SettingsRow
+            label="Theme"
+            right={
+              <Segmented
+                options={THEME_PREFERENCES}
+                value={theme}
+                onChange={(next) => {
+                  setTheme(next);
+                  saveThemePreference(next);
                 }}
               />
-            </View>
-          ))}
+            }
+          />
         </View>
 
         <SectionLabel>Danger zone</SectionLabel>
