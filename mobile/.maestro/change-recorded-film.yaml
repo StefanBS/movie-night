@@ -2,7 +2,8 @@
 # film": the Night reads as a record and Watched shows the new film, not the
 # old one.
 # Movie search hits the real TMDB: match the exact title under the result
-# count, not a list position.
+# count, not a list position. Snowpiercer isn't a dictionary word, so this
+# flow also checks that nothing rewrites a typed title.
 appId: ${APP_ID}
 name: Change a recorded night's film
 ---
@@ -12,17 +13,21 @@ name: Change a recorded night's film
 - assertVisible: Recorded ✓
 - tapOn: Change film
 - assertVisible: 'What are we watching\?'
+# hideKeyboard, not pressKey Enter: the search runs as you type, and Maestro's
+# Enter is a raw key event that makes Gboard apply its autocorrection
+# ("Snowpiercer" became "Snow piercer"). A person tapping the keyboard's ✓
+# doesn't trigger it (#285).
 - tapOn: Search a film title…
-- inputText: The Holdovers
-- pressKey: Enter
+- inputText: Snowpiercer
+- hideKeyboard
 - tapOn:
-    text: The Holdovers
+    text: Snowpiercer
     below: '\d+ films? · tap one.*'
-- assertVisible: The Holdovers
+- assertVisible: Snowpiercer
 # A night recorded tonight reads as a record, not a plan.
 - assertVisible: Who watched · 2
 - tapOn: Back to Tonight
 - tapOn: Watched
-- assertVisible: The Holdovers
+- assertVisible: Snowpiercer
 # Exact match: the seeded "Dune: Part Two" stays.
 - assertNotVisible: Dune

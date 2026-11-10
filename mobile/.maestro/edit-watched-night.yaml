@@ -14,7 +14,7 @@ name: Edit a watched night
 - assertVisible: 'What are we watching\?'
 - tapOn: Search a film title…
 - inputText: Paddington 2
-- pressKey: Enter
+- hideKeyboard
 - tapOn:
     text: Paddington 2
     below: '\d+ films? · tap one.*'

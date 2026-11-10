@@ -12,7 +12,7 @@ name: Plan a night
 - assertVisible: 'What are we watching\?'
 - tapOn: Search a film title…
 - inputText: Dune
-- pressKey: Enter
+- hideKeyboard
 # The first exact "Dune" under the result count, so not the search box itself
 # (or "Dune: Part Two").
 - tapOn:
