@@ -37,15 +37,15 @@ schema definition.
 - **groups** — a movie-night crew.
 - **memberships** — person ↔ group link; `role` (core/guest), `status`
   (active/inactive), `baseline_picks`, `rotation_position`, join/leave timestamps.
-- **picks** — one per movie night (at most one per group per date); references the
+- **nights** — one per movie night (at most one per group per date); references the
   group, the picker (always an attendee — [ADR-0008](0008-night-always-has-a-picker.md)),
   and the chosen movie; carries `is_credited`, the scheduled date, an optional start time
   ([ADR-0011](0011-night-start-time-wall-clock.md)), when it was recorded as watched
   ([ADR-0012](0012-night-recorded-as-watched.md)), and an optional repeat
   ([ADR-0014](0014-repeating-nights.md)).
-- **attendances** — who was present at a given night (linked to that night's pick).
+- **attendances** — who was present at a given night.
 - **movies** — metadata cached from TMDB.
-- **reviews** — a person's rating/notes for a given night's pick.
+- **reviews** — a person's rating/notes for a given night's film.
 - **devices** — an install's claimed identity: the person and a hash of its bearer
   token ([ADR-0009](0009-claimed-identity-device-tokens.md)); later its push token
   and timezone ([ADR-0010](0010-server-push-reminders.md)).

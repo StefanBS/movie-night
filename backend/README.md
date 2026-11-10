@@ -2,9 +2,9 @@
 
 Go HTTP API over PostgreSQL. Serves the group roster and "whose turn" ranking,
 handles membership churn (join / deactivate / reactivate / promote), runs the
-per-night lifecycle (create, edit, pick), proxies movie search/attach
-through [TMDB](https://www.themoviedb.org), and sends push reminders before
-each night.
+per-night lifecycle (plan, edit, record as watched, cancel, and repeating
+series), proxies movie search/attach through [TMDB](https://www.themoviedb.org),
+and sends push reminders before each night.
 
 ## Stack
 
@@ -87,10 +87,10 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `GET` | `/healthz` | Liveness — `{"status":"ok"}`. |
 | `GET` | `/groups/{groupId}` | The group `{"name","createdOn"}` (`createdOn`: `YYYY-MM-DD`). |
 | `PATCH` | `/groups/{groupId}` | Rename the group. Body `{"name"}`; `400` if blank. Returns the group. |
-| `GET` | `/groups/{groupId}/members` | Active members in rotation order. |
-| `GET` | `/groups/{groupId}/turn` | Active core ranked least-served ([ADR-0005](../docs/adr/0005-least-served-turn-ranking.md)); element 0 is the picker. Returns `[{"id","name","role","servedCount","lastPickedOn"}]` (`lastPickedOn`: `YYYY-MM-DD` or `null`). |
+| `GET` | `/groups/{groupId}/members` | Every member `[{"id","name","role","status","joinedOn"}]` (`joinedOn`: `YYYY-MM-DD`): active core in rotation order, then active guests, then inactive members. |
+| `GET` | `/groups/{groupId}/turn` | Active core ranked least-served ([ADR-0005](../docs/adr/0005-least-served-turn-ranking.md)); element 0 is the picker. Returns `[{"id","name","servedCount","lastPickedOn"}]` (`lastPickedOn`: `YYYY-MM-DD` or `null`). |
 
-**Membership churn** ([ADR-0006](../docs/adr/0006-membership-churn-handling.md)) — each returns the updated member `{"id","name","role","status"}`; idempotent.
+**Membership churn** ([ADR-0006](../docs/adr/0006-membership-churn-handling.md)) — each returns the updated member `{"id","name","role","status","joinedOn"}`; idempotent.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -190,10 +190,12 @@ backend/
 ├── group.go           # group read + rename
 ├── roster.go          # roster + turn handlers
 ├── turn.go            # least-served ranking response mapping
-├── membership.go      # join / deactivate / reactivate / promote (churn)
+├── membership.go      # join / deactivate / reactivate / promote (churn) handlers
+├── membership_writes.go # membership writes, each in one transaction
 ├── identity.go        # claimed identity, bearer tokens, push registration
 ├── nights.go          # night lifecycle handlers: create, read, edit, delete
 ├── night_writes.go    # Night writes (create, edit, cancel, film), each in one transaction
+├── repeat.go          # repeating nights: validation and the next date in a series
 ├── tx.go              # withTx — one transaction for a multi-statement write
 ├── movies.go          # movie search/attach handlers (TMDB-backed)
 ├── tmdb.go            # TMDB client
