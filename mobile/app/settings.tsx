@@ -87,6 +87,9 @@ export default function SettingsScreen() {
       />
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space[10] }]}
+        // Without this, the first tap on Save while the rename keyboard is up
+        // only dismisses the keyboard, so saving takes two taps.
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.rule}>
           <Text style={styles.ruleKicker}>The house rule</Text>
