@@ -14,6 +14,10 @@ export type EditorStep = "pick" | "night";
 export type NightEditorState = {
   night: Night;
   step: EditorStep;
+  // pickFromNight is whether the Pick step was opened from the Night view, so
+  // its back returns there; false while still on the step the editor opened
+  // on, whose back belongs to the screen that opened it.
+  pickFromNight: boolean;
   busy: string | null;
   actionError: string | null;
   results: SearchResult[];
@@ -55,6 +59,7 @@ export function createNightEditor({
   const core = createSessionCore<NightEditorState>({
     night,
     step: initialStep,
+    pickFromNight: initialStep !== "pick",
     busy: null,
     actionError: null,
     results: [],
@@ -81,7 +86,7 @@ export function createNightEditor({
 
   return withSession<NightEditor>(core, {
     pickFilm() {
-      core.set({ step: "pick" });
+      core.set({ step: "pick", pickFromNight: true });
     },
 
     toNight() {

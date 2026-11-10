@@ -22,6 +22,8 @@ import { createThemedStyles, space, textPresets, useColors } from "../../theme";
 // NightScreen renders the Plan module (lib/nightPlan) — When, then Who — and,
 // once the Plan is saved as a Night, hands that Night to the editor on its
 // film step. Nothing is saved before "Next", so backing out leaves nothing.
+// Back from the film step reopens the saved Night on Who, where "Next" saves
+// the changes to it.
 export default function NightScreen() {
   const colors = useColors();
   const styles = useStyles();
@@ -42,12 +44,20 @@ export default function NightScreen() {
     void plan.load();
   }, [plan]);
 
-  const onCreate = async () => {
-    const night = await plan.create();
+  const onSave = async () => {
+    const night = await plan.save();
     if (night !== null) {
       setCreated(night);
     }
   };
+  const toPeople = useCallback(
+    (night: Night) => {
+      plan.reopen(night);
+      setCreated(null);
+    },
+    [plan],
+  );
+  const close = useCallback(() => router.back(), [router]);
 
   if (state.loading) {
     return (
@@ -71,7 +81,8 @@ export default function NightScreen() {
         created={created}
         today={today}
         from={from}
-        onClose={() => router.back()}
+        onClose={close}
+        onBack={toPeople}
       />
     );
   }
@@ -95,7 +106,7 @@ export default function NightScreen() {
           busy={state.busy}
           onToggle={(m: Member) => plan.toggle(m.id)}
           onChoosePicker={plan.choosePicker}
-          onNext={() => void onCreate()}
+          onNext={() => void onSave()}
         />
       </View>
     );
@@ -121,7 +132,9 @@ export default function NightScreen() {
   );
 }
 
-// PlannedNight is the Night the Plan saved, in the editor on its film step. It
+// PlannedNight is the Night the Plan saved, in the editor on its film step,
+// which still reads as New night's third step: back (onBack) returns to
+// People with the Night as it now stands. It
 // reloads the Night on every focus, as the Night route does, so coming back
 // from "Edit night" in the ⋯ sheet shows the saved changes under the
 // still-mounted editor. Until the first reload lands it shows the Night
@@ -131,11 +144,13 @@ function PlannedNight({
   today,
   from,
   onClose,
+  onBack,
 }: {
   created: Night;
   today: string;
   from: string;
   onClose: () => void;
+  onBack: (night: Night) => void;
 }) {
   const router = useRouter();
   const [load, { night, loadStartedAt }] = useSession(() =>
@@ -153,6 +168,7 @@ function PlannedNight({
       today={today}
       initialStep="pick"
       back={{ label: from, onPress: onClose }}
+      pick={{ title: "New night", back: { label: "People", onPress: onBack } }}
       onDone={onClose}
       onEdit={() =>
         router.push({ pathname: "/night/edit/[id]", params: { id: created.id, from: "Night" } })

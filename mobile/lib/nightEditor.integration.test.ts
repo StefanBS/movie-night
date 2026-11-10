@@ -84,6 +84,23 @@ test("pickFilm and toNight move between the steps", async () => {
   });
 });
 
+test("a Pick step opened from the Night view says so; the one opened on doesn't", async () => {
+  await withEditor(
+    backend(),
+    async (editor) => {
+      assert.equal(editor.state.pickFromNight, false);
+      editor.toNight();
+      editor.pickFilm();
+      assert.equal(editor.state.pickFromNight, true);
+    },
+    "pick",
+  );
+  await withEditor(backend(), async (editor) => {
+    editor.pickFilm();
+    assert.equal(editor.state.pickFromNight, true);
+  });
+});
+
 test("search fills the results; a blank query clears them without a request", async () => {
   let searches = 0;
   const base = backend();

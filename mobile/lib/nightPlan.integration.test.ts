@@ -152,7 +152,7 @@ test("removing the chosen picker hands the pick back to the order", async () => 
   });
 });
 
-test("create posts the date, attendees and picker and returns the Night", async () => {
+test("save posts the date, attendees and picker and returns the Night", async () => {
   let posted: unknown = null;
   const base = backend();
   await withPlan(
@@ -167,7 +167,7 @@ test("create posts the date, attendees and picker and returns the Night", async 
       plan.chooseDate("2026-06-26", null);
       plan.toggle("ada");
       plan.toggle("frankie");
-      const night = await plan.create();
+      const night = await plan.save();
       assert.deepEqual(posted, { scheduledFor: "2026-06-26", startTime: null, attendees: ["ada", "frankie"], pickerId: "ada" });
       assert.equal(night?.id, "n1");
       assert.equal(plan.state.busy, null);
@@ -175,7 +175,7 @@ test("create posts the date, attendees and picker and returns the Night", async 
   );
 });
 
-test("create posts the start time chosen with the date", async () => {
+test("save posts the start time chosen with the date", async () => {
   let posted: { startTime?: unknown } | null = null;
   const base = backend();
   await withPlan(
@@ -190,19 +190,19 @@ test("create posts the start time chosen with the date", async () => {
       plan.chooseDate("2026-06-26", "20:15");
       assert.equal(plan.state.startTime, "20:15");
       plan.toggle("ada");
-      const night = await plan.create();
+      const night = await plan.save();
       assert.equal(posted?.startTime, "20:15");
       assert.equal(night?.startTime, "20:15");
     },
   );
 });
 
-test("create without a picker sends nothing", async () => {
+test("save without a picker sends nothing", async () => {
   let posts = 0;
   await withPlan(
     backend({ [`POST /groups/${GROUP}/nights`]: (_q, res) => (posts++, json(res, 201, {})) }),
     async (plan) => {
-      assert.equal(await plan.create(), null);
+      assert.equal(await plan.save(), null);
       assert.equal(posts, 0);
     },
   );
@@ -217,7 +217,7 @@ test("a taken date surfaces the backend's message and keeps the plan", async () 
       await plan.load();
       plan.chooseDate("2026-06-19", null);
       plan.toggle("ada");
-      assert.equal(await plan.create(), null);
+      assert.equal(await plan.save(), null);
       assert.equal(plan.state.actionError, "there is already a night on that date");
       assert.equal(plan.state.busy, null);
       assert.equal(plan.state.step, "who", "plan stays put");
@@ -226,20 +226,20 @@ test("a taken date surfaces the backend's message and keeps the plan", async () 
   );
 });
 
-test("choosing a new date clears the last create error", async () => {
+test("choosing a new date clears the last save error", async () => {
   await withPlan(
     backend({ [`POST /groups/${GROUP}/nights`]: (_q, res) => json(res, 409, { error: "taken" }) }),
     async (plan) => {
       await plan.load();
       plan.toggle("ada");
-      await plan.create();
+      await plan.save();
       plan.chooseDate("2026-06-27", null);
       assert.equal(plan.state.actionError, null);
     },
   );
 });
 
-test("a double create sends one request", async () => {
+test("a double save sends one request", async () => {
   let posts = 0;
   const base = backend();
   await withPlan(
@@ -252,10 +252,117 @@ test("a double create sends one request", async () => {
     async (plan) => {
       await plan.load();
       plan.toggle("ada");
-      const [a, b] = await Promise.all([plan.create(), plan.create()]);
+      const [a, b] = await Promise.all([plan.save(), plan.save()]);
       assert.equal(posts, 1);
       assert.equal(a?.id, "n1");
       assert.equal(b, null);
+    },
+  );
+});
+
+test("reopen returns to Who with the saved Night's date, attendees and picker", async () => {
+  await withPlan(backend(), async (plan) => {
+    await plan.load();
+    plan.chooseDate("2026-06-26", "20:00");
+    plan.toggle("ada");
+    plan.toggle("blake");
+    const night = await plan.save();
+    assert.ok(night !== null);
+    // The picker changed on the film step.
+    plan.reopen({ ...night, pickerId: "blake" });
+    assert.equal(plan.state.step, "who");
+    assert.equal(plan.state.date, "2026-06-26");
+    assert.equal(plan.state.startTime, "20:00");
+    assert.deepEqual([...plan.state.attendeeIds].sort(), ["ada", "blake"]);
+    assert.equal(plan.state.pickerId, "blake", "a chosen picker holds");
+    plan.back();
+    plan.chooseDate("2026-06-27", "20:00");
+    assert.equal(plan.state.pickerId, "blake");
+  });
+});
+
+test("a reopened picker who heads the order still follows it", async () => {
+  await withPlan(backend(), async (plan) => {
+    await plan.load();
+    plan.toggle("blake");
+    const night = await plan.save();
+    assert.ok(night !== null);
+    plan.reopen(night);
+    assert.equal(plan.state.pickerId, "blake");
+    plan.toggle("ada");
+    assert.equal(plan.state.pickerId, "ada", "Ada ranks above Blake");
+  });
+});
+
+test("save after reopen updates that Night instead of creating another", async () => {
+  let posts = 0;
+  let patched: { id: string; body: unknown } | null = null;
+  const base = backend();
+  const saved = aNight({
+    id: "n1",
+    scheduledFor: "2026-06-26",
+    pickerId: "ada",
+    attendees: [{ id: "ada", name: "ada" }, { id: "blake", name: "blake" }],
+    reminders: { nightBefore: false, morningOf: true, twoHoursBefore: false, audience: "picker" },
+  });
+  await withPlan(
+    backend({
+      [`POST /groups/${GROUP}/nights`]: (req, res, body) => {
+        posts++;
+        base(req, res, body);
+      },
+      [`PATCH /groups/${GROUP}/nights/n1`]: (_q, res, body) => {
+        const req = JSON.parse(body) as { attendees: string[]; pickerId: string };
+        patched = { id: "n1", body: req };
+        json(res, 200, { ...saved, pickerId: req.pickerId, attendees: req.attendees.map((id) => ({ id, name: id })) });
+      },
+    }),
+    async (plan) => {
+      await plan.load();
+      plan.reopen(saved);
+      plan.toggle("ada");
+      const night = await plan.save();
+      assert.equal(posts, 0);
+      assert.deepEqual(patched?.body, {
+        scheduledFor: "2026-06-26",
+        startTime: null,
+        attendees: ["blake"],
+        reminders: saved.reminders,
+        repeat: null,
+        pickerId: "blake",
+      });
+      assert.equal(night?.id, "n1");
+      assert.equal(night?.pickerId, "blake");
+    },
+  );
+});
+
+test("save after reopen with nothing changed sends nothing", async () => {
+  let requests = 0;
+  const saved = aNight({ attendees: [{ id: "ada", name: "ada" }] });
+  const count: Handler = (_q, res) => (requests++, json(res, 500, { error: "unexpected" }));
+  await withPlan(
+    backend({ [`POST /groups/${GROUP}/nights`]: count, [`PATCH /groups/${GROUP}/nights/n1`]: count }),
+    async (plan) => {
+      await plan.load();
+      plan.reopen(saved);
+      assert.equal(await plan.save(), saved);
+      assert.equal(requests, 0);
+    },
+  );
+});
+
+test("a refused update keeps the reopened plan and says why", async () => {
+  await withPlan(
+    backend({ [`PATCH /groups/${GROUP}/nights/n1`]: (_q, res) => json(res, 409, { error: "there is already a night on that date" }) }),
+    async (plan) => {
+      await plan.load();
+      plan.reopen(aNight());
+      plan.back();
+      plan.chooseDate("2026-06-19", null);
+      assert.equal(await plan.save(), null);
+      assert.equal(plan.state.actionError, "there is already a night on that date");
+      assert.equal(plan.state.step, "who");
     },
   );
 });
