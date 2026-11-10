@@ -84,3 +84,6 @@ jobs:
       # layer. See the Expo holds in .github/dependabot.yml.
       - name: Dependency matrix
         run: just check-deps
+
+      - name: Maestro flows
+        run: just check-flows

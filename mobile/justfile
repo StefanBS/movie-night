@@ -78,8 +78,14 @@ check-deps:
     npx expo install --check
     node --import tsx scripts/check-dependabot-holds.ts
 
-# Run everything CI runs: lint, type-check, tests, dep matrix
-check: lint typecheck test check-deps
+# Maestro flows close the keyboard with hideKeyboard: pressKey Enter is a raw
+# key event that makes Gboard apply its autocorrection ("Snowpiercer" became
+# "Snow piercer"), which a person tapping the keyboard's ✓ never triggers (#285).
+check-flows:
+    @! grep -rn 'pressKey: Enter' .maestro || { echo "check-flows: use hideKeyboard, not pressKey: Enter" >&2; exit 1; }
+
+# Run everything CI runs: lint, type-check, tests, dep matrix, flows
+check: lint typecheck test check-deps check-flows
 
 # Scan npm dependencies for known vulnerabilities (ignores in osv-scanner.toml)
 audit:
