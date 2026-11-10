@@ -1,0 +1,24 @@
+# Plan a night for a later date (the first day of next month, so it works
+# whatever day it runs) with Ada and Blake and no film yet, then check Tonight
+# shows it up next with its countdown and date.
+appId: ${APP_ID}
+name: Plan a night for a later date
+---
+- runFlow: common/setup.yaml
+- runScript: common/first-of-next-month.js
+- tapOn: Plan a night
+- tapOn: Next month
+- assertVisible: ${output.later.month}
+# A Calendar day's accessibility label is its full date.
+- tapOn: ${output.later.long}
+- tapOn: "Next: who's coming.*"
+- assertVisible: ${output.later.long}
+- tapOn: Ada
+- tapOn: Blake
+- tapOn: "Next: Ada picks.*"
+- tapOn: "Skip for now.*"
+- tapOn: Done
+- assertVisible: ${output.later.when}
+- assertVisible: Not picked yet.
+- assertVisible: Choose the film
+- assertVisible: 2 coming
