@@ -5,7 +5,7 @@ built with [expo-router](https://docs.expo.dev/router/introduction/):
 
 - **Tonight**: whose turn it is, who's on deck, the next night, and any
   other nights already planned.
-- **Watched**: every night the group has had, newest first, by month.
+- **Watched**: every night the group has recorded as watched, newest first.
 - **Club**: members in rotation, guests, and inactive members; add someone new.
 
 Settings (your identity, the group name, and reminders) opens from the gear on
@@ -99,8 +99,11 @@ fresh `curl` of the bundle shows new code.
 ### End-to-end tests (Maestro)
 
 `.maestro/` holds [Maestro](https://maestro.dev/) flows that drive the dev
-client on the adb-attached phone: plan a night, edit then cancel one, mark one
-watched, and add a member. Run them before merging a UI change:
+client on the adb-attached phone, one flow per thing a person does: plan a
+night (tonight or a later date), edit then cancel one, mark one watched, change
+a recorded night's film or who watched, check the rotation moves on, add,
+deactivate, reactivate or promote a member, join as a guest, switch identity,
+and rename the group. Run them before merging a UI change:
 
 ```bash
 just e2e "<text from your change>"                     # every flow
@@ -260,7 +263,7 @@ mobile/
 ├── app/               # expo-router screens
 │   ├── _layout.tsx    # root stack, fonts, theming
 │   ├── (tabs)/        # Tonight, Watched, Club
-│   ├── night/         # plan, view, and edit a night
+│   ├── night/         # plan, view, edit, and record a night as watched
 │   ├── member/        # member profile, add a member
 │   ├── rotation.tsx   # the full turn order
 │   ├── settings.tsx   # identity, group name, reminders (from Tonight's gear)

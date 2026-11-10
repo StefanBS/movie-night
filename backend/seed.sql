@@ -6,8 +6,10 @@
 -- checked at COMMIT, after the attendances below are in.
 BEGIN;
 
-INSERT INTO groups (id, name) VALUES
-    ('11111111-1111-1111-1111-111111111111', 'Friday Film Club')
+-- Founded before the first seeded night, so Watched's "N nights since …" line
+-- reads as it would for a real group.
+INSERT INTO groups (id, name, created_at) VALUES
+    ('11111111-1111-1111-1111-111111111111', 'Friday Film Club', '2026-04-01 12:00')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO users (id, name) VALUES
