@@ -1,0 +1,42 @@
+# Pin the theme to Light, then Dark, in Settings › Appearance, relaunch and
+# check the choice came back from storage, then set it back to System so the
+# next flow runs with the phone's own mode.
+appId: ${APP_ID}
+name: Switch the theme
+---
+- runFlow: common/setup.yaml
+- tapOn: Settings
+- scrollUntilVisible:
+    element: Dark
+- assertVisible:
+    text: "System.*"
+    checked: true
+- tapOn: Light
+- assertVisible:
+    text: Light
+    checked: true
+- assertVisible:
+    text: "System.*"
+    checked: false
+- takeScreenshot: theme-light
+- tapOn: Dark
+- assertVisible:
+    text: Dark
+    checked: true
+- takeScreenshot: theme-dark
+# Relaunch without reseeding: the phone stays claimed, so it opens on Tonight.
+- stopApp
+- openLink: ${DEV_LINK}
+- extendedWaitUntil:
+    visible: Plan a night
+    timeout: 90000
+- tapOn: Settings
+- scrollUntilVisible:
+    element: Dark
+- assertVisible:
+    text: Dark
+    checked: true
+- tapOn: System
+- assertVisible:
+    text: "System.*"
+    checked: true

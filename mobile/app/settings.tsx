@@ -14,8 +14,10 @@ import {
 } from "../components";
 import { useGroup } from "../components/GroupProvider";
 import { useIdentity } from "../components/IdentityProvider";
+import { loadThemePreference, saveThemePreference } from "../appearance";
 import { API_URL } from "../apiUrl";
 import { GROUP_ID } from "../lib/api";
+import { THEME_PREFERENCES } from "../lib/appearance";
 import { formatMonthYear } from "../lib/date";
 import { errorMessage } from "../lib/errors";
 import { renameGroup } from "../lib/group";
@@ -41,6 +43,10 @@ export default function SettingsScreen() {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // System follows the phone's light/dark mode; Light and Dark keep to one.
+  // Saving re-themes every screen at once (theme/useColors.ts).
+  const [theme, setTheme] = useState(loadThemePreference);
 
   const startEdit = () => {
     if (group === null) {
@@ -184,6 +190,26 @@ export default function SettingsScreen() {
               }
             />
           )}
+        </View>
+
+        <SectionLabel>Appearance</SectionLabel>
+        <View style={styles.card} accessibilityRole="radiogroup">
+          {THEME_PREFERENCES.map((option, i) => (
+            <View
+              key={option.value}
+              style={i < THEME_PREFERENCES.length - 1 ? styles.divider : undefined}
+            >
+              <SettingsRow
+                label={option.label}
+                sub={option.value === "system" ? "Match the phone's light or dark mode" : undefined}
+                checked={theme === option.value}
+                onPress={() => {
+                  setTheme(option.value);
+                  saveThemePreference(option.value);
+                }}
+              />
+            </View>
+          ))}
         </View>
 
         <SectionLabel>Danger zone</SectionLabel>

@@ -4,7 +4,8 @@
 
 The app uses the Movie Night "Spotlight, refined" design system, in a warm
 true-black dark theme (the default) and a warm off-white light theme that
-follows the OS. Tokens live in `mobile/theme/` (typed TS). **Never hardcode
+follows the OS, unless Settings › Appearance pins Light or Dark
+(`appearance.ts`). Tokens live in `mobile/theme/` (typed TS). **Never hardcode
 colours, type, spacing, radii or shadows.** Import from `theme/` and use the
 semantic groups (`colors.text.*`, `colors.surface.*`, `colors.accent.*`,
 `colors.border.*`, `colors.sig`, `space`, `radius`, `shadow`, `textPresets`).

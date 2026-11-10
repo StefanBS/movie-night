@@ -1,12 +1,15 @@
 import { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
+import { Check } from "lucide-react-native";
 
-import { createThemedStyles, fontFamily, pressedOpacity, space, textPresets } from "../theme";
+import { createThemedStyles, fontFamily, pressedOpacity, space, textPresets, useColors } from "../theme";
 
 // SettingsRow is the Settings screen's grouped-row primitive: a sentence-case
 // label (with an optional quieter `sub` line under it) and an optional `value` and an optional `right` node (Toggle /
 // chevron); a row with both shows the value before the node. `disabled` dims rows whose backend isn't wired yet;
-// `danger` is the red Danger-zone ink. Grouping (card + dividers) is the
+// `danger` is the red Danger-zone ink. `checked` makes it one choice in a group
+// (Appearance): a radio for screen readers, with a check when it's the one
+// chosen. Grouping (card + dividers) is the
 // caller's job, so the same row works in every group.
 export function SettingsRow({
   label,
@@ -16,6 +19,7 @@ export function SettingsRow({
   onPress,
   disabled = false,
   danger = false,
+  checked,
 }: {
   label: string;
   sub?: string;
@@ -24,8 +28,14 @@ export function SettingsRow({
   onPress?: () => void;
   disabled?: boolean;
   danger?: boolean;
+  checked?: boolean;
 }) {
+  const colors = useColors();
   const styles = useStyles();
+  // Primary ink, not accent: the accent is rationed to the picker and the
+  // screen's one primary action.
+  const trailing =
+    checked === undefined ? right : checked ? <Check size={18} color={colors.text.primary} /> : null;
   const content = (
     <>
       <View style={styles.text}>
@@ -42,7 +52,7 @@ export function SettingsRow({
           {value}
         </Text>
       ) : null}
-      {right ? <View>{right}</View> : null}
+      {trailing ? <View>{trailing}</View> : null}
     </>
   );
 
@@ -50,6 +60,8 @@ export function SettingsRow({
     return (
       <Pressable
         onPress={onPress}
+        accessibilityRole={checked !== undefined ? "radio" : undefined}
+        accessibilityState={checked !== undefined ? { checked } : undefined}
         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       >
         {content}
