@@ -1,5 +1,6 @@
 # Record tonight's night, then change its film from the receipt's "Change
-# film": Watched shows the new film and not the old one.
+# film": the Night reads as a record and Watched shows the new film, not the
+# old one.
 # Movie search hits the real TMDB: match the exact title under the result
 # count, not a list position.
 appId: ${APP_ID}
@@ -18,6 +19,8 @@ name: Change a recorded night's film
     text: The Holdovers
     below: '\d+ films? · tap one.*'
 - assertVisible: The Holdovers
+# A night recorded tonight reads as a record, not a plan.
+- assertVisible: Who watched · 2
 - tapOn: Back to Tonight
 - tapOn: Watched
 - assertVisible: The Holdovers
