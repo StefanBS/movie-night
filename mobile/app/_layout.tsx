@@ -8,10 +8,14 @@ import { GroupProvider } from "../components/GroupProvider";
 import { IdentityProvider } from "../components/IdentityProvider";
 import { ReminderTaps } from "../components/ReminderTaps";
 import { ToastProvider } from "../components/Toast";
+import { applyThemePreference, loadThemePreference } from "../appearance";
 import { showRemindersInForeground } from "../pushDevice";
 import { useColors } from "../theme";
 
 showRemindersInForeground();
+// Before the first render, so a Light or Dark choice in Settings never shows a
+// frame of the other theme.
+applyThemePreference(loadThemePreference());
 
 export default function RootLayout() {
   const colors = useColors();

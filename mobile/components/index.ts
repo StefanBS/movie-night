@@ -16,5 +16,6 @@ export { Calendar } from "./Calendar";
 export { PickerHero } from "./PickerHero";
 export { UpNextCard } from "./UpNextCard";
 export { Toggle } from "./Toggle";
+export { Segmented } from "./Segmented";
 export { ToastProvider, useToast, type ToastMessage } from "./Toast";
 export { Sheet, SheetRow } from "./Sheet";

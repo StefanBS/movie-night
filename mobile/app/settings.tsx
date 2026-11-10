@@ -8,14 +8,17 @@ import {
   Avatar,
   Input,
   SectionLabel,
+  Segmented,
   SettingsRow,
   Toggle,
   TopBar,
 } from "../components";
 import { useGroup } from "../components/GroupProvider";
 import { useIdentity } from "../components/IdentityProvider";
+import { loadThemePreference, saveThemePreference } from "../appearance";
 import { API_URL } from "../apiUrl";
 import { GROUP_ID } from "../lib/api";
+import { THEME_PREFERENCES } from "../lib/appearance";
 import { formatMonthYear } from "../lib/date";
 import { errorMessage } from "../lib/errors";
 import { renameGroup } from "../lib/group";
@@ -41,6 +44,10 @@ export default function SettingsScreen() {
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // System follows the phone's light/dark mode; Light and Dark keep to one.
+  // Saving re-themes every screen at once (theme/useColors.ts).
+  const [theme, setTheme] = useState(loadThemePreference);
 
   const startEdit = () => {
     if (group === null) {
@@ -184,6 +191,23 @@ export default function SettingsScreen() {
               }
             />
           )}
+        </View>
+
+        <SectionLabel>Appearance</SectionLabel>
+        <View style={styles.card}>
+          <SettingsRow
+            label="Theme"
+            right={
+              <Segmented
+                options={THEME_PREFERENCES}
+                value={theme}
+                onChange={(next) => {
+                  setTheme(next);
+                  saveThemePreference(next);
+                }}
+              />
+            }
+          />
         </View>
 
         <SectionLabel>Danger zone</SectionLabel>

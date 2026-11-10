@@ -1,7 +1,8 @@
 // ============================================================
 // Movie Night — active theme hooks
 // Dark is the default; light follows the OS appearance (app.json
-// `userInterfaceStyle: "automatic"`).
+// `userInterfaceStyle: "automatic"`) unless Settings › Appearance pins one,
+// which overrides what useColorScheme() reports (appearance.ts).
 // ============================================================
 
 import {
@@ -15,7 +16,7 @@ import {
 import { colors, type ColorSchemeName, type Colors } from "./colors";
 import { shadow, type Shadows } from "./spacing";
 
-/** The active theme: "light" only when the OS says so, otherwise dark. */
+/** The active theme: "light" only when the OS (or the Appearance setting) says so, otherwise dark. */
 export function useScheme(): ColorSchemeName {
   return useColorScheme() === "light" ? "light" : "dark";
 }
