@@ -117,6 +117,8 @@ each flow reopens the app (the deep link from `just phone devlink`) on "Who are
 you?" and claims Ada. The flows never clear the app's state: that would also
 wipe its granted permissions and bring back system and dev-client dialogs. The
 backend, its Postgres, and Metro must be running, and the phone unlocked.
+At the end (pass or fail) it prints a table of seconds per flow, split into
+the reseed and the `maestro test` run, with their sums and the wall-clock total.
 Movie search goes to the real TMDB, so flows match a film by title ("Dune"),
 never by its position in the results.
 
