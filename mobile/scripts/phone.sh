@@ -16,6 +16,10 @@ SCHEME=$(node -p 'require("./app.json").expo.scheme')
 BUNDLE=files/DevLauncherApp-BridgelessReactNativeDevBundle.js
 DUMP=/sdcard/movienight-ui.xml
 LAUNCH_TIMEOUT=60
+# The seeded group (lib/api.ts GROUP_ID): only our API, with the dev seed,
+# answers it with 200.
+GROUP_ID=11111111-1111-1111-1111-111111111111
+BACKEND_PORT=8080
 
 die() { echo "phone: $*" >&2; exit 2; }
 
@@ -26,6 +30,8 @@ usage: just phone <cmd>
                   (default 8081), and wait until the app has loaded
   has <text>      exit 0 if <text> is in the phone's downloaded JS bundle,
                   1 if not: the "is my change on the phone?" check
+  check [port]    exit 0 if the backend (:8080) and Metro (default :8081)
+                  answer on the LAN address the phone uses, 1 naming what's not
   devlink [--no-fab] [port]
                   print the deep link that opens the dev client against Metro
                   (what launch opens). --no-fab hides the dev client's
@@ -67,6 +73,32 @@ cmd_devlink() {
   local suffix=""
   [[ ${1:-} == --no-fab ]] && { suffix="&__expo_disable_fab=1"; shift; }
   echo "$(devlink "http://$(lan_ip):${1:-8081}")$suffix"
+}
+
+# check probes the backend and Metro at the LAN address the phone reaches them
+# on, so a server bound to loopback, down, or displaced from its port by another
+# program fails here in seconds rather than as a 90s timeout per e2e flow (#302).
+# It runs on this machine, so a firewall or AP isolation between the phone and
+# it still slips through (see README: Troubleshooting).
+cmd_check() {
+  local ip port=${1:-8081} base status ok=0
+  ip=$(lan_ip)
+  base="http://$ip:$BACKEND_PORT"
+  if curl -fsS -o /dev/null --max-time 3 "$base/groups/$GROUP_ID" 2>/dev/null; then
+    echo "phone: backend answers at $base" >&2
+  else
+    echo "phone: backend NOT reachable at $base/groups/$GROUP_ID (is 'just run' up in backend/, bound to 0.0.0.0, and the port ours: 'ss -ltnp sport = :$BACKEND_PORT'?)" >&2
+    ok=1
+  fi
+  base="http://$ip:$port"
+  status=$(curl -fsS --max-time 3 "$base/status" 2>/dev/null || true)
+  if [[ $status == packager-status:running ]]; then
+    echo "phone: Metro answers at $base" >&2
+  else
+    echo "phone: Metro NOT reachable at $base/status (is 'just start' running?)" >&2
+    ok=1
+  fi
+  return "$ok"
 }
 
 cmd_launch() {
@@ -115,6 +147,6 @@ cmd_has() {
 cmd=$1
 shift
 case $cmd in
-  launch | has | devlink) "cmd_$cmd" "$@" ;;
+  launch | has | check | devlink) "cmd_$cmd" "$@" ;;
   *) usage ;;
 esac

@@ -98,7 +98,8 @@ audit-sarif:
     osv-scanner scan source --lockfile=package-lock.json --config=osv-scanner.toml --format sarif > osv-scanner.sarif
 
 # Open the dev client on the adb-attached phone: launch [port] | has <text>
-# (is my change in the phone's bundle?) | devlink [port]. To drive the app,
+# (is my change in the phone's bundle?) | check [port] (do the backend and
+# Metro answer on the LAN?) | devlink [port]. To drive the app,
 # use Maestro (`maestro hierarchy`, or a flow).
 [positional-arguments]
 phone *args:
@@ -107,7 +108,8 @@ phone *args:
 # Run the Maestro end-to-end suite (.maestro/) on the adb-attached phone.
 # <marker> is text from your change: the run refuses a phone whose bundle lacks
 # it (`just phone has`). Each flow starts from a reseeded dev DB (needs the
-# backend's Postgres up, and the backend + Metro running). Run a subset by
+# backend's Postgres up, and the backend + Metro running: `just phone check`
+# fails the run up front if either doesn't answer on the LAN). Run a subset by
 # naming flow files: just e2e "<marker>" .maestro/plan-night.yaml
 [positional-arguments]
 e2e marker *flows:
@@ -137,6 +139,7 @@ e2e marker *flows:
         } >&2
     }
     trap summary EXIT
+    bash scripts/phone.sh check || { echo "e2e: start what's missing, then re-run" >&2; exit 1; }
     bash scripts/phone.sh launch
     bash scripts/phone.sh has "$marker"
     link=$(bash scripts/phone.sh devlink --no-fab)
