@@ -2,7 +2,6 @@
 # pick still reads as New night, and its back returns to People: dropping
 # Cleo there saves onto the same Night, not a second one. Flows that run this
 # one count Ada and Blake as who came.
-# Movie search hits the real TMDB: match the title "Dune", not a list position.
 appId: ${APP_ID}
 name: Plan a night
 ---
@@ -22,14 +21,10 @@ name: Plan a night
 - tapOn: Cleo
 - tapOn: "Next: Ada picks.*"
 - assertVisible: 'What are we watching\?'
-- tapOn: Search a film title…
-- inputText: Dune
-- hideKeyboard
-# The first exact "Dune" under the result count, so not the search box itself
-# (or "Dune: Part Two").
-- tapOn:
-    text: Dune
-    below: '\d+ films? · tap one.*'
+- runFlow:
+    file: common/pick-film.yaml
+    env:
+      TITLE: Dune
 - tapOn: Done
 - assertVisible: Dune
 - assertVisible: We watched it

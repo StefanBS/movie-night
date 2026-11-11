@@ -1,0 +1,14 @@
+# Searches for ${TITLE} and taps it in the results. The search hits the real
+# TMDB, so this matches the exact title under the result count, not a list
+# position: that skips the search box itself and longer titles ("Dune" isn't
+# "Dune: Part Two"). It closes the keyboard with hideKeyboard, not pressKey
+# Enter (see `just check-flows`), so it also checks nothing rewrites a typed
+# title.
+appId: ${APP_ID}
+---
+- tapOn: Search a film title…
+- inputText: ${TITLE}
+- hideKeyboard
+- tapOn:
+    text: ${TITLE}
+    below: '\d+ films? · tap one.*'

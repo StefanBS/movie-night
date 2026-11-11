@@ -24,9 +24,10 @@ migrate:
 migrate-down:
     go tool goose -dir migrations postgres "$DATABASE_URL" down
 
-# Load the dev seed (idempotent; NOT a migration)
+# Load the dev seed (idempotent; NOT a migration). ON_ERROR_STOP makes a
+# failing seed.sql exit non-zero instead of rolling back and reporting success.
 seed:
-    docker compose exec -T db psql -U movie -d movienight < seed.sql
+    docker compose exec -T db psql -U movie -d movienight -v ON_ERROR_STOP=1 < seed.sql
 
 # Reset the dev DB to exactly the seed: empty every table (except goose's
 # version table), then load the seed. What `just e2e` (mobile/) starts from.

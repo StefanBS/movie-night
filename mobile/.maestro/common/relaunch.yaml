@@ -1,0 +1,9 @@
+# Relaunches the app without reseeding, for a flow that checks something
+# survived a restart: the phone stays claimed, so it opens on Tonight.
+appId: ${APP_ID}
+---
+- stopApp
+- openLink: ${DEV_LINK}
+- extendedWaitUntil:
+    visible: Plan a night
+    timeout: 90000

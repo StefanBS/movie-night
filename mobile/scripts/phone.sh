@@ -26,8 +26,10 @@ usage: just phone <cmd>
                   (default 8081), and wait until the app has loaded
   has <text>      exit 0 if <text> is in the phone's downloaded JS bundle,
                   1 if not: the "is my change on the phone?" check
-  devlink [port]  print the deep link that opens the dev client against Metro
-                  (what launch opens; the e2e flows open it too)
+  devlink [--no-fab] [port]
+                  print the deep link that opens the dev client against Metro
+                  (what launch opens). --no-fab hides the dev client's
+                  floating tools button: what the e2e flows open
 EOF
   exit 2
 }
@@ -59,8 +61,12 @@ devlink() {
   echo "$SCHEME://expo-development-client/?url=$(sed -e 's/:/%3A/g' -e 's#/#%2F#g' <<<"$1")"
 }
 
+# --no-fab: the floating tools button sits over Tonight's Settings gear and
+# catches taps meant for it.
 cmd_devlink() {
-  devlink "http://$(lan_ip):${1:-8081}"
+  local suffix=""
+  [[ ${1:-} == --no-fab ]] && { suffix="&__expo_disable_fab=1"; shift; }
+  echo "$(devlink "http://$(lan_ip):${1:-8081}")$suffix"
 }
 
 cmd_launch() {

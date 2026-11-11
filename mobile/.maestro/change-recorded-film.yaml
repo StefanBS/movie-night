@@ -1,9 +1,8 @@
 # Record tonight's night, then change its film from the receipt's "Change
 # film": the Night reads as a record and Watched shows the new film, not the
 # old one.
-# Movie search hits the real TMDB: match the exact title under the result
-# count, not a list position. Snowpiercer isn't a dictionary word, so this
-# flow also checks that nothing rewrites a typed title.
+# Snowpiercer isn't a dictionary word, so this flow also checks that nothing
+# rewrites a typed title (#285).
 appId: ${APP_ID}
 name: Change a recorded night's film
 ---
@@ -13,16 +12,10 @@ name: Change a recorded night's film
 - assertVisible: Recorded ✓
 - tapOn: Change film
 - assertVisible: 'What are we watching\?'
-# hideKeyboard, not pressKey Enter: the search runs as you type, and Maestro's
-# Enter is a raw key event that makes Gboard apply its autocorrection
-# ("Snowpiercer" became "Snow piercer"). A person tapping the keyboard's ✓
-# doesn't trigger it (#285).
-- tapOn: Search a film title…
-- inputText: Snowpiercer
-- hideKeyboard
-- tapOn:
-    text: Snowpiercer
-    below: '\d+ films? · tap one.*'
+- runFlow:
+    file: common/pick-film.yaml
+    env:
+      TITLE: Snowpiercer
 - assertVisible: Snowpiercer
 # A night recorded tonight reads as a record, not a plan.
 - assertVisible: Who watched · 2
