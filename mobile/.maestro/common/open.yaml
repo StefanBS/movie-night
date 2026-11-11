@@ -1,9 +1,10 @@
 # Opens the dev client against Metro on "Who are you?", unclaimed. setup.yaml
 # runs this and then claims Ada; a flow that claims someone else (or joins as a
 # guest) runs this directly.
-# `just e2e` passes APP_ID (from app.json) and DEV_LINK
-# (`just phone devlink --no-fab`) and reseeds the DB before each flow. Reseeding empties `devices`, which
-# revokes the phone's identity token, so the app opens on "Who are you?"
+# It reseeds the dev DB first (reseed.js), so every flow starts from the seed.
+# `just e2e` passes APP_ID (from app.json), DEV_LINK
+# (`just phone devlink --no-fab`) and RESEED_URL. Reseeding empties `devices`,
+# which revokes the phone's identity token, so the app opens on "Who are you?"
 # without clearing its state. Don't use clearState: it also wipes granted
 # permissions and the dev menu's onboarding flag, so every run stops on system
 # and dev-client dialogs.
@@ -11,6 +12,7 @@
 # and the OS prompt would block a fresh install.
 appId: ${APP_ID}
 ---
+- runScript: reseed.js
 - stopApp
 - setPermissions:
     permissions:

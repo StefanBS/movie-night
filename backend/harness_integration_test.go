@@ -119,13 +119,12 @@ func migrate(connStr string) error {
 	return nil
 }
 
-// freshDB truncates every table and returns the shared pool, so each test starts
-// from an empty schema. Tests run sequentially, so the shared database is safe;
-// CASCADE drops the FK-dependent rows (memberships, attendances, nights) too.
+// freshDB empties every table (reset.sql, the same reset `just reseed` and
+// POST /dev/reseed run) and returns the shared pool, so each test starts from
+// an empty schema. Tests run sequentially, so the shared database is safe.
 func freshDB(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	if _, err := testPool.Exec(context.Background(),
-		`TRUNCATE groups, users, memberships, nights, attendances, movies CASCADE`); err != nil {
+	if _, err := testPool.Exec(context.Background(), resetSQL); err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
 	return testPool

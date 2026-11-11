@@ -52,6 +52,12 @@ func main() {
 	go runReminders(ctx, db.New(pool), newExpoPusher(os.Getenv("EXPO_ACCESS_TOKEN")), time.Minute)
 
 	mux := newRoutes(pool, tmdb)
+	// DEV_RESET=1 adds POST /dev/reseed, which wipes the database (the e2e
+	// flows call it). Only a local dev backend sets it.
+	if os.Getenv("DEV_RESET") == "1" {
+		addDevRoutes(mux, pool)
+		log.Print("DEV_RESET=1: POST /dev/reseed is enabled and resets the database to the seed")
+	}
 
 	// Browsers enforce CORS; native apps and curl do not. Allowed web origins
 	// come from CORS_ALLOWED_ORIGINS (comma-separated) so the policy is the same

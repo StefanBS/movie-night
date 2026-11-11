@@ -49,6 +49,10 @@ TMDB_READ_TOKEN=
 # the API process every minute either way.
 EXPO_ACCESS_TOKEN=
 
+# 1 adds POST /dev/reseed, which resets the database to the dev seed for the
+# mobile e2e flows. Destroys all data: local dev only, never staging or prod.
+DEV_RESET=1
+
 # Podman only — route docker compose + testcontainers to the rootless socket.
 DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
 TESTCONTAINERS_RYUK_DISABLED=true
@@ -128,6 +132,12 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `POST` | `/groups/{groupId}/nights/{nightId}/movie` | Attach a movie by `{"tmdbId"}`; re-fetches canonical title/year from TMDB and returns the night. Repeatable, including on a Watched Night (changes its film). |
 | `DELETE` | `/groups/{groupId}/nights/{nightId}/movie` | Detach the film; returns the night with `movie` null. Idempotent. `422` on a Watched Night, which keeps its film. |
 
+**Dev only** — registered only when `DEV_RESET=1`; otherwise `404`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/dev/reseed` | Empty every table and load `seed.sql`, as `just reseed` does (both run `reset.sql`); `204`. What each mobile e2e flow starts with. |
+
 ## Testing
 
 ```bash
@@ -162,7 +172,7 @@ lefthook install               # from the repo root
 just migrate        # apply pending migrations
 just migrate-down   # roll back the most recent migration
 just seed           # (re)load dev seed data — safe to run repeatedly
-just reseed         # empty every table, then seed: back to exactly the seed state
+just reseed         # empty every table (reset.sql), then seed: back to exactly the seed state
 just sqlc           # regenerate internal/db after editing SQL
 just db-reset       # destroy the container AND its data volume
 ```
