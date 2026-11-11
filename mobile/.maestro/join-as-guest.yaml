@@ -2,7 +2,7 @@
 # A guest isn't in the rotation, so Club counts 7 members but still 5 in it.
 appId: ${APP_ID}
 name: Join as a guest
-tags: [members, identity]
+tags: [members, identity, settings]
 ---
 - runFlow: common/open.yaml
 - tapOn: "I'm not on the list"

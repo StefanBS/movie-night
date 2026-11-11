@@ -2,8 +2,16 @@
 // (`just check-flows`) on each file's parsed YAML.
 import { parseAllDocuments } from "yaml";
 
-// The area a flow exercises. `just e2e "<marker>" --tags <list>` runs the
-// flows tagged with any of them (maestro test --include-tags).
+// The areas a flow touches. `just e2e "<marker>" --tags <list>` runs the
+// flows tagged with any of them (maestro test --include-tags). A flow takes
+// the tag of every area whose screen it acts in or asserts on, so that
+// changing a screen and running its tag runs every flow that would notice.
+// Starting on Tonight doesn't count (every flow does), and neither do shared
+// components (TopBar, tabs), which call for the full battery.
+//   nights:   Tonight's night, night/*, Watched, rotation
+//   members:  Club, member/*
+//   identity: welcome ("Who are you?")
+//   settings: settings
 export const AREA_TAGS = ["nights", "members", "identity", "settings"] as const;
 // smoke: a few flows that between them touch the most screens. Not an area,
 // so a flow tagged only smoke still needs an area tag.
