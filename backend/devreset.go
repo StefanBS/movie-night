@@ -1,3 +1,5 @@
+//go:build dev
+
 package main
 
 import (
@@ -38,9 +40,12 @@ SELECT token_hash, push_token, time_zone, created_at FROM devices`
 SELECT '` + seedAda + `', token_hash, push_token, time_zone, created_at FROM kept_devices`
 )
 
+// devBuild: this binary was built with -tags dev, so it has the dev routes.
+// devreset_off.go is the release build's side, without them.
+const devBuild = true
+
 // addDevRoutes registers the routes that exist only for local development and
-// the e2e flows. main calls it only when DEV_RESET=1, which staging and prod
-// never set, so there the routes 404.
+// the e2e flows. main adds them through devRoutes, only when DEV_RESET=1 too.
 func addDevRoutes(mux *http.ServeMux, pool *pgxpool.Pool) {
 	mux.Handle("POST /dev/reseed", reseedHandler(pool))
 }

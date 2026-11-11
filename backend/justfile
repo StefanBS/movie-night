@@ -50,28 +50,37 @@ sqlc:
 fmt-check:
     test -z "$(gofmt -l .)" || { echo "Not gofmt-clean:"; gofmt -l .; exit 1; }
 
-# Report suspicious constructs
+# Report suspicious constructs, in both the release build and the dev build
+# (-tags dev adds devreset.go's POST /dev/reseed)
 vet:
     go vet ./...
+    go vet -tags dev ./...
 
-# Compile all packages
+# Compile all packages, as the release build (no dev routes) and the dev build
 build:
     go build ./...
+    go build -tags dev ./...
 
-# Run the fast unit tests
+# Run the fast unit tests, in the release build (which proves it has no
+# POST /dev/reseed)
 test:
     go test ./...
 
 # Run all fast checks: formatting, vet, build, unit tests (what CI runs)
 check: fmt-check vet build test
 
-# Run the testcontainers integration tests
+# Run the testcontainers integration tests, in the dev build so the
+# POST /dev/reseed tests run too
 test-integration:
-    go test -tags=integration ./...
+    go test -tags=integration,dev ./...
+
+# The security scans read the dev build: everything the release build has, plus
+# devreset.go.
+scan_tags := "dev"
 
 # Scan dependencies for known vulnerabilities (reachable-only, near-zero false positives)
 vuln:
-    go tool govulncheck ./...
+    go tool govulncheck -tags {{scan_tags}} ./...
 
 # gosec is a go tool in its own module (tools/gosec/go.mod) so its heavy autofix
 # deps stay out of backend/go.mod; Dependabot bumps it like any other go dep.
@@ -79,7 +88,7 @@ gosec := "go tool -modfile=tools/gosec/go.mod gosec"
 
 # Static security analysis (skips sqlc-generated files)
 sast:
-    {{gosec}} -exclude-generated ./...
+    {{gosec}} -exclude-generated -tags {{scan_tags}} ./...
 
 # Run all security scans, human-readable; fails if either scan does.
 audit:
@@ -99,8 +108,8 @@ audit-sarif:
     # exits 0, so gate on any reachable (error-level) finding — what text mode exits 3 for.
     set -uo pipefail
     rc=0
-    {{gosec}} -exclude-generated -fmt sarif -out gosec.sarif ./... || rc=1
-    go tool govulncheck -format sarif ./... > govulncheck.sarif || rc=1
+    {{gosec}} -exclude-generated -tags {{scan_tags}} -fmt sarif -out gosec.sarif ./... || rc=1
+    go tool govulncheck -tags {{scan_tags}} -format sarif ./... > govulncheck.sarif || rc=1
     n=$(jq '[.runs[].results[] | select(.level == "error")] | length' govulncheck.sarif 2>/dev/null || echo 0)
     if [ "${n:-0}" -gt 0 ]; then
         echo "govulncheck: reachable vulnerabilities found (see govulncheck.sarif)" >&2
@@ -108,6 +117,7 @@ audit-sarif:
     fi
     exit $rc
 
-# Run the backend server
+# Run the backend server, as the dev build: with DEV_RESET=1 (.env) it serves
+# the e2e flows' POST /dev/reseed. A release build leaves out -tags dev.
 run:
-    go run .
+    go run -tags dev .

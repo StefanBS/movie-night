@@ -171,11 +171,12 @@ jobs:
           build-mode: ${{ matrix.build-mode }}
 
       # Manual build for Go: the module is in backend/, not the repo root, so
-      # autobuild-from-root would fail. CodeQL traces this compile.
+      # autobuild-from-root would fail. CodeQL traces this compile: the dev build
+      # (-tags dev), so devreset.go is analysed too, as gosec and govulncheck do.
       - if: matrix.language == 'go'
         name: Build Go (traced by CodeQL)
         working-directory: backend
-        run: go build ./...
+        run: go build -tags dev ./...
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@84498526a009a99c875e83ef4821a8ba52de7c22 # codeql-bundle-v2.25.5

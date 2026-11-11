@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration && dev
 
 package main
 
@@ -26,6 +26,8 @@ func TestDevReseedIntegration(t *testing.T) {
 
 	t.Run("the API's routes have no reseed", func(t *testing.T) {
 		mux := newRoutes(pool, nil)
+		// A dev build still leaves the route out without DEV_RESET=1.
+		devRoutes(mux, pool, false)
 		code, _ := doReq(t, mux, http.MethodPost, "/dev/reseed", "")
 		if code != http.StatusNotFound {
 			t.Errorf("status = %d, want 404", code)
@@ -36,7 +38,7 @@ func TestDevReseedIntegration(t *testing.T) {
 	})
 
 	mux := newRoutes(pool, nil)
-	addDevRoutes(mux, pool)
+	devRoutes(mux, pool, true)
 
 	// Twice: the second run starts from the seed, as every e2e flow but the
 	// first does.
