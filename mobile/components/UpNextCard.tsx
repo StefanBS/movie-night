@@ -83,7 +83,7 @@ export function UpNextCard({
       >
         <View style={styles.whenRow}>
           <View style={styles.dot} />
-          <Text style={styles.when} numberOfLines={2}>
+          <Text style={styles.when} numberOfLines={2} testID={`up-next-when-${night.scheduledFor}`}>
             {when}
           </Text>
         </View>
