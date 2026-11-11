@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { View, Text } from "react-native";
 import { Ellipsis } from "lucide-react-native";
 
@@ -20,12 +20,17 @@ import { createThemedStyles, space, textPresets, useColors } from "../../theme";
 // without remounting, so its step survives. `back` names the screen the
 // Night view returns to ("Tonight", "Watched", …). `onDone`, for a Night just
 // planned, puts a "Done" in the Night view's footer that ends the flow.
+// `pick` is the top bar of the Pick step the editor opens on (initialStep
+// "pick"), when the screen that opened it should get the Night back: its back
+// gets the Night as it now stands. Opened from the Night view, the Pick step
+// always reads "‹ Night · The pick".
 export function ExistingNightEditor({
   night,
   loadStartedAt,
   today,
   initialStep,
   back,
+  pick,
   onEdit,
   onDone,
 }: {
@@ -34,6 +39,7 @@ export function ExistingNightEditor({
   today: string;
   initialStep?: EditorStep;
   back: { label: string; onPress: () => void };
+  pick?: { title: string; back: { label: string; onPress: (night: Night) => void } };
   onEdit: () => void;
   onDone?: () => void;
 }) {
@@ -51,13 +57,23 @@ export function ExistingNightEditor({
   const current = state.night;
 
   const picking = state.step === "pick";
-  // The Pick step returns to the Night view, on Android's back button too.
-  useHardwareBack(picking ? editor.toNight : null);
+  // The Pick step returns where its top bar says, on Android's back button too.
+  const opener = pick !== undefined && !state.pickFromNight ? pick : null;
+  const openerBack = opener?.back.onPress;
+  const pickBack = useMemo(
+    () => (openerBack === undefined ? editor.toNight : () => openerBack(current)),
+    [openerBack, editor, current],
+  );
+  const pickBar = {
+    title: opener?.title ?? "The pick",
+    back: { label: opener?.back.label ?? "Night", onPress: pickBack },
+  };
+  useHardwareBack(picking ? pickBack : null);
 
   return (
     <View style={styles.screen}>
       {picking ? (
-        <TopBar kind="title" title="The pick" back={{ label: "Night", onPress: editor.toNight }} />
+        <TopBar kind="title" title={pickBar.title} back={pickBar.back} />
       ) : (
         <TopBar
           kind="title"

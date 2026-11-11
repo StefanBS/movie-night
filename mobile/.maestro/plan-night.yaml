@@ -1,4 +1,7 @@
-# Plan a night for tonight with Ada and Blake, and give it Ada's pick.
+# Plan a night for tonight with Ada and Blake, and give it Ada's pick. The
+# pick still reads as New night, and its back returns to People: dropping
+# Cleo there saves onto the same Night, not a second one. Flows that run this
+# one count Ada and Blake as who came.
 # Movie search hits the real TMDB: match the title "Dune", not a list position.
 appId: ${APP_ID}
 name: Plan a night
@@ -8,6 +11,15 @@ name: Plan a night
 - tapOn: "Next: who's coming.*"
 - tapOn: Ada
 - tapOn: Blake
+- tapOn: Cleo
+- tapOn: "Next: Ada picks.*"
+- assertVisible: 'What are we watching\?'
+- assertVisible: New night
+- assertVisible: Back to People
+- assertNotVisible: The pick
+- tapOn: Back to People
+- assertVisible: "Next: Ada picks.*"
+- tapOn: Cleo
 - tapOn: "Next: Ada picks.*"
 - assertVisible: 'What are we watching\?'
 - tapOn: Search a film title…

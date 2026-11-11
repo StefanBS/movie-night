@@ -27,7 +27,7 @@ One dated movie-night occasion of a group. Every Night has a picker; a plan with
 _Avoid_: event, session, open night, pick (for the occasion itself)
 
 **Plan**:
-A Night being arranged (date and attendees) that doesn't exist yet; it becomes a Night once it's saved with a picker.
+A Night being arranged (date and attendees) that doesn't exist yet; it becomes a Night once it's saved with a picker. Going back from New night's film step reopens that Night as the Plan, and saving again updates it.
 _Avoid_: draft, open night
 
 **Start time**:

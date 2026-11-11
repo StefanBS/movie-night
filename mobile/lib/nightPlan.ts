@@ -1,15 +1,17 @@
 import { errorMessage } from "./errors";
 import { fetchMembers, type Member } from "./members";
-import { createPicking } from "./nightDraft";
+import { createPicking, draftPicker, rankAmong } from "./nightDraft";
 import { nightDates } from "./nightLifecycle";
-import { createNight, listNights, type Night } from "./nights";
+import { createNight, listNights, updateNight, type Night } from "./nights";
 import { createSessionCore, withSession, type Session } from "./session";
 import { fetchTurn, type TurnMember } from "./turn";
 
 // The Plan module behind the New night screen (GLOSSARY: Plan). A Plan is a
 // Night being arranged — date and start time, then who's coming — that exists only here until
-// create() saves it whole with its picker (ADR-0008). It owns the When → Who
-// step, the live turn order over the attendees, and who picks.
+// save() creates it whole with its picker (ADR-0008). It owns the When → Who
+// step, the live turn order over the attendees, and who picks. Backing out of
+// the film step reopens the saved Night here, so the wizard's earlier steps
+// edit it: the next save() updates that Night rather than creating another.
 
 export type PlanStep = "when" | "who";
 
@@ -39,9 +41,14 @@ export type NightPlan = Session<NightPlanState> & {
   toggle(memberId: string): void;
   // choosePicker overrides the order until that person stops attending.
   choosePicker(memberId: string): void;
-  // create saves the Plan as a Night, or returns null (no picker, already
-  // creating, or the backend refused — see actionError).
-  create(): Promise<Night | null>;
+  // reopen returns to Who with a Night this Plan saved, as it now stands
+  // (its picker may have changed on the film step), so the next save()
+  // updates it.
+  reopen(night: Night): void;
+  // save creates the Plan as a Night, or updates the Night it reopened (no
+  // request when nothing changed). It returns null when there's no picker, a
+  // save is already running, or the backend refused — see actionError.
+  save(): Promise<Night | null>;
 };
 
 export function createNightPlan({
@@ -68,12 +75,16 @@ export function createNightPlan({
     actionError: null,
   });
   const picking = createPicking(core);
+  // ranking is the club's full turn ranking, as load fetched it.
+  let ranking: TurnMember[] = [];
+  // saved is the Night this Plan saved and reopened, or null before then.
+  let saved: Night | null = null;
 
   return withSession<NightPlan>(core, {
     async load() {
       core.set({ loading: true, error: null });
       try {
-        const [members, ranking, nights] = await core.track((signal) =>
+        const [members, turn, nights] = await core.track((signal) =>
           Promise.all([
             fetchMembers(baseUrl, groupId, signal),
             fetchTurn(baseUrl, groupId, signal),
@@ -82,6 +93,7 @@ export function createNightPlan({
           ]),
         );
         core.set({ members, nightDates: nightDates(nights), loading: false });
+        ranking = turn;
         picking.reset(new Set(), ranking, null);
       } catch (e) {
         core.set({ error: errorMessage(e, "failed to load the club"), loading: false });
@@ -99,14 +111,63 @@ export function createNightPlan({
     toggle: picking.toggle,
     choosePicker: picking.choosePicker,
 
-    create() {
+    reopen(night) {
+      saved = night;
+      const attendeeIds = new Set(night.attendees.map((a) => a.id));
+      // A picker who heads the order over these attendees is the order's, so
+      // toggling still reranks; anyone else was chosen, and holds.
+      const order = rankAmong(ranking, attendeeIds);
+      const chosen = draftPicker(order, attendeeIds, null) === night.pickerId ? null : night.pickerId;
+      core.set({ step: "who", date: night.scheduledFor, startTime: night.startTime, actionError: null });
+      picking.reset(attendeeIds, ranking, chosen);
+    },
+
+    async save() {
       const { pickerId, date, startTime, attendeeIds } = core.state;
       if (pickerId === null) {
-        return Promise.resolve(null);
+        return null;
       }
-      return core.act("create", "failed to create night", (signal) =>
-        createNight(baseUrl, groupId, { scheduledFor: date, startTime, attendees: [...attendeeIds], pickerId }, signal),
+      const attendees = [...attendeeIds];
+      const night = saved;
+      if (night === null) {
+        return core.act("save", "failed to create night", (signal) =>
+          createNight(baseUrl, groupId, { scheduledFor: date, startTime, attendees, pickerId }, signal),
+        );
+      }
+      if (core.state.busy !== null) {
+        return null;
+      }
+      if (unchanged(night, { date, startTime, attendeeIds, pickerId })) {
+        return night;
+      }
+      const updated = await core.act("save", "failed to save night", (signal) =>
+        updateNight(
+          baseUrl,
+          groupId,
+          night.id,
+          { scheduledFor: date, startTime, attendees, reminders: night.reminders, repeat: night.repeat, pickerId },
+          signal,
+        ),
       );
+      if (updated !== null) {
+        saved = updated;
+      }
+      return updated;
     },
   });
+}
+
+// unchanged reports whether the Plan still says what its saved Night does, so
+// saving again needs no request. Pure.
+function unchanged(
+  night: Night,
+  plan: { date: string; startTime: string | null; attendeeIds: ReadonlySet<string>; pickerId: string },
+): boolean {
+  return (
+    night.scheduledFor === plan.date &&
+    night.startTime === plan.startTime &&
+    night.pickerId === plan.pickerId &&
+    night.attendees.length === plan.attendeeIds.size &&
+    night.attendees.every((a) => plan.attendeeIds.has(a.id))
+  );
 }
