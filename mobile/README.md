@@ -112,16 +112,20 @@ just e2e "<text from your change>" .maestro/plan-night.yaml   # just one
 ```
 
 `just e2e` first checks that the backend and Metro answer on the LAN address
-the phone uses (`just phone check`), and stops within seconds, naming what's
-missing, if either doesn't. Then it launches the app (`just phone launch`), refuses to run if the
-phone's bundle lacks your text (`just phone has`), then runs each flow on a
-fresh dev DB (`just reseed` in `backend/`). Reseeding revokes the phone's identity, so
-each flow reopens the app (the deep link from `just phone devlink --no-fab`) on "Who are
-you?" and claims Ada. The flows never clear the app's state: that would also
-wipe its granted permissions and bring back system and dev-client dialogs. The
-backend, its Postgres, and Metro must be running, and the phone unlocked.
-At the end (pass or fail) it prints a table of seconds per flow, split into
-the reseed and the `maestro test` run, with their sums and the wall-clock total.
+the phone uses (`just phone check`) and that the backend can reseed, and
+stops within seconds, naming what's missing, if not. Then it launches the app
+(`just phone launch`), refuses to run if the phone's bundle lacks your text
+(`just phone has`), and runs every flow in one `maestro test` process, which
+connects to the phone once rather than once per flow (about 8s each). Each
+flow starts by reseeding the dev DB itself (`common/open.yaml` runs
+`common/reseed.js`, which calls the backend's `POST /dev/reseed`), so the
+backend must run with `DEV_RESET=1` in `backend/.env`. Reseeding revokes the
+phone's identity, so each flow reopens the app (the deep link from
+`just phone devlink --no-fab`) on "Who are you?" and claims Ada. The flows
+never clear the app's state: that would also wipe its granted permissions and
+bring back system and dev-client dialogs. The backend, its Postgres, and Metro
+must be running, and the phone unlocked. Maestro prints each flow's result and
+time and then the failed flows; the recipe adds the wall-clock total.
 Movie search goes to the real TMDB, so flows match a film by title ("Dune"),
 never by its position in the results.
 
