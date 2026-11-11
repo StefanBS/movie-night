@@ -127,10 +127,38 @@ e2e marker *flows:
     app_id=$(node -p 'require("./app.json").expo.android.package')
     failed=()
     report() { [[ ${#failed[@]} -eq 0 ]] || printf 'e2e: FAILED %s\n' "${failed[@]}" >&2; }
+    # Time each flow's reseed and `maestro test` (#296). The table prints on
+    # any exit, so a failed reseed or a Ctrl-C still shows the flows so far.
+    # Milliseconds from EPOCHREALTIME, minus its locale's decimal separator.
+    now() { local t=${EPOCHREALTIME//[!0-9]/}; echo $((t / 1000)); }
+    secs() { printf '%d.%d' $(($1 / 1000)) $(($1 % 1000 / 100)); }
+    rows=() reseed_sum=0 maestro_sum=0 start=$(now)
+    timings() {
+        [[ ${#rows[@]} -gt 0 ]] || return 0
+        {
+            printf '\ne2e: timings (s)\n%-32s %8s %8s %8s  %s\n' flow reseed maestro total result
+            printf '%s\n' "${rows[@]}"
+            printf '%-32s %8s %8s %8s\n' "sum (${#rows[@]} flows)" "$(secs $reseed_sum)" "$(secs $maestro_sum)" "$(secs $((reseed_sum + maestro_sum)))"
+            printf '%-32s %8s %8s %8s\n' "wall clock (incl. launch)" "" "" "$(secs $(($(now) - start)))"
+        } >&2
+    }
+    trap timings EXIT
     for f in "${flows[@]}"; do
+        t0=$(now)
         # A failed reseed stops the run, but still reports the flows before it.
-        (cd ../backend && just reseed) || { report; echo "e2e: reseed failed before $f" >&2; exit 1; }
-        maestro test -e APP_ID="$app_id" -e DEV_LINK="$link" "$f" || failed+=("$f")
+        if ! (cd ../backend && just reseed); then
+            reseed_ms=$(($(now) - t0)) reseed_sum=$((reseed_sum + reseed_ms))
+            rows+=("$(printf '%-32s %8s %8s %8s  %s' "$(basename "$f")" "$(secs $reseed_ms)" - "$(secs $reseed_ms)" 'reseed failed')")
+            report
+            echo "e2e: reseed failed before $f" >&2
+            exit 1
+        fi
+        t1=$(now)
+        result=pass
+        maestro test -e APP_ID="$app_id" -e DEV_LINK="$link" "$f" || { failed+=("$f"); result=FAIL; }
+        t2=$(now)
+        reseed_sum=$((reseed_sum + t1 - t0)) maestro_sum=$((maestro_sum + t2 - t1))
+        rows+=("$(printf '%-32s %8s %8s %8s  %s' "$(basename "$f")" "$(secs $((t1 - t0)))" "$(secs $((t2 - t1)))" "$(secs $((t2 - t0)))" "$result")")
     done
     if [[ ${#failed[@]} -gt 0 ]]; then
         report
