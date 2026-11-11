@@ -85,6 +85,7 @@ connect to the Metro bundler. Use `just ios` (macOS) or `just web` for those tar
 ```bash
 just phone launch [port]    # force-stop, open the dev client on http://<lan-ip>:<port> (8081), wait for load
 just phone has "someText"   # exit 0 if the text is in the phone's JS bundle, 1 if not
+just phone check [port]     # do the backend (:8080) and Metro (:8081) answer on the LAN address?
 just phone devlink [--no-fab]  # print the deep link that opens the dev client on Metro
 ```
 
@@ -110,7 +111,9 @@ just e2e "<text from your change>"                     # every flow
 just e2e "<text from your change>" .maestro/plan-night.yaml   # just one
 ```
 
-`just e2e` launches the app (`just phone launch`), refuses to run if the
+`just e2e` first checks that the backend and Metro answer on the LAN address
+the phone uses (`just phone check`), and stops within seconds, naming what's
+missing, if either doesn't. Then it launches the app (`just phone launch`), refuses to run if the
 phone's bundle lacks your text (`just phone has`), then runs each flow on a
 fresh dev DB (`just reseed` in `backend/`). Reseeding revokes the phone's identity, so
 each flow reopens the app (the deep link from `just phone devlink --no-fab`) on "Who are
@@ -186,7 +189,7 @@ just start-clean    # = npx expo start -c
 
 Then `just phone launch` and check with `just phone has <text from your change>`.
 
-If it persists, confirm the backend is reachable from the phone:
+If it persists, run `just phone check`, then confirm the backend is reachable from the phone:
 
 - Phone and computer on the same Wi-Fi (no AP isolation).
 - Backend bound to `0.0.0.0:8080`, not loopback.
