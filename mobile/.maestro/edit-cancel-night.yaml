@@ -2,6 +2,7 @@
 # Blake, Dune), edit who's coming, then cancel it.
 appId: ${APP_ID}
 name: Edit, then cancel, a night
+tags: [nights]
 ---
 - runFlow:
     file: common/setup.yaml

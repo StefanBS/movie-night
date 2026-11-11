@@ -3,6 +3,7 @@
 # it back to System so the next flow runs with the phone's own mode.
 appId: ${APP_ID}
 name: Switch the theme
+tags: [settings, smoke]
 ---
 - runFlow: common/setup.yaml
 - tapOn: Settings

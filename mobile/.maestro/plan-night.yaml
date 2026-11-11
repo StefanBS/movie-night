@@ -7,6 +7,7 @@
 # facts, so if the two drift apart, this flow fails.
 appId: ${APP_ID}
 name: Plan a night
+tags: [nights, smoke]
 ---
 - runFlow: common/setup.yaml
 - tapOn: Plan a night

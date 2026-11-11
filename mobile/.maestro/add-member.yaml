@@ -1,6 +1,7 @@
 # Add a core member from the Club tab.
 appId: ${APP_ID}
 name: Add a member
+tags: [members, smoke]
 ---
 - runFlow: common/setup.yaml
 - tapOn: Club

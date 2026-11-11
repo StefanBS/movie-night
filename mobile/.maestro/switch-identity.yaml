@@ -3,6 +3,7 @@
 # on Tonight.
 appId: ${APP_ID}
 name: Switch identity
+tags: [identity]
 ---
 - runFlow: common/setup.yaml
 - tapOn: Settings

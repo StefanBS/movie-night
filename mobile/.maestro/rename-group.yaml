@@ -3,6 +3,7 @@
 # back from the backend and not from GroupProvider's state.
 appId: ${APP_ID}
 name: Rename the group
+tags: [settings]
 ---
 - runFlow: common/setup.yaml
 - assertVisible: Friday Film Club

@@ -3,6 +3,7 @@
 # shows it up next with its countdown and date.
 appId: ${APP_ID}
 name: Plan a night for a later date
+tags: [nights]
 ---
 - runFlow: common/setup.yaml
 - runScript: common/first-of-next-month.js

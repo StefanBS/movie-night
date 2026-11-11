@@ -6,6 +6,7 @@
 # rewrites a typed title (#285).
 appId: ${APP_ID}
 name: Change a recorded night's film
+tags: [nights]
 ---
 - runFlow:
     file: common/setup.yaml

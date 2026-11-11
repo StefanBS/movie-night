@@ -4,6 +4,7 @@
 # the rotation becomes Ada, Dev, Frankie, Cleo, Blake, Esme.
 appId: ${APP_ID}
 name: Promote a guest to core
+tags: [members]
 ---
 - runFlow: common/setup.yaml
 - tapOn: Club
