@@ -52,11 +52,8 @@ func main() {
 	go runReminders(ctx, db.New(pool), newExpoPusher(os.Getenv("EXPO_ACCESS_TOKEN")), time.Minute)
 
 	mux := newRoutes(pool, tmdb)
-	// DEV_RESET=1 adds POST /dev/reseed, which wipes the database (the e2e
-	// flows call it). Only a local dev backend sets it.
-	if os.Getenv("DEV_RESET") == "1" {
-		addDevRoutes(mux, pool)
-		log.Print("DEV_RESET=1: POST /dev/reseed is enabled and resets the database to the seed")
+	if msg := devRoutes(mux, pool, os.Getenv("DEV_RESET") == "1"); msg != "" {
+		log.Print(msg)
 	}
 
 	// Browsers enforce CORS; native apps and curl do not. Allowed web origins
@@ -92,6 +89,23 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("graceful shutdown failed: %v", err)
 	}
+}
+
+// devRoutes adds POST /dev/reseed, which wipes the database (the e2e flows
+// call it), only in a dev build (-tags dev, as `just run` builds) with
+// devReset (DEV_RESET=1) set: a release build doesn't contain the route at
+// all, and DEV_RESET keeps a dev build pointed at a database you care about
+// from exposing it by accident. It returns what it did for main to log, ""
+// when devReset is off.
+func devRoutes(mux *http.ServeMux, pool *pgxpool.Pool, devReset bool) string {
+	switch {
+	case !devReset:
+		return ""
+	case !devBuild:
+		return "DEV_RESET=1 ignored: this binary was built without -tags dev, so it has no POST /dev/reseed"
+	}
+	addDevRoutes(mux, pool)
+	return "DEV_RESET=1: POST /dev/reseed is enabled and resets the database to the seed"
 }
 
 // newRoutes is the API's route table. main serves it, and the integration

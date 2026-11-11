@@ -142,7 +142,8 @@ stops within seconds, naming what's missing, if not. Then it launches the app
 connects to the phone once rather than once per flow (about 8s each). Each
 flow starts by reseeding the dev DB itself (`common/launch.yaml` runs
 `common/reseed.js`, which calls the backend's `POST /dev/reseed`), so the
-backend must run with `DEV_RESET=1` in `backend/.env`, then reopens the app
+backend must run as the dev build (`just run`) with `DEV_RESET=1` in
+`backend/.env`, then reopens the app
 (the deep link from `just phone devlink --no-fab`). Most flows start from
 `common/setup.yaml`, whose reseed keeps the phone claimed as Ada, so the app
 opens on Tonight; it claims Ada only when the phone has no identity yet. A

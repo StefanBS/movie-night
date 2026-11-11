@@ -108,8 +108,9 @@ phone *args:
 # one `maestro test` process. <marker> is text from your change: the run
 # refuses a phone whose bundle lacks it (`just phone has`). Each flow reseeds
 # the dev DB itself (common/launch.yaml → POST /dev/reseed), so the backend must
-# run with DEV_RESET=1 (backend/.env), and it and Metro must be up: `just phone
-# check` and a first reseed fail the run up front otherwise. Run a subset by
+# run as the dev build (`just run`) with DEV_RESET=1 (backend/.env), and it and
+# Metro must be up: `just phone check` and a first reseed fail the run up front
+# otherwise. Run a subset by
 # area tag (each flow's `tags:`; the list is in lib/flowChecks.ts), by flow
 # file, or both:
 #   just e2e "<marker>" --tags settings,smoke
@@ -142,7 +143,7 @@ e2e marker *args:
     bash scripts/phone.sh check || { echo "e2e: start what's missing, then re-run" >&2; exit 1; }
     # claimed=1, like setup.yaml's reseed: the first flow needn't claim Ada again.
     status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 -X POST "$reseed_url?claimed=1" || true)
-    [[ $status == 204 ]] || { echo "e2e: POST $reseed_url answered ${status:-nothing}, want 204 (is the backend running with DEV_RESET=1 in backend/.env?)" >&2; exit 1; }
+    [[ $status == 204 ]] || { echo "e2e: POST $reseed_url answered ${status:-nothing}, want 204 (is the backend running from just run, the dev build, with DEV_RESET=1 in backend/.env?)" >&2; exit 1; }
     bash scripts/phone.sh launch
     bash scripts/phone.sh has "$marker"
     link=$(bash scripts/phone.sh devlink --no-fab)

@@ -50,7 +50,8 @@ TMDB_READ_TOKEN=
 EXPO_ACCESS_TOKEN=
 
 # 1 adds POST /dev/reseed, which resets the database to the dev seed for the
-# mobile e2e flows. Destroys all data: local dev only, never staging or prod.
+# mobile e2e flows. Destroys all data: local dev only. Only a dev build
+# (`just run`, -tags dev) has the route; a release build ignores this.
 DEV_RESET=1
 
 # Podman only — route docker compose + testcontainers to the rootless socket.
@@ -69,8 +70,21 @@ From this directory:
 just db-up      # start PostgreSQL 18 in a container (detached)
 just migrate    # apply all goose migrations
 just seed       # load dev fixtures (idempotent)
-just run        # start the API on http://localhost:8080
+just run        # start the API on http://localhost:8080 (the dev build, below)
 ```
+
+### Dev and release builds
+
+The dev-only `POST /dev/reseed` ([`devreset.go`](devreset.go)) is behind the
+`dev` build tag. `just run` and `just test-integration` build with `-tags dev`;
+a plain `go build` (the release build, and what any deploy must use) leaves
+the file out, so a deployed server has no reseed route even if `DEV_RESET=1`
+were set by mistake (it logs that it's ignored). In a dev build `DEV_RESET=1`
+is still needed too, so a `just run` against a database you care about
+doesn't expose the route by accident. `just test` runs in the release build
+and checks the route is absent (`devreset_off_test.go`); `just vet` and
+`just build` cover both builds, and the security scans (`just audit`, CodeQL)
+read the dev build.
 
 Verify:
 
@@ -132,7 +146,7 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 | `POST` | `/groups/{groupId}/nights/{nightId}/movie` | Attach a movie by `{"tmdbId"}`; re-fetches canonical title/year from TMDB and returns the night. Repeatable, including on a Watched Night (changes its film). |
 | `DELETE` | `/groups/{groupId}/nights/{nightId}/movie` | Detach the film; returns the night with `movie` null. Idempotent. `422` on a Watched Night, which keeps its film. |
 
-**Dev only** — registered only when `DEV_RESET=1`; otherwise `404`.
+**Dev only** — only in a dev build (`-tags dev`, [above](#dev-and-release-builds)) with `DEV_RESET=1`; otherwise `404`.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -142,13 +156,15 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 
 ```bash
 just test              # fast unit tests (pure functions, no external deps)
-just test-integration  # integration tests against a real Postgres
+just test-integration  # integration tests against a real Postgres (dev build)
 just check             # gofmt + vet + build + unit tests (the pre-commit/CI gate)
 ```
 
 `just test-integration` starts a throwaway Postgres via testcontainers, runs the
 migrations, and exercises the handlers end to end. Run it through `just` so the
-container-runtime vars from `.env` load.
+container-runtime vars from `.env` load. A single test:
+`go test -tags=integration,dev -run '^TestName$' ./...` (the `/dev/reseed`
+tests need `dev`; the rest run either way).
 
 ## Git hooks
 
@@ -211,8 +227,9 @@ backend/
 ├── movies.go          # movie search/attach handlers (TMDB-backed)
 ├── tmdb.go            # TMDB client
 ├── reminders.go       # once-a-minute reminder loop + Expo push sender
+├── devreset.go        # dev build only (-tags dev): POST /dev/reseed; devreset_off.go is the release side
 ├── *_test.go          # table-driven unit tests (pure functions, no mocks)
-├── *_integration_test.go  # testcontainers integration tests (//go:build integration)
+├── *_integration_test.go  # testcontainers integration tests (//go:build integration; reseed's also dev)
 ├── seed.sql           # idempotent dev fixtures
 ├── compose.yaml       # PostgreSQL 18 dev container
 └── justfile           # all dev commands
