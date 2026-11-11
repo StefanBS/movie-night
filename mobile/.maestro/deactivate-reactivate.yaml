@@ -6,6 +6,7 @@
 # one credited pick = 0), so he's back between Cleo and Esme.
 appId: ${APP_ID}
 name: Deactivate, then reactivate, a member
+tags: [members, nights]
 ---
 - runFlow: common/setup.yaml
 - tapOn: Club

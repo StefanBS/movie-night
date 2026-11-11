@@ -3,6 +3,7 @@
 # Ada and Dev.
 appId: ${APP_ID}
 name: Edit a watched night
+tags: [nights]
 ---
 - runFlow: common/setup.yaml
 - tapOn: Watched

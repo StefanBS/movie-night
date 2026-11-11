@@ -78,11 +78,10 @@ check-deps:
     npx expo install --check
     node --import tsx scripts/check-dependabot-holds.ts
 
-# Maestro flows close the keyboard with hideKeyboard: pressKey Enter is a raw
-# key event that makes Gboard apply its autocorrection ("Snowpiercer" became
-# "Snow piercer"), which a person tapping the keyboard's ✓ never triggers (#285).
+# Every Maestro flow has an area tag (what `just e2e --tags` selects by) and
+# none presses Enter (#285). The rules and their reasons: lib/flowChecks.ts.
 check-flows:
-    @! grep -rn 'pressKey: Enter' .maestro || { echo "check-flows: use hideKeyboard, not pressKey: Enter" >&2; exit 1; }
+    node --import tsx scripts/check-flows.ts
 
 # Run everything CI runs: lint, type-check, tests, dep matrix, flows
 check: lint typecheck test check-deps check-flows
@@ -111,17 +110,33 @@ phone *args:
 # the dev DB itself (common/launch.yaml → POST /dev/reseed), so the backend must
 # run with DEV_RESET=1 (backend/.env), and it and Metro must be up: `just phone
 # check` and a first reseed fail the run up front otherwise. Run a subset by
-# naming flow files: just e2e "<marker>" .maestro/plan-night.yaml
+# area tag (each flow's `tags:`; the list is in lib/flowChecks.ts), by flow
+# file, or both:
+#   just e2e "<marker>" --tags settings,smoke
+#   just e2e "<marker>" .maestro/plan-night.yaml
 [positional-arguments]
-e2e marker *flows:
+e2e marker *args:
     #!/usr/bin/env bash
     set -euo pipefail
     export MAESTRO_CLI_NO_ANALYTICS=1 MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED=true
     command -v maestro >/dev/null || { echo "e2e: maestro isn't on PATH (see README: End-to-end tests)" >&2; exit 2; }
     marker=$1
     shift
-    flows=("$@")
+    flows=()
+    tags=
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --tags) [[ $# -ge 2 ]] || { echo "e2e: --tags needs a list, e.g. --tags nights,smoke" >&2; exit 2; }; tags=$2; shift 2 ;;
+            --tags=*) tags=${1#--tags=}; shift ;;
+            -*) echo "e2e: unknown option $1" >&2; exit 2 ;;
+            *) flows+=("$1"); shift ;;
+        esac
+    done
     [[ ${#flows[@]} -gt 0 ]] || flows=(.maestro/*.yaml)
+    # Maestro filters the flows by tag, and fails if none matches.
+    tag_args=()
+    what="${#flows[@]} flows"
+    [[ -z $tags ]] || { tag_args=(--include-tags="$tags"); what="flows tagged $tags"; }
     # Maestro runs on this machine, so the flows reach the backend on localhost.
     reseed_url=http://localhost:8080/dev/reseed
     bash scripts/phone.sh check || { echo "e2e: start what's missing, then re-run" >&2; exit 1; }
@@ -135,7 +150,7 @@ e2e marker *flows:
     # Maestro prints each flow's result and time, then the failed flows.
     start=$SECONDS
     rc=0
-    maestro test -e APP_ID="$app_id" -e DEV_LINK="$link" -e RESEED_URL="$reseed_url" "${flows[@]}" || rc=$?
-    echo "e2e: ${#flows[@]} flows in $((SECONDS - start))s" >&2
+    maestro test "${tag_args[@]}" -e APP_ID="$app_id" -e DEV_LINK="$link" -e RESEED_URL="$reseed_url" "${flows[@]}" || rc=$?
+    echo "e2e: $what in $((SECONDS - start))s" >&2
     [[ $rc -eq 0 ]] || { echo "e2e: FAILED (see Maestro's report above)" >&2; exit "$rc"; }
-    echo "e2e: all ${#flows[@]} flows passed" >&2
+    echo "e2e: $what passed" >&2

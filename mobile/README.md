@@ -104,12 +104,35 @@ client on the adb-attached phone, one flow per thing a person does: plan a
 night (tonight or a later date), edit then cancel one, mark one watched, change
 a recorded night's film or who watched, check the rotation moves on, add,
 deactivate, reactivate or promote a member, join as a guest, switch identity,
-and rename the group. Run them before merging a UI change:
+and rename the group or switch the theme. Run them before merging a UI change:
 
 ```bash
 just e2e "<text from your change>"                     # every flow
+just e2e "<text from your change>" --tags settings,smoke      # by tag
 just e2e "<text from your change>" .maestro/plan-night.yaml   # just one
 ```
+
+Each flow's header tags the areas whose screens it acts in or asserts on
+(`tags: [members, nights]`), so changing a screen and running its tag runs
+every flow that would notice. Starting on Tonight doesn't count, since every
+flow does. `--tags` runs the flows with any of the listed tags (`maestro test
+--include-tags`; Maestro fails the run if none matches):
+
+| tag | screens | flows |
+|---|---|---|
+| `nights` | Tonight's night, plan/edit/watched night, Watched, rotation | plan-night, plan-later-night, edit-cancel-night, edit-watched-night, mark-watched, change-recorded-film, rotation-moves-on, deactivate-reactivate, promote-guest |
+| `members` | Club, member | add-member, deactivate-reactivate, promote-guest, join-as-guest |
+| `identity` | "Who are you?" | switch-identity, join-as-guest |
+| `settings` | Settings | rename-group, switch-theme, switch-identity, join-as-guest |
+| `smoke` | between them, the most screens | plan-night, add-member, switch-theme |
+
+`just check-flows` (part of `just check`) fails on a flow without an area tag
+or with a tag outside this list (`lib/flowChecks.ts`). Before merging, run the
+tags your change touches plus `smoke`. Run every flow before a release, after
+a cross-cutting change (theme, navigation, shared components, the API client),
+and whenever you want CI-level confidence. A change to a shared component
+(TopBar, tabs) counts as cross-cutting: rename-group asserts the group name in
+Tonight's header, but only under `settings`.
 
 `just e2e` first checks that the backend and Metro answer on the LAN address
 the phone uses (`just phone check`) and that the backend can reseed, and

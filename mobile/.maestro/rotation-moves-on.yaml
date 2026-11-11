@@ -7,6 +7,7 @@
 # then Cleo (Apr 10), Blake (May 1), Esme (May 15), and Ada last.
 appId: ${APP_ID}
 name: The rotation moves on
+tags: [nights]
 ---
 - runFlow:
     file: common/setup.yaml
