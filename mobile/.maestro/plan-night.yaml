@@ -1,7 +1,10 @@
 # Plan a night for tonight with Ada and Blake, and give it Ada's pick. The
 # pick still reads as New night, and its back returns to People: dropping
-# Cleo there saves onto the same Night, not a second one. Flows that run this
-# one count Ada and Blake as who came.
+# Cleo there saves onto the same Night, not a second one.
+# The only flow that plans a night through the UI: the others start from the
+# backend fixture that stands for what this one leaves
+# (backend/fixtures/tonight-planned.sql). It ends by asserting the fixture's
+# facts, so if the two drift apart, this flow fails.
 appId: ${APP_ID}
 name: Plan a night
 ---
@@ -26,5 +29,10 @@ name: Plan a night
     env:
       TITLE: Dune
 - tapOn: Done
+# What tonight-planned.sql encodes: tonight, not watched yet, Ada and Blake
+# coming, Ada's pick Dune.
 - assertVisible: Dune
 - assertVisible: We watched it
+- assertVisible: 2 coming
+- tapOn: We watched it
+- assertVisible: "Record: Ada picked.*"

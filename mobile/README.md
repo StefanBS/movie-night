@@ -117,12 +117,18 @@ stops within seconds, naming what's missing, if not. Then it launches the app
 (`just phone launch`), refuses to run if the phone's bundle lacks your text
 (`just phone has`), and runs every flow in one `maestro test` process, which
 connects to the phone once rather than once per flow (about 8s each). Each
-flow starts by reseeding the dev DB itself (`common/open.yaml` runs
+flow starts by reseeding the dev DB itself (`common/launch.yaml` runs
 `common/reseed.js`, which calls the backend's `POST /dev/reseed`), so the
-backend must run with `DEV_RESET=1` in `backend/.env`. Reseeding revokes the
-phone's identity, so each flow reopens the app (the deep link from
-`just phone devlink --no-fab`) on "Who are you?" and claims Ada. The flows
-never clear the app's state: that would also wipe its granted permissions and
+backend must run with `DEV_RESET=1` in `backend/.env`, then reopens the app
+(the deep link from `just phone devlink --no-fab`). Most flows start from
+`common/setup.yaml`, whose reseed keeps the phone claimed as Ada, so the app
+opens on Tonight; it claims Ada only when the phone has no identity yet. A
+flow that needs "Who are you?" (join as a guest) starts from `common/open.yaml`
+instead, whose reseed revokes the phone's identity. A flow that needs more
+than the seed names a fixture (`env: FIXTURE: tonight-planned`, from
+`backend/fixtures/`), so only `plan-night` plans a night through the UI; it
+ends by asserting what the fixture encodes, so the two can't drift apart
+silently. The flows never clear the app's state: that would also wipe its granted permissions and
 bring back system and dev-client dialogs. The backend, its Postgres, and Metro
 must be running, and the phone unlocked. Maestro prints each flow's result and
 time and then the failed flows; the recipe adds the wall-clock total.

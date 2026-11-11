@@ -1,23 +1,15 @@
-# Opens the dev client against Metro on "Who are you?", unclaimed. setup.yaml
-# runs this and then claims Ada; a flow that claims someone else (or joins as a
-# guest) runs this directly.
-# It reseeds the dev DB first (reseed.js), so every flow starts from the seed.
-# `just e2e` passes APP_ID (from app.json), DEV_LINK
-# (`just phone devlink --no-fab`) and RESEED_URL. Reseeding empties `devices`,
-# which revokes the phone's identity token, so the app opens on "Who are you?"
-# without clearing its state. Don't use clearState: it also wipes granted
-# permissions and the dev menu's onboarding flag, so every run stops on system
-# and dev-client dialogs.
-# Notifications are granted up front: claiming asks for them (pushDevice.ts),
-# and the OS prompt would block a fresh install.
+# Opens the dev client on "Who are you?", unclaimed, for a flow that claims
+# someone other than Ada or joins as a guest (every other flow runs setup.yaml).
+# The reseed (launch.yaml) empties `devices`, which revokes the phone's
+# identity token, so the app opens unclaimed without clearing its state.
+# A flow can pass FIXTURE (backend/fixtures/) to start from more than the seed.
 appId: ${APP_ID}
 ---
-- runScript: reseed.js
-- stopApp
-- setPermissions:
-    permissions:
-      notifications: allow
-- openLink: ${DEV_LINK}
+- runFlow:
+    file: launch.yaml
+    env:
+      FIXTURE: "${typeof FIXTURE === 'undefined' ? '' : FIXTURE}"
+      CLAIMED: "0"
 - extendedWaitUntil:
     visible: 'Who are you\?'
     timeout: 90000

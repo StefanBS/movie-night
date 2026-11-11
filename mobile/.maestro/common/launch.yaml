@@ -1,0 +1,17 @@
+# Reseeds the dev DB (reseed.js, with this flow's FIXTURE and CLAIMED) and
+# opens the dev client against Metro, without waiting for a screen: open.yaml
+# and setup.yaml run this, then wait for what they expect.
+# `just e2e` passes APP_ID (from app.json), DEV_LINK
+# (`just phone devlink --no-fab`) and RESEED_URL. Don't use clearState: it also
+# wipes granted permissions and the dev menu's onboarding flag, so every run
+# stops on system and dev-client dialogs.
+# Notifications are granted up front: claiming asks for them (pushDevice.ts),
+# and the OS prompt would block a fresh install.
+appId: ${APP_ID}
+---
+- runScript: reseed.js
+- stopApp
+- setPermissions:
+    permissions:
+      notifications: allow
+- openLink: ${DEV_LINK}

@@ -30,11 +30,17 @@ seed:
     docker compose exec -T db psql -U movie -d movienight -v ON_ERROR_STOP=1 < seed.sql
 
 # Reset the dev DB to exactly the seed: empty every table (reset.sql, except
-# goose's version table), then load the seed. The same reset as the dev-only
-# POST /dev/reseed that each `just e2e` flow (mobile/) calls.
-reseed:
-    docker compose exec -T db psql -U movie -d movienight -v ON_ERROR_STOP=1 < reset.sql
-    just seed
+# goose's version table), then load the seed, then the fixture if one is named
+# (fixtures/<fixture>.sql, e.g. `just reseed tonight-planned`), with today's
+# local date as its "tonight". The same reset as the dev-only POST /dev/reseed
+# that each `just e2e` flow (mobile/) calls.
+reseed fixture="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    files=(reset.sql seed.sql)
+    [[ -z "{{fixture}}" ]] || files+=("fixtures/{{fixture}}.sql")
+    cat "${files[@]}" | docker compose exec -T -e PGOPTIONS="-c fixture.today=$(date +%F)" \
+        db psql -U movie -d movienight -v ON_ERROR_STOP=1 -q
 
 # Regenerate the sqlc db package
 sqlc:

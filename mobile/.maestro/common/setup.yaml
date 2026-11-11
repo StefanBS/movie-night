@@ -1,10 +1,29 @@
 # Every flow runs this first (unless it needs an unclaimed phone; see
-# open.yaml): the dev client opened on "Who are you?", then claimed as Ada (she
-# has never picked in the seed, so she's next up).
+# open.yaml): the dev client opened on Tonight, claimed as Ada (she has never
+# picked in the seed, so she's next up). A flow can pass FIXTURE
+# (backend/fixtures/) to start from more than the seed, e.g. tonight-planned
+# for the Night plan-night leaves.
+# The reseed keeps the phone claimed (CLAIMED=1, launch.yaml), as Ada whoever
+# the last flow left it as, so this only claims Ada when the phone has no
+# identity yet: the first run, or after a bare reseed.
 appId: ${APP_ID}
 ---
-- runFlow: open.yaml
-- tapOn: Ada
+- runFlow:
+    file: launch.yaml
+    env:
+      FIXTURE: "${typeof FIXTURE === 'undefined' ? '' : FIXTURE}"
+      CLAIMED: "1"
+# "Who are you?" also shows while the app checks its token, so wait for the
+# roster (Ada) or for Tonight: Ada's turn (Plan a night) or a planned Night
+# (N coming).
 - extendedWaitUntil:
-    visible: Plan a night
+    visible: 'Ada|Plan a night|\d+ coming'
+    timeout: 90000
+- runFlow:
+    when:
+      visible: 'Who are you\?'
+    commands:
+      - tapOn: Ada
+- extendedWaitUntil:
+    visible: 'Plan a night|\d+ coming'
     timeout: 15000
