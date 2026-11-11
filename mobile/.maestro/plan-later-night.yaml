@@ -9,17 +9,23 @@ tags: [nights]
 - runScript: common/first-of-next-month.js
 - tapOn: Plan a night
 - tapOn: Next month
-- assertVisible: ${output.later.month}
-# A Calendar day's accessibility label is its full date.
-- tapOn: ${output.later.long}
+# The Calendar, who step and Up next card carry testIDs by date; their labels
+# are lib/date.ts's, checked by its unit tests (#303).
+- assertVisible:
+    id: month-${output.later.month}
+- tapOn:
+    id: day-${output.later.iso}
 - tapOn: "Next: who's coming.*"
-- assertVisible: ${output.later.long}
+- assertVisible:
+    id: who-date-${output.later.iso}
 - tapOn: Ada
 - tapOn: Blake
 - tapOn: "Next: Ada picks.*"
 - tapOn: "Skip for now.*"
 - tapOn: Done
-- assertVisible: ${output.later.when}
+- assertVisible:
+    id: up-next-when-${output.later.iso}
+    text: "(Tomorrow|In \\d+ days) · .+"
 - assertVisible: Not picked yet.
 - assertVisible: Choose the film
 - assertVisible: 2 coming

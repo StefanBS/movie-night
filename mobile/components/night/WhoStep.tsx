@@ -49,7 +49,7 @@ export function WhoStep({
     <View style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content}>
         {stepper ? <Stepper current={1} /> : null}
-        <Text style={styles.heading} numberOfLines={1}>
+        <Text style={styles.heading} numberOfLines={1} testID={`who-date-${scheduledFor}`}>
           {formatWeekdayDate(scheduledFor)}
         </Text>
         <Text style={styles.hint}>

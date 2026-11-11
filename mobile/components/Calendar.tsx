@@ -16,6 +16,8 @@ const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"];
 // a text-colour ring, a day with a night gets a dot, past days dim. It is purely presentational:
 // it computes its cells from `month` via monthGrid, classifies each day with
 // dayState, and reports taps. The owner holds `value` (selected ISO) and `month`.
+// The header and each day carry a testID by date (month-2026-12, day-2026-12-01)
+// so the E2E flows find them without rebuilding the labels.
 export function Calendar({
   value,
   today,
@@ -37,7 +39,11 @@ export function Calendar({
   return (
     <View>
       <View style={styles.header}>
-        <Text style={styles.monthName} allowFontScaling={false}>
+        <Text
+          style={styles.monthName}
+          allowFontScaling={false}
+          testID={`month-${month.year}-${String(month.month).padStart(2, "0")}`}
+        >
           {`${MONTH_NAMES[month.month - 1]} `}
           <Text style={styles.year}>{month.year}</Text>
         </Text>
@@ -76,6 +82,7 @@ export function Calendar({
           return (
             <Pressable
               key={cell.iso}
+              testID={`day-${cell.iso}`}
               onPress={() => onPick(cell.iso)}
               accessibilityRole="button"
               accessibilityLabel={formatWeekdayDate(cell.iso)}
