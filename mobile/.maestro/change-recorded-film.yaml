@@ -1,12 +1,16 @@
 # Record tonight's night, then change its film from the receipt's "Change
 # film": the Night reads as a record and Watched shows the new film, not the
-# old one.
+# old one. It starts from plan-night's Night
+# (backend/fixtures/tonight-planned.sql).
 # Snowpiercer isn't a dictionary word, so this flow also checks that nothing
 # rewrites a typed title (#285).
 appId: ${APP_ID}
 name: Change a recorded night's film
 ---
-- runFlow: plan-night.yaml
+- runFlow:
+    file: common/setup.yaml
+    env:
+      FIXTURE: tonight-planned
 - tapOn: We watched it
 - tapOn: "Record: Ada picked.*"
 - assertVisible: Recorded ✓

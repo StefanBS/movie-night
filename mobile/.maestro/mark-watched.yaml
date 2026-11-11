@@ -1,8 +1,12 @@
-# Record tonight's night as watched, then find it on the Watched tab.
+# Record tonight's night as watched, then find it on the Watched tab. It
+# starts from plan-night's Night (backend/fixtures/tonight-planned.sql).
 appId: ${APP_ID}
 name: Mark a night watched
 ---
-- runFlow: plan-night.yaml
+- runFlow:
+    file: common/setup.yaml
+    env:
+      FIXTURE: tonight-planned
 - tapOn: We watched it
 - tapOn: "Record: Ada picked.*"
 - tapOn: Done

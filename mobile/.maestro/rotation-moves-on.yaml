@@ -1,4 +1,5 @@
-# Record Ada's pick, then check the rotation moves on to the next picker.
+# With Ada's pick recorded (backend/fixtures/tonight-watched.sql, the Night
+# mark-watched leaves), check the rotation moves on to the next picker.
 # From the seed (backend/seed.sql) and the turn query (fewest credited picks,
 # then longest since last pick, then rotation_position): Ada and Dev start on
 # 0 (Dev's seeded pick isn't credited), Cleo, Blake and Esme on 1. Ada's
@@ -7,11 +8,11 @@
 appId: ${APP_ID}
 name: The rotation moves on
 ---
-- runFlow: mark-watched.yaml
-- tapOn: Tonight
-- extendedWaitUntil:
-    visible: After Dev
-    timeout: 15000
+- runFlow:
+    file: common/setup.yaml
+    env:
+      FIXTURE: tonight-watched
+- assertVisible: After Dev
 - assertVisible: Dev
 - assertNotVisible: After Ada
 - tapOn: See full rotation →

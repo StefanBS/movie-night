@@ -1,21 +1,18 @@
-# Plan a night with no film, edit who's coming, then cancel it.
+# From plan-night's Night (backend/fixtures/tonight-planned.sql: Ada and
+# Blake, Dune), edit who's coming, then cancel it.
 appId: ${APP_ID}
 name: Edit, then cancel, a night
 ---
-- runFlow: common/setup.yaml
-- tapOn: Plan a night
-- tapOn: "Next: who's coming.*"
-- tapOn: Ada
-- tapOn: Blake
-- tapOn: "Next: Ada picks.*"
-- tapOn: "Skip for now.*"
-- tapOn: Done
-- assertVisible: Choose the film
+- runFlow:
+    file: common/setup.yaml
+    env:
+      FIXTURE: tonight-planned
+- assertVisible: Dune
 - assertVisible: 2 coming
 - tapOn: Edit
 - tapOn: Cleo
 - tapOn: Save changes
-- assertVisible: Choose the film
+- assertVisible: Dune
 - assertVisible: 3 coming
 - tapOn: Edit
 - tapOn: Cancel this night

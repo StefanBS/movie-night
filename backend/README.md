@@ -136,7 +136,7 @@ curl localhost:8080/groups/11111111-1111-1111-1111-111111111111/members
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/dev/reseed` | Empty every table and load `seed.sql`, as `just reseed` does (both run `reset.sql`); `204`. What each mobile e2e flow starts with. |
+| `POST` | `/dev/reseed` | Empty every table and load `seed.sql`, as `just reseed` does (both run `reset.sql`); `204`. What each mobile e2e flow starts with. Optional query: `fixture=<name>&today=YYYY-MM-DD` adds `fixtures/<name>.sql` on top, with `today` (the caller's local date) as its "tonight"; `claimed=1` keeps the devices, all as Ada, so a claimed phone stays claimed. A bad fixture or date is `400`. |
 
 ## Testing
 
@@ -173,6 +173,7 @@ just migrate        # apply pending migrations
 just migrate-down   # roll back the most recent migration
 just seed           # (re)load dev seed data — safe to run repeatedly
 just reseed         # empty every table (reset.sql), then seed: back to exactly the seed state
+just reseed tonight-planned   # …plus a fixture from fixtures/ (tonight = today's local date)
 just sqlc           # regenerate internal/db after editing SQL
 just db-reset       # destroy the container AND its data volume
 ```
