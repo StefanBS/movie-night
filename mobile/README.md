@@ -85,7 +85,7 @@ connect to the Metro bundler. Use `just ios` (macOS) or `just web` for those tar
 ```bash
 just phone launch [port]    # force-stop, open the dev client on http://<lan-ip>:<port> (8081), wait for load
 just phone has "someText"   # exit 0 if the text is in the phone's JS bundle, 1 if not
-just phone devlink          # print the deep link that opens the dev client on Metro
+just phone devlink [--no-fab]  # print the deep link that opens the dev client on Metro
 ```
 
 To drive the app (tap, read the screen, screenshot), use Maestro: `maestro
@@ -113,7 +113,7 @@ just e2e "<text from your change>" .maestro/plan-night.yaml   # just one
 `just e2e` launches the app (`just phone launch`), refuses to run if the
 phone's bundle lacks your text (`just phone has`), then runs each flow on a
 fresh dev DB (`just reseed` in `backend/`). Reseeding revokes the phone's identity, so
-each flow reopens the app (the deep link from `just phone devlink`) on "Who are
+each flow reopens the app (the deep link from `just phone devlink --no-fab`) on "Who are
 you?" and claims Ada. The flows never clear the app's state: that would also
 wipe its granted permissions and bring back system and dev-client dialogs. The
 backend, its Postgres, and Metro must be running, and the phone unlocked.

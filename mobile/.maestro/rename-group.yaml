@@ -20,12 +20,7 @@ name: Rename the group
 - tapOn: Tonight
 - assertVisible: Sunday Screenings
 - assertNotVisible: Friday Film Club
-# Relaunch without reseeding: the phone stays claimed, so it opens on Tonight.
-- stopApp
-- openLink: ${DEV_LINK}
-- extendedWaitUntil:
-    visible: Plan a night
-    timeout: 90000
+- runFlow: common/relaunch.yaml
 - assertVisible: Sunday Screenings
 - assertNotVisible: Friday Film Club
 - tapOn: Settings
